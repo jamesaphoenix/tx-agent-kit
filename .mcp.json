@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "prometheus-local": {
+      "type": "stdio",
+      "command": "./scripts/mcp/prometheus.sh"
+    },
+    "jaeger-local": {
+      "type": "stdio",
+      "command": "./scripts/mcp/jaeger.sh"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+node_modules
+.pnpm-store
+.turbo
+dist
+coverage
+.env
+.env.*
+!.env.example
+!.env.mcp.example
+.next
+.DS_Store
+*.log
+apps/*/.next
+apps/*/dist
+packages/*/dist
+pgdata

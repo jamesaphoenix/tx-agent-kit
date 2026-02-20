@@ -1,0 +1,26 @@
+{
+  "name": "@tx-agent-kit/observability",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "type-check": "tsc -b --pretty false",
+    "lint": "eslint src --max-warnings=0",
+    "test": "vitest run -c vitest.config.ts"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.207.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.207.0",
+    "@opentelemetry/resources": "^2.1.0",
+    "@opentelemetry/sdk-metrics": "^2.1.0",
+    "@opentelemetry/sdk-node": "^0.207.0",
+    "@opentelemetry/semantic-conventions": "^1.38.0"
+  },
+  "devDependencies": {
+    "@tx-agent-kit/vitest-config": "workspace:*"
+  }
+}

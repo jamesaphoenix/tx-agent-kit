@@ -1,0 +1,10 @@
+{
+  "name": "@tx-agent-kit/vitest-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./unit": "./unit.ts",
+    "./integration": "./integration.ts"
+  }
+}

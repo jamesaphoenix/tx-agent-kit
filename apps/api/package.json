@@ -1,0 +1,29 @@
+{
+  "name": "@tx-agent-kit/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -b",
+    "type-check": "tsc -b --pretty false",
+    "lint": "eslint src --max-warnings=0",
+    "test": "vitest run -c vitest.config.ts",
+    "test:integration": "vitest run -c vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@effect/platform": "^0.94.4",
+    "@effect/platform-node": "^0.104.1",
+    "@tx-agent-kit/contracts": "workspace:*",
+    "@tx-agent-kit/core": "workspace:*",
+    "@tx-agent-kit/observability": "workspace:*",
+    "effect": "^3.19.16"
+  },
+  "devDependencies": {
+    "@tx-agent-kit/vitest-config": "workspace:*",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4"
+  }
+}

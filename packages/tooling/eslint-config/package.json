@@ -1,0 +1,13 @@
+{
+  "name": "@tx-agent-kit/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./base": "./base.js",
+    "./boundaries": "./boundaries.js",
+    "./domain-invariants": "./domain-invariants.js",
+    "./promise": "./promise.js",
+    "./testing": "./testing.js"
+  }
+}

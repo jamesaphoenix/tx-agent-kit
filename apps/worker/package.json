@@ -1,0 +1,25 @@
+{
+  "name": "@tx-agent-kit/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -b",
+    "type-check": "tsc -b --pretty false",
+    "lint": "eslint src --max-warnings=0",
+    "test": "vitest run -c vitest.config.ts"
+  },
+  "dependencies": {
+    "@temporalio/client": "^1.13.1",
+    "@temporalio/worker": "^1.13.1",
+    "@temporalio/workflow": "^1.13.1",
+    "@tx-agent-kit/observability": "workspace:*",
+    "effect": "^3.19.16"
+  },
+  "devDependencies": {
+    "@tx-agent-kit/vitest-config": "workspace:*"
+  }
+}

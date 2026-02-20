@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "./packages/contracts" },
+    { "path": "./packages/auth" },
+    { "path": "./packages/db" },
+    { "path": "./packages/core" },
+    { "path": "./packages/observability" },
+    { "path": "./apps/api" },
+    { "path": "./apps/worker" },
+    { "path": "./apps/web" }
+  ]
+}

@@ -1,0 +1,159 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tx_agent_kit
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d tx_agent_kit']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: ['infra']
+
+  temporal-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: temporal
+    ports:
+      - '5433:5432'
+    volumes:
+      - temporal_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d temporal']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: ['infra']
+
+  temporal:
+    image: temporalio/auto-setup:1.22.5
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    environment:
+      DB: postgresql
+      DB_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PWD: postgres
+      POSTGRES_SEEDS: temporal-postgres
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+    volumes:
+      - ./monitoring/local/temporal:/etc/temporal/config/dynamicconfig
+    ports:
+      - '7233:7233'
+    profiles: ['infra']
+
+  temporal-ui:
+    image: temporalio/ui:2.39.0
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - '8233:8080'
+    profiles: ['infra']
+
+  jaeger:
+    image: jaegertracing/jaeger:2.15.0
+    ports:
+      - '16686:16686'
+      - '4317:4317'
+      - '4318:4318'
+    profiles: ['infra']
+
+  prometheus:
+    image: prom/prometheus:v3.3.1
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--enable-feature=otlp-write-receiver'
+    volumes:
+      - ./monitoring/local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - '9090:9090'
+    profiles: ['infra']
+
+  grafana:
+    image: grafana/grafana:11.6.2
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - ./monitoring/local/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/local/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - '3001:3000'
+    depends_on:
+      - prometheus
+      - jaeger
+    profiles: ['infra']
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.126.0
+    command: ['--config=/etc/otel-collector-config.yaml']
+    volumes:
+      - ./monitoring/local/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - '4319:4317'
+      - '4320:4318'
+      - '8888:8888'
+      - '13133:13133'
+    depends_on:
+      - jaeger
+      - prometheus
+    profiles: ['infra']
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/tx_agent_kit
+      AUTH_SECRET: change-me-in-production
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    ports:
+      - '4000:4000'
+    profiles: ['app']
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      NODE_ENV: production
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      TEMPORAL_TASK_QUEUE: tx-agent-kit
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    depends_on:
+      temporal:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    profiles: ['app']
+
+volumes:
+  postgres_data:
+  temporal_postgres_data:
+  prometheus_data:
+  grafana_data:

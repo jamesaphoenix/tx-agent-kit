@@ -1,0 +1,56 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  batch:
+    send_batch_size: 100
+    timeout: 1s
+  resource:
+    attributes:
+      - key: service.namespace
+        value: tx-agent-kit
+        action: upsert
+      - key: deployment.environment
+        value: local
+        action: upsert
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+exporters:
+  otlphttp/jaeger:
+    endpoint: http://jaeger:4318
+    tls:
+      insecure: true
+  otlphttp/prometheus:
+    endpoint: http://prometheus:9090/api/v1/otlp
+    tls:
+      insecure: true
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlphttp/jaeger, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlphttp/prometheus, debug]
+  telemetry:
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888
