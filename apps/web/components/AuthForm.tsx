@@ -17,19 +17,19 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
     setPending(true)
     setError(null)
 
-    const response = mode === 'sign-up'
-      ? await clientApi.signUp({ email, password, name })
-      : await clientApi.signIn({ email, password })
+    try {
+      if (mode === 'sign-up') {
+        await clientApi.signUp({ email, password, name })
+      } else {
+        await clientApi.signIn({ email, password })
+      }
 
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}))
-      setError(body?.error?.message ?? body?.message ?? 'Authentication failed')
+      router.push(nextPath)
+      router.refresh()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Authentication failed')
       setPending(false)
-      return
     }
-
-    router.push(nextPath)
-    router.refresh()
   }
 
   return (

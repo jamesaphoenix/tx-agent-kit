@@ -22,6 +22,7 @@
       "@tx-agent-kit/contracts": ["packages/contracts/src/index.ts"],
       "@tx-agent-kit/core": ["packages/core/src/index.ts"],
       "@tx-agent-kit/db": ["packages/db/src/index.ts"],
+      "@tx-agent-kit/logging": ["packages/logging/src/index.ts"],
       "@tx-agent-kit/observability": ["packages/observability/src/index.ts"]
     }
   }

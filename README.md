@@ -8,6 +8,7 @@ Agent-first TypeScript monorepo for building scalable apps with Effect, Temporal
 - `apps/worker`: Temporal worker and workflows.
 - `packages/core`: Effect services and domain logic.
 - `packages/db`: Drizzle schema, repositories, migrations, and table-aligned Effect schemas.
+- `packages/logging`: Structured JSON logger package for all services.
 - `packages/contracts`: Shared contracts and `effect/Schema` definitions.
 - `packages/auth`: Password/JWT primitives.
 - `packages/observability`: OpenTelemetry bootstrap utilities.
@@ -18,7 +19,10 @@ Agent-first TypeScript monorepo for building scalable apps with Effect, Temporal
 - Domain boundaries are schema-first with `effect/Schema` (zod is banned).
 - Only `packages/db` imports `drizzle-orm`.
 - Every DB table has a matching Effect schema in `packages/db/src/effect-schemas`.
-- `OpenAPI.yml` is the external contract and closed-invariant reference.
+- Every DB table has a matching factory in `packages/db/src/factories`.
+- `console.*` is banned; use `@tx-agent-kit/logging`.
+- DDD import direction is enforced: `domain <- ports <- repositories/adapters <- services <- runtime/ui`.
+- `apps/api/openapi.json` is generated from `apps/api` and is the external contract reference.
 
 ## Prerequisites
 - Node.js `>=22`
@@ -41,6 +45,7 @@ pnpm dev
 - Temporal UI: `http://localhost:8233`
 - Prometheus: `http://localhost:9090`
 - Jaeger UI: `http://localhost:16686`
+- Loki: `http://localhost:3100`
 - Grafana: `http://localhost:3001` (`admin` / `admin`)
 
 ## Common Commands
@@ -50,9 +55,11 @@ pnpm dev:web             # web only
 pnpm dev:api             # api only
 pnpm dev:worker          # worker only
 pnpm lint
+pnpm lint:invariants
 pnpm type-check
 pnpm test
 pnpm test:integration
+pnpm openapi:generate
 pnpm db:migrate
 pnpm db:studio
 pnpm infra:up
@@ -85,4 +92,4 @@ pnpm mcp:jaeger
 - Architecture: `docs/ARCHITECTURE.md`
 - Quality and boundaries: `docs/QUALITY.md`
 - Runbooks: `docs/RUNBOOKS.md`
-- API contract: `OpenAPI.yml`
+- API contract (generated): `apps/api/openapi.json`

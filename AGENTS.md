@@ -2,27 +2,60 @@
 
 Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.
 
-## Map
+## Repo Map
 - Architecture: `docs/ARCHITECTURE.md`
-- Quality and boundaries: `docs/QUALITY.md`
+- Quality + lint invariants: `docs/QUALITY.md`
 - Runbooks: `docs/RUNBOOKS.md`
-- API contract and invariants: `OpenAPI.yml`
+- API contract: `apps/api/openapi.json` (generated via `pnpm openapi:generate`)
 - Skills: `.claude/skills/*`
 
-## Guardrails
-- API and worker use Effect layers/services.
-- Web never queries Postgres directly.
-- Shared types live in `packages/contracts`.
-- Domain state changes go through `apps/api`.
+## Closed Invariants
+- Validation library: `effect/Schema` only. (`zod` and alternatives are lint-banned)
+- Logging: `console.*` is lint-banned. Use `@tx-agent-kit/logging` for structured JSON logs.
+- Persistence boundary: only `packages/db` imports `drizzle-orm`.
+- Web boundary: `apps/web` never imports DB modules or runs direct SQL/Drizzle access.
+- Table schema parity: each `pgTable(...)` has a matching Effect schema file in `packages/db/src/effect-schemas/`.
+- Table factory parity: each `pgTable(...)` has a matching test-data factory in `packages/db/src/factories/*.factory.ts`.
+- Domain layering: dependencies must flow inward (`domain <- ports <- repositories/adapters <- services <- runtime/ui`).
 
-## Harness Engineering Principles (OpenAI, Feb 11, 2026)
+## New Domain Creation Contract
+Create domains under:
+
+```txt
+packages/core/src/domains/<domain>/
+  domain/
+  ports/
+  repositories/
+  services/
+  runtime/        # optional
+  adapters/       # optional
+  ui/             # optional
+```
+
+Rules:
+- `domain/` contains pure business rules/entities/value objects.
+- `ports/` contains interfaces and capability contracts.
+- `repositories/` and `adapters/` implement ports (DB, HTTP, external systems).
+- `services/` orchestrates use-cases across domain + ports + repositories.
+- `runtime/` wires layers into Effect `Layer`s and app entrypoints.
+- `ui/` may depend on runtime/services/domain but never directly on DB.
+
+## DB + Schema Contract
+When adding a table in `packages/db/src/schema.ts`:
+1. Add matching file in `packages/db/src/effect-schemas/<table-name>.ts`.
+2. Export `*RowSchema` and `*RowShape` from that file.
+3. Re-export it in `packages/db/src/effect-schemas/index.ts`.
+4. Add matching factory file in `packages/db/src/factories/<table-name>.factory.ts`.
+5. Re-export the factory in `packages/db/src/factories/index.ts`.
+
+## Enforcement
+- ESLint rules: `packages/tooling/eslint-config/domain-invariants.js`.
+- Structural invariant checker: `scripts/lint/enforce-domain-invariants.mjs`.
+- Full gate: `pnpm lint` (runs workspace ESLint + invariant checker).
+
+## Harness Engineering References
 Reference: `https://openai.com/index/harness-engineering/`
-- Humans steer; agents execute. Push intent/specs, not hand-written ad hoc code paths.
-- Keep `AGENTS.md` short. Treat it as a map into source-of-truth docs, not a giant manual.
-- Repository knowledge is the system of record. If a decision is not in-repo, it does not exist for agents.
-- Prefer progressive disclosure: small stable entry docs that link to deeper design/product/reliability docs.
-- Enforce architecture/taste mechanically via linters, structural tests, and CI checks.
-- Optimize for agent legibility: clear layering, explicit boundaries, predictable naming, strong schema contracts.
-- Make the app observable to agents in local dev: logs, metrics, traces, and reproducible UI validation loops.
-- Keep PRs short-lived and reversible; fix quickly with follow-up runs when safe.
-- Run recurring cleanup/doc-gardening to prevent drift and remove stale instructions.
+- Humans steer; agents execute.
+- Keep this file short and map-like.
+- Repository-local docs/code are the system of record.
+- Encode architecture and taste in mechanical checks, not ad hoc prompts.

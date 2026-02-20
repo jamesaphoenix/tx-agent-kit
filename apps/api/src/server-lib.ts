@@ -1,6 +1,7 @@
 import { HttpApiBuilder } from '@effect/platform'
 import { NodeHttpServer, NodeRuntime } from '@effect/platform-node'
 import { AuthServiceLive, TaskServiceLive, WorkspaceServiceLive } from '@tx-agent-kit/core'
+import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
 import { Layer } from 'effect'
 import { createServer } from 'node:http'
@@ -11,6 +12,8 @@ import { AuthLive } from './routes/auth.js'
 import { HealthLive } from './routes/health.js'
 import { TasksLive } from './routes/tasks.js'
 import { WorkspacesLive } from './routes/workspaces.js'
+
+const logger = createLogger('tx-agent-kit-api').child('server')
 
 const ApiLive = HttpApiBuilder.api(TxAgentApi).pipe(
   Layer.provide(HealthLive),
@@ -37,6 +40,7 @@ export const makeServerLive = (options?: { port?: number; host?: string }) => {
 export const main = (): void => {
   const port = Number.parseInt(process.env.API_PORT ?? '4000', 10)
   const host = process.env.API_HOST ?? '0.0.0.0'
+  logger.info('Starting API server.', { host, port })
 
   void startTelemetry('tx-agent-kit-api')
 
@@ -44,6 +48,7 @@ export const main = (): void => {
   NodeRuntime.runMain(Layer.launch(layer))
 
   const shutdown = () => {
+    logger.info('Stopping API server.')
     void stopTelemetry().finally(() => process.exit(0))
   }
 

@@ -17,17 +17,15 @@ export function AcceptInvitationForm() {
     setError(null)
     setMessage(null)
 
-    const response = await clientApi.acceptInvitation(token)
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}))
-      setError(body?.error?.message ?? body?.message ?? 'Failed to accept invitation')
+    try {
+      await clientApi.acceptInvitation(token)
+      setToken('')
+      setMessage('Invitation accepted successfully')
+      router.refresh()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to accept invitation')
       setPending(false)
-      return
     }
-
-    setToken('')
-    setMessage('Invitation accepted successfully')
-    router.refresh()
   }
 
   return (

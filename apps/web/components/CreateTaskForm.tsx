@@ -16,22 +16,20 @@ export function CreateTaskForm({ workspaceId }: { workspaceId: string }) {
     setPending(true)
     setError(null)
 
-    const response = await clientApi.createTask({
-      workspaceId,
-      title,
-      description: description || undefined
-    })
+    try {
+      await clientApi.createTask({
+        workspaceId,
+        title,
+        description: description || undefined
+      })
 
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}))
-      setError(body?.error?.message ?? body?.message ?? 'Failed to create task')
+      setTitle('')
+      setDescription('')
+      router.refresh()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to create task')
       setPending(false)
-      return
     }
-
-    setTitle('')
-    setDescription('')
-    router.refresh()
   }
 
   return (

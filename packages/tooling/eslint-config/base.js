@@ -18,6 +18,7 @@ export const baseConfig = [
       }
     },
     rules: {
+      'no-console': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/consistent-type-imports': [

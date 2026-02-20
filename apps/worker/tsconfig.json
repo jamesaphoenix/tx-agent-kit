@@ -5,5 +5,8 @@
     "outDir": "dist"
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../../packages/observability" }]
+  "references": [
+    { "path": "../../packages/logging" },
+    { "path": "../../packages/observability" }
+  ]
 }

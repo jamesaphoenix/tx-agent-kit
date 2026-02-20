@@ -1,47 +1,97 @@
+import type { AuthResponse, Invitation, Task, Workspace } from '@tx-agent-kit/contracts'
+import { api, clearSessionToken, getApiErrorMessage, setSessionToken } from './axios'
+
+const fail = (error: unknown, fallback: string): never => {
+  throw new Error(getApiErrorMessage(error, fallback))
+}
+
 export const clientApi = {
-  signIn: (input: { email: string; password: string }) =>
-    fetch('/api/auth/sign-in', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input)
-    }),
+  signIn: async (input: { email: string; password: string }): Promise<AuthResponse> => {
+    try {
+      const { data } = await api.post<AuthResponse>('/v1/auth/sign-in', input)
+      setSessionToken(data.token)
+      return data
+    } catch (error) {
+      return fail(error, 'Authentication failed')
+    }
+  },
 
-  signUp: (input: { email: string; password: string; name: string }) =>
-    fetch('/api/auth/sign-up', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input)
-    }),
+  signUp: async (input: { email: string; password: string; name: string }): Promise<AuthResponse> => {
+    try {
+      const { data } = await api.post<AuthResponse>('/v1/auth/sign-up', input)
+      setSessionToken(data.token)
+      return data
+    } catch (error) {
+      return fail(error, 'Sign-up failed')
+    }
+  },
 
-  signOut: () =>
-    fetch('/api/auth/sign-out', { method: 'POST' }),
+  signOut: (): void => {
+    clearSessionToken()
+  },
 
-  listWorkspaces: () => fetch('/api/workspaces', { method: 'GET' }),
-  createWorkspace: (input: { name: string }) =>
-    fetch('/api/workspaces', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input)
-    }),
+  listWorkspaces: async (): Promise<{ workspaces: Workspace[] }> => {
+    try {
+      const { data } = await api.get<{ workspaces: Workspace[] }>('/v1/workspaces')
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to list workspaces')
+    }
+  },
 
-  listTasks: (workspaceId: string) =>
-    fetch(`/api/tasks?workspaceId=${encodeURIComponent(workspaceId)}`, { method: 'GET' }),
+  createWorkspace: async (input: { name: string }): Promise<Workspace> => {
+    try {
+      const { data } = await api.post<Workspace>('/v1/workspaces', input)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to create workspace')
+    }
+  },
 
-  createTask: (input: { workspaceId: string; title: string; description?: string }) =>
-    fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input)
-    }),
+  listTasks: async (workspaceId: string): Promise<{ tasks: Task[] }> => {
+    try {
+      const { data } = await api.get<{ tasks: Task[] }>('/v1/tasks', {
+        params: { workspaceId }
+      })
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to list tasks')
+    }
+  },
 
-  listInvitations: () => fetch('/api/invitations', { method: 'GET' }),
-  createInvitation: (input: { workspaceId: string; email: string; role: 'admin' | 'member' }) =>
-    fetch('/api/invitations', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input)
-    }),
+  createTask: async (input: { workspaceId: string; title: string; description?: string }): Promise<Task> => {
+    try {
+      const { data } = await api.post<Task>('/v1/tasks', input)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to create task')
+    }
+  },
 
-  acceptInvitation: (token: string) =>
-    fetch(`/api/invitations/${token}/accept`, { method: 'POST' })
+  listInvitations: async (): Promise<{ invitations: Invitation[] }> => {
+    try {
+      const { data } = await api.get<{ invitations: Invitation[] }>('/v1/invitations')
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to list invitations')
+    }
+  },
+
+  createInvitation: async (input: { workspaceId: string; email: string; role: 'admin' | 'member' }): Promise<Invitation> => {
+    try {
+      const { data } = await api.post<Invitation>('/v1/invitations', input)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to send invitation')
+    }
+  },
+
+  acceptInvitation: async (token: string): Promise<{ accepted: boolean }> => {
+    try {
+      const { data } = await api.post<{ accepted: boolean }>(`/v1/invitations/${encodeURIComponent(token)}/accept`)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to accept invitation')
+    }
+  }
 }

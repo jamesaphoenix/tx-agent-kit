@@ -1,31 +1,56 @@
 # tx-agent-kit Claude Guide
 
-This repository follows an agent-first operating model inspired by OpenAI's "Harness engineering: leveraging Codex in an agent-first world" (February 11, 2026).
+This repository uses an agent-first workflow inspired by OpenAI's Harness Engineering post (February 11, 2026).
 
-## Core Operating Model
-- Humans steer; agents execute.
-- Prioritize environment design, clear intent, and feedback loops over ad hoc coding.
-- Treat agent struggles as system gaps: add tooling, docs, constraints, and checks.
+## Operating Model
+- Humans steer intent and acceptance criteria.
+- Agents implement, validate, and iterate with mechanical checks.
+- If an agent fails repeatedly, improve scaffolding (docs, linters, tests, scripts).
 
-## Repository Knowledge Rules
-- Keep this file and `AGENTS.md` concise and map-like.
-- Keep durable decisions in versioned docs/code, not chat history.
-- Use progressive disclosure: link into deeper docs instead of bloating entrypoint docs.
-- If knowledge is not in-repo, assume agents cannot reliably use it.
+## Hard Constraints
+- Use `effect/Schema` only for validation/contracts.
+- Never import `drizzle-orm` outside `packages/db`.
+- Never query DB directly from `apps/web`.
+- Keep `apps/api/openapi.json` generated from `apps/api` (`pnpm openapi:generate`).
+- Maintain table-to-schema parity in `packages/db/src/effect-schemas`.
+- Maintain table-to-factory parity in `packages/db/src/factories`.
+- Use `@tx-agent-kit/logging` for structured logs (`console.*` is lint-banned).
 
-## Legibility and Architecture
-- Optimize for agent legibility: explicit layers, stable APIs, predictable naming.
-- Enforce dependency direction and bounded-context boundaries mechanically.
-- Validate data at boundaries with `effect/Schema` only.
-- Keep `OpenAPI.yml` as external API contract and closed invariant reference.
+## DDD Construction Pattern
+For each domain, create:
 
-## Enforcement and Feedback
-- Encode invariants as lint rules, structural tests, and CI checks.
-- Keep logs/metrics/traces queryable in local environments so agents can self-debug.
-- Prefer small, short-lived PRs and rapid correction loops.
-- Run recurring refactor/doc-gardening passes to prevent drift and stale guidance.
+```txt
+packages/core/src/domains/<domain>/
+  domain/         # entities/value objects/pure rules
+  ports/          # interfaces/capability contracts
+  repositories/   # persistence implementations
+  services/       # use-case orchestration
+  runtime/        # layer wiring (optional)
+  adapters/       # external system adapters (optional)
+  ui/             # presentation-facing layer (optional)
+```
 
-## Practical Expectations
-- Correctness, maintainability, and agent legibility are the quality bar.
-- Human stylistic preference is secondary to verifiable behavior and clear constraints.
-- When docs and reality diverge, update docs or encode the rule into tooling.
+Dependency direction must stay inward:
+- `domain` imports only `domain`.
+- `ports` imports `domain|ports`.
+- `repositories|adapters` import `domain|ports|self`.
+- `services` import `domain|ports|repositories|adapters|self`.
+- `runtime|ui` may import outer orchestration layers.
+
+## Required Workflow For New Features
+1. Add/extend contracts in `packages/contracts` with `effect/Schema`.
+2. Add domain logic under `packages/core/src/domains/<domain>/...`.
+3. If persistence changes, update `packages/db/src/schema.ts` and matching `packages/db/src/effect-schemas/*.ts`.
+4. Add/update matching table factory in `packages/db/src/factories/*.factory.ts`.
+5. Expose API behavior from `apps/api`, then regenerate OpenAPI.
+6. Run `pnpm lint && pnpm type-check && pnpm test`.
+
+## Mechanical Enforcement
+- ESLint restrictions live in `packages/tooling/eslint-config/domain-invariants.js`.
+- Structural checks live in `scripts/lint/enforce-domain-invariants.mjs`.
+- `pnpm lint` executes both ESLint and structural invariants.
+
+## Repository Knowledge Discipline
+- Keep `AGENTS.md` and this file short and map-like.
+- Move durable decisions into versioned docs/code.
+- Treat in-repo artifacts as the only reliable knowledge source for agents.

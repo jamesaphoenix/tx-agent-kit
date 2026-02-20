@@ -79,9 +79,20 @@ services:
       - '--enable-feature=otlp-write-receiver'
     volumes:
       - ./monitoring/local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/local/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports:
       - '9090:9090'
+    profiles: ['infra']
+
+  loki:
+    image: grafana/loki:3.5.0
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./monitoring/local/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    ports:
+      - '3100:3100'
     profiles: ['infra']
 
   grafana:
@@ -98,7 +109,33 @@ services:
       - '3001:3000'
     depends_on:
       - prometheus
+      - loki
       - jaeger
+    profiles: ['infra']
+
+  promtail:
+    image: grafana/promtail:3.5.0
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./monitoring/local/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    profiles: ['infra']
+
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - '9100:9100'
     profiles: ['infra']
 
   otel-collector:
@@ -114,6 +151,7 @@ services:
     depends_on:
       - jaeger
       - prometheus
+      - loki
     profiles: ['infra']
 
   api:
@@ -157,3 +195,4 @@ volumes:
   temporal_postgres_data:
   prometheus_data:
   grafana_data:
+  loki_data:

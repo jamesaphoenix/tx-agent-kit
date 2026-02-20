@@ -28,17 +28,14 @@ export function CreateInvitationForm({ workspaces }: { workspaces: WorkspaceOpti
     setPending(true)
     setError(null)
 
-    const response = await clientApi.createInvitation({ workspaceId, email, role })
-
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}))
-      setError(body?.error?.message ?? body?.message ?? 'Failed to send invitation')
+    try {
+      await clientApi.createInvitation({ workspaceId, email, role })
+      setEmail('')
+      router.refresh()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to send invitation')
       setPending(false)
-      return
     }
-
-    setEmail('')
-    router.refresh()
   }
 
   return (

@@ -8,6 +8,7 @@
   "references": [
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
+    { "path": "../../packages/logging" },
     { "path": "../../packages/observability" }
   ]
 }

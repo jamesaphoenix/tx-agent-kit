@@ -16,6 +16,7 @@
     "@temporalio/client": "^1.13.1",
     "@temporalio/worker": "^1.13.1",
     "@temporalio/workflow": "^1.13.1",
+    "@tx-agent-kit/logging": "workspace:*",
     "@tx-agent-kit/observability": "workspace:*",
     "effect": "^3.19.16"
   },

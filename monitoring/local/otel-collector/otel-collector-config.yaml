@@ -6,36 +6,52 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: /health/status
+
 processors:
+  batch:
+    timeout: 500ms
+    send_batch_size: 50
+    send_batch_max_size: 100
   memory_limiter:
     check_interval: 1s
     limit_mib: 512
     spike_limit_mib: 128
-  batch:
-    send_batch_size: 100
-    timeout: 1s
   resource:
     attributes:
       - key: service.namespace
-        value: tx-agent-kit
+        value: 'tx-agent-kit'
         action: upsert
       - key: deployment.environment
-        value: local
+        value: 'local'
         action: upsert
-
-extensions:
-  health_check:
-    endpoint: 0.0.0.0:13133
 
 exporters:
   otlphttp/jaeger:
     endpoint: http://jaeger:4318
     tls:
       insecure: true
+    encoding: proto
+    timeout: 10s
+
   otlphttp/prometheus:
     endpoint: http://prometheus:9090/api/v1/otlp
     tls:
       insecure: true
+    encoding: proto
+    timeout: 10s
+
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    tls:
+      insecure: true
+    default_labels_enabled:
+      exporter: true
+      job: true
+
   debug:
     verbosity: basic
 
@@ -46,11 +62,20 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
       exporters: [otlphttp/jaeger, debug]
+
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
       exporters: [otlphttp/prometheus, debug]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [loki, debug]
+
   telemetry:
+    logs:
+      level: info
     metrics:
       level: detailed
       address: 0.0.0.0:8888

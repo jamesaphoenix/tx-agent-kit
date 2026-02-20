@@ -1,0 +1,84 @@
+# Prometheus Alert Rules for tx-agent-kit
+# Basic alerting rules for local development
+
+groups:
+  - name: tx-agent-kit-api
+    rules:
+      # API is down
+      - alert: APIDown
+        expr: up{job="tx-agent-kit-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'tx-agent-kit API is down'
+          description: 'The tx-agent-kit API has been down for more than 1 minute.'
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{job="tx-agent-kit-api",status=~"5.."}[5m]))
+          / sum(rate(http_requests_total{job="tx-agent-kit-api"}[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High error rate on tx-agent-kit API'
+          description: 'Error rate is above 5% for the last 2 minutes.'
+
+  - name: temporal
+    rules:
+      # Temporal is down
+      - alert: TemporalDown
+        expr: up{job="temporal"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Temporal server is down'
+          description: 'The Temporal server has been down for more than 1 minute.'
+
+  - name: infrastructure
+    rules:
+      # Node exporter down
+      - alert: NodeExporterDown
+        expr: up{job="node"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Node Exporter is down'
+          description: 'Node Exporter has been down for more than 2 minutes.'
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High memory usage detected'
+          description: 'Memory usage is above 90% for the last 5 minutes.'
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High CPU usage detected'
+          description: 'CPU usage is above 90% for the last 5 minutes.'
+
+      # Disk space low
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Low disk space'
+          description: 'Less than 10% disk space remaining.'

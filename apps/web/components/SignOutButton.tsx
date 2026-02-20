@@ -10,8 +10,8 @@ export function SignOutButton() {
     <button
       className="secondary"
       type="button"
-      onClick={async () => {
-        await clientApi.signOut()
+      onClick={() => {
+        clientApi.signOut()
         router.push('/sign-in')
         router.refresh()
       }}

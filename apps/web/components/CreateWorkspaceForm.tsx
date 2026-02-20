@@ -15,17 +15,14 @@ export function CreateWorkspaceForm() {
     setPending(true)
     setError(null)
 
-    const response = await clientApi.createWorkspace({ name })
-
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}))
-      setError(body?.error?.message ?? body?.message ?? 'Failed to create workspace')
+    try {
+      await clientApi.createWorkspace({ name })
+      setName('')
+      router.refresh()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to create workspace')
       setPending(false)
-      return
     }
-
-    setName('')
-    router.refresh()
   }
 
   return (
