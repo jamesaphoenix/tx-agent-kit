@@ -24,5 +24,13 @@
 - `pnpm db:test:reset`: idempotently reset integration DB state without tearing down containers.
 - `pnpm worktree:ports <name>`: derive deterministic local ports for a worktree.
 
+## MCP Servers
+- `pnpm mcp:prometheus`: start Prometheus MCP (containerized server).
+- `pnpm mcp:jaeger`: start Jaeger MCP.
+- `pnpm mcp:context7`: start Context7 MCP.
+- `pnpm mcp:supabase`: start Supabase MCP (requires `SUPABASE_ACCESS_TOKEN`).
+- `pnpm mcp:playwright`: start Playwright MCP.
+- `pnpm mcp:codex-config`: print Codex MCP TOML blocks wired to local wrappers.
+
 ## Diagnostics
 - `pnpm test:run-silent`: verify `scripts/run-silent.sh` behavior.

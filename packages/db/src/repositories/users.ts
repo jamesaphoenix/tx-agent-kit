@@ -10,5 +10,8 @@ export const usersRepository = {
     db.query.users.findFirst({ where: eq(users.email, email) }),
 
   findById: (id: string) =>
-    db.query.users.findFirst({ where: eq(users.id, id) })
+    db.query.users.findFirst({ where: eq(users.id, id) }),
+
+  deleteById: (id: string) =>
+    db.delete(users).where(eq(users.id, id)).returning().then((rows) => rows[0] ?? null)
 }

@@ -8,6 +8,7 @@ Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.
 - Runbooks: `docs/RUNBOOKS.md`
 - Command catalog: `docs/COMMANDS.md`
 - API contract: `apps/api/openapi.json` (generated via `pnpm openapi:generate`)
+- MCP wrappers: `scripts/mcp/*` and project MCP map `.mcp.json`
 - Skills: `.claude/skills/*`
 
 ## Closed Invariants
@@ -18,6 +19,7 @@ Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.
 - Table schema parity: each `pgTable(...)` has a matching Effect schema file in `packages/db/src/effect-schemas/`.
 - Table factory parity: each `pgTable(...)` has a matching test-data factory in `packages/db/src/factories/*.factory.ts`.
 - Domain layering: dependencies must flow inward (`domain <- ports <- repositories/adapters <- services <- runtime/ui`).
+- MCP entrypoints are centralized in `scripts/mcp/*`; do not hardcode ad hoc MCP startup commands in docs/scripts.
 
 ## New Domain Creation Contract
 Create domains under:

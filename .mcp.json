@@ -7,6 +7,18 @@
     "jaeger-local": {
       "type": "stdio",
       "command": "./scripts/mcp/jaeger.sh"
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "./scripts/mcp/context7.sh"
+    },
+    "supabase": {
+      "type": "stdio",
+      "command": "./scripts/mcp/supabase.sh"
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "./scripts/mcp/playwright.sh"
     }
   }
 }

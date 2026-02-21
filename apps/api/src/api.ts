@@ -62,6 +62,10 @@ const PrincipalResponse = Schema.Struct({
   roles: Schema.Array(Schema.String)
 })
 
+const DeleteMeResponse = Schema.Struct({
+  deleted: Schema.Boolean
+})
+
 const SignUpBody = Schema.Struct({
   email: Schema.String,
   password: Schema.String,
@@ -149,6 +153,7 @@ export const AuthGroup = HttpApiGroup.make('auth')
   .add(HttpApiEndpoint.post('signUp', '/v1/auth/sign-up').setPayload(SignUpBody).addSuccess(AuthResponse, { status: 201 }))
   .add(HttpApiEndpoint.post('signIn', '/v1/auth/sign-in').setPayload(SignInBody).addSuccess(AuthResponse))
   .add(HttpApiEndpoint.get('me', '/v1/auth/me').addSuccess(PrincipalResponse))
+  .add(HttpApiEndpoint.del('deleteMe', '/v1/auth/me').addSuccess(DeleteMeResponse))
 
 export const WorkspacesGroup = HttpApiGroup.make('workspaces')
   .add(HttpApiEndpoint.get('listWorkspaces', '/v1/workspaces').addSuccess(WorkspacesResponse))

@@ -88,15 +88,21 @@ docker compose -p tx-agent-kit down -v
 - `pnpm test:integration` is idempotent: it keeps infra running, migrates if needed, resets DB state, and runs integration suites.
 - `pnpm db:test:reset` can be run manually before local integration/dev sessions.
 
-## MCP Observability (Codex + Claude Code)
+## MCP Servers (Codex + Claude Code)
 - Project MCP config lives in `.mcp.json`.
 - MCP wrappers live in `scripts/mcp/`.
-- Configure endpoints in `.env.mcp`.
+- Configure endpoints in `.env.mcp` (`SUPABASE_ACCESS_TOKEN` is required for Supabase MCP).
 
 ```bash
 pnpm mcp:prometheus
 pnpm mcp:jaeger
+pnpm mcp:context7
+pnpm mcp:supabase
+pnpm mcp:playwright
+pnpm mcp:codex-config
 ```
+
+Use `pnpm mcp:codex-config` to print TOML blocks for `~/.codex/config.toml` that reference the same project wrappers.
 
 ## Docs
 - Agent map and guardrails: `AGENTS.md`

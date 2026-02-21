@@ -49,6 +49,7 @@ const DDD_INVARIANTS = {
 const OPERATION_INVARIANTS: Record<string, readonly string[]> = {
   signUp: ['INV-AUTH-001'],
   signIn: ['INV-AUTH-001'],
+  deleteMe: ['INV-ARCH-001'],
   createInvitation: ['INV-WS-001'],
   listTasks: ['INV-WS-001'],
   createTask: ['INV-WS-001'],

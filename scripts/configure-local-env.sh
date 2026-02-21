@@ -20,6 +20,16 @@ upsert_key() {
   rm -f "${file}.bak"
 }
 
+ensure_key_if_missing() {
+  local file="$1"
+  local key="$2"
+  local value="${3:-}"
+
+  if ! grep -Eq "^${key}=" "$file"; then
+    printf "\n%s=%s\n" "$key" "$value" >> "$file"
+  fi
+}
+
 ensure_file() {
   local source_file="$1"
   local target_file="$2"
@@ -48,5 +58,18 @@ upsert_key ".env.mcp" "PROMETHEUS_URL" "http://localhost:9090"
 upsert_key ".env.mcp" "JAEGER_URL" "http://localhost:16686"
 upsert_key ".env.mcp" "JAEGER_PROTOCOL" "HTTP"
 upsert_key ".env.mcp" "JAEGER_PORT" "16686"
+upsert_key ".env.mcp" "CONTEXT7_TRANSPORT" "stdio"
+upsert_key ".env.mcp" "SUPABASE_MCP_READ_ONLY" "true"
+upsert_key ".env.mcp" "PLAYWRIGHT_MCP_HEADLESS" "true"
+upsert_key ".env.mcp" "PLAYWRIGHT_MCP_ISOLATED" "true"
+ensure_key_if_missing ".env.mcp" "CONTEXT7_API_KEY"
+ensure_key_if_missing ".env.mcp" "CONTEXT7_PORT"
+ensure_key_if_missing ".env.mcp" "SUPABASE_ACCESS_TOKEN"
+ensure_key_if_missing ".env.mcp" "SUPABASE_PROJECT_REF"
+ensure_key_if_missing ".env.mcp" "SUPABASE_API_URL"
+ensure_key_if_missing ".env.mcp" "SUPABASE_MCP_FEATURES"
+ensure_key_if_missing ".env.mcp" "PLAYWRIGHT_MCP_BROWSER"
+ensure_key_if_missing ".env.mcp" "PLAYWRIGHT_MCP_CAPS"
+ensure_key_if_missing ".env.mcp" "PLAYWRIGHT_MCP_OUTPUT_DIR"
 
 echo "Local env files configured: .env, .env.mcp"

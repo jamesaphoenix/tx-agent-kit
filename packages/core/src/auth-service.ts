@@ -4,7 +4,7 @@ import { hashPassword, signSessionToken, verifyPassword, verifySessionToken, toP
 import { usersRepository } from '@tx-agent-kit/db'
 import { Context, Effect, Layer } from 'effect'
 import * as Schema from 'effect/Schema'
-import { badRequest, conflict, unauthorized, type CoreError } from './errors.js'
+import { badRequest, conflict, notFound, unauthorized, type CoreError } from './errors.js'
 
 const toUser = (row: { id: string; email: string; name: string; createdAt: Date }): User => ({
   id: row.id,
@@ -19,6 +19,7 @@ export class AuthService extends Context.Tag('AuthService')<
     signUp: (input: unknown) => Effect.Effect<AuthResponse, CoreError>
     signIn: (input: unknown) => Effect.Effect<AuthResponse, CoreError>
     getPrincipalFromToken: (token: string) => Effect.Effect<AuthPrincipal, CoreError>
+    deleteUser: (principal: { userId: string }) => Effect.Effect<{ deleted: true }, CoreError>
   }
 >() {}
 
@@ -106,6 +107,29 @@ export const AuthServiceLive = Layer.effect(
       verifySessionToken(token).pipe(
         Effect.map(toPrincipal),
         Effect.mapError(() => unauthorized('Invalid token'))
-      )
+      ),
+
+    deleteUser: (principal) =>
+      Effect.gen(function* () {
+        const existing = yield* Effect.tryPromise({
+          try: () => usersRepository.findById(principal.userId),
+          catch: () => badRequest('Failed to read user')
+        })
+
+        if (!existing) {
+          return yield* Effect.fail(notFound('User not found'))
+        }
+
+        const deleted = yield* Effect.tryPromise({
+          try: () => usersRepository.deleteById(principal.userId),
+          catch: () => badRequest('Failed to delete user')
+        })
+
+        if (!deleted) {
+          return yield* Effect.fail(notFound('User not found'))
+        }
+
+        return { deleted: true as const }
+      })
   })
 )

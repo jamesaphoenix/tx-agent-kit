@@ -15,6 +15,7 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
 - Maintain table-to-schema parity in `packages/db/src/effect-schemas`.
 - Maintain table-to-factory parity in `packages/db/src/factories`.
 - Use `@tx-agent-kit/logging` for structured logs (`console.*` is lint-banned).
+- MCP servers are started via project wrappers in `scripts/mcp/*` (configured by `.mcp.json`), not ad hoc commands.
 
 ## DDD Construction Pattern
 For each domain, create:

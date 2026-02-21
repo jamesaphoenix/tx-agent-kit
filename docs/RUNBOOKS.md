@@ -9,11 +9,12 @@
 ## Ensure shared infra from any worktree
 `./scripts/worktree/ensure-shared-infra.sh`
 
-## MCP observability setup (Claude Code + Codex)
+## MCP setup (Claude Code + Codex)
 1. `cp .env.mcp.example .env.mcp`
-2. Ensure Docker is running (Prometheus MCP uses container runtime).
-3. Claude Code uses project `.mcp.json` automatically.
-4. Codex reads global entries from `~/.codex/config.toml` that point to `scripts/mcp/*.sh`.
+2. Fill required secrets in `.env.mcp` (`SUPABASE_ACCESS_TOKEN`; optional `CONTEXT7_API_KEY`).
+3. Ensure Docker is running (Prometheus MCP uses container runtime).
+4. Claude Code uses project `.mcp.json` automatically.
+5. For Codex, run `pnpm mcp:codex-config`, then copy the output into `~/.codex/config.toml`.
 
 ## Run services
 `pnpm dev`

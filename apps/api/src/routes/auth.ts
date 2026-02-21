@@ -1,5 +1,5 @@
 import { HttpApiBuilder, HttpServerRequest } from '@effect/platform'
-import { AuthService } from '@tx-agent-kit/core'
+import { AuthService, principalFromAuthorization } from '@tx-agent-kit/core'
 import { Effect } from 'effect'
 import { TxAgentApi, mapCoreError } from '../api.js'
 
@@ -30,6 +30,14 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) =>
         const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : authorization
         const principal = yield* authService.getPrincipalFromToken(token).pipe(Effect.mapError(mapCoreError))
         return principal
+      })
+    )
+    .handle('deleteMe', () =>
+      Effect.gen(function* () {
+        const request = yield* HttpServerRequest.HttpServerRequest
+        const principal = yield* principalFromAuthorization(request.headers.authorization).pipe(Effect.mapError(mapCoreError))
+        const authService = yield* AuthService
+        return yield* authService.deleteUser(principal).pipe(Effect.mapError(mapCoreError))
       })
     )
 )
