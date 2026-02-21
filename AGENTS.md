@@ -61,6 +61,14 @@ When adding a table in `packages/db/src/schema.ts`:
 - Derive deterministic worktree ports with `pnpm worktree:ports <name>`.
 - For local setup, prefer `pnpm env:configure` over hand-editing env files.
 
+## Context-Efficient Command Preference
+- Prefer quiet runners first to reduce agent context bloat:
+  - `pnpm lint:quiet`
+  - `pnpm type-check:quiet`
+  - `pnpm test:quiet`
+  - `pnpm test:integration:quiet`
+- Use full commands (`pnpm lint`, `pnpm type-check`, `pnpm test`) when you need full diagnostics or enforcing final merge gates.
+
 ## Harness Engineering References
 Reference: `https://openai.com/index/harness-engineering/`
 - Humans steer; agents execute.

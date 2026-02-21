@@ -55,7 +55,12 @@ Dependency direction must stay inward:
 - Use `pnpm env:configure` to seed local env files idempotently.
 - Use `pnpm infra:ensure` to start shared local infrastructure across worktrees.
 - Use `pnpm test:integration` for integration suites (idempotent DB reset + no container teardown).
-- Use quiet runners (`pnpm *:quiet`) when agent context pressure matters.
+- Prefer quiet runners first to reduce context bloat:
+  - `pnpm lint:quiet`
+  - `pnpm type-check:quiet`
+  - `pnpm test:quiet`
+  - `pnpm test:integration:quiet`
+- Switch to full commands (`pnpm lint`, `pnpm type-check`, `pnpm test`) when detailed diagnostics are needed.
 
 ## Repository Knowledge Discipline
 - Keep `AGENTS.md` and this file short and map-like.
