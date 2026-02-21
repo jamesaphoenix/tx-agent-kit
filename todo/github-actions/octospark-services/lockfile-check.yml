@@ -1,0 +1,64 @@
+name: Lockfile Check
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'apps/*/package.json'
+      - 'packages/**/package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+
+jobs:
+  lockfile-check:
+    runs-on: ubuntu-latest
+    name: Check lockfile consistency
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Check lockfile consistency
+        run: |
+          echo "🔍 Checking if lockfile is consistent with package.json files..."
+
+          # Try installing with frozen lockfile
+          if pnpm install --frozen-lockfile; then
+            echo "✅ Lockfile is consistent with package.json files"
+          else
+            echo "❌ Lockfile is inconsistent with package.json files"
+            echo ""
+            echo "::error::Lockfile is out of date with package.json files"
+            echo ""
+            echo "To fix this issue, run the following commands in your local repository:"
+            echo ""
+            echo "```bash"
+            echo "pnpm install"
+            echo "git add pnpm-lock.yaml"
+            echo "git commit -m 'chore: update pnpm lockfile'"
+            echo "git push"
+            echo "```"
+            echo ""
+            echo "This ensures that all dependencies are properly locked and deployments are reproducible."
+            exit 1
+          fi
+
+      - name: Validate workspace consistency
+        run: |
+          echo "🔍 Validating workspace consistency..."
+          pnpm list --depth=0 --json > /dev/null
+          echo "✅ Workspace is valid"

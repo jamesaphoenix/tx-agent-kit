@@ -1,0 +1,180 @@
+name: Weekly ESLint Scanner
+
+# Schedule: Every Monday at 02:00 UTC
+on:
+  schedule:
+    - cron: '0 2 * * 1' # Every Monday at 02:00 UTC
+  workflow_dispatch: # Allow manual triggering for testing
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10'
+  CI: true
+  FORCE_COLOR: '1'
+
+jobs:
+  eslint-scan:
+    name: Scan Codebase for ESLint Rule Opportunities
+    runs-on: ubuntu-latest
+    environment: production # Use production credentials
+    timeout-minutes: 15 # Cost protection per .github/CLAUDE.md philosophy
+    permissions:
+      contents: write # For committing scan history state
+      issues: write # For creating failure issues
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace dependencies
+        run: pnpm --filter @repo/automation-utils... build
+
+      - name: Run ESLint scanner (Round-Robin)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LINEAR_TEAM_ID: b38ce839-a7c9-4dc0-8c08-2776062db0bd # OctoSpark team
+          SAMPLE_SIZE: 50
+        run: pnpm --filter @repo/automation-utils eslint-scanner
+
+      - name: Commit scan history state
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          # Check if state file changed
+          if [ -f "packages/tooling/automation-utils/state/eslint-scanner/scan-history.json" ]; then
+            git add packages/tooling/automation-utils/state/eslint-scanner/scan-history.json
+
+            # Only commit if there are changes
+            if git diff --staged --quiet; then
+              echo "✅ No changes to scan history"
+            else
+              git commit -m "chore(scanner): update scan history state [skip ci]
+
+              Automated update from Weekly ESLint Scanner run
+              Tracked areas for round-robin sampling
+
+              Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+              # Retry push with rebase if needed (handles race conditions)
+              for i in {1..3}; do
+                if git push; then
+                  echo "✅ Scan history state committed"
+                  break
+                else
+                  if [ $i -lt 3 ]; then
+                    echo "⚠️  Push failed (attempt $i/3), rebasing and retrying..."
+                    git pull --rebase
+                  else
+                    echo "❌ Push failed after 3 attempts"
+                    exit 1
+                  fi
+                fi
+              done
+            fi
+          fi
+
+      - name: Notify Discord on success
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "⚠️  DISCORD_WEBHOOK_URL not set - skipping Discord notification"
+            exit 0
+          fi
+
+          # Create Discord embed payload
+          curl -H "Content-Type: application/json" -X POST "$DISCORD_WEBHOOK_URL" -d @- << EOF
+          {
+            "embeds": [{
+              "title": "🔍 Weekly ESLint Scanner - Scan Complete",
+              "description": "Successfully analyzed codebase for ESLint rule opportunities and posted findings to Linear",
+              "color": 5763719,
+              "fields": [
+                {
+                  "name": "📂 Analysis",
+                  "value": "**Round-robin** area selection\\n**50 files** sampled\\n**~1-2 min** runtime",
+                  "inline": true
+                },
+                {
+                  "name": "🤖 Claude AI",
+                  "value": "High-value rule recommendations\\nPosted directly to Linear",
+                  "inline": true
+                },
+                {
+                  "name": "🔗 Links",
+                  "value": "[Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\\n[Linear Issue](https://linear.app/justunderstandingdata/issue/OS-1539)",
+                  "inline": false
+                }
+              ],
+              "footer": {
+                "text": "Weekly ESLint Scanner • ${{ github.repository }}"
+              },
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          EOF
+
+          echo "✅ Discord notification sent"
+
+      - name: Notify Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "⚠️  DISCORD_WEBHOOK_URL not set - skipping Discord notification"
+            exit 0
+          fi
+
+          curl -H "Content-Type: application/json" -X POST "$DISCORD_WEBHOOK_URL" -d @- << EOF
+          {
+            "embeds": [{
+              "title": "❌ Weekly ESLint Scanner - Failed",
+              "description": "The ESLint scanner workflow encountered an error",
+              "color": 15548997,
+              "fields": [
+                {
+                  "name": "🔗 Workflow Run",
+                  "value": "[View Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})",
+                  "inline": false
+                },
+                {
+                  "name": "📋 Linear Issue",
+                  "value": "[OS-1539](https://linear.app/justunderstandingdata/issue/OS-1539)",
+                  "inline": false
+                }
+              ],
+              "footer": {
+                "text": "Weekly ESLint Scanner • ${{ github.repository }}"
+              },
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          EOF
+
+          echo "✅ Discord failure notification sent"
+
+      - name: Log failure details
+        if: failure()
+        run: |
+          echo "❌ Weekly ESLint Scanner Failed"
+          echo "Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "Related Linear Issue: https://linear.app/justunderstandingdata/issue/OS-1539"

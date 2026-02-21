@@ -1,0 +1,109 @@
+name: Lint & Format Check
+
+concurrency:
+  group: lint-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.js'
+      - '**/*.jsx'
+      - '**/*.json'
+      - '**/*.md'
+      - '**/*.css'
+      - '**/*.scss'
+      - '**/*.yaml'
+      - '**/*.yml'
+      - '**/.eslintrc*'
+      - '**/eslint.config.*'
+      - '**/.prettierrc*'
+      - '**/prettier.config.*'
+      - '**/package.json'
+      - 'pnpm-lock.yaml'
+      - 'turbo.json'
+  pull_request:
+    branches: ['**']
+    paths:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.js'
+      - '**/*.jsx'
+      - '**/*.json'
+      - '**/*.md'
+      - '**/*.css'
+      - '**/*.scss'
+      - '**/*.yaml'
+      - '**/*.yml'
+      - '**/.eslintrc*'
+      - '**/eslint.config.*'
+      - '**/.prettierrc*'
+      - '**/prettier.config.*'
+      - '**/package.json'
+      - 'pnpm-lock.yaml'
+      - 'turbo.json'
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10'
+  CI: true
+  FORCE_COLOR: '1'
+
+jobs:
+  lint-check:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Cache Turbo build outputs
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('**/package.json', 'pnpm-lock.yaml', 'turbo.json') }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Build packages (TypeScript composite build)
+        run: pnpm build:composite
+
+      - name: Run lint check (packages only, apps temporarily disabled)
+        run: pnpm lint
+
+      - name: Run format check
+        run: pnpm format:check

@@ -6,6 +6,7 @@ Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.
 - Architecture: `docs/ARCHITECTURE.md`
 - Quality + lint invariants: `docs/QUALITY.md`
 - Runbooks: `docs/RUNBOOKS.md`
+- Command catalog: `docs/COMMANDS.md`
 - API contract: `apps/api/openapi.json` (generated via `pnpm openapi:generate`)
 - Skills: `.claude/skills/*`
 
@@ -51,7 +52,14 @@ When adding a table in `packages/db/src/schema.ts`:
 ## Enforcement
 - ESLint rules: `packages/tooling/eslint-config/domain-invariants.js`.
 - Structural invariant checker: `scripts/lint/enforce-domain-invariants.mjs`.
-- Full gate: `pnpm lint` (runs workspace ESLint + invariant checker).
+- Shell invariant checker: `scripts/check-shell-invariants.sh`.
+- Full gate: `pnpm lint` (workspace ESLint + structural invariants + shell invariants).
+
+## Worktree + Infra Discipline
+- Use `pnpm infra:ensure` (idempotent, no container teardown).
+- Integration tests must run through `pnpm test:integration` (ensures infra + reset DB state).
+- Derive deterministic worktree ports with `pnpm worktree:ports <name>`.
+- For local setup, prefer `pnpm env:configure` over hand-editing env files.
 
 ## Harness Engineering References
 Reference: `https://openai.com/index/harness-engineering/`

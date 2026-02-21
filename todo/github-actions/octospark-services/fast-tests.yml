@@ -1,0 +1,205 @@
+name: Fast Tests (Unit + Component)
+
+# Fast tests that run on every commit/PR
+# Target: < 5 minutes total execution time
+# No external dependencies (database, APIs, etc.)
+
+concurrency:
+  group: fast-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: ['**'] # Run on all branches
+  pull_request:
+    branches: ['**'] # Run on PRs to all branches
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10'
+  CI: true
+  FORCE_COLOR: '1'
+  # Prevent watch mode and interactive prompts
+  VITEST_REPORTER: verbose
+
+jobs:
+  unit-tests:
+    name: Unit Tests (All Packages)
+    runs-on: ubuntu-latest
+    # Increased from 15 to 25 minutes to account for coverage artifact upload
+    # Tests typically complete in ~5 minutes, but coverage upload can take 10+ minutes
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Ensure pnpm store directory exists
+        run: mkdir -p "${{ env.STORE_PATH }}"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Cache Turbo build outputs
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('**/package.json', 'pnpm-lock.yaml', 'turbo.json') }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Build packages (TypeScript composite build)
+        run: pnpm build:composite
+
+      - name: Run unit tests across all packages
+        timeout-minutes: 10
+        run: pnpm test:unit
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-coverage
+          # Only upload essential coverage files (lcov.info, coverage-summary.json)
+          # This reduces upload from 35K+ files to just the essential reports
+          path: |
+            apps/*/coverage/lcov.info
+            apps/*/coverage/coverage-summary.json
+            packages/**/coverage/lcov.info
+            packages/**/coverage/coverage-summary.json
+          retention-days: 7
+
+  # component-tests: # Disabled per request
+  #   name: Component Tests
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 8
+  #
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: pnpm/action-setup@v4
+  #       with:
+  #         version: 10.10.0
+  #         run_install: false
+  #
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'pnpm'
+  #
+  #     - name: Setup Bun
+  #       uses: oven-sh/setup-bun@v2
+  #       with:
+  #         bun-version: latest
+  #
+  #     - name: Get pnpm store directory
+  #       shell: bash
+  #       run: |
+  #         echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+  #
+  #     - name: Ensure pnpm store directory exists
+  #       run: mkdir -p "${{ env.STORE_PATH }}"
+  #
+  #     - name: Cache pnpm store
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ${{ env.STORE_PATH }}
+  #         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-pnpm-store-
+  #
+  #     - name: Install dependencies
+  #       run: pnpm install --no-frozen-lockfile
+  #
+  #     - name: Build packages (TypeScript composite build)
+  #       run: pnpm build:composite
+  #
+  #     - name: Run component tests (web app)
+  #       timeout-minutes: 5
+  #       env:
+  #         # Mock environment variables for component tests
+  #         NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+  #         NEXT_PUBLIC_SUPABASE_ANON_KEY: mock-anon-key
+  #         NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  #         NEXT_PUBLIC_API_URL: http://localhost:8080
+  #         NEXT_PUBLIC_APP_URL: http://localhost:3000
+  #       run: |
+  #         cd apps/web
+  #         # Run component tests with CI-specific config (longer timeouts)
+  #         pnpm test:ci:coverage
+  #
+  #     - name: Upload component test coverage
+  #       uses: actions/upload-artifact@v4
+  #       if: always()
+  #       with:
+  #         name: web-component-test-coverage
+  #         path: apps/web/coverage/
+  #         retention-days: 7
+
+  # lint-check:  # Disabled temporarily per request
+  #   name: Lint Check (disabled)
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 5
+  #
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: pnpm/action-setup@v4
+  #       with:
+  #         version: 10.10.0
+  #         run_install: false
+  #
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'pnpm'
+  #
+  #     - name: Setup Bun
+  #       uses: oven-sh/setup-bun@v2
+  #       with:
+  #         bun-version: latest
+  #
+  #     - name: Cache pnpm store
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/.pnpm-store
+  #         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-pnpm-store-
+  #
+  #     - name: Install dependencies
+  #       run: |
+  #         pnpm config set store-dir ~/.pnpm-store
+  #         pnpm install --no-frozen-lockfile
+  #
+  #     - name: Run lint check
+  #       run: pnpm lint
+  #
+  #     - name: Run format check
+  #       run: pnpm format:check

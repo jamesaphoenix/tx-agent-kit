@@ -1,7 +1,13 @@
 # Runbooks
 
+## Configure local env files (idempotent)
+`pnpm env:configure`
+
 ## Start local infra
-`pnpm infra:up`
+`pnpm infra:ensure`
+
+## Ensure shared infra from any worktree
+`./scripts/worktree/ensure-shared-infra.sh`
 
 ## MCP observability setup (Claude Code + Codex)
 1. `cp .env.mcp.example .env.mcp`
@@ -14,6 +20,18 @@
 
 ## Apply migrations
 `pnpm db:migrate`
+
+## Compute deterministic worktree ports
+`pnpm worktree:ports feature-my-branch`
+
+## Reset integration DB state (idempotent)
+`pnpm db:test:reset`
+
+## Run integration tests (idempotent, no container teardown)
+`pnpm test:integration`
+
+## Check run-silent behavior
+`pnpm test:run-silent`
 
 ## Shutdown infra
 `pnpm infra:down`

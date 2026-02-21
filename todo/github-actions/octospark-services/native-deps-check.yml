@@ -1,0 +1,68 @@
+name: Native Dependencies Check
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'packages/**/package.json'
+      - '.github/workflows/native-deps-check.yml'
+
+jobs:
+  check-native-deps:
+    name: Validate Native Dependencies
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [24]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build composite types
+        run: pnpm -w build:composite
+      - name: Build core packages (JS)
+        run: |
+          pnpm --filter "@repo/supabase" build
+          pnpm --filter "@repo/core-services" build
+          pnpm --filter "@repo/media-rendering" build
+          pnpm --filter "@repo/scheduling" build
+
+      - name: Test Temporal worker
+        run: |
+          cd apps/worker
+          pnpm run type-check
+
+      - name: Build Temporal worker
+        run: |
+          cd apps/worker
+          pnpm run build
+
+      - name: Verify native bindings
+        run: |
+          # Check if Temporal worker can be loaded (verifies all native deps)
+          cd apps/worker
+          node -e "try { require.resolve('@temporalio/worker'); console.log('✅ Native bindings verified'); process.exit(0); } catch(e) { console.error('❌ Native bindings failed:', e.message); process.exit(1); }"
+
+          # Also verify the build artifacts exist
+          test -d dist || (echo "❌ Build artifacts missing" && exit 1)
+          echo "✅ Build artifacts found"

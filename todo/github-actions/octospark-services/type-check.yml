@@ -1,0 +1,95 @@
+name: TypeScript Type Check
+
+# Fast TypeScript type checking across the monorepo
+# Target: < 3 minutes total execution time
+# Triggers only on TypeScript-related file changes for optimal performance
+
+concurrency:
+  group: type-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: ['**'] # Run on all branches
+    paths:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.d.ts'
+      - '**/tsconfig.json'
+      - '**/tsconfig.*.json'
+      - '**/package.json'
+      - 'pnpm-lock.yaml'
+      - 'turbo.json'
+  pull_request:
+    branches: ['**'] # Run on PRs to all branches
+    paths:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.d.ts'
+      - '**/tsconfig.json'
+      - '**/tsconfig.*.json'
+      - '**/package.json'
+      - 'pnpm-lock.yaml'
+      - 'turbo.json'
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10'
+  CI: true
+  FORCE_COLOR: '1'
+
+jobs:
+  type-check:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Ensure pnpm store directory exists
+        run: mkdir -p "${{ env.STORE_PATH }}"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Cache Turbo build outputs
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('**/package.json', 'pnpm-lock.yaml', 'turbo.json') }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Build packages (TypeScript composite build)
+        run: pnpm build:composite
+
+      - name: TypeScript type check
+        run: pnpm type-check

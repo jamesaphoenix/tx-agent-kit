@@ -31,10 +31,9 @@ Agent-first TypeScript monorepo for building scalable apps with Effect, Temporal
 
 ## Quickstart
 ```bash
-cp .env.example .env
-cp .env.mcp.example .env.mcp
 pnpm install
-pnpm infra:up
+pnpm env:configure
+pnpm infra:ensure
 pnpm db:migrate
 pnpm dev
 ```
@@ -55,26 +54,39 @@ pnpm dev:web             # web only
 pnpm dev:api             # api only
 pnpm dev:worker          # worker only
 pnpm lint
+pnpm lint:quiet
 pnpm lint:invariants
 pnpm type-check
+pnpm type-check:quiet
 pnpm test
+pnpm test:quiet
 pnpm test:integration
+pnpm test:integration:quiet
 pnpm openapi:generate
 pnpm db:migrate
+pnpm db:test:reset
 pnpm db:studio
-pnpm infra:up
+pnpm infra:ensure
 pnpm infra:down
+pnpm worktree:ports feature-my-branch
+pnpm test:run-silent
 ```
 
 ## Docker Profiles
 ```bash
-docker compose --profile infra up -d
-docker compose --profile infra --profile app up --build
-docker compose down -v
+docker compose -p tx-agent-kit --profile infra up -d
+docker compose -p tx-agent-kit --profile infra --profile app up --build
+docker compose -p tx-agent-kit down -v
 ```
 
 `infra` brings up Postgres, Temporal, Jaeger, Prometheus, Grafana, and OTel Collector.  
 `app` builds and runs API and worker containers.
+
+## Worktrees + Idempotent Integration Tests
+- Infrastructure is shared across worktrees with a fixed compose project: `tx-agent-kit`.
+- `pnpm infra:ensure` is idempotent: it checks health first, only starts missing services, and never tears down containers.
+- `pnpm test:integration` is idempotent: it keeps infra running, migrates if needed, resets DB state, and runs integration suites.
+- `pnpm db:test:reset` can be run manually before local integration/dev sessions.
 
 ## MCP Observability (Codex + Claude Code)
 - Project MCP config lives in `.mcp.json`.
@@ -90,6 +102,8 @@ pnpm mcp:jaeger
 - Agent map and guardrails: `AGENTS.md`
 - Claude operating guide: `CLAUDE.md`
 - Architecture: `docs/ARCHITECTURE.md`
+- Commands: `docs/COMMANDS.md`
 - Quality and boundaries: `docs/QUALITY.md`
 - Runbooks: `docs/RUNBOOKS.md`
+- OctoSpark mining log: `todo/octospark-mining.md`
 - API contract (generated): `apps/api/openapi.json`

@@ -11,7 +11,7 @@
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run -c vitest.config.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node ./scripts/migrate.mjs",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

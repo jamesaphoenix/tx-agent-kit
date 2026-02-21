@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Idempotently configure local env files for development.
+
+set -euo pipefail
+
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+upsert_key() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+
+  if grep -Eq "^${key}=" "$file"; then
+    sed -i.bak "s|^${key}=.*|${key}=${value}|" "$file"
+  else
+    printf "\n%s=%s\n" "$key" "$value" >> "$file"
+  fi
+
+  rm -f "${file}.bak"
+}
+
+ensure_file() {
+  local source_file="$1"
+  local target_file="$2"
+
+  if [[ ! -f "$target_file" ]]; then
+    cp "$source_file" "$target_file"
+  fi
+}
+
+ensure_file ".env.example" ".env"
+ensure_file ".env.mcp.example" ".env.mcp"
+
+upsert_key ".env" "NODE_ENV" "development"
+upsert_key ".env" "API_PORT" "4000"
+upsert_key ".env" "API_HOST" "0.0.0.0"
+upsert_key ".env" "DATABASE_URL" "postgres://postgres:postgres@localhost:5432/tx_agent_kit"
+upsert_key ".env" "AUTH_SECRET" "local-dev-auth-secret-123456"
+upsert_key ".env" "API_CORS_ORIGIN" "http://localhost:3000"
+upsert_key ".env" "API_BASE_URL" "http://localhost:4000"
+upsert_key ".env" "TEMPORAL_ADDRESS" "localhost:7233"
+upsert_key ".env" "TEMPORAL_NAMESPACE" "default"
+upsert_key ".env" "TEMPORAL_TASK_QUEUE" "tx-agent-kit"
+upsert_key ".env" "OTEL_EXPORTER_OTLP_ENDPOINT" "http://localhost:4318"
+
+upsert_key ".env.mcp" "PROMETHEUS_URL" "http://localhost:9090"
+upsert_key ".env.mcp" "JAEGER_URL" "http://localhost:16686"
+upsert_key ".env.mcp" "JAEGER_PROTOCOL" "HTTP"
+upsert_key ".env.mcp" "JAEGER_PORT" "16686"
+
+echo "Local env files configured: .env, .env.mcp"

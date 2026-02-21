@@ -48,7 +48,14 @@ Dependency direction must stay inward:
 ## Mechanical Enforcement
 - ESLint restrictions live in `packages/tooling/eslint-config/domain-invariants.js`.
 - Structural checks live in `scripts/lint/enforce-domain-invariants.mjs`.
-- `pnpm lint` executes both ESLint and structural invariants.
+- Shell checks live in `scripts/check-shell-invariants.sh`.
+- `pnpm lint` executes ESLint + structural invariants + shell invariants.
+
+## Infra + Test Reliability
+- Use `pnpm env:configure` to seed local env files idempotently.
+- Use `pnpm infra:ensure` to start shared local infrastructure across worktrees.
+- Use `pnpm test:integration` for integration suites (idempotent DB reset + no container teardown).
+- Use quiet runners (`pnpm *:quiet`) when agent context pressure matters.
 
 ## Repository Knowledge Discipline
 - Keep `AGENTS.md` and this file short and map-like.

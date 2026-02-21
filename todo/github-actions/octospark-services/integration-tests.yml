@@ -1,0 +1,404 @@
+name: Integration Tests (Database + API)
+
+# Integration tests that require database and external services
+# Optimized for parallel execution with schema isolation
+# Target: < 20 minutes total (setup ~12min, parallel tests ~8min)
+
+concurrency:
+  group: integration-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch: # Manual trigger for now
+  # Enable when ready for controlled integration testing
+  # push:
+  #   branches: ['main', 'staging', 'dev']
+  # pull_request:
+  #   branches: ['main', 'staging', 'dev']
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10'
+  CI: true
+  FORCE_COLOR: '1'
+
+jobs:
+  # ============================================
+  # STAGE 1: Setup Infrastructure (runs once)
+  # ============================================
+  setup:
+    name: Setup Infrastructure
+    timeout-minutes: 35
+    runs-on: ubuntu-latest
+    environment: development
+    outputs:
+      supabase-anon-key: ${{ steps.supabase-creds.outputs.anon-key }}
+      supabase-service-role-key: ${{ steps.supabase-creds.outputs.service-role-key }}
+    env:
+      # Supabase local development keys (safe to be public)
+      NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      SUPABASE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+
+      # Base URLs
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      API_BASE_URL: http://localhost:8080
+
+      # Environment
+      NODE_ENV: test
+      SENTRY_ENVIRONMENT: test
+
+      # API Keys from GitHub Secrets (development environment)
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL_NAME: ${{ secrets.OPENAI_MODEL_NAME }}
+      OPENAI_FAST_MODEL_NAME: ${{ secrets.OPENAI_FAST_MODEL_NAME }}
+      MAX_TOKENS_PER_MINUTE_OPENAI_MODEL: ${{ secrets.MAX_TOKENS_PER_MINUTE_OPENAI_MODEL }}
+      MAX_REQUESTS_PER_MINUTE_OPENAI_MODEL: ${{ secrets.MAX_REQUESTS_PER_MINUTE_OPENAI_MODEL }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
+      INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      COMPANY_SUPPORT_EMAIL: ${{ secrets.COMPANY_SUPPORT_EMAIL }}
+
+      # TikTok OAuth
+      TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+      TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+
+      # Sentry
+      NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+      NEXT_PUBLIC_SENTRY_ORG: ${{ secrets.NEXT_PUBLIC_SENTRY_ORG }}
+      NEXT_PUBLIC_SENTRY_PROJECT: ${{ secrets.NEXT_PUBLIC_SENTRY_PROJECT }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+      # Redis (local Docker)
+      REDIS_URL: redis://localhost:6379
+
+      # Redis/KV (Vercel KV for production)
+      KV_URL: ${{ secrets.KV_URL }}
+      KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
+      KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
+      KV_REST_API_READ_ONLY_TOKEN: ${{ secrets.KV_REST_API_READ_ONLY_TOKEN }}
+
+      # GCP Configuration from GitHub Secrets
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      SERVICE_ACCOUNT_EMAIL: ${{ secrets.SERVICE_ACCOUNT_EMAIL }}
+      GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      BUCKET_URI: ${{ secrets.BUCKET_URI }}
+      TERRAFORM_WORKSPACE: ${{ secrets.TERRAFORM_WORKSPACE }}
+
+      # Stripe Configuration
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
+      # Apify Cloud Tasks
+      APIFY_CLOUD_TASKS_QUEUE_PATH: ${{ secrets.APIFY_CLOUD_TASKS_QUEUE_PATH }}
+      APIFY_CLOUD_TASKS_QUEUE_NAME: ${{ secrets.APIFY_CLOUD_TASKS_QUEUE_NAME }}
+      APIFY_CLOUD_TASKS_LOCATION: ${{ secrets.APIFY_CLOUD_TASKS_LOCATION }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Aggregate Environment Variables
+        run: |
+          echo "Creating aggregated .env file for Integration tests"
+
+          # Create root .env from various sources
+          cat > .env << 'EOF'
+          # Supabase Configuration
+          NEXT_PUBLIC_SUPABASE_URL=${{ env.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ env.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_JWT_SECRET=${{ env.SUPABASE_JWT_SECRET }}
+
+          # Base URLs
+          NEXT_PUBLIC_SITE_URL=${{ env.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_API_URL=${{ env.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_APP_URL=${{ env.NEXT_PUBLIC_APP_URL }}
+          API_BASE_URL=${{ env.API_BASE_URL }}
+
+          # Environment
+          NODE_ENV=${{ env.NODE_ENV }}
+          SENTRY_ENVIRONMENT=${{ env.SENTRY_ENVIRONMENT }}
+
+          # API Keys
+          OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}
+          OPENAI_MODEL_NAME=${{ env.OPENAI_MODEL_NAME }}
+          OPENAI_FAST_MODEL_NAME=${{ env.OPENAI_FAST_MODEL_NAME }}
+          MAX_TOKENS_PER_MINUTE_OPENAI_MODEL=${{ env.MAX_TOKENS_PER_MINUTE_OPENAI_MODEL }}
+          MAX_REQUESTS_PER_MINUTE_OPENAI_MODEL=${{ env.MAX_REQUESTS_PER_MINUTE_OPENAI_MODEL }}
+          GEMINI_API_KEY=${{ env.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY=${{ env.ANTHROPIC_API_KEY }}
+          APIFY_API_KEY=${{ env.APIFY_API_KEY }}
+          INTERNAL_API_KEY=${{ env.INTERNAL_API_KEY }}
+          RESEND_API_KEY=${{ env.RESEND_API_KEY }}
+          COMPANY_SUPPORT_EMAIL=${{ env.COMPANY_SUPPORT_EMAIL }}
+
+          # TikTok OAuth
+          TIKTOK_CLIENT_KEY=${{ env.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET=${{ env.TIKTOK_CLIENT_SECRET }}
+
+          # GCP Configuration
+          GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
+          GCP_PROJECT_NUMBER=${{ env.GCP_PROJECT_NUMBER }}
+          SERVICE_ACCOUNT_EMAIL=${{ env.SERVICE_ACCOUNT_EMAIL }}
+          GCP_SERVICE_ACCOUNT_EMAIL=${{ env.GCP_SERVICE_ACCOUNT_EMAIL }}
+          BUCKET_URI=${{ env.BUCKET_URI }}
+          TERRAFORM_WORKSPACE=${{ env.TERRAFORM_WORKSPACE }}
+
+          # Stripe Configuration
+          STRIPE_SECRET_KEY=${{ env.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ env.STRIPE_WEBHOOK_SECRET }}
+
+          # Redis (local Docker)
+          REDIS_URL=${{ env.REDIS_URL }}
+
+          # Redis/KV (Vercel KV)
+          KV_URL=${{ env.KV_URL }}
+          KV_REST_API_URL=${{ env.KV_REST_API_URL }}
+          KV_REST_API_TOKEN=${{ env.KV_REST_API_TOKEN }}
+          KV_REST_API_READ_ONLY_TOKEN=${{ env.KV_REST_API_READ_ONLY_TOKEN }}
+
+          # Sentry
+          NEXT_PUBLIC_SENTRY_DSN=${{ env.NEXT_PUBLIC_SENTRY_DSN }}
+          NEXT_PUBLIC_SENTRY_ORG=${{ env.NEXT_PUBLIC_SENTRY_ORG }}
+          NEXT_PUBLIC_SENTRY_PROJECT=${{ env.NEXT_PUBLIC_SENTRY_PROJECT }}
+          SENTRY_AUTH_TOKEN=${{ env.SENTRY_AUTH_TOKEN }}
+
+          # Apify Cloud Tasks
+          APIFY_CLOUD_TASKS_QUEUE_PATH=${{ env.APIFY_CLOUD_TASKS_QUEUE_PATH }}
+          APIFY_CLOUD_TASKS_QUEUE_NAME=${{ env.APIFY_CLOUD_TASKS_QUEUE_NAME }}
+          APIFY_CLOUD_TASKS_LOCATION=${{ env.APIFY_CLOUD_TASKS_LOCATION }}
+          EOF
+
+          echo "Environment aggregation complete"
+          wc -l .env
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: |
+          # Try installing with frozen lockfile first
+          if ! pnpm install --frozen-lockfile; then
+            echo "⚠️ Lockfile is out of date. Installing without frozen-lockfile..."
+            echo "::warning::Lockfile is out of date. Please run 'pnpm install' locally and commit the updated pnpm-lock.yaml"
+            pnpm install --no-frozen-lockfile
+          fi
+
+      # OPTIMIZED: Use dependency-based cache key instead of github.sha
+      - name: Cache Turbo build outputs
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('**/package.json', 'pnpm-lock.yaml', 'turbo.json') }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Cache Supabase CLI
+        uses: actions/cache@v4
+        with:
+          path: ~/.supabase
+          key: ${{ runner.os }}-supabase-cli-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-supabase-cli-
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # OPTIMIZED: Pre-pull Docker images in parallel with other setup
+      - name: Pre-pull Docker images
+        run: |
+          echo "Pre-pulling Docker images for faster startup..."
+          docker pull redis:7.2-alpine &
+          docker pull temporalio/auto-setup:1.22.4 &
+          docker pull postgres:13-alpine &
+          wait
+          echo "✅ Docker images pre-pulled"
+
+      - name: Kill processes using Supabase ports
+        run: |
+          sudo lsof -ti:54321,54322,54323,54324,54325,54326,54327,54328 | xargs -r sudo kill -9
+
+      - name: Start Supabase
+        timeout-minutes: 10
+        run: |
+          cd packages/platform/supabase
+          max_attempts=3
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt to start Supabase..."
+            if supabase start; then
+              echo "Supabase started successfully"
+              break
+            else
+              echo "Attempt $attempt failed"
+              sudo lsof -ti:54321,54322,54323,54324,54325,54326,54327,54328 | xargs -r sudo kill -9
+              if [ $attempt -eq $max_attempts ]; then
+                echo "All attempts failed"
+                exit 1
+              fi
+              attempt=$((attempt+1))
+              sleep 5
+            fi
+          done
+
+      - name: Extract Supabase credentials
+        id: supabase-creds
+        run: |
+          cd packages/platform/supabase
+          echo "Extracting credentials from running Supabase instance..."
+
+          # Get credentials from supabase status
+          ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY // .anon_key // empty')
+          SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY // .service_role_key // empty')
+          JWT_SECRET=$(supabase status --output json | jq -r '.JWT_SECRET // .jwt_secret // empty')
+
+          # Fallback to parsing text output if JSON doesn't work
+          if [ -z "$ANON_KEY" ]; then
+            ANON_KEY=$(supabase status | grep -i "anon key" | awk '{print $NF}')
+          fi
+          if [ -z "$SERVICE_ROLE_KEY" ]; then
+            SERVICE_ROLE_KEY=$(supabase status | grep -i "service_role key" | awk '{print $NF}')
+          fi
+          if [ -z "$JWT_SECRET" ]; then
+            JWT_SECRET=$(supabase status | grep -i "JWT secret" | awk '{print $NF}')
+          fi
+
+          # Set as outputs and env vars
+          echo "SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
+          echo "SUPABASE_JWT_SECRET=$JWT_SECRET" >> $GITHUB_ENV
+          echo "anon-key=$ANON_KEY" >> $GITHUB_OUTPUT
+          echo "service-role-key=$SERVICE_ROLE_KEY" >> $GITHUB_OUTPUT
+
+          # Also update the root .env file (we're in packages/platform/supabase)
+          ROOT_ENV="../../../.env"
+          sed -i "s|NEXT_PUBLIC_SUPABASE_ANON_KEY=.*|NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY|" "$ROOT_ENV"
+          sed -i "s|SUPABASE_SERVICE_ROLE_KEY=.*|SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY|" "$ROOT_ENV"
+          sed -i "s|SUPABASE_JWT_SECRET=.*|SUPABASE_JWT_SECRET=$JWT_SECRET|" "$ROOT_ENV"
+
+          echo "✅ Supabase credentials extracted and configured"
+          echo "API URL: http://localhost:54321"
+          echo "Anon Key: ${ANON_KEY:0:20}..."
+          echo "Service Role Key: ${SERVICE_ROLE_KEY:0:20}..."
+
+      - name: Start Docker infrastructure (Redis, Temporal)
+        timeout-minutes: 5
+        run: |
+          echo "Starting Docker infrastructure..."
+          echo "Supabase network should now exist for Docker services to join"
+          docker compose up -d redis temporal postgresql-db
+          echo "Waiting for services to be healthy..."
+          sleep 15
+          docker compose ps
+          echo "✅ Docker infrastructure started"
+
+      - name: Generate database types
+        timeout-minutes: 3
+        run: |
+          cd packages/platform/supabase
+          pnpm run db:generate-types
+
+      - name: Build packages
+        timeout-minutes: 10
+        run: pnpm build
+
+      - name: Start Fastify API server
+        timeout-minutes: 3
+        run: |
+          echo "Starting Fastify API server..."
+          cd apps/api
+          nohup pnpm dev > /tmp/fastify.log 2>&1 &
+          echo "Waiting for Fastify to be ready..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+              echo "✅ Fastify API is running"
+              exit 0
+            fi
+            echo "Attempt $i: Fastify not ready yet..."
+            sleep 2
+          done
+          echo "❌ Fastify failed to start. Logs:"
+          cat /tmp/fastify.log
+          exit 1
+
+      # Run all tests sequentially (schema isolation not yet wired up)
+      - name: Run web integration tests
+        timeout-minutes: 10
+        env:
+          CI: true
+          VITEST_REPORTER: verbose
+        run: pnpm test:integration
+
+      - name: Run API integration tests
+        timeout-minutes: 10
+        env:
+          CI: true
+          VITEST_REPORTER: verbose
+        run: cd apps/api && pnpm test:integration
+
+      - name: Run pgTap database tests
+        timeout-minutes: 5
+        run: |
+          cd packages/platform/supabase/supabase
+          echo "Running essential pgTap database tests..."
+          PGPASSWORD=postgres psql -h localhost -p 54322 -U postgres -d postgres -f tests/cleanup_essential.sql
+          echo "✅ Database tests completed successfully"
+
+      - name: Upload web integration test coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-integration-test-coverage
+          path: apps/web/coverage/
+          retention-days: 7
+
+      - name: Upload API integration test coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-integration-test-coverage
+          path: apps/api/coverage/
+          retention-days: 30
+
+      - name: Cleanup Supabase
+        if: always()
+        run: |
+          cd packages/platform/supabase
+          supabase stop
+
+      - name: Cleanup Docker
+        if: always()
+        run: |
+          docker compose down --volumes --remove-orphans || true

@@ -5,6 +5,7 @@
 - Keep tests idempotent and deterministic.
 - Run unit tests via `pnpm test`.
 - Run integration tests against Docker infra via `pnpm test:integration`.
+- Integration DB reset is lock-guarded (`/tmp/tx-agent-kit-db-reset.lock`) to avoid concurrent local test clobbering.
 - Run invariant checks via `pnpm lint` (`eslint` + `scripts/lint/enforce-domain-invariants.mjs`).
 
 ## Domain Invariants

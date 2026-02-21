@@ -1,5 +1,5 @@
 import { defineConfig, mergeConfig } from 'vitest/config'
-import { unitConfig } from './unit'
+import { unitConfig } from './unit.ts'
 
 export const integrationConfig = mergeConfig(
   unitConfig,
