@@ -1,5 +1,6 @@
-import { relations, sql } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import {
+  primaryKey,
   pgEnum,
   pgTable,
   text,
@@ -50,7 +51,7 @@ export const rolePermissions = pgTable('role_permissions', {
 export const workspaces = pgTable('workspaces', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),
-  ownerUserId: uuid('owner_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  ownerUserId: uuid('owner_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
   organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 })
@@ -68,6 +69,7 @@ export const workspaceMembers = pgTable('workspace_members', {
 export const invitations = pgTable('invitations', {
   id: uuid('id').defaultRandom().primaryKey(),
   workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  inviteeUserId: uuid('invitee_user_id').references(() => users.id, { onDelete: 'set null' }),
   email: text('email').notNull(),
   role: membershipRoleEnum('role').notNull().default('member'),
   status: invitationStatusEnum('status').notNull().default('pending'),
@@ -98,18 +100,16 @@ export const creditLedger = pgTable('credit_ledger', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 })
 
-export const usersRelations = relations(users, ({ many }) => ({
-  workspaces: many(workspaces),
-  memberships: many(workspaceMembers)
-}))
-
-export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
-  owner: one(users, {
-    fields: [workspaces.ownerUserId],
-    references: [users.id]
-  }),
-  members: many(workspaceMembers),
-  tasks: many(tasks)
+export const processedOperations = pgTable('processed_operations', {
+  operationId: text('operation_id').notNull(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  taskId: uuid('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  processedOperationsPk: primaryKey({
+    columns: [table.operationId, table.workspaceId, table.taskId],
+    name: 'processed_operations_pkey'
+  })
 }))
 
 export type UserRow = typeof users.$inferSelect
@@ -117,3 +117,4 @@ export type WorkspaceRow = typeof workspaces.$inferSelect
 export type WorkspaceMemberRow = typeof workspaceMembers.$inferSelect
 export type InvitationRow = typeof invitations.$inferSelect
 export type TaskRow = typeof tasks.$inferSelect
+export type ProcessedOperationRow = typeof processedOperations.$inferSelect

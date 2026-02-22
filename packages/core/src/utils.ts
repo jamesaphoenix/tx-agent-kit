@@ -1,6 +1,7 @@
 import type { AuthPrincipal } from '@tx-agent-kit/contracts'
 import { Effect } from 'effect'
-import { AuthService } from './auth-service.js'
+import type { AuthUsersPort } from './domains/auth/ports/auth-ports.js'
+import { AuthService } from './domains/auth/services/auth-service.js'
 import { unauthorized, type CoreError } from './errors.js'
 
 export const parseBearerToken = (authorization: string | undefined): Effect.Effect<string, CoreError> => {
@@ -18,7 +19,7 @@ export const parseBearerToken = (authorization: string | undefined): Effect.Effe
 
 export const principalFromAuthorization = (
   authorization: string | undefined
-): Effect.Effect<AuthPrincipal, CoreError, AuthService> =>
+): Effect.Effect<AuthPrincipal, CoreError, AuthService | AuthUsersPort> =>
   Effect.gen(function* () {
     const authService = yield* AuthService
     const token = yield* parseBearerToken(authorization)

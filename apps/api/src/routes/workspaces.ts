@@ -3,6 +3,8 @@ import { principalFromAuthorization, WorkspaceService } from '@tx-agent-kit/core
 import { Effect } from 'effect'
 import { TxAgentApi, mapCoreError } from '../api.js'
 
+export const WorkspacesRouteKind = 'custom' as const
+
 export const WorkspacesLive = HttpApiBuilder.group(TxAgentApi, 'workspaces', (handlers) =>
   handlers
     .handle('listWorkspaces', () =>

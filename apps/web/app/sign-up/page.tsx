@@ -1,13 +1,12 @@
-import Link from 'next/link'
-import { AuthForm } from '../../components/AuthForm'
+'use client'
 
-export default async function SignUpPage({
-  searchParams
-}: {
-  searchParams: Promise<{ next?: string }>
-}) {
-  const params = await searchParams
-  const nextPath = typeof params.next === 'string' && params.next.startsWith('/') ? params.next : '/dashboard'
+import Link from 'next/link'
+import { Suspense } from 'react'
+import { AuthForm } from '../../components/AuthForm'
+import { useSafeNextPath } from '../../lib/url-state'
+
+function SignUpContent() {
+  const nextPath = useSafeNextPath('/dashboard')
 
   return (
     <section className="card" style={{ maxWidth: '460px', margin: '2rem auto' }}>
@@ -20,5 +19,13 @@ export default async function SignUpPage({
         </p>
       </div>
     </section>
+  )
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignUpContent />
+    </Suspense>
   )
 }

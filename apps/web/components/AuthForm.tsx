@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { clientApi } from '../lib/client-api'
+import { notify } from '../lib/notify'
+import { sessionStoreActions } from '../stores/session-store'
 
 export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; nextPath: string }) {
   const router = useRouter()
@@ -24,16 +26,25 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
         await clientApi.signIn({ email, password })
       }
 
+      const principal = await clientApi.me()
+      sessionStoreActions.setPrincipal(principal)
+      notify.success(mode === 'sign-up' ? 'Account created successfully' : 'Signed in successfully')
       router.push(nextPath)
-      router.refresh()
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Authentication failed')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Authentication failed'
+      setError(message)
+      notify.error(message)
       setPending(false)
     }
   }
 
   return (
-    <form className="stack" onSubmit={onSubmit}>
+    <form
+      className="stack"
+      onSubmit={(event) => {
+        void onSubmit(event)
+      }}
+    >
       {mode === 'sign-up' && (
         <label className="stack">
           <span>Name</span>

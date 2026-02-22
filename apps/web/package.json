@@ -7,20 +7,33 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
+    "generate:api": "orval --config ./orval.config.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
-    "test": "vitest run -c vitest.config.ts"
+    "test": "vitest run -c vitest.config.ts",
+    "test:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.7",
+    "@tanstack/react-store": "^0.9.1",
     "@tx-agent-kit/contracts": "workspace:*",
     "axios": "^1.13.2",
+    "effect": "^3.19.18",
     "next": "16.1.3",
+    "nuqs": "^2.8.8",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "sonner": "^2.0.7"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
     "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.2"
+    "@types/react-dom": "^19.2.2",
+    "jsdom": "^28.1.0",
+    "orval": "^8.1.0"
   }
 }

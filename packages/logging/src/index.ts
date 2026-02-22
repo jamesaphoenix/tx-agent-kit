@@ -1,3 +1,5 @@
+import { getLoggingEnv } from './env.js'
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 export interface LogContext {
@@ -191,4 +193,5 @@ export const createPerfLogger = (
   }
 }
 
-export const defaultLogger = createLogger(process.env.SERVICE_NAME ?? 'tx-agent-kit')
+const loggingEnv = getLoggingEnv()
+export const defaultLogger = createLogger(loggingEnv.SERVICE_NAME)

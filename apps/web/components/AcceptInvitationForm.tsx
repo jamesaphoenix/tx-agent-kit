@@ -1,11 +1,14 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import { clientApi } from '../lib/client-api'
+import { notify } from '../lib/notify'
 
-export function AcceptInvitationForm() {
-  const router = useRouter()
+export function AcceptInvitationForm({
+  onAccepted
+}: {
+  onAccepted?: () => void | Promise<void>
+}) {
   const [token, setToken] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -21,15 +24,24 @@ export function AcceptInvitationForm() {
       await clientApi.acceptInvitation(token)
       setToken('')
       setMessage('Invitation accepted successfully')
-      router.refresh()
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to accept invitation')
+      notify.success('Invitation accepted')
+      await onAccepted?.()
+      setPending(false)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to accept invitation'
+      setError(message)
+      notify.error(message)
       setPending(false)
     }
   }
 
   return (
-    <form className="stack" onSubmit={onSubmit}>
+    <form
+      className="stack"
+      onSubmit={(event) => {
+        void onSubmit(event)
+      }}
+    >
       <h3>Accept invitation</h3>
       <input value={token} onChange={(event) => setToken(event.target.value)} placeholder="Paste invitation token" required />
       {error && <p className="error">{error}</p>}

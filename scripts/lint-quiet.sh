@@ -11,8 +11,11 @@ PACKAGES=(
   "@tx-agent-kit/logging"
   "@tx-agent-kit/auth"
   "@tx-agent-kit/db"
+  "@tx-agent-kit/testkit"
   "@tx-agent-kit/core"
   "@tx-agent-kit/observability"
+  "@tx-agent-kit/temporal-client"
+  "@tx-agent-kit/scaffold"
   "@tx-agent-kit/api"
   "@tx-agent-kit/worker"
   "@tx-agent-kit/web"
@@ -37,6 +40,10 @@ done
 
 if ! run_silent "lint invariants" "pnpm lint:invariants"; then
   FAILED_PACKAGES+=("lint:invariants")
+fi
+
+if ! run_silent "lint ci env" "pnpm lint:ci-env"; then
+  FAILED_PACKAGES+=("lint:ci-env")
 fi
 
 if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then

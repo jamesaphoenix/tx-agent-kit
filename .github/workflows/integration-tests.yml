@@ -1,0 +1,20 @@
+name: Integration Tests
+
+on:
+  workflow_dispatch:
+
+env:
+  NODE_ENV: test
+  API_PORT: '4100'
+  API_HOST: '127.0.0.1'
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/tx_agent_kit
+  AUTH_SECRET: ci-auth-secret-123456
+  API_CORS_ORIGIN: http://localhost:3000
+
+jobs:
+  placeholder:
+    name: Integration Placeholder
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "integration workflow scaffold"

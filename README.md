@@ -23,6 +23,7 @@ Agent-first TypeScript monorepo for building scalable apps with Effect, Temporal
 - `console.*` is banned; use `@tx-agent-kit/logging`.
 - DDD import direction is enforced: `domain <- ports <- repositories/adapters <- services <- runtime/ui`.
 - `apps/api/openapi.json` is generated from `apps/api` and is the external contract reference.
+- Routes and repositories must declare explicit kind markers (`crud` vs `custom`) and keep kind intent consistent.
 
 ## Prerequisites
 - Node.js `>=22`
@@ -63,6 +64,7 @@ pnpm test:quiet
 pnpm test:integration
 pnpm test:integration:quiet
 pnpm openapi:generate
+pnpm api:client:generate
 pnpm db:migrate
 pnpm db:test:reset
 pnpm db:studio
@@ -70,6 +72,8 @@ pnpm infra:ensure
 pnpm infra:down
 pnpm worktree:ports feature-my-branch
 pnpm test:run-silent
+pnpm scaffold:crud --domain billing --entity invoice --dry-run
+pnpm scaffold:crud --domain billing --entity invoice
 ```
 
 ## Docker Profiles
@@ -85,13 +89,16 @@ docker compose -p tx-agent-kit down -v
 ## Worktrees + Idempotent Integration Tests
 - Infrastructure is shared across worktrees with a fixed compose project: `tx-agent-kit`.
 - `pnpm infra:ensure` is idempotent: it checks health first, only starts missing services, and never tears down containers.
-- `pnpm test:integration` is idempotent: it keeps infra running, migrates if needed, resets DB state, and runs integration suites.
+- `pnpm test:integration` is idempotent: it runs one Vitest workspace integration run with global setup (infra + DB reset + pgTAP once).
+- Select subset projects with `INTEGRATION_PROJECTS=web` or `INTEGRATION_PROJECTS=api,testkit`.
+- Tune non-web integration parallelism with `INTEGRATION_MAX_WORKERS` (default `2`).
+- Use `pnpm test:integration --skip-pgtap` for faster local loops; keep pgTAP enabled in CI.
 - `pnpm db:test:reset` can be run manually before local integration/dev sessions.
 
 ## MCP Servers (Codex + Claude Code)
 - Project MCP config lives in `.mcp.json`.
 - MCP wrappers live in `scripts/mcp/`.
-- Configure endpoints in `.env.mcp` (`SUPABASE_ACCESS_TOKEN` is required for Supabase MCP).
+- Configure endpoints in `.env` (`SUPABASE_ACCESS_TOKEN` is required for Supabase MCP).
 
 ```bash
 pnpm mcp:prometheus
@@ -107,6 +114,7 @@ Use `pnpm mcp:codex-config` to print TOML blocks for `~/.codex/config.toml` that
 ## Docs
 - Agent map and guardrails: `AGENTS.md`
 - Claude operating guide: `CLAUDE.md`
+- Golden-path CRUD skill: `skills/golden-path-crud/SKILL.md`
 - Architecture: `docs/ARCHITECTURE.md`
 - Commands: `docs/COMMANDS.md`
 - Quality and boundaries: `docs/QUALITY.md`

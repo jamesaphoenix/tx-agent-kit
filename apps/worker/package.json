@@ -10,14 +10,17 @@
     "build": "tsc -b",
     "type-check": "tsc -b --pretty false",
     "lint": "eslint src --max-warnings=0",
-    "test": "vitest run -c vitest.config.ts"
+    "test": "vitest run -c vitest.config.ts",
+    "test:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
     "@temporalio/client": "^1.13.1",
     "@temporalio/worker": "^1.13.1",
     "@temporalio/workflow": "^1.13.1",
+    "@tx-agent-kit/db": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
     "@tx-agent-kit/observability": "workspace:*",
+    "@tx-agent-kit/temporal-client": "workspace:*",
     "effect": "^3.19.16"
   },
   "devDependencies": {

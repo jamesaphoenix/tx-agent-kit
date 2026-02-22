@@ -59,14 +59,302 @@ export const domainInvariantConfig = [
             {
               name: 'drizzle-orm',
               message: 'Web must stay API-first. Only the DB layer may import Drizzle.'
+            },
+            {
+              name: 'effect',
+              message:
+                'apps/web is intentionally dumb. Keep Effect runtime usage in API/core/worker layers.'
+            },
+            {
+              name: 'next/server',
+              message:
+                'apps/web is client-only. Server runtime imports (`next/server`) are forbidden.'
+            },
+            {
+              name: 'next/headers',
+              message:
+                'apps/web is client-only. Request header/cookie APIs (`next/headers`) are forbidden.'
+            },
+            {
+              name: 'next/navigation',
+              importNames: ['useSearchParams'],
+              message:
+                'Avoid `useSearchParams` in apps/web; it introduces Suspense/prerender constraints in static client pages.'
+            },
+            {
+              name: 'next/navigation',
+              importNames: ['redirect', 'notFound'],
+              message:
+                'apps/web is client-only. `redirect`/`notFound` server navigation APIs are forbidden.'
             }
           ],
           patterns: [
             {
               group: ['@tx-agent-kit/db/*', 'drizzle-orm/*'],
               message: 'Web must stay API-first. Keep persistence concerns behind API/core services.'
+            },
+            {
+              group: ['effect/*'],
+              message:
+                'apps/web is intentionally dumb. Keep Effect runtime usage in API/core/worker layers.'
+            },
+            {
+              group: ['next/server/*', 'next/headers/*'],
+              message: 'apps/web is client-only. Server runtime imports are forbidden.'
             }
           ]
+        }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "ExpressionStatement[directive='use server']",
+          message:
+            "Server actions are forbidden in apps/web. Keep Next.js as a dumb client consumer."
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: ['apps/web/lib/axios.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'axios',
+              message: 'Use shared axios clients from `apps/web/lib/axios.ts` only.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['axios/*'],
+              message: 'Use shared axios clients from `apps/web/lib/axios.ts` only.'
+            }
+          ]
+        }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.object.name='axios'][callee.property.name='create']",
+          message: 'Create axios clients only in `apps/web/lib/axios.ts`.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: ['apps/web/lib/env.ts', 'apps/web/lib/api/generated/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message: 'Web must read environment variables via `apps/web/lib/env.ts` only.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/**/src/**/*.{ts,tsx}', 'packages/**/src/**/*.{ts,tsx}'],
+    ignores: [
+      '**/__tests__/**/*.{ts,tsx}',
+      '**/*.test.ts',
+      '**/*.spec.ts',
+      'apps/api/src/config/env.ts',
+      'apps/api/src/config/openapi-env.ts',
+      'apps/worker/src/config/env.ts',
+      'packages/auth/src/env.ts',
+      'packages/db/src/env.ts',
+      'packages/logging/src/env.ts',
+      'packages/observability/src/env.ts',
+      'packages/testkit/src/env.ts'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            'Read runtime environment through dedicated env modules only.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: ['apps/web/lib/notify.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'sonner',
+              message:
+                'Use `apps/web/lib/notify.tsx` as the single entry-point for toast notifications.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['sonner/*'],
+              message:
+                'Use `apps/web/lib/notify.tsx` as the single entry-point for toast notifications.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: ['apps/web/lib/url-state.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'nuqs',
+              message: 'Use `apps/web/lib/url-state.tsx` wrappers for URL query state.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['nuqs/*'],
+              message: 'Use `apps/web/lib/url-state.tsx` wrappers for URL query state.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: ['apps/web/lib/auth-token.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='window'][property.name='localStorage']",
+          message:
+            'Access browser session storage through `apps/web/lib/auth-token.ts` only.'
+        },
+        {
+          selector: "MemberExpression[object.name='localStorage']",
+          message:
+            'Access browser session storage through `apps/web/lib/auth-token.ts` only.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='window'][property.name='location']",
+          message:
+            'Do not read window.location directly in apps/web. Use `apps/web/lib/url-state.tsx` wrappers.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/web/lib/api/generated/**/*.{ts,tsx}',
+      'apps/web/lib/api/orval-mutator.ts'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.name='fetch']",
+          message:
+            'Direct fetch is forbidden in apps/web. Use typed client transport (`clientApi`/generated client).'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/web/lib/axios.ts',
+      'apps/web/lib/client-api.ts',
+      'apps/web/lib/api/orval-mutator.ts',
+      'apps/web/lib/api/generated/**/*.{ts,tsx}'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='api'][callee.property.name=/^(get|post|put|patch|delete|request)$/]",
+          message:
+            'Use generated API hooks/functions (or `clientApi` transitional wrapper) instead of calling shared axios instances directly.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/web/app/api/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Program',
+          message:
+            'Next API routes are forbidden in apps/web. Route all backend behavior through apps/api.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/api/src/**/*.integration.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'node:child_process',
+              message:
+                'API integration tests must use `createDbAuthContext(...)` from testkit and must not spawn processes manually.'
+            },
+            {
+              name: '@tx-agent-kit/testkit',
+              importNames: ['createSqlTestContext'],
+              message:
+                'API integration tests must use `createDbAuthContext(...)` (not direct `createSqlTestContext(...)`).'
+            }
+          ]
+        }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.name='spawn']",
+          message:
+            'API integration tests must use `createDbAuthContext(...)` from testkit and must not spawn processes manually.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/web/**/*.integration.test.ts', 'apps/web/**/*.integration.test.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "ImportSpecifier[imported.name=/^(setupWebIntegrationSuite|resetWebIntegrationCase|teardownWebIntegrationSuite)$/]",
+          message:
+            'Web integration suites must use centralized lifecycle hooks from `apps/web/vitest.integration.setup.ts`.'
         }
       ]
     }
@@ -79,11 +367,63 @@ export const domainInvariantConfig = [
     }
   },
   {
-    files: ['packages/**/src/domains/*/domain/**/*.{ts,tsx}'],
+    files: [
+      'packages/**/src/domains/*/{domain,ports,repositories,adapters,services,runtime,ui}/**/*.{ts,tsx}',
+      'apps/**/src/domains/*/{domain,ports,repositories,adapters,services,runtime,ui}/**/*.{ts,tsx}',
+      'apps/api/src/routes/**/*.{ts,tsx}'
+    ],
     rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportDefaultDeclaration',
+          message: 'Use named exports only in domain and route layers.'
+        },
+        {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message:
+            'Inject time via domain ports (clock provider) instead of calling Date.now() directly.'
+        },
+        {
+          selector: "NewExpression[callee.name='Date']",
+          message:
+            'Inject time via domain ports (clock provider) instead of instantiating Date directly.'
+        },
+        {
+          selector: "CallExpression[callee.object.name='Math'][callee.property.name='random']",
+          message:
+            'Inject randomness/ID generation via domain ports instead of Math.random().'
+        }
+      ]
+    }
+  },
+  {
+    files: ['packages/**/src/domains/*/domain/**/*.{ts,tsx}', 'apps/**/src/domains/*/domain/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message: 'Domain layer must not read environment variables directly.'
+        }
+      ],
       'no-restricted-imports': [
         'error',
         {
+          paths: [
+            {
+              name: 'node:fs',
+              message: 'Domain layer must stay pure and must not import filesystem dependencies.'
+            },
+            {
+              name: 'node:path',
+              message: 'Domain layer must stay pure and must not import path dependencies.'
+            },
+            {
+              name: 'node:child_process',
+              message: 'Domain layer must stay pure and must not import process execution dependencies.'
+            }
+          ],
           patterns: [
             {
               regex: '(^|/)(ports|repositories|adapters|services|runtime|ui)(/|$)',
@@ -95,8 +435,15 @@ export const domainInvariantConfig = [
     }
   },
   {
-    files: ['packages/**/src/domains/*/ports/**/*.{ts,tsx}'],
+    files: ['packages/**/src/domains/*/ports/**/*.{ts,tsx}', 'apps/**/src/domains/*/ports/**/*.{ts,tsx}'],
     rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'TSTypeReference[typeName.name=\"Promise\"]',
+          message: 'Domain ports must return Effect types, never Promise types.'
+        }
+      ],
       'no-restricted-imports': [
         'error',
         {
@@ -111,7 +458,10 @@ export const domainInvariantConfig = [
     }
   },
   {
-    files: ['packages/**/src/domains/*/{repositories,adapters}/**/*.{ts,tsx}'],
+    files: [
+      'packages/**/src/domains/*/{repositories,adapters}/**/*.{ts,tsx}',
+      'apps/**/src/domains/*/{repositories,adapters}/**/*.{ts,tsx}'
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -127,17 +477,245 @@ export const domainInvariantConfig = [
     }
   },
   {
-    files: ['packages/**/src/domains/*/services/**/*.{ts,tsx}'],
+    files: ['packages/db/src/repositories/**/*.{ts,tsx}'],
+    rules: {
+      'promise/prefer-await-to-then': 'error',
+      '@typescript-eslint/no-floating-promises': 'error'
+    }
+  },
+  {
+    files: ['packages/**/src/domains/*/services/**/*.{ts,tsx}', 'apps/**/src/domains/*/services/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
+          paths: [
+            {
+              name: '@tx-agent-kit/db',
+              message: 'Services must depend on domain ports, never DB packages directly.'
+            }
+          ],
           patterns: [
             {
-              regex: '(^|/)(runtime|ui)(/|$)',
-              message: 'Services may not import runtime/ui layers.'
+              regex: '(^|/)(repositories|adapters|runtime|ui)(/|$)',
+              message: 'Services may only depend on domain and ports layers.'
+            },
+            {
+              group: ['@tx-agent-kit/db/*'],
+              message: 'Services must depend on domain ports, never DB packages directly.'
             }
           ]
+        }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message: 'Domain services must receive config via ports/layers, not process.env.'
+        },
+        {
+          selector:
+            "CallExpression[callee.object.name='Effect'][callee.property.name=/^run(Promise|PromiseExit|Sync|Fork)$/]",
+          message:
+            'Domain services must stay declarative. Do not execute effects (run*) inside service/domain layers.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/api/src/routes/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@tx-agent-kit/db',
+              message: 'API routes must call domain services, not DB modules directly.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['@tx-agent-kit/db/*'],
+              message: 'API routes must call domain services, not DB modules directly.'
+            },
+            {
+              regex: '(^|/)domains/[^/]+/repositories(/|$)',
+              message: 'API routes must not depend on repository implementations directly.'
+            }
+          ]
+        }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message: 'API routes must read configuration from typed config modules, not process.env directly.'
+        },
+        {
+          selector:
+            "CallExpression[callee.object.name='Effect'][callee.property.name=/^run(Promise|PromiseExit|Sync|Fork)$/]",
+          message: 'API routes must remain effectful and compositional. Do not call Effect.run* in route handlers.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/worker/src/workflows*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@tx-agent-kit/db',
+              message: 'Temporal workflows must stay deterministic and must not import DB modules.'
+            },
+            {
+              name: '@tx-agent-kit/logging',
+              message: 'Temporal workflows must stay deterministic and must not import logging side effects.'
+            },
+            {
+              name: '@tx-agent-kit/observability',
+              message: 'Temporal workflows must stay deterministic and must not import observability side effects.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['@tx-agent-kit/db/*', 'node:*'],
+              message: 'Temporal workflows must stay deterministic and must not import non-deterministic infrastructure.'
+            }
+          ]
+        }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message: 'Temporal workflows must not read process.env directly.'
+        },
+        {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message: 'Temporal workflows must not call Date.now() directly.'
+        },
+        {
+          selector: "NewExpression[callee.name='Date']",
+          message: 'Temporal workflows must not instantiate Date directly.'
+        },
+        {
+          selector: "CallExpression[callee.object.name='Math'][callee.property.name='random']",
+          message: 'Temporal workflows must not call Math.random() directly.'
+        },
+        {
+          selector: "CallExpression[callee.name='setTimeout']",
+          message: 'Temporal workflows must not use setTimeout directly. Use Temporal workflow timers/APIs.'
+        },
+        {
+          selector: "CallExpression[callee.name='setInterval']",
+          message: 'Temporal workflows must not use setInterval directly. Use Temporal workflow timers/APIs.'
+        },
+        {
+          selector: "CallExpression[callee.name='clearTimeout']",
+          message: 'Temporal workflows must not manage timer handles directly.'
+        },
+        {
+          selector: "CallExpression[callee.name='clearInterval']",
+          message: 'Temporal workflows must not manage timer handles directly.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/worker/src/**/*.{ts,tsx}'],
+    ignores: ['apps/worker/src/config/env.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message: 'Worker code must read environment variables through `apps/worker/src/config/env.ts` only.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['packages/**/src/**/*.{ts,tsx}', 'apps/**/src/**/*.{ts,tsx}'],
+    ignores: [
+      '**/__tests__/**/*.{ts,tsx}',
+      'apps/worker/src/activities.ts'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='Effect'][callee.property.name=/^run(Promise|PromiseExit|Sync|Fork)$/]",
+          message:
+            'Avoid Effect.run* in application source. Keep code declarative and execute effects only at explicit runtime boundaries.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['packages/core/src/domains/**/*.{ts,tsx}', 'apps/api/src/routes/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            'Domain and route layers must read environment via typed config modules / ports, not process.env directly.'
+        },
+        {
+          selector:
+            "CallExpression[callee.object.name='Effect'][callee.property.name=/^run(Promise|PromiseExit|Sync|Fork)$/]",
+          message:
+            'Domain and route layers must stay declarative. Do not execute effects (run*) inside these layers.'
+        },
+        {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message:
+            'Inject time via domain ports (clock provider) instead of calling Date.now() directly.'
+        },
+        {
+          selector: "NewExpression[callee.name='Date']",
+          message:
+            'Inject time via domain ports (clock provider) instead of instantiating Date directly.'
+        },
+        {
+          selector: "CallExpression[callee.object.name='Math'][callee.property.name='random']",
+          message:
+            'Inject randomness/ID generation via domain ports instead of Math.random().'
+        },
+        {
+          selector: "ThrowStatement > NewExpression[callee.name='Error']",
+          message:
+            'Domain and route layers should use typed Effect failures instead of throwing raw Error instances.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['packages/**/src/**/*.{ts,tsx}', 'apps/**/src/**/*.{ts,tsx}'],
+    ignores: ['**/__tests__/**/*.{ts,tsx}', 'packages/tooling/scaffold/src/index.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'TSAsExpression[typeAnnotation.type="TSAnyKeyword"]',
+          message: 'Avoid `as any` in application source. Fix boundary types instead.'
+        },
+        {
+          selector: 'TSTypeAssertion[typeAnnotation.type="TSAnyKeyword"]',
+          message: 'Avoid `<any>` assertions in application source. Fix boundary types instead.'
+        },
+        {
+          selector: 'TSAsExpression[typeAnnotation.type="TSNeverKeyword"]',
+          message: 'Avoid `as never` in application source. Fix types at the boundary instead.'
+        },
+        {
+          selector: 'TSAsExpression > TSAsExpression',
+          message: 'Avoid chained type assertions (`as unknown as ...`) in application source.'
         }
       ]
     }

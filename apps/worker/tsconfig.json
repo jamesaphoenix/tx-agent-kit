@@ -6,7 +6,9 @@
   },
   "include": ["src/**/*"],
   "references": [
+    { "path": "../../packages/db" },
     { "path": "../../packages/logging" },
-    { "path": "../../packages/observability" }
+    { "path": "../../packages/observability" },
+    { "path": "../../packages/temporal-client" }
   ]
 }

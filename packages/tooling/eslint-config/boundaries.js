@@ -1,19 +1,41 @@
-import boundaries from 'eslint-plugin-boundaries'
+import boundariesPlugin from 'eslint-plugin-boundaries'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export const boundariesConfig = [
   {
-    files: ['apps/web/**/*.{ts,tsx}'],
-    plugins: { boundaries },
+    plugins: {
+      boundaries: boundariesPlugin
+    },
     settings: {
+      'boundaries/root-path': resolve(__dirname, '../..'),
+      'boundaries/include': ['packages/**/*', 'apps/**/*'],
+      'boundaries/ignore': [
+        '**/*.test.ts',
+        '**/dist/**',
+        '**/*.d.ts',
+        '**/vitest.config.ts'
+      ],
       'boundaries/elements': [
-        { type: 'web', pattern: 'apps/web/**' },
-        { type: 'api', pattern: 'apps/api/**' },
-        { type: 'worker', pattern: 'apps/worker/**' },
-        { type: 'db', pattern: 'packages/db/**' },
-        { type: 'core', pattern: 'packages/core/**' },
-        { type: 'contracts', pattern: 'packages/contracts/**' },
-        { type: 'auth', pattern: 'packages/auth/**' },
-        { type: 'observability', pattern: 'packages/observability/**' }
+        {
+          type: 'temporal-workflow',
+          pattern: 'apps/worker/src/workflows*'
+        },
+        {
+          type: 'temporal-activity',
+          pattern: 'apps/worker/src/activities*'
+        },
+        {
+          type: 'app',
+          pattern: 'apps/*'
+        },
+        {
+          type: 'package',
+          pattern: 'packages/*'
+        }
       ]
     },
     rules: {
@@ -23,12 +45,23 @@ export const boundariesConfig = [
           default: 'disallow',
           rules: [
             {
-              from: 'web',
-              allow: ['contracts', 'auth', 'observability', 'web']
+              from: 'package',
+              allow: ['package']
+            },
+            {
+              from: 'app',
+              allow: ['package', 'app', 'temporal-activity'],
+              disallow: ['temporal-workflow']
+            },
+            {
+              from: 'temporal-workflow',
+              allow: ['temporal-workflow', 'temporal-activity', 'package']
             }
           ]
         }
-      ]
+      ],
+      'boundaries/no-unknown': 'error',
+      'boundaries/no-unknown-files': 'warn'
     }
   }
 ]

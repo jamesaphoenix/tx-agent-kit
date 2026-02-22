@@ -1,11 +1,14 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import { clientApi } from '../lib/client-api'
+import { notify } from '../lib/notify'
 
-export function CreateWorkspaceForm() {
-  const router = useRouter()
+export function CreateWorkspaceForm({
+  onCreated
+}: {
+  onCreated?: () => void | Promise<void>
+}) {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -18,15 +21,24 @@ export function CreateWorkspaceForm() {
     try {
       await clientApi.createWorkspace({ name })
       setName('')
-      router.refresh()
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to create workspace')
+      notify.success('Workspace created')
+      await onCreated?.()
+      setPending(false)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create workspace'
+      setError(message)
+      notify.error(message)
       setPending(false)
     }
   }
 
   return (
-    <form className="stack" onSubmit={onSubmit}>
+    <form
+      className="stack"
+      onSubmit={(event) => {
+        void onSubmit(event)
+      }}
+    >
       <h3>Create Workspace</h3>
       <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Growth Experiments" minLength={2} maxLength={64} required />
       {error && <p className="error">{error}</p>}

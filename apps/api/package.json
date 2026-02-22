@@ -24,6 +24,8 @@
     "effect": "^3.19.16"
   },
   "devDependencies": {
+    "@tx-agent-kit/auth": "workspace:*",
+    "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
     "@types/supertest": "^6.0.3",
     "supertest": "^7.1.4"

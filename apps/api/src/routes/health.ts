@@ -1,13 +1,15 @@
 import { HttpApiBuilder } from '@effect/platform'
-import { Effect } from 'effect'
+import { DateTime, Effect } from 'effect'
 import { TxAgentApi } from '../api.js'
+
+export const HealthRouteKind = 'custom' as const
 
 export const HealthLive = HttpApiBuilder.group(TxAgentApi, 'health', (handlers) =>
   handlers.handle('health', () =>
-    Effect.succeed({
+    Effect.map(DateTime.now, (now) => ({
       status: 'healthy' as const,
-      timestamp: new Date().toISOString(),
+      timestamp: DateTime.formatIso(now),
       service: 'tx-agent-kit-api'
-    })
+    }))
   )
 )

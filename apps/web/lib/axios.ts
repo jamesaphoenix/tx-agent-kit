@@ -2,13 +2,13 @@
 
 import axios, {
   type AxiosError,
-  type AxiosResponse,
+  type AxiosRequestConfig,
   type InternalAxiosRequestConfig
 } from 'axios'
+import { readAuthToken } from './auth-token'
+import { getWebEnv } from './env'
 
-const TOKEN_COOKIE_NAME = 'tx_agent_token'
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000'
+const webEnv = getWebEnv()
 
 interface ApiErrorPayload {
   message?: string
@@ -21,82 +21,51 @@ const isApiErrorPayload = (value: unknown): value is ApiErrorPayload => {
   if (typeof value !== 'object' || value === null) {
     return false
   }
+
   return true
 }
 
-const getCookieValue = (name: string): string | null => {
-  if (typeof document === 'undefined') {
-    return null
+const attachAuthHeader = (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
+  const token = readAuthToken()
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  } else {
+    delete config.headers.Authorization
   }
 
-  const encodedName = `${encodeURIComponent(name)}=`
-  const pairs = document.cookie.split(';')
-  for (const rawPair of pairs) {
-    const pair = rawPair.trim()
-    if (pair.startsWith(encodedName)) {
-      return decodeURIComponent(pair.slice(encodedName.length))
-    }
-  }
-
-  return null
-}
-
-const setCookieValue = (name: string, value: string, maxAgeSeconds: number): void => {
-  if (typeof document === 'undefined') {
-    return
-  }
-
-  const securePart = window.location.protocol === 'https:' ? '; Secure' : ''
-  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${securePart}`
-}
-
-export const setSessionToken = (token: string): void => {
-  setCookieValue(TOKEN_COOKIE_NAME, token, SESSION_MAX_AGE_SECONDS)
-}
-
-export const clearSessionToken = (): void => {
-  setCookieValue(TOKEN_COOKIE_NAME, '', 0)
-}
-
-export const getSessionToken = (): string | null => {
-  return getCookieValue(TOKEN_COOKIE_NAME)
+  return config
 }
 
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: webEnv.API_BASE_URL,
   headers: {
     'Content-Type': 'application/json'
   }
 })
 
-api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = getSessionToken()
-  if (token) {
-    config.headers.set('Authorization', `Bearer ${token}`)
-  }
-  return config
-})
+api.interceptors.request.use(attachAuthHeader)
 
-api.interceptors.response.use(
-  (response: AxiosResponse): AxiosResponse => response,
-  (error: AxiosError<ApiErrorPayload>): Promise<never> => {
-    if (error.response?.status === 401) {
-      clearSessionToken()
-    }
-
-    return Promise.reject(error instanceof Error ? error : new Error('API request failed'))
+export const getApiErrorStatus = (error: unknown): number | undefined => {
+  if (!axios.isAxiosError(error)) {
+    return undefined
   }
-)
+
+  return error.response?.status
+}
 
 export const getApiErrorMessage = (error: unknown, fallback: string): string => {
   if (!axios.isAxiosError(error)) {
     return fallback
   }
 
-  const payload = error.response?.data
+  const payload: unknown = error.response?.data
   if (!isApiErrorPayload(payload)) {
     return error.message || fallback
   }
 
   return payload.error?.message ?? payload.message ?? error.message ?? fallback
 }
+
+export type ApiAxiosRequestConfig = AxiosRequestConfig
+export type ApiAxiosError<T = unknown> = AxiosError<T>

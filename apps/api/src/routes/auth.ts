@@ -3,6 +3,8 @@ import { AuthService, principalFromAuthorization } from '@tx-agent-kit/core'
 import { Effect } from 'effect'
 import { TxAgentApi, mapCoreError } from '../api.js'
 
+export const AuthRouteKind = 'custom' as const
+
 export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) =>
   handlers
     .handle('signUp', ({ payload }) =>
@@ -20,16 +22,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) =>
     .handle('me', () =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
-        const authorization = request.headers.authorization
-        const authService = yield* AuthService
-
-        if (!authorization) {
-          return yield* Effect.fail(mapCoreError({ _tag: 'CoreError', code: 'UNAUTHORIZED', message: 'Missing authorization header' }))
-        }
-
-        const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : authorization
-        const principal = yield* authService.getPrincipalFromToken(token).pipe(Effect.mapError(mapCoreError))
-        return principal
+        return yield* principalFromAuthorization(request.headers.authorization).pipe(Effect.mapError(mapCoreError))
       })
     )
     .handle('deleteMe', () =>

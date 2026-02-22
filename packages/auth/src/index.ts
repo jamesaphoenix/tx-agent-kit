@@ -3,6 +3,7 @@ import { Effect } from 'effect'
 import * as Schema from 'effect/Schema'
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose'
 import type { AuthPrincipal } from '@tx-agent-kit/contracts'
+import { getAuthEnv } from './env.js'
 
 export class AuthError extends Schema.TaggedError<AuthError>()('AuthError', {
   message: Schema.String
@@ -16,7 +17,8 @@ export interface SessionTokenPayload extends JWTPayload {
 const encoder = new TextEncoder()
 
 const getSecret = (): Uint8Array => {
-  const secret = process.env.AUTH_SECRET
+  const env = getAuthEnv()
+  const secret = env.AUTH_SECRET
   if (!secret || secret.length < 16) {
     throw new Error('AUTH_SECRET must be configured and at least 16 chars')
   }

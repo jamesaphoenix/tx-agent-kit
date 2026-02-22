@@ -1,22 +1,35 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { clientApi } from '../lib/client-api'
+import { notify } from '../lib/notify'
+import { sessionStoreActions } from '../stores/session-store'
 
 export function SignOutButton() {
   const router = useRouter()
+  const [pending, setPending] = useState(false)
 
   return (
     <button
       className="secondary"
       type="button"
+      disabled={pending}
       onClick={() => {
-        clientApi.signOut()
-        router.push('/sign-in')
-        router.refresh()
+        void (async () => {
+          setPending(true)
+          try {
+            await clientApi.signOut()
+            sessionStoreActions.clear()
+            notify.info('Signed out')
+            router.replace('/sign-in')
+          } finally {
+            setPending(false)
+          }
+        })()
       }}
     >
-      Sign out
+      {pending ? 'Signing out...' : 'Sign out'}
     </button>
   )
 }

@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    build:
+      context: .
+      dockerfile: monitoring/local/postgres/Dockerfile
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -106,7 +108,7 @@ services:
       - ./monitoring/local/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
-      - '3001:3000'
+      - '${GRAFANA_PORT:-3001}:3000'
     depends_on:
       - prometheus
       - loki
@@ -162,7 +164,7 @@ services:
       NODE_ENV: production
       API_PORT: 4000
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/tx_agent_kit
-      AUTH_SECRET: change-me-in-production
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET must be set}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     depends_on:
       postgres:

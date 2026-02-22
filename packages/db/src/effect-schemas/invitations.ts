@@ -6,6 +6,7 @@ export const invitationRoleSchema = Schema.Literal('owner', 'admin', 'member')
 export const invitationRowSchema = Schema.Struct({
   id: Schema.UUID,
   workspaceId: Schema.UUID,
+  inviteeUserId: Schema.NullOr(Schema.UUID),
   email: Schema.String,
   role: invitationRoleSchema,
   status: invitationStatusSchema,

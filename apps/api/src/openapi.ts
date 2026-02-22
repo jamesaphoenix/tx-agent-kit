@@ -4,6 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { TxAgentApi } from './api.js'
+import { getOpenApiEnv } from './config/openapi-env.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -40,6 +41,10 @@ const DDD_INVARIANTS = {
       rule: 'Invitations can be accepted only when status is pending, not expired, and email matches authenticated principal.'
     },
     {
+      id: 'INV-INV-002',
+      rule: 'Invitation list visibility is scoped to invitations whose email matches the authenticated principal.'
+    },
+    {
       id: 'INV-ARCH-001',
       rule: 'Domain mutations are accepted only via API/application services; direct UI-to-DB writes are forbidden.'
     }
@@ -51,6 +56,7 @@ const OPERATION_INVARIANTS: Record<string, readonly string[]> = {
   signIn: ['INV-AUTH-001'],
   deleteMe: ['INV-ARCH-001'],
   createInvitation: ['INV-WS-001'],
+  listInvitations: ['INV-INV-002'],
   listTasks: ['INV-WS-001'],
   createTask: ['INV-WS-001'],
   acceptInvitation: ['INV-INV-001']
@@ -93,6 +99,7 @@ const injectOperationInvariants = (spec: Record<string, unknown>): Record<string
 
 const generate = async (): Promise<void> => {
   const baseSpec = OpenApi.fromApi(TxAgentApi)
+  const openApiEnv = getOpenApiEnv()
   const spec = injectOperationInvariants({
     ...baseSpec,
     info: {
@@ -104,7 +111,7 @@ const generate = async (): Promise<void> => {
     },
     servers: [
       {
-        url: process.env.OPENAPI_SERVER_URL ?? 'http://localhost:4000',
+        url: openApiEnv.OPENAPI_SERVER_URL,
         description: 'Local development API'
       }
     ],

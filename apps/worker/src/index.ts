@@ -4,45 +4,60 @@ import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { activities } from './activities.js'
+import { getWorkerEnv } from './config/env.js'
 
 const logger = createLogger('tx-agent-kit-worker')
 
 async function run(): Promise<void> {
+  const env = getWorkerEnv()
   await startTelemetry('tx-agent-kit-worker')
 
   const connection = await NativeConnection.connect({
-    address: process.env.TEMPORAL_ADDRESS ?? 'localhost:7233'
+    address: env.TEMPORAL_ADDRESS
   })
 
   const worker = await Worker.create({
     connection,
-    namespace: process.env.TEMPORAL_NAMESPACE ?? 'default',
-    taskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'tx-agent-kit',
+    namespace: env.TEMPORAL_NAMESPACE,
+    taskQueue: env.TEMPORAL_TASK_QUEUE,
     workflowsPath: path.join(path.dirname(fileURLToPath(import.meta.url)), 'workflows.js'),
     activities
   })
 
   logger.info('Temporal worker started.', {
-    address: process.env.TEMPORAL_ADDRESS ?? 'localhost:7233',
-    namespace: process.env.TEMPORAL_NAMESPACE ?? 'default',
-    taskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'tx-agent-kit'
+    address: env.TEMPORAL_ADDRESS,
+    namespace: env.TEMPORAL_NAMESPACE,
+    taskQueue: env.TEMPORAL_TASK_QUEUE
   })
 
-  const shutdown = async () => {
-    logger.info('Stopping Temporal worker.')
-    await stopTelemetry()
-    process.exit(0)
+  let shuttingDown = false
+  let shutdownSignal = 'worker.run completed'
+  const requestShutdown = (signal: string) => {
+    if (shuttingDown) {
+      return
+    }
+
+    shuttingDown = true
+    shutdownSignal = signal
+    logger.info('Stopping Temporal worker.', { signal })
+    worker.shutdown()
   }
 
   process.on('SIGINT', () => {
-    void shutdown()
+    requestShutdown('SIGINT')
   })
 
   process.on('SIGTERM', () => {
-    void shutdown()
+    requestShutdown('SIGTERM')
   })
 
-  await worker.run()
+  try {
+    await worker.run()
+    logger.info('Temporal worker stopped.', { signal: shutdownSignal })
+  } finally {
+    await connection.close()
+    await stopTelemetry()
+  }
 }
 
 void run()

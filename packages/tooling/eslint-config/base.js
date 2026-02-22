@@ -19,7 +19,24 @@ export const baseConfig = [
     },
     rules: {
       'no-console': 'error',
+      'no-warning-comments': [
+        'error',
+        {
+          terms: ['todo', 'fixme', 'hack'],
+          location: 'start'
+        }
+      ],
       '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        {
+          'ts-ignore': true,
+          'ts-expect-error': true,
+          'ts-nocheck': true,
+          'ts-check': false
+        }
+      ],
+      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/consistent-type-imports': [
         'error',
@@ -30,7 +47,10 @@ export const baseConfig = [
     }
   },
   {
-    files: ['apps/web/**/*.{ts,tsx}'],
+    files: [
+      'apps/web/lib/api/generated/**/*.{ts,tsx}',
+      'apps/web/lib/api/orval-mutator.ts'
+    ],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',

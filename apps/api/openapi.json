@@ -1744,6 +1744,10 @@
         "rule": "Invitations can be accepted only when status is pending, not expired, and email matches authenticated principal."
       },
       {
+        "id": "INV-INV-002",
+        "rule": "Invitation list visibility is scoped to invitations whose email matches the authenticated principal."
+      },
+      {
         "id": "INV-ARCH-001",
         "rule": "Domain mutations are accepted only via API/application services; direct UI-to-DB writes are forbidden."
       }

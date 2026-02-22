@@ -1,4 +1,5 @@
-const seenOperations = new Set<string>()
+import { processedOperationsRepository } from '@tx-agent-kit/db'
+import { Effect } from 'effect'
 
 export interface ProcessTaskInput {
   operationId: string
@@ -7,19 +8,6 @@ export interface ProcessTaskInput {
 }
 
 export const activities = {
-  processTask: (input: ProcessTaskInput): Promise<{ operationId: string; alreadyProcessed: boolean }> => {
-    if (seenOperations.has(input.operationId)) {
-      return Promise.resolve({
-        operationId: input.operationId,
-        alreadyProcessed: true
-      })
-    }
-
-    seenOperations.add(input.operationId)
-
-    return Promise.resolve({
-      operationId: input.operationId,
-      alreadyProcessed: false
-    })
-  }
+  processTask: (input: ProcessTaskInput): Promise<{ operationId: string; alreadyProcessed: boolean }> =>
+    Effect.runPromise(processedOperationsRepository.markProcessed(input))
 }

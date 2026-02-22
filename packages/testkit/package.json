@@ -1,0 +1,27 @@
+{
+  "name": "@tx-agent-kit/testkit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "type-check": "tsc -b --pretty false",
+    "lint": "eslint src --max-warnings=0",
+    "test": "vitest run -c vitest.config.ts",
+    "test:integration": "vitest run -c vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@tx-agent-kit/contracts": "workspace:*",
+    "@tx-agent-kit/db": "workspace:*",
+    "@opentelemetry/api": "^1.9.0",
+    "effect": "^3.19.16",
+    "pg": "^8.16.3",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@tx-agent-kit/vitest-config": "workspace:*",
+    "@types/pg": "^8.15.5"
+  }
+}

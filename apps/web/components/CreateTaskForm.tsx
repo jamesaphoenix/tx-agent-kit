@@ -1,11 +1,16 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import { clientApi } from '../lib/client-api'
+import { notify } from '../lib/notify'
 
-export function CreateTaskForm({ workspaceId }: { workspaceId: string }) {
-  const router = useRouter()
+export function CreateTaskForm({
+  workspaceId,
+  onCreated
+}: {
+  workspaceId: string
+  onCreated?: () => void | Promise<void>
+}) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [pending, setPending] = useState(false)
@@ -25,15 +30,24 @@ export function CreateTaskForm({ workspaceId }: { workspaceId: string }) {
 
       setTitle('')
       setDescription('')
-      router.refresh()
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to create task')
+      notify.success('Task created')
+      await onCreated?.()
+      setPending(false)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create task'
+      setError(message)
+      notify.error(message)
       setPending(false)
     }
   }
 
   return (
-    <form className="stack" onSubmit={onSubmit}>
+    <form
+      className="stack"
+      onSubmit={(event) => {
+        void onSubmit(event)
+      }}
+    >
       <h3>Create Task</h3>
       <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ship invitation acceptance flow" required />
       <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Optional context" rows={4} />

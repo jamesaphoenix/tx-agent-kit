@@ -1,4 +1,5 @@
 import { proxyActivities } from '@temporalio/workflow'
+import type { TaskProcessWorkflowInput, TaskProcessWorkflowOutput } from '@tx-agent-kit/temporal-client'
 import type { activities } from './activities.js'
 
 const { processTask } = proxyActivities<typeof activities>({
@@ -9,17 +10,12 @@ const { processTask } = proxyActivities<typeof activities>({
   }
 })
 
-export interface TaskProcessWorkflowInput {
-  operationId: string
-  taskId: string
-  workspaceId: string
-}
-
-export async function taskProcessWorkflow(input: TaskProcessWorkflowInput): Promise<{ success: boolean; operationId: string }> {
-  await processTask(input)
+export async function taskProcessWorkflow(input: TaskProcessWorkflowInput): Promise<TaskProcessWorkflowOutput> {
+  const result = await processTask(input)
 
   return {
-    success: true,
-    operationId: input.operationId
+    success: !result.alreadyProcessed,
+    operationId: input.operationId,
+    alreadyProcessed: result.alreadyProcessed
   }
 }

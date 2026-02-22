@@ -12,6 +12,7 @@ type InvitationInsert = typeof invitations.$inferInsert
 export interface CreateInvitationFactoryOptions {
   workspaceId: string
   invitedByUserId: string
+  inviteeUserId?: string | null
   id?: string
   email?: string
   role?: 'owner' | 'admin' | 'member'
@@ -27,6 +28,7 @@ export const createInvitationFactory = (
   return {
     id: options.id ?? generateId(),
     workspaceId: options.workspaceId,
+    inviteeUserId: options.inviteeUserId ?? null,
     email: options.email ?? generateEmail('invite'),
     role: options.role ?? 'member',
     status: options.status ?? 'pending',

@@ -6,7 +6,6 @@ coverage
 .env
 .env.*
 !.env.example
-!.env.mcp.example
 .next
 .DS_Store
 *.log

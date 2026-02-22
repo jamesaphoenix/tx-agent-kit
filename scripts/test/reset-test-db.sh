@@ -6,35 +6,71 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-COMPOSE_PROJECT_NAME="tx-agent-kit"
-DB_NAME="${TX_AGENT_DB_NAME:-tx_agent_kit}"
-LOCK_DIR="/tmp/tx-agent-kit-db-reset.lock"
+source "$PROJECT_ROOT/scripts/lib/lock.sh"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-tx-agent-kit}"
+LOCK_DIR="/tmp/${COMPOSE_PROJECT_NAME}-db-reset.lock"
 
 cd "$PROJECT_ROOT"
 
 "$PROJECT_ROOT/scripts/start-dev-services.sh"
 
-acquire_lock() {
-  local timeout_seconds=120
-  local waited=0
+derive_db_name_from_url() {
+  local database_url="${1:-}"
+  if [[ -z "$database_url" ]]; then
+    return 1
+  fi
 
-  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
-    if (( waited >= timeout_seconds )); then
-      echo "Timed out waiting for DB reset lock: $LOCK_DIR"
-      exit 1
-    fi
+  local without_query="${database_url%%\?*}"
+  local candidate="${without_query##*/}"
+  if [[ -z "$candidate" || "$candidate" == "$without_query" ]]; then
+    return 1
+  fi
 
-    sleep 1
-    waited=$((waited + 1))
-  done
+  printf '%s\n' "$candidate"
 }
 
-release_lock() {
-  rmdir "$LOCK_DIR" 2>/dev/null || true
+derive_db_host_from_url() {
+  local database_url="${1:-}"
+  if [[ -z "$database_url" ]]; then
+    return 1
+  fi
+
+  local without_protocol="${database_url#postgresql://}"
+  without_protocol="${without_protocol#postgres://}"
+  local without_auth="${without_protocol#*@}"
+  local host_port="${without_auth%%/*}"
+  local host="${host_port%%:*}"
+  host="${host#[}"
+  host="${host%]}"
+  printf '%s\n' "$host"
 }
 
-acquire_lock
-trap release_lock EXIT
+if derived_db_name="$(derive_db_name_from_url "${DATABASE_URL:-}")"; then
+  DB_NAME="$derived_db_name"
+else
+  DB_NAME="${TX_AGENT_DB_NAME:-tx_agent_kit}"
+fi
+
+EXPECTED_DB_NAME="tx_agent_kit"
+if [[ "$DB_NAME" != "$EXPECTED_DB_NAME" ]]; then
+  echo "Refusing to reset database '$DB_NAME'. Expected '$EXPECTED_DB_NAME'."
+  exit 1
+fi
+
+if [[ -n "${DATABASE_URL:-}" ]]; then
+  if ! db_host="$(derive_db_host_from_url "$DATABASE_URL")"; then
+    echo "Could not parse DATABASE_URL host. Refusing to continue."
+    exit 1
+  fi
+
+  if [[ "$db_host" != "localhost" && "$db_host" != "127.0.0.1" && "$db_host" != "::1" ]]; then
+    echo "Refusing to reset non-local DATABASE_URL host '$db_host'."
+    exit 1
+  fi
+fi
+
+lock_acquire "$LOCK_DIR" 120
+trap 'lock_release "$LOCK_DIR"' EXIT
 
 echo "Applying migrations..."
 pnpm db:migrate
@@ -58,7 +94,8 @@ BEGIN
   INTO truncate_sql
   FROM pg_tables
   WHERE schemaname = 'public'
-    AND tablename <> '__drizzle_migrations';
+    AND tablename <> '__drizzle_migrations'
+    AND tablename <> '__tx_agent_migrations';
 
   IF truncate_sql IS NOT NULL THEN
     EXECUTE truncate_sql;

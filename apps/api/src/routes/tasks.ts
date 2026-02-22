@@ -3,6 +3,8 @@ import { principalFromAuthorization, TaskService } from '@tx-agent-kit/core'
 import { Effect } from 'effect'
 import { TxAgentApi, mapCoreError } from '../api.js'
 
+export const TasksRouteKind = 'custom' as const
+
 export const TasksLive = HttpApiBuilder.group(TxAgentApi, 'tasks', (handlers) =>
   handlers
     .handle('listTasks', ({ urlParams }) =>

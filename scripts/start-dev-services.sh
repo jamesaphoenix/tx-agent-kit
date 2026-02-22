@@ -7,7 +7,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPOSE_PROJECT_NAME="tx-agent-kit"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-tx-agent-kit}"
+TEMPORAL_PORT="${TEMPORAL_PORT:-7233}"
+OTEL_HEALTH_PORT="${OTEL_HEALTH_PORT:-13133}"
+PROMETHEUS_PORT="${PROMETHEUS_PORT:-9090}"
+GRAFANA_PORT="${GRAFANA_PORT:-3001}"
+JAEGER_UI_PORT="${JAEGER_UI_PORT:-16686}"
+LOKI_PORT="${LOKI_PORT:-3100}"
+TEMPORAL_UI_PORT="${TEMPORAL_UI_PORT:-8233}"
 
 cd "$PROJECT_ROOT"
 
@@ -23,6 +30,12 @@ check_tcp_port() {
     return $?
   fi
 
+  # Fallback for environments that do not ship nc/lsof (for example lean containers).
+  if [[ -n "${BASH_VERSION:-}" ]]; then
+    (exec 3<>"/dev/tcp/127.0.0.1/${port}") >/dev/null 2>&1
+    return $?
+  fi
+
   return 1
 }
 
@@ -32,12 +45,12 @@ check_postgres() {
   [[ -n "$container_id" ]] && docker exec "$container_id" pg_isready -U postgres -d tx_agent_kit >/dev/null 2>&1
 }
 
-check_temporal() { check_tcp_port 7233; }
-check_otel() { curl -fsS "http://localhost:13133/health/status" >/dev/null 2>&1; }
-check_prometheus() { curl -fsS "http://localhost:9090/-/healthy" >/dev/null 2>&1; }
-check_grafana() { curl -fsS "http://localhost:3001/api/health" >/dev/null 2>&1; }
-check_jaeger() { curl -fsS "http://localhost:16686" >/dev/null 2>&1; }
-check_loki() { curl -fsS "http://localhost:3100/ready" >/dev/null 2>&1; }
+check_temporal() { check_tcp_port "$TEMPORAL_PORT"; }
+check_otel() { curl -fsS "http://localhost:${OTEL_HEALTH_PORT}/health/status" >/dev/null 2>&1; }
+check_prometheus() { curl -fsS "http://localhost:${PROMETHEUS_PORT}/-/healthy" >/dev/null 2>&1; }
+check_grafana() { curl -fsS "http://localhost:${GRAFANA_PORT}/api/health" >/dev/null 2>&1; }
+check_jaeger() { curl -fsS "http://localhost:${JAEGER_UI_PORT}" >/dev/null 2>&1; }
+check_loki() { curl -fsS "http://localhost:${LOKI_PORT}/ready" >/dev/null 2>&1; }
 
 all_healthy() {
   check_postgres &&
@@ -67,10 +80,10 @@ echo "Waiting for infrastructure readiness..."
 for i in {1..120}; do
   if all_healthy; then
     echo "Infrastructure is ready."
-    echo "Temporal UI:  http://localhost:8233"
-    echo "Grafana:      http://localhost:3001"
-    echo "Prometheus:   http://localhost:9090"
-    echo "Jaeger:       http://localhost:16686"
+    echo "Temporal UI:  http://localhost:${TEMPORAL_UI_PORT}"
+    echo "Grafana:      http://localhost:${GRAFANA_PORT}"
+    echo "Prometheus:   http://localhost:${PROMETHEUS_PORT}"
+    echo "Jaeger:       http://localhost:${JAEGER_UI_PORT}"
     exit 0
   fi
 

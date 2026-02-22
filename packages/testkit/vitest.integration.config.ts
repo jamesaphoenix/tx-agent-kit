@@ -1,0 +1,15 @@
+import { defineConfig, mergeConfig } from 'vitest/config'
+import integrationConfig from '@tx-agent-kit/vitest-config/integration'
+
+export default mergeConfig(
+  integrationConfig,
+  defineConfig({
+    test: {
+      name: 'testkit-integration',
+      include: ['src/**/*.integration.test.ts'],
+      sequence: {
+        groupOrder: 2
+      }
+    }
+  })
+)

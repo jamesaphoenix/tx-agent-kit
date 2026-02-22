@@ -1,17 +1,16 @@
-import type { Metadata } from 'next'
-import type { ReactNode } from 'react'
-import './globals.css'
+'use client'
 
-export const metadata: Metadata = {
-  title: 'tx-agent-kit',
-  description: 'Agent-first starter with Effect, Temporal, and Next.js'
-}
+import type { ReactNode } from 'react'
+import { AppProviders } from '../components/providers/AppProviders'
+import './globals.css'
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <main>{children}</main>
+        <AppProviders>
+          <main>{children}</main>
+        </AppProviders>
       </body>
     </html>
   )
