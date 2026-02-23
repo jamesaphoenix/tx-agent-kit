@@ -6,7 +6,9 @@
     "moduleResolution": "Bundler",
     "jsx": "react-native",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@tx-agent-kit/observability": ["../../packages/observability/src/index.ts"],
+      "@tx-agent-kit/observability/*": ["../../packages/observability/src/*"]
     }
   },
   "include": [

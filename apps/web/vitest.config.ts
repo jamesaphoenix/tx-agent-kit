@@ -22,7 +22,10 @@ export default mergeConfig(
     },
     resolve: {
       alias: {
-        '@': fileURLToPath(new URL('./', import.meta.url))
+        '@': fileURLToPath(new URL('./', import.meta.url)),
+        '@tx-agent-kit/observability/client': fileURLToPath(
+          new URL('../../packages/observability/src/client.ts', import.meta.url)
+        )
       }
     }
   })

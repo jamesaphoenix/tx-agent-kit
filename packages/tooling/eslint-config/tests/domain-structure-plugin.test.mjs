@@ -138,6 +138,42 @@ test('require-domain-structure reports empty application use-case folder', async
   }
 })
 
+test('require-domain-structure reports forbidden repositories and services folders', async () => {
+  const fixture = makeTempDomainRoot({
+    includeFolders: [
+      'domain',
+      'ports',
+      'application',
+      'adapters',
+      'repositories',
+      'services'
+    ],
+    applicationFiles: ['create-sample.ts']
+  })
+
+  try {
+    const messages = await withDomainRoots([fixture.domainRoot], () =>
+      runRule({
+        ruleName: 'require-domain-structure',
+        filePath: 'packages/core/src/domains/task/domain/example.ts',
+        code: 'export const x = 1\n'
+      })
+    )
+
+    assert.equal(messages.length, 2)
+    assert.ok(
+      messages.some((message) =>
+        /must not include `repositories\/`/.test(message.message)
+      )
+    )
+    assert.ok(
+      messages.some((message) => /must not include `services\/`/.test(message.message))
+    )
+  } finally {
+    fixture.cleanup()
+  }
+})
+
 test('enforce-layer-boundaries reports invalid domain -> adapters import', async () => {
   const messages = await runRule({
     ruleName: 'enforce-layer-boundaries',

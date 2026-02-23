@@ -31,6 +31,7 @@
     "test:integration": "./scripts/test/run-integration.sh",
     "test:integration:quiet": "./scripts/test-integration-quiet.sh",
     "test:db:pgtap": "./scripts/test/run-pgtap.sh",
+    "test:infra:observability": "./scripts/test/check-observability.sh",
     "test:run-silent": "./scripts/test-run-silent.sh",
     "verify:temporal-types": "tsx ./scripts/verify-temporal-types.ts",
     "test:temporal-types": "vitest run -c scripts/vitest.config.ts",
@@ -48,7 +49,13 @@
     "db:trigger:new": "node ./scripts/db/new-trigger.mjs",
     "db:test:reset": "./scripts/test/reset-test-db.sh",
     "db:studio": "pnpm --filter @tx-agent-kit/db db:studio",
-    "scaffold:crud": "pnpm --filter @tx-agent-kit/scaffold scaffold:crud"
+    "scaffold:crud": "pnpm --filter @tx-agent-kit/scaffold scaffold:crud",
+    "deploy:build-images": "./scripts/deploy/build-images.sh",
+    "deploy:migrate:staging": "./scripts/deploy/migrate.sh staging",
+    "deploy:migrate:prod": "./scripts/deploy/migrate.sh prod",
+    "deploy:staging": "./scripts/deploy/deploy-compose.sh staging",
+    "deploy:prod": "./scripts/deploy/deploy-compose.sh prod",
+    "deploy:smoke": "./scripts/deploy/smoke-api.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

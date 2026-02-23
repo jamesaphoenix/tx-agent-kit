@@ -8,7 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(scriptDir, '../..')
 
-const defaultLockTimeoutSeconds = 120
+const defaultLockTimeoutSeconds = 900
 const maxAutoIntegrationWorkers = 6
 const maxAutoWebIntegrationWorkers = 4
 const composeProjectName = process.env.COMPOSE_PROJECT_NAME ?? 'tx-agent-kit'

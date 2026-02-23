@@ -36,6 +36,8 @@
 - Table factory parity: each database table has a corresponding factory under `packages/db/src/factories/`.
 - Contract governance: `apps/api/openapi.json` is generated from `apps/api` and carries closed DDD invariants (`x-ddd` + per-route `x-invariants`).
 - Kind governance: repository ports and API routes must explicitly declare `crud` or `custom` markers, and marker claims must match actual surface area.
+- Core domain folder contract: `packages/core/src/domains/*` must use `domain/ports/application/adapters` and must not contain `repositories/` or `services/`.
+- Persistence boundary contract: core `ports/` are abstract repository seams; concrete persistence implementations live only in `packages/db/src/repositories/`.
 - Domain legibility governance: domain layer files use named exports only (no default exports).
 - Source hygiene governance: TODO/FIXME/HACK comments are forbidden in source modules.
 - Domain determinism governance: no direct `Date.now`, `new Date`, or `Math.random` in domain-layer paths.

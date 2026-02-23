@@ -69,7 +69,7 @@ if [[ -n "${DATABASE_URL:-}" ]]; then
   fi
 fi
 
-lock_acquire "$LOCK_DIR" 120
+lock_acquire "$LOCK_DIR" "${DB_RESET_LOCK_TIMEOUT_SECONDS:-900}"
 trap 'lock_release "$LOCK_DIR"' EXIT
 
 echo "Applying migrations..."

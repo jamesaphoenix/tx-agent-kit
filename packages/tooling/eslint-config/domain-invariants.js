@@ -67,6 +67,22 @@ export const domainInvariantConfig = [
   },
   {
     files: [
+      'packages/core/src/domains/*/repositories/**/*.{ts,tsx}',
+      'apps/api/src/domains/*/repositories/**/*.{ts,tsx}'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Program',
+          message:
+            'Domain modules must not define `repositories/`. Use `ports/` for contracts and `adapters/` for implementations.'
+        }
+      ]
+    }
+  },
+  {
+    files: [
       'packages/db/src/**/*.{ts,tsx}',
       'packages/contracts/src/**/*.{ts,tsx}',
       'apps/api/src/**/*.{ts,tsx}'

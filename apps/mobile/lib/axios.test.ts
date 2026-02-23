@@ -4,6 +4,36 @@ import axios from 'axios'
 import { writeAuthToken, clearAuthToken } from './auth-token'
 import { api, getApiErrorStatus, getApiErrorMessage } from './axios'
 
+const telemetryMocks = vi.hoisted(() => {
+  const spanSetAttributeMock = vi.fn()
+  const spanSetStatusMock = vi.fn()
+  const spanRecordExceptionMock = vi.fn()
+  const spanEndMock = vi.fn()
+  const startSpanMock = vi.fn(() => ({
+    setAttribute: spanSetAttributeMock,
+    setStatus: spanSetStatusMock,
+    recordException: spanRecordExceptionMock,
+    end: spanEndMock
+  }))
+  const recordRequestMock = vi.fn()
+  const getClientHttpTelemetryMock = vi.fn(() => ({
+    tracer: {
+      startSpan: startSpanMock
+    },
+    recordRequest: recordRequestMock
+  }))
+
+  return {
+    spanSetAttributeMock,
+    spanSetStatusMock,
+    spanRecordExceptionMock,
+    spanEndMock,
+    startSpanMock,
+    recordRequestMock,
+    getClientHttpTelemetryMock
+  }
+})
+
 vi.mock('expo-constants', () => ({
   default: {
     expoConfig: {
@@ -26,6 +56,10 @@ vi.mock('expo-secure-store', () => ({
   })
 }))
 
+vi.mock('@tx-agent-kit/observability/client', () => ({
+  getClientHttpTelemetry: telemetryMocks.getClientHttpTelemetryMock
+}))
+
 describe('axios interceptor', () => {
   let capturedConfig: InternalAxiosRequestConfig | null = null
 
@@ -34,6 +68,7 @@ describe('axios interceptor', () => {
       delete mockStore[key]
     }
     capturedConfig = null
+    vi.clearAllMocks()
 
     api.defaults.adapter = (config: InternalAxiosRequestConfig) => {
       capturedConfig = config
@@ -47,6 +82,15 @@ describe('axios interceptor', () => {
 
     expect(capturedConfig).not.toBeNull()
     expect(capturedConfig!.headers.Authorization).toBe('Bearer test-jwt')
+    expect(telemetryMocks.startSpanMock).toHaveBeenCalledWith(
+      'http.client.request',
+      expect.objectContaining({
+        attributes: expect.objectContaining({
+          'http.request.method': 'GET',
+          'url.path': '/test'
+        })
+      })
+    )
   })
 
   it('removes Authorization header when no token', async () => {
@@ -55,6 +99,51 @@ describe('axios interceptor', () => {
 
     expect(capturedConfig).not.toBeNull()
     expect(capturedConfig!.headers.Authorization).toBeUndefined()
+  })
+
+  it('records request telemetry on success responses', async () => {
+    await api.post('/create', { name: 'item' })
+
+    expect(telemetryMocks.recordRequestMock).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({
+        'http.request.method': 'POST',
+        'url.path': '/create',
+        'http.response.status_code': 200
+      })
+    )
+    expect(telemetryMocks.spanEndMock).toHaveBeenCalledTimes(1)
+    expect(telemetryMocks.spanSetStatusMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: expect.any(Number)
+      })
+    )
+  })
+
+  it('records request telemetry on error responses', async () => {
+    api.defaults.adapter = (config: InternalAxiosRequestConfig) => {
+      capturedConfig = config
+      throw new axios.AxiosError('unauthorized', '401', config, undefined, {
+        status: 401,
+        data: { message: 'Unauthorized' },
+        statusText: 'Unauthorized',
+        headers: {},
+        config
+      })
+    }
+
+    await expect(api.get('/v1/auth/me')).rejects.toBeInstanceOf(axios.AxiosError)
+
+    expect(telemetryMocks.recordRequestMock).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({
+        'http.request.method': 'GET',
+        'url.path': '/v1/auth/me',
+        'http.response.status_code': 401
+      })
+    )
+    expect(telemetryMocks.spanRecordExceptionMock).toHaveBeenCalledTimes(1)
+    expect(telemetryMocks.spanEndMock).toHaveBeenCalledTimes(1)
   })
 })
 

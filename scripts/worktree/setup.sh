@@ -48,6 +48,8 @@ SQL
 
 WEB_PORT=""
 API_PORT=""
+MOBILE_PORT=""
+WORKER_INSPECT_PORT=""
 while IFS='=' read -r key value; do
   case "$key" in
     WEB_PORT)
@@ -56,12 +58,18 @@ while IFS='=' read -r key value; do
     API_PORT)
       API_PORT="$value"
       ;;
+    MOBILE_PORT)
+      MOBILE_PORT="$value"
+      ;;
+    WORKER_INSPECT_PORT)
+      WORKER_INSPECT_PORT="$value"
+      ;;
   esac
 done <<EOF
 $(allocate_worktree_ports "$WORKTREE_NAME")
 EOF
 
-if [[ -z "$WEB_PORT" || -z "$API_PORT" ]]; then
+if [[ -z "$WEB_PORT" || -z "$API_PORT" || -z "$MOBILE_PORT" || -z "$WORKER_INSPECT_PORT" ]]; then
   log_error "Failed to derive deterministic worktree ports"
   exit 1
 fi
@@ -96,7 +104,16 @@ upsert_env_value "$WORKTREE_ENV" "DATABASE_SCHEMA" "$SCHEMA_NAME"
 upsert_env_value "$WORKTREE_ENV" "API_PORT" "$API_PORT"
 upsert_env_value "$WORKTREE_ENV" "PORT" "$WEB_PORT"
 upsert_env_value "$WORKTREE_ENV" "WEB_PORT" "$WEB_PORT"
+upsert_env_value "$WORKTREE_ENV" "MOBILE_PORT" "$MOBILE_PORT"
+upsert_env_value "$WORKTREE_ENV" "WORKER_INSPECT_PORT" "$WORKER_INSPECT_PORT"
 upsert_env_value "$WORKTREE_ENV" "API_BASE_URL" "http://localhost:${API_PORT}"
+upsert_env_value "$WORKTREE_ENV" "NEXT_PUBLIC_API_BASE_URL" "http://localhost:${API_PORT}"
+upsert_env_value "$WORKTREE_ENV" "EXPO_PUBLIC_API_BASE_URL" "http://localhost:${API_PORT}"
+upsert_env_value "$WORKTREE_ENV" "OTEL_EXPORTER_OTLP_ENDPOINT" "http://localhost:4320"
+upsert_env_value "$WORKTREE_ENV" "NEXT_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT" "http://localhost:4320"
+upsert_env_value "$WORKTREE_ENV" "EXPO_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT" "http://localhost:4320"
+upsert_env_value "$WORKTREE_ENV" "NEXT_PUBLIC_NODE_ENV" "development"
+upsert_env_value "$WORKTREE_ENV" "EXPO_PUBLIC_NODE_ENV" "development"
 upsert_env_value "$WORKTREE_ENV" "API_CORS_ORIGIN" "http://localhost:${WEB_PORT}"
 
 cat > "$WORKTREE_PATH/run-migrations.sh" <<MIGRATE
@@ -120,4 +137,6 @@ printf '  Worktree: %s\n' "$WORKTREE_NAME"
 printf '  Schema:   %s\n' "$SCHEMA_NAME"
 printf '  Web port: %s\n' "$WEB_PORT"
 printf '  API port: %s\n' "$API_PORT"
+printf '  Mobile port: %s\n' "$MOBILE_PORT"
+printf '  Worker inspect port: %s\n' "$WORKER_INSPECT_PORT"
 printf '  Env file: %s\n' "$WORKTREE_ENV"

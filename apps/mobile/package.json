@@ -4,7 +4,7 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "dev": "expo start",
+    "dev": "sh -c 'expo start --port ${MOBILE_PORT:-8081}'",
     "generate:api": "orval --config ./orval.config.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
@@ -14,6 +14,7 @@
     "@tanstack/react-query": "^5.90.7",
     "@tanstack/react-store": "^0.9.1",
     "@tx-agent-kit/contracts": "workspace:*",
+    "@tx-agent-kit/observability": "workspace:*",
     "axios": "^1.13.2",
     "expo": "~53.0.0",
     "expo-constants": "~17.0.0",

@@ -78,7 +78,7 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
-      - '--enable-feature=otlp-write-receiver'
+      - '--web.enable-otlp-receiver'
     volumes:
       - ./monitoring/local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/local/prometheus/rules:/etc/prometheus/rules:ro

@@ -4,6 +4,7 @@ Agent-first TypeScript monorepo for building scalable apps with Effect, Temporal
 
 ## Stack
 - `apps/web`: Next.js 16 frontend with auth, dashboard, workspaces, invitations, and tasks.
+- `apps/mobile`: Expo React Native app for auth/workspaces/tasks/invitations.
 - `apps/api`: Effect HTTP API for auth/workspaces/invitations/tasks.
 - `apps/worker`: Temporal worker and workflows.
 - `packages/core`: Effect services and domain logic.
@@ -52,6 +53,7 @@ pnpm dev
 ```bash
 pnpm dev                 # run web + api + worker
 pnpm dev:web             # web only
+pnpm dev:mobile          # mobile only
 pnpm dev:api             # api only
 pnpm dev:worker          # worker only
 pnpm lint
@@ -65,6 +67,10 @@ pnpm test:integration
 pnpm test:integration:quiet
 pnpm openapi:generate
 pnpm api:client:generate
+pnpm mobile:generate:api
+PUSH_IMAGES=1 pnpm deploy:build-images
+pnpm deploy:migrate:staging
+pnpm deploy:staging deploy/artifacts/images-<git-sha>.env
 pnpm db:migrate
 pnpm db:test:reset
 pnpm db:studio
@@ -85,9 +91,11 @@ docker compose -p tx-agent-kit down -v
 
 `infra` brings up Postgres, Temporal, Jaeger, Prometheus, Grafana, and OTel Collector.  
 `app` builds and runs API and worker containers.
+Local development still defaults to `pnpm dev` (web + api + worker as local processes) while reusing shared Docker infra.
 
 ## Worktrees + Idempotent Integration Tests
 - Infrastructure is shared across worktrees with a fixed compose project: `tx-agent-kit`.
+- Deterministic worktree port offsets include `WEB_PORT`, `API_PORT`, `MOBILE_PORT`, and `WORKER_INSPECT_PORT` via `pnpm worktree:ports <name>`.
 - `pnpm infra:ensure` is idempotent: it checks health first, only starts missing services, and never tears down containers.
 - `pnpm test:integration` is idempotent: it runs one Vitest workspace integration run with global setup (infra + DB reset + pgTAP once).
 - Select subset projects with `INTEGRATION_PROJECTS=web` or `INTEGRATION_PROJECTS=api,testkit`.
@@ -121,5 +129,7 @@ Use `pnpm mcp:codex-config` to print TOML blocks for `~/.codex/config.toml` that
 - Commands: `docs/COMMANDS.md`
 - Quality and boundaries: `docs/QUALITY.md`
 - Runbooks: `docs/RUNBOOKS.md`
+- Deployment: `docs/DEPLOYMENT.md`
+- Rollback: `docs/ROLLBACK.md`
 - OctoSpark mining log: `todo/octospark-mining.md`
 - API contract (generated): `apps/api/openapi.json`

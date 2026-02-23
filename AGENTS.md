@@ -16,6 +16,7 @@ Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.
 - Validation library: `effect/Schema` only. (`zod` and alternatives are lint-banned)
 - Logging: `console.*` is lint-banned. Use `@tx-agent-kit/logging` for structured JSON logs.
 - Persistence boundary: only `packages/db` imports `drizzle-orm`.
+- Persistence naming boundary: core domain persistence contracts live in `ports/`; concrete repository implementations live in `packages/db/src/repositories/`.
 - Web boundary: `apps/web` never imports DB modules or runs direct SQL/Drizzle access.
 - Web simplicity boundary: `apps/web` must not import `effect`/`effect/*`; keep Effect runtime code in API/core/worker layers.
 - Next web runtime is client-only: no `apps/web/app/api`, no `proxy.ts`/`middleware.ts`, and no `next/server` or `next/headers` imports.
@@ -30,6 +31,7 @@ Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.
 - Table factory parity: each `pgTable(...)` has a matching test-data factory in `packages/db/src/factories/*.factory.ts`.
 - Route/repository intent is explicit: every API route and core repository port declares a kind marker (`crud` or `custom`) and markers must stay consistent.
 - Domain layering: dependencies must flow inward with ports as the seam (`domain <- ports <- application <- runtime/ui` and `domain <- ports <- adapters <- runtime/ui`).
+- Core domain folder contract: `packages/core/src/domains/*` must not contain `repositories/` or `services/`.
 - Domain legibility: no default exports inside domain layer files; use named exports only.
 - Source hygiene: TODO/FIXME/HACK comments are forbidden in `apps/` and `packages/` source modules.
 - Domain determinism: avoid `Date.now`, `new Date`, and `Math.random` in domain layers; inject clock/random providers via ports.
@@ -76,6 +78,7 @@ Rules:
 - `adapters/` implement ports (DB, HTTP, external systems).
 - `runtime/` wires layers into Effect `Layer`s and app entrypoints.
 - `ui/` may depend on runtime/application/domain but never directly on DB.
+- `repositories/` and `services/` folders are disallowed in core domains.
 
 ## DB + Schema Contract
 When adding a table in `packages/db/src/schema.ts`:

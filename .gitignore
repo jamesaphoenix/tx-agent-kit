@@ -11,6 +11,8 @@ coverage
 .DS_Store
 *.log
 *.map
+deploy/.rendered
+deploy/artifacts
 apps/*/.next
 apps/*/dist
 packages/*/dist

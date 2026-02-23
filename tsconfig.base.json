@@ -24,6 +24,7 @@
       "@tx-agent-kit/db": ["packages/db/src/index.ts"],
       "@tx-agent-kit/logging": ["packages/logging/src/index.ts"],
       "@tx-agent-kit/observability": ["packages/observability/src/index.ts"],
+      "@tx-agent-kit/observability/*": ["packages/observability/src/*"],
       "@tx-agent-kit/testkit": ["packages/testkit/src/index.ts"],
       "@tx-agent-kit/temporal-client": ["packages/temporal-client/src/index.ts"]
     }

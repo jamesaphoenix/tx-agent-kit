@@ -1,0 +1,30 @@
+services:
+  api:
+    image: ${API_IMAGE:?API_IMAGE must be set to a pinned image reference}
+    restart: unless-stopped
+    env_file:
+      - ${DEPLOY_ENV_FILE:?DEPLOY_ENV_FILE must point to rendered env}
+    environment:
+      API_PORT: '4000'
+      API_HOST: 0.0.0.0
+    ports:
+      - '${API_PORT:-4000}:4000'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/health').then((response)=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  worker:
+    image: ${WORKER_IMAGE:?WORKER_IMAGE must be set to a pinned image reference}
+    restart: unless-stopped
+    env_file:
+      - ${DEPLOY_ENV_FILE:?DEPLOY_ENV_FILE must point to rendered env}
+    depends_on:
+      api:
+        condition: service_healthy

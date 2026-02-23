@@ -1,7 +1,11 @@
 const defaultApiBaseUrl = 'http://localhost:4000'
+const defaultOtelEndpoint = 'http://localhost:4320'
+const defaultNodeEnv = 'development'
 
 export interface WebEnv {
   API_BASE_URL: string
+  OTEL_EXPORTER_OTLP_ENDPOINT: string
+  NODE_ENV: string
 }
 
 let cachedEnv: WebEnv | null = null
@@ -15,7 +19,15 @@ export const getWebEnv = (): WebEnv => {
     API_BASE_URL:
       process.env.NEXT_PUBLIC_API_BASE_URL ??
       process.env.API_BASE_URL ??
-      defaultApiBaseUrl
+      defaultApiBaseUrl,
+    OTEL_EXPORTER_OTLP_ENDPOINT:
+      process.env.NEXT_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT ??
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
+      defaultOtelEndpoint,
+    NODE_ENV:
+      process.env.NEXT_PUBLIC_NODE_ENV ??
+      process.env.NODE_ENV ??
+      defaultNodeEnv
   }
 
   return cachedEnv

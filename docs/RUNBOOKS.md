@@ -18,6 +18,8 @@
 
 ## Run services
 `pnpm dev`
+- Runs `web + api + worker` as local processes.
+- Docker is shared infra-first (`pnpm infra:ensure`) for local development.
 
 ## Apply migrations
 `pnpm db:migrate`
@@ -33,6 +35,17 @@
 
 ## Compute deterministic worktree ports
 `pnpm worktree:ports feature-my-branch`
+
+## Setup a worktree with isolated app ports
+`scripts/worktree/setup.sh <worktree-path>`
+- Writes worktree-local env keys:
+  - `WEB_PORT`
+  - `API_PORT`
+  - `MOBILE_PORT`
+  - `WORKER_INSPECT_PORT`
+  - `API_BASE_URL`
+  - `NEXT_PUBLIC_API_BASE_URL`
+  - `EXPO_PUBLIC_API_BASE_URL`
 
 ## Reset integration DB state (idempotent)
 `pnpm db:test:reset`
@@ -53,3 +66,14 @@
 
 ## Shutdown infra
 `pnpm infra:down`
+
+## Staging/Production deployment
+1. Build/push images and capture artifact:
+   - `PUSH_IMAGES=1 pnpm deploy:build-images`
+2. Run migrations:
+   - `pnpm deploy:migrate:staging` or `pnpm deploy:migrate:prod`
+3. Deploy:
+   - `pnpm deploy:staging deploy/artifacts/images-<sha>.env`
+   - `pnpm deploy:prod deploy/artifacts/images-<sha>.env`
+4. Smoke verification:
+   - `API_BASE_URL=https://<api-host> pnpm deploy:smoke`

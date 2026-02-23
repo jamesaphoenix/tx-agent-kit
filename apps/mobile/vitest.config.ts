@@ -23,6 +23,9 @@ export default mergeConfig(
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./', import.meta.url)),
+        '@tx-agent-kit/observability/client': fileURLToPath(
+          new URL('../../packages/observability/src/client.ts', import.meta.url)
+        ),
         'react-native': fileURLToPath(
           new URL('./__mocks__/react-native.ts', import.meta.url)
         )

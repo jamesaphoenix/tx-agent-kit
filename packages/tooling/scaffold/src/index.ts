@@ -130,7 +130,7 @@ import type { ${n.Entity}, ${n.Entity}Id, Create${n.Entity}Input, Update${n.Enti
 
 export const ${n.Entity}RepositoryKind = 'crud' as const
 
-export interface ${n.Entity}RepositoryPort {
+export interface ${n.Entity}StorePort {
   list: () => Effect.Effect<ReadonlyArray<${n.Entity}>, CoreError>
   getById: (id: ${n.Entity}Id) => Effect.Effect<${n.Entity}, CoreError>
   create: (input: Create${n.Entity}Input) => Effect.Effect<${n.Entity}, CoreError>
@@ -142,14 +142,16 @@ export interface ${n.Entity}RepositoryPort {
 const coreRepositoryFile = (n: NameSet): string => `import { Effect } from 'effect'
 import { notFound, type CoreError } from '../../../errors.js'
 import type { ${n.Entity}, ${n.Entity}Id, Create${n.Entity}Input, Update${n.Entity}Input } from '../domain/${n.entitySlug}.js'
-import type { ${n.Entity}RepositoryPort } from '../ports/${n.entitySlug}-repository-port.js'
+import type { ${n.Entity}StorePort } from '../ports/${n.entitySlug}-store-port.js'
 
-export interface Make${n.Entity}RepositoryOptions {
+export interface Make${n.Entity}StoreAdapterOptions {
   now?: () => string
   idFactory?: () => ${n.Entity}Id
 }
 
-export const make${n.Entity}Repository = (options: Make${n.Entity}RepositoryOptions = {}): ${n.Entity}RepositoryPort => {
+export const make${n.Entity}StoreAdapter = (
+  options: Make${n.Entity}StoreAdapterOptions = {}
+): ${n.Entity}StorePort => {
   const records = new Map<string, ${n.Entity}>()
   const now = options.now ?? (() => new Date().toISOString())
   let nextId = 1
@@ -203,7 +205,7 @@ export const make${n.Entity}Repository = (options: Make${n.Entity}RepositoryOpti
 const coreServiceFile = (n: NameSet): string => `import { Context, Effect, Layer } from 'effect'
 import type { CoreError } from '../../../errors.js'
 import type { ${n.Entity}, ${n.Entity}Id, Create${n.Entity}Input, Update${n.Entity}Input } from '../domain/${n.entitySlug}.js'
-import type { ${n.Entity}RepositoryPort } from '../ports/${n.entitySlug}-repository-port.js'
+import type { ${n.Entity}StorePort } from '../ports/${n.entitySlug}-store-port.js'
 
 export interface ${n.Entity}ServiceContract {
   list: () => Effect.Effect<ReadonlyArray<${n.Entity}>, CoreError>
@@ -216,41 +218,41 @@ export interface ${n.Entity}ServiceContract {
 export class ${n.Entity}Service extends Context.Tag('${n.Entity}Service')<${n.Entity}Service, ${n.Entity}ServiceContract>() {}
 
 export interface Make${n.Entity}ServiceOptions {
-  repository: ${n.Entity}RepositoryPort
+  store: ${n.Entity}StorePort
 }
 
 export const make${n.Entity}Service = (options: Make${n.Entity}ServiceOptions): ${n.Entity}ServiceContract => ({
-  list: () => options.repository.list(),
-  getById: (id) => options.repository.getById(id),
-  create: (input) => options.repository.create(input),
-  update: (input) => options.repository.update(input),
-  remove: (id) => options.repository.remove(id)
+  list: () => options.store.list(),
+  getById: (id) => options.store.getById(id),
+  create: (input) => options.store.create(input),
+  update: (input) => options.store.update(input),
+  remove: (id) => options.store.remove(id)
 })
 
 export const ${n.Entity}ServiceLive = (options: Make${n.Entity}ServiceOptions) =>
   Layer.succeed(${n.Entity}Service, make${n.Entity}Service(options))
 `
 
-const coreRuntimeFile = (n: NameSet): string => `import { make${n.Entity}Repository } from '../adapters/${n.entitySlug}-repository.js'
+const coreRuntimeFile = (n: NameSet): string => `import { make${n.Entity}StoreAdapter } from '../adapters/${n.entitySlug}-store-adapter.js'
 import { ${n.Entity}ServiceLive } from '../application/${n.entitySlug}-service.js'
 
 export const ${n.Entity}DomainLive = ${n.Entity}ServiceLive({
-  repository: make${n.Entity}Repository()
+  store: make${n.Entity}StoreAdapter()
 })
 `
 
 const coreServiceTestFile = (n: NameSet): string => `import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { make${n.Entity}Repository } from '../adapters/${n.entitySlug}-repository.js'
+import { make${n.Entity}StoreAdapter } from '../adapters/${n.entitySlug}-store-adapter.js'
 import { make${n.Entity}Service } from '../application/${n.entitySlug}-service.js'
 
 describe('${n.Entity}Service', () => {
   it('runs create -> list -> getById -> update -> remove CRUD flow', async () => {
-    const repository = make${n.Entity}Repository({
+    const store = make${n.Entity}StoreAdapter({
       now: () => '2026-01-01T00:00:00.000Z'
     })
 
-    const service = make${n.Entity}Service({ repository })
+    const service = make${n.Entity}Service({ store })
 
     const created = await Effect.runPromise(service.create({ name: '${n.Entity} Name' }))
     expect(created.name).toBe('${n.Entity} Name')
@@ -435,10 +437,10 @@ const coreFilePlan = (n: NameSet): PlannedFile[] => {
   return [
     { path: `${basePath}/domain/${n.entitySlug}.ts`, content: coreDomainFile(n) },
     { path: `${basePath}/domain/index.ts`, content: indexFile([n.entitySlug]) },
-    { path: `${basePath}/ports/${n.entitySlug}-repository-port.ts`, content: corePortFile(n) },
-    { path: `${basePath}/ports/index.ts`, content: indexFile([`${n.entitySlug}-repository-port`]) },
-    { path: `${basePath}/adapters/${n.entitySlug}-repository.ts`, content: coreRepositoryFile(n) },
-    { path: `${basePath}/adapters/index.ts`, content: indexFile([`${n.entitySlug}-repository`]) },
+    { path: `${basePath}/ports/${n.entitySlug}-store-port.ts`, content: corePortFile(n) },
+    { path: `${basePath}/ports/index.ts`, content: indexFile([`${n.entitySlug}-store-port`]) },
+    { path: `${basePath}/adapters/${n.entitySlug}-store-adapter.ts`, content: coreRepositoryFile(n) },
+    { path: `${basePath}/adapters/index.ts`, content: indexFile([`${n.entitySlug}-store-adapter`]) },
     { path: `${basePath}/application/${n.entitySlug}-service.ts`, content: coreServiceFile(n) },
     { path: `${basePath}/application/index.ts`, content: indexFile([`${n.entitySlug}-service`]) },
     { path: `${basePath}/runtime/${n.entitySlug}-live.ts`, content: coreRuntimeFile(n) },

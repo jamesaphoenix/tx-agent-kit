@@ -7,6 +7,10 @@
 - `packages/db/src/effect-schemas`: Table-aligned Effect schemas (one schema per table).
 - `packages/core`: Effect services composing db/auth behavior.
 - `packages/core/src/domains/*`: DDD slices (`domain -> ports -> application/adapters -> runtime/ui`).
+- Persistence terminology:
+  - `packages/core/src/domains/*/ports/*`: abstract persistence contracts (repository seam).
+  - `packages/db/src/repositories/*`: concrete persistence implementations.
+  - Core domains must not define a `repositories/` folder.
 - `packages/auth`: Password and JWT primitives.
 - `packages/logging`: Structured JSON logger helpers (mandatory over `console.*`).
 - `packages/contracts`: Shared API schemas and types.

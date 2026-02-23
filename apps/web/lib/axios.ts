@@ -1,5 +1,6 @@
 'use client'
 
+import { getClientHttpTelemetry } from '@tx-agent-kit/observability/client'
 import axios, {
   type AxiosError,
   type AxiosRequestConfig,
@@ -9,12 +10,122 @@ import { readAuthToken } from './auth-token'
 import { getWebEnv } from './env'
 
 const webEnv = getWebEnv()
+const webClientTelemetry = getClientHttpTelemetry({
+  serviceName: 'tx-agent-kit-web',
+  otlpEndpoint: webEnv.OTEL_EXPORTER_OTLP_ENDPOINT,
+  deploymentEnvironment: webEnv.NODE_ENV
+})
 
 interface ApiErrorPayload {
   message?: string
   error?: {
     message?: string
   }
+}
+
+interface RequestTelemetryContext {
+  readonly span: ReturnType<typeof webClientTelemetry.tracer.startSpan>
+  readonly startedAtMs: number
+  readonly method: string
+  readonly path: string
+}
+
+const spanStatusCode = {
+  OK: 1,
+  ERROR: 2
+} as const
+
+const requestTelemetryContexts = new WeakMap<
+  InternalAxiosRequestConfig,
+  RequestTelemetryContext
+>()
+
+const nowMs = (): number => {
+  if (typeof globalThis.performance !== 'undefined') {
+    return globalThis.performance.now()
+  }
+
+  return Date.now()
+}
+
+const normalizeHttpMethod = (method: string | undefined): string =>
+  (method ?? 'GET').toUpperCase()
+
+const resolveRequestPath = (config: InternalAxiosRequestConfig): string => {
+  const requestUrl = config.url ?? '/'
+
+  try {
+    const resolvedUrl = new URL(requestUrl, config.baseURL ?? webEnv.API_BASE_URL)
+    return resolvedUrl.pathname
+  } catch {
+    return requestUrl
+  }
+}
+
+const startRequestTelemetry = (
+  config: InternalAxiosRequestConfig
+): InternalAxiosRequestConfig => {
+  const method = normalizeHttpMethod(config.method)
+  const path = resolveRequestPath(config)
+  const span = webClientTelemetry.tracer.startSpan('http.client.request', {
+    attributes: {
+      'http.request.method': method,
+      'url.path': path
+    }
+  })
+
+  requestTelemetryContexts.set(config, {
+    span,
+    startedAtMs: nowMs(),
+    method,
+    path
+  })
+
+  return config
+}
+
+const finishRequestTelemetry = (
+  config: InternalAxiosRequestConfig,
+  statusCode: number | undefined,
+  error: Error | undefined
+): void => {
+  const telemetryContext = requestTelemetryContexts.get(config)
+  if (!telemetryContext) {
+    return
+  }
+
+  requestTelemetryContexts.delete(config)
+  const durationMs = Math.max(nowMs() - telemetryContext.startedAtMs, 0)
+  const responseStatus = statusCode ?? 0
+
+  if (statusCode !== undefined) {
+    telemetryContext.span.setAttribute('http.response.status_code', statusCode)
+  }
+
+  webClientTelemetry.recordRequest(durationMs, {
+    'http.request.method': telemetryContext.method,
+    'url.path': telemetryContext.path,
+    'http.response.status_code': responseStatus
+  })
+
+  if (error) {
+    telemetryContext.span.recordException(error)
+    telemetryContext.span.setStatus({
+      code: spanStatusCode.ERROR,
+      message: error.message
+    })
+  } else if (responseStatus >= 400) {
+    telemetryContext.span.setStatus({
+      code: spanStatusCode.ERROR,
+      message: `HTTP ${responseStatus}`
+    })
+  } else {
+    telemetryContext.span.setStatus({
+      code: spanStatusCode.OK
+    })
+  }
+
+  telemetryContext.span.end()
 }
 
 const isApiErrorPayload = (value: unknown): value is ApiErrorPayload => {
@@ -34,7 +145,7 @@ const attachAuthHeader = (config: InternalAxiosRequestConfig): InternalAxiosRequ
     delete config.headers.Authorization
   }
 
-  return config
+  return startRequestTelemetry(config)
 }
 
 export const api = axios.create({
@@ -45,6 +156,21 @@ export const api = axios.create({
 })
 
 api.interceptors.request.use(attachAuthHeader)
+api.interceptors.response.use(
+  (response) => {
+    finishRequestTelemetry(response.config, response.status, undefined)
+    return response
+  },
+  (error: unknown) => {
+    if (axios.isAxiosError(error) && error.config) {
+      finishRequestTelemetry(error.config, error.response?.status, error)
+    }
+
+    const rejectionError =
+      error instanceof Error ? error : new Error('Web API client request failed.')
+    return Promise.reject(rejectionError)
+  }
+)
 
 export const getApiErrorStatus = (error: unknown): number | undefined => {
   if (!axios.isAxiosError(error)) {

@@ -3,7 +3,7 @@
 ## Core Development
 - `pnpm env:configure`: idempotently configure `.env` for local development.
 - `pnpm infra:ensure`: idempotently start shared Docker infra and wait for health.
-- `pnpm dev`: run web + api + worker.
+- `pnpm dev`: run web + api + worker locally (outside Docker app profile).
 - `pnpm openapi:generate`: regenerate `apps/api/openapi.json` from API definitions.
 - `pnpm api:client:generate`: regenerate `apps/api/openapi.json` and web Orval hooks in `apps/web/lib/api/generated`.
 - `pnpm scaffold:crud --domain <domain> --entity <entity> [--dry-run] [--force]`: generate `domain -> ports -> application/adapters -> routes -> tests` scaffold.
@@ -34,7 +34,15 @@
 - `pnpm db:migrate`: run Drizzle migrations.
 - `pnpm db:trigger:new --name <trigger-name> --table <table> [--timing BEFORE|AFTER] [--events INSERT,UPDATE] [--level ROW|STATEMENT]`: scaffold migration + pgTAP contract for a custom trigger.
 - `pnpm db:test:reset`: idempotently reset integration DB state without tearing down containers.
-- `pnpm worktree:ports <name>`: derive deterministic local ports for a worktree.
+- `pnpm worktree:ports <name>`: derive deterministic local ports for a worktree (`WEB_PORT`, `API_PORT`, `MOBILE_PORT`, `WORKER_INSPECT_PORT`, observability UI ports).
+
+## Deployment
+- `PUSH_IMAGES=1 pnpm deploy:build-images`: build and push API/worker images, then emit image artifact env file in `deploy/artifacts/`.
+- `pnpm deploy:migrate:staging`: run DB migrations with staging secrets from 1Password template.
+- `pnpm deploy:migrate:prod`: run DB migrations with production secrets from 1Password template.
+- `pnpm deploy:staging [deploy/artifacts/images-<sha>.env]`: render staging env with `op inject`, deploy compose services, run smoke checks.
+- `pnpm deploy:prod [deploy/artifacts/images-<sha>.env]`: render production env with `op inject`, deploy compose services, run smoke checks.
+- `API_BASE_URL=https://<api-host> pnpm deploy:smoke`: run API critical-flow smoke checks.
 
 ## MCP Servers
 - `pnpm mcp:prometheus`: start Prometheus MCP (containerized server).

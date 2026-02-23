@@ -12,6 +12,7 @@ const defaultDomainRoots = [
 ]
 
 const requiredDomainFolders = ['domain', 'ports', 'application', 'adapters']
+const forbiddenDomainFolders = ['repositories', 'services']
 const domainLayers = ['domain', 'ports', 'application', 'adapters', 'runtime', 'ui']
 
 const allowedLayerImports = {
@@ -162,6 +163,15 @@ const collectStructureIssues = () => {
         if (!existsSync(requiredPath) || !statSync(requiredPath).isDirectory()) {
           issues.push(
             `Domain \`${domainLabel}\` is missing required folder \`${requiredFolder}/\`.`
+          )
+        }
+      }
+
+      for (const forbiddenFolder of forbiddenDomainFolders) {
+        const forbiddenPath = resolve(domainPath, forbiddenFolder)
+        if (existsSync(forbiddenPath) && statSync(forbiddenPath).isDirectory()) {
+          issues.push(
+            `Domain \`${domainLabel}\` must not include \`${forbiddenFolder}/\`. Use \`ports/\` for contracts and \`adapters/\` for implementations.`
           )
         }
       }

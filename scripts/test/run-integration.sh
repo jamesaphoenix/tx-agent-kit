@@ -9,12 +9,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
-INTEGRATION_PACKAGE_MAP=(
-  "@tx-agent-kit/api:api"
-  "@tx-agent-kit/testkit:testkit"
-  "@tx-agent-kit/web:web"
-  "@tx-agent-kit/worker:worker"
-)
+discover_integration_project_map() {
+  node "$PROJECT_ROOT/scripts/lib/discover-integration-projects.mjs"
+}
 
 dedupe_csv() {
   local raw_csv="$1"
@@ -45,19 +42,24 @@ dedupe_csv() {
 resolve_project_ids_from_filter() {
   local filter="$1"
   local project_ids=""
+  local normalized_filter
+  normalized_filter="$(echo "$filter" | tr '[:upper:]' '[:lower:]')"
 
-  for mapping in "${INTEGRATION_PACKAGE_MAP[@]}"; do
-    local package_name="${mapping%%:*}"
-    local project_id="${mapping##*:}"
+  while IFS=$'\t' read -r package_name project_id _config_path; do
+    if [[ -z "$package_name" || -z "$project_id" ]]; then
+      continue
+    fi
 
-    if [[ "$package_name" == *"$filter"* ]]; then
+    local normalized_package_name
+    normalized_package_name="$(echo "$package_name" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$normalized_package_name" == *"$normalized_filter"* ]]; then
       if [[ -n "$project_ids" ]]; then
         project_ids="$project_ids,$project_id"
       else
         project_ids="$project_id"
       fi
     fi
-  done
+  done < <(discover_integration_project_map)
 
   printf '%s\n' "$project_ids"
 }

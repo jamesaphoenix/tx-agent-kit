@@ -104,7 +104,7 @@ describe('crud scaffold planner', () => {
     expect(domainFile?.content).toContain('UpdateInvoiceInputSchema')
   })
 
-  it('includes CRUD methods across repository, service, and routes', () => {
+  it('includes CRUD methods across store port, service, and routes', () => {
     const planned = planCrudScaffold({ domain: 'billing', entity: 'invoice' })
     const joined = planned.map((file) => file.content).join('\n')
 
@@ -117,12 +117,12 @@ describe('crud scaffold planner', () => {
     expect(joined).toContain('remove: (id')
   })
 
-  it('brands generated repository IDs by casting the full id expression', () => {
+  it('brands generated store IDs by casting the full id expression', () => {
     const planned = planCrudScaffold({ domain: 'billing', entity: 'invoice' })
-    const repositoryFile = planned.find((file) =>
-      file.path.endsWith('/adapters/invoice-repository.ts')
+    const storeAdapterFile = planned.find((file) =>
+      file.path.endsWith('/adapters/invoice-store-adapter.ts')
     )
-    expect(repositoryFile?.content).toContain(
+    expect(storeAdapterFile?.content).toContain(
       "const idFactory = options.idFactory ?? (() => ('invoice-' + String(nextId++)) as InvoiceId)"
     )
   })
@@ -256,8 +256,8 @@ describe('crud scaffold apply', () => {
 
     expect(coreDomainIndex).toContain("export * from './invoice.js'")
     expect(coreDomainIndex).toContain("export * from './payment.js'")
-    expect(corePortsIndex).toContain("export * from './invoice-repository-port.js'")
-    expect(corePortsIndex).toContain("export * from './payment-repository-port.js'")
+    expect(corePortsIndex).toContain("export * from './invoice-store-port.js'")
+    expect(corePortsIndex).toContain("export * from './payment-store-port.js'")
     expect(apiRoutesIndex).toContain("export * from './invoice.js'")
     expect(apiRoutesIndex).toContain("export * from './payment.js'")
   })

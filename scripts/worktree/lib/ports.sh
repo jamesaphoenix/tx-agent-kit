@@ -6,6 +6,8 @@ source "$_LIB_DIR/colors.sh"
 
 DEFAULT_WEB_BASE_PORT=3000
 DEFAULT_API_BASE_PORT=4000
+DEFAULT_MOBILE_BASE_PORT=8081
+DEFAULT_WORKER_INSPECT_BASE_PORT=9229
 DEFAULT_GRAFANA_BASE_PORT=3001
 DEFAULT_PROMETHEUS_BASE_PORT=9090
 PORT_OFFSET_MIN=100
@@ -35,6 +37,8 @@ allocate_worktree_ports() {
 
   echo "WEB_PORT=$((DEFAULT_WEB_BASE_PORT + offset))"
   echo "API_PORT=$((DEFAULT_API_BASE_PORT + offset))"
+  echo "MOBILE_PORT=$((DEFAULT_MOBILE_BASE_PORT + offset))"
+  echo "WORKER_INSPECT_PORT=$((DEFAULT_WORKER_INSPECT_BASE_PORT + offset))"
   echo "GRAFANA_PORT=$((DEFAULT_GRAFANA_BASE_PORT + offset))"
   echo "PROMETHEUS_PORT=$((DEFAULT_PROMETHEUS_BASE_PORT + offset))"
   echo "WORKTREE_PORT_OFFSET=$offset"
@@ -47,6 +51,8 @@ get_port_summary() {
 
   echo "Web:        $((DEFAULT_WEB_BASE_PORT + offset))"
   echo "API:        $((DEFAULT_API_BASE_PORT + offset))"
+  echo "Mobile:     $((DEFAULT_MOBILE_BASE_PORT + offset))"
+  echo "Worker dbg: $((DEFAULT_WORKER_INSPECT_BASE_PORT + offset))"
   echo "Grafana:    $((DEFAULT_GRAFANA_BASE_PORT + offset))"
   echo "Prometheus: $((DEFAULT_PROMETHEUS_BASE_PORT + offset))"
 }

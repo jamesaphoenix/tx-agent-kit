@@ -1,4 +1,4 @@
-import { diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api'
+import { diag, DiagConsoleLogger, DiagLogLevel, metrics, trace } from '@opentelemetry/api'
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
 import { resourceFromAttributes } from '@opentelemetry/resources'
@@ -9,6 +9,7 @@ import {
   SEMRESATTRS_DEPLOYMENT_ENVIRONMENT
 } from '@opentelemetry/semantic-conventions'
 import { getObservabilityEnv } from './env.js'
+import { getOrCreateNodeServiceMetrics } from './metrics-registry.js'
 
 let telemetrySdk: NodeSDK | undefined
 
@@ -49,4 +50,19 @@ export const stopTelemetry = async (): Promise<void> => {
 
   await Promise.resolve(telemetrySdk.shutdown())
   telemetrySdk = undefined
+}
+
+export const emitNodeTelemetrySmoke = (
+  serviceName: string
+): void => {
+  const tracer = trace.getTracer(serviceName)
+  const span = tracer.startSpan('observability.smoke.node')
+  span.setAttribute('smoke.service', serviceName)
+  span.end()
+
+  const meter = metrics.getMeter(serviceName)
+  const { startupCounter } = getOrCreateNodeServiceMetrics(meter)
+  startupCounter.add(1, {
+    'smoke.service': serviceName
+  })
 }

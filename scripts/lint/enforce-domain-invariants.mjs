@@ -233,6 +233,7 @@ const enforceDbFactoryParity = () => {
 }
 
 const requiredDomainFolders = ['domain', 'ports', 'application', 'adapters']
+const forbiddenDomainFolders = ['repositories', 'services']
 const domainLayers = ['domain', 'ports', 'application', 'adapters', 'runtime', 'ui']
 const allowedLayerImports = {
   domain: new Set(['domain']),
@@ -315,6 +316,15 @@ const enforceDomainDirectoryContracts = () => {
         if (!existsSync(requiredPath) || !statSync(requiredPath).isDirectory()) {
           fail(
             `Domain \`${toPosix(relative(repoRoot, domainPath))}\` is missing required folder \`${requiredFolder}/\`.`
+          )
+        }
+      }
+
+      for (const forbiddenFolder of forbiddenDomainFolders) {
+        const forbiddenPath = join(domainPath, forbiddenFolder)
+        if (existsSync(forbiddenPath) && statSync(forbiddenPath).isDirectory()) {
+          fail(
+            `Domain \`${toPosix(relative(repoRoot, domainPath))}\` must not include \`${forbiddenFolder}/\`. Use \`ports/\` for contracts and \`adapters/\` for implementations.`
           )
         }
       }
@@ -1141,6 +1151,38 @@ const enforceCriticalIntegrationCoverage = () => {
     if (!/alreadyProcessed:\s*false/u.test(workerActivitiesSource)) {
       fail(
         'Worker activities integration suite must assert first-time processing (`alreadyProcessed: false`).'
+      )
+    }
+  }
+
+  const observabilitySuitePath = resolve(repoRoot, 'packages/observability/src/stack.integration.test.ts')
+  if (!existsSync(observabilitySuitePath) || !statSync(observabilitySuitePath).isFile()) {
+    fail('Critical observability integration coverage missing: `packages/observability/src/stack.integration.test.ts`.')
+  } else {
+    const observabilitySource = readUtf8(observabilitySuitePath)
+    const requiredObservabilityMarkers = [
+      'tx-agent-kit-api',
+      'tx-agent-kit-worker',
+      'tx-agent-kit-web',
+      'tx-agent-kit-mobile',
+      'clientRequestTotalSeriesQuery',
+      'nodeServiceStartupSeriesQuery',
+      'queryJaegerTraceCount'
+    ]
+
+    for (const marker of requiredObservabilityMarkers) {
+      if (!observabilitySource.includes(marker)) {
+        fail(
+          `Critical observability flow coverage missing in \`packages/observability/src/stack.integration.test.ts\`: expected marker \`${marker}\`.`
+        )
+      }
+    }
+
+    const hasDbAuthHarness = /\bcreateDbAuthContext\s*\(/u.test(observabilitySource)
+    const hasInlineApiHarness = /\bstartApiHarness\s*=\s*async/u.test(observabilitySource)
+    if (!hasDbAuthHarness && !hasInlineApiHarness) {
+      fail(
+        'Critical observability coverage missing: stack integration suite must include a real API harness flow (either `createDbAuthContext(...)` or `startApiHarness(...)`).'
       )
     }
   }

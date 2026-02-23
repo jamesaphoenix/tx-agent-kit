@@ -20,7 +20,7 @@ get_file_mtime_epoch() {
 
 lock_try_reap_stale() {
   local lock_dir="$1"
-  local stale_after_seconds="${2:-120}"
+  local stale_after_seconds="${2:-900}"
   local pid_file="$lock_dir/pid"
 
   if [[ -f "$pid_file" ]]; then
@@ -53,7 +53,7 @@ lock_try_reap_stale() {
 
 lock_acquire() {
   local lock_dir="$1"
-  local timeout_seconds="${2:-120}"
+  local timeout_seconds="${2:-900}"
   local waited=0
 
   while ! mkdir "$lock_dir" 2>/dev/null; do
