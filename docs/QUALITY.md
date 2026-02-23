@@ -6,16 +6,16 @@
 - Run unit tests via `pnpm test`.
 - Run integration tests against Docker infra via `pnpm test:integration`.
 - Integration suites execute via one root Vitest workspace run (`vitest.integration.workspace.ts`) with shared global setup.
-- Non-web integration suites run with configurable parallelism (`INTEGRATION_MAX_WORKERS`, default `2`).
-- Web integration suites run with multi-worker Vitest by default (`WEB_INTEGRATION_MAX_WORKERS=3`) with pool-slot isolated API ports/schemas.
-- Worker integration is intentionally single-worker (`maxWorkers: 1`) because it validates Effect-driven writes against deterministic public-schema resets.
+- Unit suites run with host-CPU parallelism by default (`TEST_MAX_WORKERS` to override).
+- Integration suites run with host-CPU parallelism by default (`INTEGRATION_MAX_WORKERS` to override).
+- Web integration can be independently capped with `WEB_INTEGRATION_MAX_WORKERS` and continues to use pool-slot isolated API ports/schemas.
 - Web integration harnesses keep one API process per pool slot warm across test files; resets happen per test case.
 - Integration DB reset is lock-guarded (`/tmp/tx-agent-kit-db-reset.lock`) to avoid concurrent local test clobbering.
 - Full integration runners are lock-guarded (`/tmp/tx-agent-kit-integration.lock`) to prevent concurrent suite interference.
 - Run database contract suites via `pnpm test:db:pgtap`.
 - API integration harness is standardized via `createDbAuthContext(...)` (no manual process spawning in API integration suites).
 - API harness callers must resolve `apiCwd` via `fileURLToPath(import.meta.url)` (never `process.cwd()`), so root-workspace integration runs stay deterministic.
-- Run invariant checks via `pnpm lint` (`eslint` + `scripts/lint/enforce-domain-invariants.mjs`).
+- Run invariant checks via `pnpm lint` (`eslint` + `scripts/lint/enforce-domain-invariants.mjs` + shell invariants).
 
 ## Domain Invariants
 
@@ -64,6 +64,6 @@
 
 - `domain` imports only `domain`.
 - `ports` imports only `domain|ports`.
-- `repositories|adapters` import only `domain|ports|self`.
-- `services` import only `domain|ports|repositories|adapters|self`.
+- `application` imports only `domain|ports|application|self`.
+- `adapters` import only `domain|ports|adapters|self`.
 - `runtime|ui` are orchestration/presentation layers and must not invert dependencies back into persistence concerns.

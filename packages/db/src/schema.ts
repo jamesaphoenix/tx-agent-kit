@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  index,
   primaryKey,
   pgEnum,
   pgTable,
@@ -63,7 +64,8 @@ export const workspaceMembers = pgTable('workspace_members', {
   role: membershipRoleEnum('role').notNull().default('member'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, (table) => ({
-  workspaceUserUnique: uniqueIndex('workspace_members_workspace_user_unique').on(table.workspaceId, table.userId)
+  workspaceUserUnique: uniqueIndex('workspace_members_workspace_user_unique').on(table.workspaceId, table.userId),
+  userIdIdx: index('workspace_members_user_id_idx').on(table.userId)
 }))
 
 export const invitations = pgTable('invitations', {
@@ -79,7 +81,17 @@ export const invitations = pgTable('invitations', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, (table) => ({
   workspaceEmailPendingUnique: uniqueIndex('invitations_workspace_email_pending_unique').on(table.workspaceId, table.email)
-    .where(sql`${table.status} = 'pending'`)
+    .where(sql`${table.status} = 'pending'`),
+  inviteeCreatedAtIdx: index('invitations_invitee_user_created_at_id_idx').on(
+    table.inviteeUserId,
+    table.createdAt,
+    table.id
+  ),
+  inviteeExpiresAtIdx: index('invitations_invitee_user_expires_at_id_idx').on(
+    table.inviteeUserId,
+    table.expiresAt,
+    table.id
+  )
 }))
 
 export const tasks = pgTable('tasks', {
@@ -90,7 +102,27 @@ export const tasks = pgTable('tasks', {
   status: taskStatusEnum('status').notNull().default('todo'),
   createdByUserId: uuid('created_by_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
-})
+}, (table) => ({
+  workspaceCreatedAtIdx: index('tasks_workspace_created_at_id_idx').on(
+    table.workspaceId,
+    table.createdAt,
+    table.id
+  ),
+  workspaceTitleIdx: index('tasks_workspace_title_id_idx').on(
+    table.workspaceId,
+    table.title,
+    table.id
+  ),
+  workspaceStatusIdx: index('tasks_workspace_status_id_idx').on(
+    table.workspaceId,
+    table.status,
+    table.id
+  ),
+  workspaceCreatedByIdx: index('tasks_workspace_created_by_user_id_idx').on(
+    table.workspaceId,
+    table.createdByUserId
+  )
+}))
 
 export const creditLedger = pgTable('credit_ledger', {
   id: uuid('id').defaultRandom().primaryKey(),

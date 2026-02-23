@@ -15,6 +15,7 @@ GRAFANA_PORT="${GRAFANA_PORT:-3001}"
 JAEGER_UI_PORT="${JAEGER_UI_PORT:-16686}"
 LOKI_PORT="${LOKI_PORT:-3100}"
 TEMPORAL_UI_PORT="${TEMPORAL_UI_PORT:-8233}"
+REDIS_PORT="${REDIS_PORT:-6379}"
 
 cd "$PROJECT_ROOT"
 
@@ -51,6 +52,11 @@ check_prometheus() { curl -fsS "http://localhost:${PROMETHEUS_PORT}/-/healthy" >
 check_grafana() { curl -fsS "http://localhost:${GRAFANA_PORT}/api/health" >/dev/null 2>&1; }
 check_jaeger() { curl -fsS "http://localhost:${JAEGER_UI_PORT}" >/dev/null 2>&1; }
 check_loki() { curl -fsS "http://localhost:${LOKI_PORT}/ready" >/dev/null 2>&1; }
+check_redis() {
+  local container_id
+  container_id="$(docker compose -p "$COMPOSE_PROJECT_NAME" ps -q redis 2>/dev/null || true)"
+  [[ -n "$container_id" ]] && docker exec "$container_id" redis-cli ping >/dev/null 2>&1
+}
 
 all_healthy() {
   check_postgres &&
@@ -59,8 +65,35 @@ all_healthy() {
   check_prometheus &&
   check_grafana &&
   check_jaeger &&
-  check_loki
+  check_loki &&
+  check_redis
 }
+
+resolve_available_port() {
+  local candidate="$1"
+  while true; do
+    if ! check_tcp_port "$candidate"; then
+      echo "$candidate"
+      return
+    fi
+
+    if curl -fsS "http://localhost:${candidate}/api/health" >/dev/null 2>&1; then
+      echo "$candidate"
+      return
+    fi
+
+    candidate=$((candidate + 1))
+  done
+}
+
+# If Grafana's default host port is occupied by a non-Grafana process,
+# select a free fallback to keep infra startup resilient on shared dev machines.
+if check_tcp_port "$GRAFANA_PORT" && ! check_grafana; then
+  fallback_port="$(resolve_available_port $((GRAFANA_PORT + 1)))"
+  echo "Grafana host port ${GRAFANA_PORT} is in use by another process; using ${fallback_port}."
+  GRAFANA_PORT="$fallback_port"
+  export GRAFANA_PORT
+fi
 
 echo "Checking local infrastructure health..."
 if all_healthy; then
@@ -84,6 +117,7 @@ for i in {1..120}; do
     echo "Grafana:      http://localhost:${GRAFANA_PORT}"
     echo "Prometheus:   http://localhost:${PROMETHEUS_PORT}"
     echo "Jaeger:       http://localhost:${JAEGER_UI_PORT}"
+    echo "Redis:        localhost:${REDIS_PORT}"
     exit 0
   fi
 

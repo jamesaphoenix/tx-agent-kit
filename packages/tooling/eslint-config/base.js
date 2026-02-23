@@ -49,7 +49,9 @@ export const baseConfig = [
   {
     files: [
       'apps/web/lib/api/generated/**/*.{ts,tsx}',
-      'apps/web/lib/api/orval-mutator.ts'
+      'apps/web/lib/api/orval-mutator.ts',
+      'apps/mobile/lib/api/generated/**/*.{ts,tsx}',
+      'apps/mobile/lib/api/orval-mutator.ts'
     ],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',

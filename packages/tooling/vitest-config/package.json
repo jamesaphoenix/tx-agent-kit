@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./unit": "./unit.ts",
-    "./integration": "./integration.ts"
+    "./integration": "./integration.ts",
+    "./workers": "./workers.ts"
   }
 }

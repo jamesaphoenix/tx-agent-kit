@@ -5,6 +5,7 @@ import { hashPassword, signSessionToken, verifyPassword, verifySessionToken } fr
 describe('auth primitives', () => {
   beforeEach(() => {
     process.env.AUTH_SECRET = 'local-dev-auth-secret-12345'
+    process.env.AUTH_BCRYPT_ROUNDS = '4'
   })
 
   it('hashes and verifies password', async () => {

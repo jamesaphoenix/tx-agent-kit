@@ -1,13 +1,18 @@
 import { createSqlTestContext } from '@tx-agent-kit/testkit'
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { availableParallelism, cpus } from 'node:os'
+import { dirname, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { fileURLToPath } from 'node:url'
 
 const defaultWebIntegrationBasePort = 4101
-const defaultWebIntegrationMaxWorkers = 3
 const webIntegrationStateDirRelativePath = '.vitest/web-integration'
 const webIntegrationSlotClaimDirRelativePath = '.vitest/web-integration/slot-claims'
 const webIntegrationPortStride = 10
+const maxAutoIntegrationWorkers = 6
+const maxAutoWebIntegrationWorkers = 4
+const webIntegrationSupportDir = dirname(fileURLToPath(import.meta.url))
+const repoRoot = resolve(webIntegrationSupportDir, '../../../..')
 
 const parsePositiveInt = (value: string | undefined, fallback: number): number => {
   if (!value) {
@@ -22,6 +27,24 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
   return parsed
 }
 
+const resolveAutoMaxWorkers = (): number => {
+  try {
+    return Math.max(1, availableParallelism())
+  } catch {
+    return Math.max(1, cpus().length)
+  }
+}
+
+const defaultIntegrationMaxWorkers = parsePositiveInt(
+  process.env.INTEGRATION_MAX_WORKERS,
+  Math.min(resolveAutoMaxWorkers(), maxAutoIntegrationWorkers)
+)
+
+const defaultWebIntegrationMaxWorkers = parsePositiveInt(
+  process.env.WEB_INTEGRATION_MAX_WORKERS,
+  Math.min(defaultIntegrationMaxWorkers, maxAutoWebIntegrationWorkers)
+)
+
 export const resolveWebIntegrationMaxWorkers = (): number =>
   parsePositiveInt(process.env.WEB_INTEGRATION_MAX_WORKERS, defaultWebIntegrationMaxWorkers)
 
@@ -32,13 +55,55 @@ export const resolveWebIntegrationRunId = (): string =>
   process.env.WEB_INTEGRATION_RUN_ID ?? 'webintegration'
 
 export const resolveWebIntegrationStateDir = (): string => {
-  const stateDir = resolve(process.cwd(), webIntegrationStateDirRelativePath)
+  const stateDir = resolve(repoRoot, webIntegrationStateDirRelativePath)
   mkdirSync(stateDir, { recursive: true })
   return stateDir
 }
 
 const resolveWebIntegrationSlotClaimDir = (): string =>
-  resolve(process.cwd(), webIntegrationSlotClaimDirRelativePath)
+  resolve(repoRoot, webIntegrationSlotClaimDirRelativePath)
+
+const resolveKnownWorkerSlots = (maxWorkers: number): number[] => {
+  const slots = new Set<number>()
+
+  for (let workerSlot = 1; workerSlot <= maxWorkers; workerSlot += 1) {
+    slots.add(workerSlot)
+  }
+
+  const stateDir = resolveWebIntegrationStateDir()
+  if (existsSync(stateDir)) {
+    for (const fileName of readdirSync(stateDir)) {
+      const match = /^api-slot-(\d+)\.pid$/u.exec(fileName)
+      const slotValue = match?.[1]
+      if (!slotValue) {
+        continue
+      }
+
+      const slot = Number.parseInt(slotValue, 10)
+      if (!Number.isNaN(slot) && slot > 0) {
+        slots.add(slot)
+      }
+    }
+  }
+
+  const claimDir = resolveWebIntegrationSlotClaimDir()
+  if (existsSync(claimDir)) {
+    for (const fileName of readdirSync(claimDir)) {
+      const match = /^slot-(\d+)\.lock$/u.exec(fileName)
+      const slotValue = match?.[1]
+      if (!slotValue) {
+        continue
+      }
+
+      const slot = Number.parseInt(slotValue, 10)
+      if (!Number.isNaN(slot) && slot > 0) {
+        slots.add(slot)
+      }
+    }
+  }
+
+  return [...slots].sort((left, right) => left - right)
+}
 
 export const resolveWebIntegrationPort = (workerSlot: number): number =>
   resolveWebIntegrationBasePort() + (workerSlot - 1) * webIntegrationPortStride
@@ -111,7 +176,9 @@ const cleanupSchemaForSlot = async (workerSlot: number): Promise<void> => {
 export const cleanupPersistentWebIntegrationHarnesses = async (
   maxWorkers = resolveWebIntegrationMaxWorkers()
 ): Promise<void> => {
-  for (let workerSlot = 1; workerSlot <= maxWorkers; workerSlot += 1) {
+  const knownSlots = resolveKnownWorkerSlots(maxWorkers)
+
+  for (const workerSlot of knownSlots) {
     const pidFilePath = resolveWebIntegrationPidFilePath(workerSlot)
 
     if (existsSync(pidFilePath)) {

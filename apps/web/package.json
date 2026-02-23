@@ -14,6 +14,9 @@
     "test:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^7.3.5",
     "@tanstack/react-query": "^5.90.7",
     "@tanstack/react-store": "^0.9.1",
     "@tx-agent-kit/contracts": "workspace:*",
@@ -23,6 +26,7 @@
     "nuqs": "^2.8.8",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-admin": "^5.13.0",
     "sonner": "^2.0.7"
   },
   "devDependencies": {
@@ -31,8 +35,8 @@
     "@testing-library/user-event": "^14.6.1",
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
-    "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.2",
+    "@types/react": "~18.3.12",
+    "@types/react-dom": "~18.3.0",
     "jsdom": "^28.1.0",
     "orval": "^8.1.0"
   }

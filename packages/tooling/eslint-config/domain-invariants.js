@@ -1,3 +1,5 @@
+import { domainStructurePlugin } from './domain-structure-plugin.js'
+
 const effectSchemaOnlyRestrictions = {
   paths: [
     {
@@ -43,6 +45,21 @@ export const domainInvariantConfig = [
     files: ['**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', effectSchemaOnlyRestrictions]
+    }
+  },
+  {
+    files: [
+      'packages/**/src/domains/**/*.{ts,tsx}',
+      'apps/**/src/domains/**/*.{ts,tsx}'
+    ],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/require-domain-structure': 'error',
+      'domain-structure/enforce-layer-boundaries': 'error',
+      'domain-structure/ports-no-layer-providers': 'error',
+      'domain-structure/adapters-must-import-port': 'error'
     }
   },
   {
@@ -287,7 +304,8 @@ export const domainInvariantConfig = [
       'apps/web/lib/axios.ts',
       'apps/web/lib/client-api.ts',
       'apps/web/lib/api/orval-mutator.ts',
-      'apps/web/lib/api/generated/**/*.{ts,tsx}'
+      'apps/web/lib/api/generated/**/*.{ts,tsx}',
+      'apps/web/lib/react-admin/data-provider.ts'
     ],
     rules: {
       'no-restricted-syntax': [
@@ -368,8 +386,8 @@ export const domainInvariantConfig = [
   },
   {
     files: [
-      'packages/**/src/domains/*/{domain,ports,repositories,adapters,services,runtime,ui}/**/*.{ts,tsx}',
-      'apps/**/src/domains/*/{domain,ports,repositories,adapters,services,runtime,ui}/**/*.{ts,tsx}',
+      'packages/**/src/domains/*/{domain,ports,application,adapters,runtime,ui}/**/*.{ts,tsx}',
+      'apps/**/src/domains/*/{domain,ports,application,adapters,runtime,ui}/**/*.{ts,tsx}',
       'apps/api/src/routes/**/*.{ts,tsx}'
     ],
     rules: {
@@ -404,7 +422,8 @@ export const domainInvariantConfig = [
         'error',
         {
           selector: "MemberExpression[object.name='process'][property.name='env']",
-          message: 'Domain layer must not read environment variables directly.'
+          message:
+            'Domain layer must stay pure. Read env through typed config modules and pass values into domain via ports/application.'
         }
       ],
       'no-restricted-imports': [
@@ -412,21 +431,39 @@ export const domainInvariantConfig = [
         {
           paths: [
             {
+              name: '@tx-agent-kit/contracts',
+              message:
+                'Domain must stay transport-agnostic. Define domain models in `domain/` and map to API contracts in route-layer mappers.'
+            },
+            {
+              name: '@tx-agent-kit/auth',
+              message:
+                'Domain must stay infra-agnostic. Depend on auth capabilities via ports and provide implementations in adapters/application.'
+            },
+            {
               name: 'node:fs',
-              message: 'Domain layer must stay pure and must not import filesystem dependencies.'
+              message:
+                'Domain layer must stay pure. Model filesystem capability as a port and implement it in adapters.'
             },
             {
               name: 'node:path',
-              message: 'Domain layer must stay pure and must not import path dependencies.'
+              message:
+                'Domain layer must stay pure. Compute path/infrastructure details in adapters, not domain.'
             },
             {
               name: 'node:child_process',
-              message: 'Domain layer must stay pure and must not import process execution dependencies.'
+              message:
+                'Domain layer must stay pure. Wrap process execution behind a port and implement it in outer layers.'
             }
           ],
           patterns: [
             {
-              regex: '(^|/)(ports|repositories|adapters|services|runtime|ui)(/|$)',
+              group: ['@tx-agent-kit/contracts/*', '@tx-agent-kit/auth/*'],
+              message:
+                'Domain must stay boundary-free. Use domain-native models and capability ports, then map in outer layers.'
+            },
+            {
+              regex: '(^|/)(ports|application|adapters|runtime|ui)(/|$)',
               message: 'Domain layer is innermost and may only import from domain.'
             }
           ]
@@ -442,6 +479,11 @@ export const domainInvariantConfig = [
         {
           selector: 'TSTypeReference[typeName.name=\"Promise\"]',
           message: 'Domain ports must return Effect types, never Promise types.'
+        },
+        {
+          selector: 'ExportNamedDeclaration > TSInterfaceDeclaration',
+          message:
+            'Domain record interfaces must be defined in domain/ and imported by ports/. Use `type` for port-specific type aliases.'
         }
       ],
       'no-restricted-imports': [
@@ -449,7 +491,7 @@ export const domainInvariantConfig = [
         {
           patterns: [
             {
-              regex: '(^|/)(repositories|adapters|services|runtime|ui)(/|$)',
+              regex: '(^|/)(application|adapters|runtime|ui)(/|$)',
               message: 'Ports may depend only on domain/ports.'
             }
           ]
@@ -459,8 +501,8 @@ export const domainInvariantConfig = [
   },
   {
     files: [
-      'packages/**/src/domains/*/{repositories,adapters}/**/*.{ts,tsx}',
-      'apps/**/src/domains/*/{repositories,adapters}/**/*.{ts,tsx}'
+      'packages/**/src/domains/*/adapters/**/*.{ts,tsx}',
+      'apps/**/src/domains/*/adapters/**/*.{ts,tsx}'
     ],
     rules: {
       'no-restricted-imports': [
@@ -468,8 +510,8 @@ export const domainInvariantConfig = [
         {
           patterns: [
             {
-              regex: '(^|/)(services|runtime|ui)(/|$)',
-              message: 'Repositories/adapters may depend on domain/ports only.'
+              regex: '(^|/)(application|runtime|ui)(/|$)',
+              message: 'Adapters may depend on domain/ports only.'
             }
           ]
         }
@@ -479,12 +521,23 @@ export const domainInvariantConfig = [
   {
     files: ['packages/db/src/repositories/**/*.{ts,tsx}'],
     rules: {
-      'promise/prefer-await-to-then': 'error',
-      '@typescript-eslint/no-floating-promises': 'error'
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.property.name='then']",
+          message:
+            'Avoid `.then(...)` chains in DB repositories. Use `await`/`yield*` so control flow and errors stay explicit.'
+        },
+        {
+          selector: "ExpressionStatement > CallExpression[callee.property.name='catch']",
+          message:
+            'Do not leave promise chains floating in DB repositories. Return the effect/promise or await it explicitly.'
+        }
+      ]
     }
   },
   {
-    files: ['packages/**/src/domains/*/services/**/*.{ts,tsx}', 'apps/**/src/domains/*/services/**/*.{ts,tsx}'],
+    files: ['packages/**/src/domains/*/application/**/*.{ts,tsx}', 'apps/**/src/domains/*/application/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -492,17 +545,37 @@ export const domainInvariantConfig = [
           paths: [
             {
               name: '@tx-agent-kit/db',
-              message: 'Services must depend on domain ports, never DB packages directly.'
+              message: 'Application layer must depend on domain ports, never DB packages directly.'
+            },
+            {
+              name: '@tx-agent-kit/contracts',
+              message:
+                'Domain application layer must stay transport-agnostic. Accept typed command objects from routes instead of importing API contract schemas/types.'
+            },
+            {
+              name: '@tx-agent-kit/auth',
+              message:
+                'Domain application layer must depend on auth capability ports, not concrete auth implementations.'
+            },
+            {
+              name: 'effect/Schema',
+              message:
+                'Decode/validate payloads at route boundaries. Application use-cases should receive already-typed command objects.'
             }
           ],
           patterns: [
             {
-              regex: '(^|/)(repositories|adapters|runtime|ui)(/|$)',
-              message: 'Services may only depend on domain and ports layers.'
+              regex: '(^|/)(adapters|runtime|ui)(/|$)',
+              message: 'Application layer may only depend on domain and ports layers.'
             },
             {
               group: ['@tx-agent-kit/db/*'],
-              message: 'Services must depend on domain ports, never DB packages directly.'
+              message: 'Application layer must depend on domain ports, never DB packages directly.'
+            },
+            {
+              group: ['@tx-agent-kit/contracts/*', '@tx-agent-kit/auth/*'],
+              message:
+                'Application layer must not couple to transport/infra packages. Use domain models and capability ports, then map in outer layers.'
             }
           ]
         }
@@ -511,13 +584,18 @@ export const domainInvariantConfig = [
         'error',
         {
           selector: "MemberExpression[object.name='process'][property.name='env']",
-          message: 'Domain services must receive config via ports/layers, not process.env.'
+          message: 'Domain application layer must receive config via ports/layers, not process.env.'
         },
         {
           selector:
             "CallExpression[callee.object.name='Effect'][callee.property.name=/^run(Promise|PromiseExit|Sync|Fork)$/]",
           message:
-            'Domain services must stay declarative. Do not execute effects (run*) inside service/domain layers.'
+            'Domain application layer must stay declarative. Do not execute effects (run*) inside application/domain layers.'
+        },
+        {
+          selector: "CallExpression[callee.object.name='Schema'][callee.property.name='decodeUnknown']",
+          message:
+            'Decode unknown payloads in route/API boundaries. Pass typed command objects into domain application use-cases.'
         }
       ]
     }
@@ -531,17 +609,17 @@ export const domainInvariantConfig = [
           paths: [
             {
               name: '@tx-agent-kit/db',
-              message: 'API routes must call domain services, not DB modules directly.'
+              message: 'API routes must call domain application use-cases, not DB modules directly.'
             }
           ],
           patterns: [
             {
               group: ['@tx-agent-kit/db/*'],
-              message: 'API routes must call domain services, not DB modules directly.'
+              message: 'API routes must call domain application use-cases, not DB modules directly.'
             },
             {
-              regex: '(^|/)domains/[^/]+/repositories(/|$)',
-              message: 'API routes must not depend on repository implementations directly.'
+              regex: '(^|/)domains/[^/]+/adapters(/|$)',
+              message: 'API routes must not depend on adapter implementations directly.'
             }
           ]
         }
@@ -592,19 +670,23 @@ export const domainInvariantConfig = [
         'error',
         {
           selector: "MemberExpression[object.name='process'][property.name='env']",
-          message: 'Temporal workflows must not read process.env directly.'
+          message:
+            'Temporal workflows must stay deterministic. Read env in `apps/worker/src/config/env.ts` and pass values into workflow inputs.'
         },
         {
           selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
-          message: 'Temporal workflows must not call Date.now() directly.'
+          message:
+            'Temporal workflows must stay deterministic. Use Temporal workflow time APIs (for example `workflow.now`) or pass timestamps as inputs.'
         },
         {
           selector: "NewExpression[callee.name='Date']",
-          message: 'Temporal workflows must not instantiate Date directly.'
+          message:
+            'Temporal workflows must stay deterministic. Use Temporal workflow time APIs or pass timestamps from activities/inputs.'
         },
         {
           selector: "CallExpression[callee.object.name='Math'][callee.property.name='random']",
-          message: 'Temporal workflows must not call Math.random() directly.'
+          message:
+            'Temporal workflows must stay deterministic. Generate randomness/IDs in activities or inject deterministic values via workflow inputs.'
         },
         {
           selector: "CallExpression[callee.name='setTimeout']",
@@ -642,6 +724,10 @@ export const domainInvariantConfig = [
     files: ['packages/**/src/**/*.{ts,tsx}', 'apps/**/src/**/*.{ts,tsx}'],
     ignores: [
       '**/__tests__/**/*.{ts,tsx}',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.integration.test.ts',
+      '**/*.integration.test.tsx',
       'apps/worker/src/activities.ts'
     ],
     rules: {
@@ -696,8 +782,8 @@ export const domainInvariantConfig = [
     }
   },
   {
-    files: ['packages/**/src/**/*.{ts,tsx}', 'apps/**/src/**/*.{ts,tsx}'],
-    ignores: ['**/__tests__/**/*.{ts,tsx}', 'packages/tooling/scaffold/src/index.ts'],
+    files: ['packages/**/src/**/*.{ts,tsx}', 'apps/**/src/**/*.{ts,tsx}', 'apps/mobile/**/*.{ts,tsx}'],
+    ignores: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', 'packages/tooling/scaffold/src/index.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -718,6 +804,215 @@ export const domainInvariantConfig = [
           message: 'Avoid chained type assertions (`as unknown as ...`) in application source.'
         }
       ]
+    }
+  },
+  {
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@tx-agent-kit/db',
+              message: 'Mobile must stay API-first. Call `apps/api` via typed client functions, never DB modules.'
+            },
+            {
+              name: 'drizzle-orm',
+              message: 'Mobile must stay API-first. Only the DB layer may import Drizzle.'
+            },
+            {
+              name: 'effect',
+              message:
+                'apps/mobile is a dumb API consumer. Keep Effect runtime usage in API/core/worker layers.'
+            },
+            {
+              name: '@tx-agent-kit/core',
+              message:
+                'apps/mobile is a dumb API consumer. Import contracts only, not core domain modules.'
+            },
+            {
+              name: '@tx-agent-kit/logging',
+              message: 'Mobile must use `apps/mobile/lib/log.ts` for logging.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['@tx-agent-kit/db/*', 'drizzle-orm/*'],
+              message: 'Mobile must stay API-first. Keep persistence concerns behind API/core services.'
+            },
+            {
+              group: ['effect/*'],
+              message:
+                'apps/mobile is a dumb API consumer. Keep Effect runtime usage in API/core/worker layers.'
+            },
+            {
+              group: ['@tx-agent-kit/core/*'],
+              message:
+                'apps/mobile is a dumb API consumer. Import contracts only, not core domain modules.'
+            },
+            {
+              group: ['@tx-agent-kit/logging/*'],
+              message: 'Mobile must use `apps/mobile/lib/log.ts` for logging.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    ignores: ['apps/mobile/lib/axios.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'axios',
+              message: 'Use shared axios clients from `apps/mobile/lib/axios.ts` only.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['axios/*'],
+              message: 'Use shared axios clients from `apps/mobile/lib/axios.ts` only.'
+            }
+          ]
+        }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.object.name='axios'][callee.property.name='create']",
+          message: 'Create axios clients only in `apps/mobile/lib/axios.ts`.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    ignores: ['apps/mobile/lib/env.ts', 'apps/mobile/lib/api/generated/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message: 'Mobile must read environment variables via `apps/mobile/lib/env.ts` only.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    ignores: ['apps/mobile/lib/notify.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react-native-toast-message',
+              message:
+                'Use `apps/mobile/lib/notify.tsx` as the single entry-point for toast notifications.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['react-native-toast-message/*'],
+              message:
+                'Use `apps/mobile/lib/notify.tsx` as the single entry-point for toast notifications.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    ignores: ['apps/mobile/lib/url-state.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'expo-router',
+              importNames: ['useLocalSearchParams', 'useGlobalSearchParams'],
+              message: 'Use `apps/mobile/lib/url-state.tsx` wrappers for URL search params.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    ignores: ['apps/mobile/lib/auth-token.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'expo-secure-store',
+              message:
+                'Access secure storage through `apps/mobile/lib/auth-token.ts` only.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['expo-secure-store/*'],
+              message:
+                'Access secure storage through `apps/mobile/lib/auth-token.ts` only.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/mobile/lib/api/generated/**/*.{ts,tsx}',
+      'apps/mobile/lib/api/orval-mutator.ts'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.name='fetch']",
+          message:
+            'Direct fetch is forbidden in apps/mobile. Use typed client transport (`clientApi`/generated client).'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/mobile/lib/axios.ts',
+      'apps/mobile/lib/axios.test.ts',
+      'apps/mobile/lib/client-api.ts',
+      'apps/mobile/lib/api/orval-mutator.ts',
+      'apps/mobile/lib/api/generated/**/*.{ts,tsx}'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='api'][callee.property.name=/^(get|post|put|patch|delete|request)$/]",
+          message:
+            'Use generated API hooks/functions (or `clientApi` transitional wrapper) instead of calling shared axios instances directly.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['apps/mobile/lib/log.ts'],
+    rules: {
+      'no-console': 'off'
     }
   }
 ]

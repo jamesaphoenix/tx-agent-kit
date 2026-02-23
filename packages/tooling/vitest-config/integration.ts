@@ -1,20 +1,8 @@
 import { defineConfig, mergeConfig } from 'vitest/config'
-import { unitConfig } from './unit.ts'
+import { unitConfig } from './unit.js'
+import { resolveIntegrationMaxWorkers } from './workers.js'
 
-const parsePositiveInt = (value: string | undefined, fallback: number): number => {
-  if (!value) {
-    return fallback
-  }
-
-  const parsed = Number.parseInt(value, 10)
-  if (Number.isNaN(parsed) || parsed < 1) {
-    return fallback
-  }
-
-  return parsed
-}
-
-const integrationMaxWorkers = parsePositiveInt(process.env.INTEGRATION_MAX_WORKERS, 2)
+const integrationMaxWorkers = resolveIntegrationMaxWorkers()
 
 export const integrationConfig = mergeConfig(
   unitConfig,

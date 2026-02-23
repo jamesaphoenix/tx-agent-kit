@@ -52,14 +52,23 @@ const DDD_INVARIANTS = {
 } as const
 
 const OPERATION_INVARIANTS: Record<string, readonly string[]> = {
-  signUp: ['INV-AUTH-001'],
-  signIn: ['INV-AUTH-001'],
-  deleteMe: ['INV-ARCH-001'],
-  createInvitation: ['INV-WS-001'],
-  listInvitations: ['INV-INV-002'],
-  listTasks: ['INV-WS-001'],
-  createTask: ['INV-WS-001'],
-  acceptInvitation: ['INV-INV-001']
+  'auth.signUp': ['INV-AUTH-001'],
+  'auth.signIn': ['INV-AUTH-001'],
+  'auth.deleteMe': ['INV-ARCH-001'],
+  'workspaces.createInvitation': ['INV-WS-001'],
+  'workspaces.listInvitations': ['INV-INV-002'],
+  'workspaces.getInvitation': ['INV-INV-002'],
+  'workspaces.getManyInvitations': ['INV-INV-002'],
+  'workspaces.updateInvitation': ['INV-WS-001'],
+  'workspaces.removeInvitation': ['INV-WS-001'],
+  'workspaces.getManyWorkspaces': ['INV-WS-001'],
+  'tasks.listTasks': ['INV-WS-001'],
+  'tasks.getTask': ['INV-WS-001'],
+  'tasks.getManyTasks': ['INV-WS-001'],
+  'tasks.createTask': ['INV-WS-001'],
+  'tasks.updateTask': ['INV-WS-001'],
+  'tasks.removeTask': ['INV-WS-001'],
+  'workspaces.acceptInvitation': ['INV-INV-001']
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {

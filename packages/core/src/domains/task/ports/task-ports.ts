@@ -1,28 +1,35 @@
 import { Context } from 'effect'
 import type * as Effect from 'effect/Effect'
+import type { ListParams, PaginatedResult } from '../../../pagination.js'
+import type { TaskRecord } from '../domain/task-domain.js'
 
-export const TaskRepositoryKind = 'custom' as const
+export const TaskRepositoryKind = 'crud' as const
 
-export interface TaskRecord {
-  id: string
-  workspaceId: string
-  title: string
-  description: string | null
-  status: 'todo' | 'in_progress' | 'done'
-  createdByUserId: string
-  createdAt: Date
-}
+export type { TaskRecord }
 
 export class TaskStorePort extends Context.Tag('TaskStorePort')<
   TaskStorePort,
   {
-    listByWorkspace: (workspaceId: string) => Effect.Effect<ReadonlyArray<TaskRecord>, unknown>
+    list: (workspaceId: string, params: ListParams) => Effect.Effect<PaginatedResult<TaskRecord>, unknown>
+    listByWorkspace: (workspaceId: string, params: ListParams) => Effect.Effect<PaginatedResult<TaskRecord>, unknown>
+    getManyByIdsForUser: (
+      userId: string,
+      ids: ReadonlyArray<string>
+    ) => Effect.Effect<ReadonlyArray<TaskRecord>, unknown>
+    getById: (id: string) => Effect.Effect<TaskRecord | null, unknown>
     create: (input: {
       workspaceId: string
       title: string
       description?: string
       createdByUserId: string
     }) => Effect.Effect<TaskRecord | null, unknown>
+    update: (input: {
+      id: string
+      title?: string
+      description?: string | null
+      status?: 'todo' | 'in_progress' | 'done'
+    }) => Effect.Effect<TaskRecord | null, unknown>
+    remove: (id: string) => Effect.Effect<{ deleted: true }, unknown>
   }
 >() {}
 

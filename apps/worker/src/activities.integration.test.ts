@@ -1,14 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { getPool as GetDbPool } from '@tx-agent-kit/db'
 import type { activities as WorkerActivities } from './activities.js'
 
 let activitiesRef: typeof WorkerActivities | undefined
 let getPoolRef: typeof GetDbPool | undefined
-
-const defaultDatabaseUrl = 'postgres://postgres:postgres@localhost:5432/tx_agent_kit'
-const baseDatabaseUrl = process.env.DATABASE_URL ?? defaultDatabaseUrl
-const previousDatabaseUrl = process.env.DATABASE_URL
 
 const seedTask = async (): Promise<{ workspaceId: string; taskId: string }> => {
   if (!getPoolRef) {
@@ -52,8 +48,6 @@ const seedTask = async (): Promise<{ workspaceId: string; taskId: string }> => {
 }
 
 beforeAll(async () => {
-  process.env.DATABASE_URL = baseDatabaseUrl
-
   const [{ activities }, dbModule] = await Promise.all([
     import('./activities.js'),
     import('@tx-agent-kit/db')
@@ -63,10 +57,6 @@ beforeAll(async () => {
   getPoolRef = dbModule.getPool
 })
 
-beforeEach(() => {
-  process.env.DATABASE_URL = baseDatabaseUrl
-})
-
 afterAll(async () => {
   try {
     if (getPoolRef) {
@@ -74,12 +64,6 @@ afterAll(async () => {
     }
   } catch {
     // Pool may not be initialized in failing/short-circuit paths.
-  }
-
-  if (previousDatabaseUrl === undefined) {
-    delete process.env.DATABASE_URL
-  } else {
-    process.env.DATABASE_URL = previousDatabaseUrl
   }
 })
 

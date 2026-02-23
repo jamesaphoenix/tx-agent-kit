@@ -20,11 +20,13 @@ export function SignOutButton() {
           setPending(true)
           try {
             await clientApi.signOut()
-            sessionStoreActions.clear()
             notify.info('Signed out')
-            router.replace('/sign-in')
+          } catch {
+            notify.error('Sign out failed')
           } finally {
+            sessionStoreActions.clear()
             setPending(false)
+            router.replace('/sign-in')
           }
         })()
       }}

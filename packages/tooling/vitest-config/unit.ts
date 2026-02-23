@@ -1,13 +1,22 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
+import { resolveUnitMaxWorkers } from './workers.js'
+
+const unitMaxWorkers = resolveUnitMaxWorkers()
 
 export const unitConfig = defineConfig({
   test: {
     environment: 'node',
     pool: 'forks',
-    maxWorkers: 1,
+    maxWorkers: unitMaxWorkers,
     isolate: true,
-    fileParallelism: false,
-    passWithNoTests: true
+    fileParallelism: unitMaxWorkers > 1,
+    passWithNoTests: false,
+    exclude: [
+      ...configDefaults.exclude,
+      '**/dist/**',
+      '**/.next/**',
+      '**/.turbo/**'
+    ]
   }
 })
 

@@ -1,4 +1,4 @@
-FROM postgres:16
+FROM postgres:16.12
 
 RUN apt-get update \
   && apt-get install --yes --no-install-recommends postgresql-16-pgtap pgtap \

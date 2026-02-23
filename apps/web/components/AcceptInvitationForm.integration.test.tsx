@@ -54,7 +54,7 @@ describe('AcceptInvitationForm integration', () => {
     })
 
     const invitations = await clientApi.listInvitations()
-    const accepted = invitations.invitations.find((invitation) => invitation.id === createdInvitation.id)
+    const accepted = invitations.data.find((invitation) => invitation.id === createdInvitation.id)
     expect(accepted?.status).toBe('accepted')
   })
 })

@@ -55,10 +55,7 @@ const shouldResetBackendStateForCurrentTest = (): boolean => {
     return false
   }
 
-  return !(
-    testPath.endsWith('apps/web/components/SignOutButton.integration.test.tsx') ||
-    testPath.endsWith('apps/web/lib/client-auth.integration.test.ts')
-  )
+  return !testPath.endsWith('apps/web/components/SignOutButton.integration.test.tsx')
 }
 
 beforeAll(async () => {

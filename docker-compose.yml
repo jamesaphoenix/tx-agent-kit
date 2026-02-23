@@ -19,7 +19,7 @@ services:
     profiles: ['infra']
 
   temporal-postgres:
-    image: postgres:16-alpine
+    image: postgres:16.12-alpine3.23
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -36,12 +36,12 @@ services:
     profiles: ['infra']
 
   temporal:
-    image: temporalio/auto-setup:1.22.5
+    image: temporalio/auto-setup:1.29.3
     depends_on:
       temporal-postgres:
         condition: service_healthy
     environment:
-      DB: postgresql
+      DB: postgres12
       DB_PORT: 5432
       POSTGRES_USER: postgres
       POSTGRES_PWD: postgres
@@ -54,7 +54,7 @@ services:
     profiles: ['infra']
 
   temporal-ui:
-    image: temporalio/ui:2.39.0
+    image: temporalio/ui:2.45.3
     depends_on:
       - temporal
     environment:
@@ -65,7 +65,7 @@ services:
     profiles: ['infra']
 
   jaeger:
-    image: jaegertracing/jaeger:2.15.0
+    image: jaegertracing/jaeger:2.15.1
     ports:
       - '16686:16686'
       - '4317:4317'
@@ -73,7 +73,7 @@ services:
     profiles: ['infra']
 
   prometheus:
-    image: prom/prometheus:v3.3.1
+    image: prom/prometheus:v3.9.1
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -88,7 +88,7 @@ services:
     profiles: ['infra']
 
   loki:
-    image: grafana/loki:3.5.0
+    image: grafana/loki:3.6.6
     command: -config.file=/etc/loki/loki-config.yml
     volumes:
       - ./monitoring/local/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
@@ -98,7 +98,7 @@ services:
     profiles: ['infra']
 
   grafana:
-    image: grafana/grafana:11.6.2
+    image: grafana/grafana:12.3.3
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -116,7 +116,7 @@ services:
     profiles: ['infra']
 
   promtail:
-    image: grafana/promtail:3.5.0
+    image: grafana/promtail:3.6.6
     command: -config.file=/etc/promtail/promtail-config.yml
     volumes:
       - ./monitoring/local/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
@@ -127,7 +127,7 @@ services:
     profiles: ['infra']
 
   node-exporter:
-    image: prom/node-exporter:v1.6.1
+    image: prom/node-exporter:v1.10.2
     command:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
@@ -141,7 +141,7 @@ services:
     profiles: ['infra']
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.126.0
+    image: otel/opentelemetry-collector-contrib:0.146.1
     command: ['--config=/etc/otel-collector-config.yaml']
     volumes:
       - ./monitoring/local/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
@@ -163,6 +163,8 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 4000
+      API_HOST: 0.0.0.0
+      API_CORS_ORIGIN: http://localhost:3000
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/tx_agent_kit
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET must be set}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
@@ -192,9 +194,24 @@ services:
         condition: service_started
     profiles: ['app']
 
+  redis:
+    image: redis:8.6.0-alpine3.23
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: ['infra']
+
 volumes:
   postgres_data:
   temporal_postgres_data:
   prometheus_data:
   grafana_data:
   loki_data:
+  redis_data:

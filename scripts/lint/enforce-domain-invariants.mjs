@@ -232,16 +232,15 @@ const enforceDbFactoryParity = () => {
   }
 }
 
-const requiredDomainFolders = ['domain', 'ports', 'repositories', 'services']
-const domainLayers = ['domain', 'ports', 'repositories', 'adapters', 'services', 'runtime', 'ui']
+const requiredDomainFolders = ['domain', 'ports', 'application', 'adapters']
+const domainLayers = ['domain', 'ports', 'application', 'adapters', 'runtime', 'ui']
 const allowedLayerImports = {
   domain: new Set(['domain']),
   ports: new Set(['domain', 'ports']),
-  repositories: new Set(['domain', 'ports', 'repositories']),
+  application: new Set(['domain', 'ports', 'application']),
   adapters: new Set(['domain', 'ports', 'adapters']),
-  services: new Set(['domain', 'ports', 'services']),
-  runtime: new Set(['domain', 'ports', 'repositories', 'adapters', 'services', 'runtime']),
-  ui: new Set(['domain', 'ports', 'repositories', 'adapters', 'services', 'runtime', 'ui'])
+  runtime: new Set(['domain', 'ports', 'application', 'adapters', 'runtime']),
+  ui: new Set(['domain', 'ports', 'application', 'adapters', 'runtime', 'ui'])
 }
 
 const inferLayerFromPath = (pathValue) => {
@@ -279,6 +278,10 @@ const resolveImportTarget = (sourceFilePath, importPath) => {
 }
 
 const importRegex = /(?:import|export)\s+(?:[\s\w{},*]+from\s+)?['"]([^'"]+)['"]/g
+
+const isPublishedDomainSharedImport = (importPath, resolvedImportTarget) =>
+  /(^|\/)(domain-shared|domains\/shared)(\/|$)/.test(importPath) ||
+  /\/domains\/(?:shared|[^/]+\/domain-shared)\//.test(toPosix(resolvedImportTarget))
 
 const enforceDomainDirectoryContracts = () => {
   const domainRoots = [
@@ -347,34 +350,45 @@ const enforceDomainDirectoryContracts = () => {
         }
       }
 
-      const repositoryFiles = listFilesRecursively(join(domainPath, 'repositories')).filter(
+      const applicationFiles = listFilesRecursively(join(domainPath, 'application')).filter(
         (filePath) =>
           (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) &&
           !filePath.endsWith('.gitkeep')
       )
-      if (repositoryFiles.length === 0) {
+      if (applicationFiles.length === 0) {
         fail(
-          `Domain \`${toPosix(relative(repoRoot, domainPath))}\` must define at least one repository implementation in \`repositories/\`.`
+          `Domain \`${toPosix(relative(repoRoot, domainPath))}\` must define at least one application use-case module in \`application/\`.`
         )
       }
 
-      for (const filePath of repositoryFiles) {
+      const concreteUseCaseFiles = applicationFiles.filter((filePath) => {
+        const fileName = filePath.split(sep).pop() ?? ''
+        return fileName !== 'index.ts' && fileName !== 'index.tsx'
+      })
+      if (concreteUseCaseFiles.length === 0) {
+        fail(
+          `Domain \`${toPosix(relative(repoRoot, domainPath))}\` must define at least one use-case file in \`application/\` (non-index file).`
+        )
+      }
+
+      const adapterFiles = listFilesRecursively(join(domainPath, 'adapters')).filter(
+        (filePath) =>
+          (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) &&
+          !filePath.endsWith('.gitkeep')
+      )
+      if (adapterFiles.length === 0) {
+        fail(
+          `Domain \`${toPosix(relative(repoRoot, domainPath))}\` must define at least one adapter implementation in \`adapters/\`.`
+        )
+      }
+
+      for (const filePath of adapterFiles) {
         const source = readUtf8(filePath)
-        if (!/from\s+['"]\.\.\/ports\//.test(source)) {
+        if (!/from\s+['"][^'"]*ports\//.test(source)) {
           fail(
-            `Repository implementation must depend on a domain port in \`${toPosix(relative(repoRoot, filePath))}\`.`
+            `Adapter implementation must import at least one domain port in \`${toPosix(relative(repoRoot, filePath))}\`.`
           )
         }
-      }
-
-      const serviceFiles = listFilesRecursively(join(domainPath, 'services')).filter(
-        (filePath) => filePath.endsWith('.ts') || filePath.endsWith('.tsx')
-      )
-
-      if (serviceFiles.length === 0) {
-        fail(
-          `Domain \`${toPosix(relative(repoRoot, domainPath))}\` must define at least one service implementation in \`services/\`.`
-        )
       }
 
       const tsFiles = listFilesRecursively(domainPath).filter(
@@ -388,17 +402,31 @@ const enforceDomainDirectoryContracts = () => {
         }
 
         const source = readUtf8(filePath)
+        const fileRelativePath = toPosix(relative(repoRoot, filePath))
+        if (
+          sourceLayer === 'ports' &&
+          /(?:^|\n)\s*[^/\n]*Layer\.(?:succeed|effect)\s*\(/.test(source)
+        ) {
+          fail(
+            `Ports must not implement layers with Layer.succeed/Layer.effect: \`${fileRelativePath}\`.`
+          )
+        }
+
         for (const match of source.matchAll(importRegex)) {
           const importPath = match[1]
           const resolvedImportTarget = resolveImportTarget(filePath, importPath)
           const importedDomain = inferDomainFromPath(resolvedImportTarget)
           const shouldCheckLayer = importPath.startsWith('.') || importedDomain === domainName
 
-          if (importedDomain && importedDomain !== domainName) {
+          if (
+            importedDomain &&
+            importedDomain !== domainName &&
+            !isPublishedDomainSharedImport(importPath, resolvedImportTarget)
+          ) {
             fail(
               [
                 'Cross-domain import detected:',
-                `source=${toPosix(relative(repoRoot, filePath))}`,
+                `source=${fileRelativePath}`,
                 `import=${importPath}`,
                 `expected-domain=${domainName}`,
                 `actual-domain=${importedDomain}`
@@ -422,7 +450,7 @@ const enforceDomainDirectoryContracts = () => {
             fail(
               [
                 'Invalid domain-layer dependency:',
-                `source=${toPosix(relative(repoRoot, filePath))} (${sourceLayer})`,
+                `source=${fileRelativePath} (${sourceLayer})`,
                 `import=${importPath} -> ${targetLayer}`,
                 `allowed=${[...allowedLayerImports[sourceLayer]].join(', ')}`
               ].join(' ')
@@ -438,7 +466,7 @@ const enforceDomainDirectoryContracts = () => {
   }
 
   if (discoveredDomains === 0) {
-    fail('No domain modules found under domain roots. Add at least one domain with services/ implementation.')
+    fail('No domain modules found under domain roots. Add at least one domain with `domain/ports/application/adapters` implementation.')
   }
 }
 
@@ -994,7 +1022,7 @@ const enforceCriticalIntegrationCoverage = () => {
     'apps/web/components/CreateInvitationForm.integration.test.tsx',
     'apps/web/components/AcceptInvitationForm.integration.test.tsx',
     'apps/web/components/SignOutButton.integration.test.tsx',
-    'apps/web/lib/client-auth.integration.test.ts'
+    'apps/web/lib/client-auth.test.ts'
   ]
 
   for (const requiredPath of requiredWebIntegrationSuites) {
@@ -1070,7 +1098,7 @@ const enforceCriticalIntegrationCoverage = () => {
     }
   }
 
-  const clientAuthSuitePath = resolve(repoRoot, 'apps/web/lib/client-auth.integration.test.ts')
+  const clientAuthSuitePath = resolve(repoRoot, 'apps/web/lib/client-auth.test.ts')
   if (existsSync(clientAuthSuitePath) && statSync(clientAuthSuitePath).isFile()) {
     const clientAuthSource = readUtf8(clientAuthSuitePath)
     if (!/handleUnauthorizedApiError/u.test(clientAuthSource)) {
@@ -1301,14 +1329,14 @@ const enforceGlobalIntegrationWorkspaceContracts = () => {
     }
   }
 
-  const integrationGroupOrderContracts = [
-    ['apps/api/vitest.integration.config.ts', 1],
-    ['packages/testkit/vitest.integration.config.ts', 2],
-    ['apps/web/vitest.integration.config.ts', 3],
-    ['apps/worker/vitest.integration.config.ts', 4]
+  const integrationProjectConfigPaths = [
+    'apps/api/vitest.integration.config.ts',
+    'apps/web/vitest.integration.config.ts',
+    'packages/testkit/vitest.integration.config.ts',
+    'apps/worker/vitest.integration.config.ts'
   ]
 
-  for (const [relativePath, groupOrder] of integrationGroupOrderContracts) {
+  for (const relativePath of integrationProjectConfigPaths) {
     const absolutePath = resolve(repoRoot, relativePath)
     if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
       fail(`Missing integration project config: \`${relativePath}\`.`)
@@ -1316,28 +1344,39 @@ const enforceGlobalIntegrationWorkspaceContracts = () => {
     }
 
     const source = readUtf8(absolutePath)
-    const groupOrderRegex = new RegExp(`groupOrder:\\s*${groupOrder}\\b`, 'u')
-    if (!groupOrderRegex.test(source)) {
+    if (/\bgroupOrder\s*:/u.test(source)) {
       fail(
-        `Integration project config \`${relativePath}\` must declare \`sequence.groupOrder: ${groupOrder}\` for workspace scheduling stability.`
+        `Integration project config \`${relativePath}\` must not pin \`sequence.groupOrder\`; allow workspace-level parallel scheduling.`
+      )
+    }
+
+    if (/maxWorkers:\s*1/u.test(source)) {
+      fail(
+        `Integration project config \`${relativePath}\` must not force \`maxWorkers: 1\`; use shared env-driven worker policy.`
+      )
+    }
+
+    if (/fileParallelism:\s*false/u.test(source)) {
+      fail(
+        `Integration project config \`${relativePath}\` must not disable \`fileParallelism\`; use shared env-driven worker policy.`
       )
     }
   }
 
-  const workerIntegrationConfigPath = resolve(repoRoot, 'apps/worker/vitest.integration.config.ts')
-  if (!existsSync(workerIntegrationConfigPath) || !statSync(workerIntegrationConfigPath).isFile()) {
-    fail('Missing integration project config: `apps/worker/vitest.integration.config.ts`.')
+  const rootVitestConfigPath = resolve(repoRoot, 'vitest.config.ts')
+  if (!existsSync(rootVitestConfigPath) || !statSync(rootVitestConfigPath).isFile()) {
+    fail('Missing root unit workspace config: `vitest.config.ts`.')
   } else {
-    const workerIntegrationConfig = readUtf8(workerIntegrationConfigPath)
-    if (!/maxWorkers:\s*1/u.test(workerIntegrationConfig)) {
+    const rootVitestConfigSource = readUtf8(rootVitestConfigPath)
+    if (/maxWorkers:\s*1/u.test(rootVitestConfigSource)) {
       fail(
-        'Worker integration config must pin `maxWorkers: 1` to avoid shared public-schema contention.'
+        'Root unit workspace config must not force `maxWorkers: 1`; use shared env-driven worker policy.'
       )
     }
 
-    if (!/fileParallelism:\s*false/u.test(workerIntegrationConfig)) {
+    if (/fileParallelism:\s*false/u.test(rootVitestConfigSource)) {
       fail(
-        'Worker integration config must set `fileParallelism: false` to keep deterministic DB reset sequencing.'
+        'Root unit workspace config must not disable `fileParallelism`; use shared env-driven worker policy.'
       )
     }
   }
@@ -1354,6 +1393,7 @@ const enforceNoDirectProcessEnvInSource = () => {
     'apps/api/src/config/openapi-env.ts',
     'apps/worker/src/config/env.ts',
     'apps/web/lib/env.ts',
+    'apps/mobile/lib/env.ts',
     'packages/auth/src/env.ts',
     'packages/db/src/env.ts',
     'packages/logging/src/env.ts',
@@ -1372,11 +1412,11 @@ const enforceNoDirectProcessEnvInSource = () => {
         return false
       }
 
-      if (!normalized.includes('/src/') && normalized !== 'apps/web/lib/env.ts') {
+      if (!normalized.includes('/src/') && normalized !== 'apps/web/lib/env.ts' && !normalized.startsWith('apps/mobile/')) {
         return false
       }
 
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.spec.ts')) {
+      if (normalized.includes('/__tests__/') || /\.(test|spec)\.(ts|tsx)$/u.test(normalized)) {
         return false
       }
 
@@ -1426,7 +1466,12 @@ const enforceNoSourcePlaceholderComments = () => {
         normalized.includes('/src/') ||
         normalized.startsWith('apps/web/app/') ||
         normalized.startsWith('apps/web/components/') ||
-        normalized.startsWith('apps/web/lib/')
+        normalized.startsWith('apps/web/lib/') ||
+        normalized.startsWith('apps/mobile/app/') ||
+        normalized.startsWith('apps/mobile/components/') ||
+        normalized.startsWith('apps/mobile/lib/') ||
+        normalized.startsWith('apps/mobile/stores/') ||
+        normalized.startsWith('apps/mobile/hooks/')
       if (!isSourcePath) {
         return false
       }
@@ -1435,7 +1480,7 @@ const enforceNoSourcePlaceholderComments = () => {
         return false
       }
 
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.spec.ts')) {
+      if (normalized.includes('/__tests__/') || /\.(test|spec)\.(ts|tsx)$/u.test(normalized)) {
         return false
       }
 
@@ -1511,7 +1556,7 @@ const enforceNoDefaultExportsInDdd = () => {
         return false
       }
 
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.spec.ts')) {
+      if (normalized.includes('/__tests__/') || /\.(test|spec)\.(ts|tsx)$/u.test(normalized)) {
         return false
       }
 
@@ -1802,6 +1847,10 @@ const collectApiRouteKinds = (rootRelativePath, expectsHandlers, requiredPathTok
   const routeFiles = listFilesRecursively(root).filter((filePath) => {
     const normalized = toPosix(filePath)
     if (!normalized.endsWith('.ts') && !normalized.endsWith('.tsx')) {
+      return false
+    }
+
+    if (normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx')) {
       return false
     }
 

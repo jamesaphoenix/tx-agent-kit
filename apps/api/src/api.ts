@@ -43,6 +43,14 @@ export const mapCoreError = (error: unknown): BadRequest | Unauthorized | NotFou
   return new InternalError({ message: 'Internal server error' })
 }
 
+const paginatedResponseSchema = <A, I, R>(itemSchema: Schema.Schema<A, I, R>) =>
+  Schema.Struct({
+    data: Schema.Array(itemSchema),
+    total: Schema.Number,
+    nextCursor: Schema.NullOr(Schema.String),
+    prevCursor: Schema.NullOr(Schema.String)
+  })
+
 const AuthUser = Schema.Struct({
   id: Schema.String,
   email: Schema.String,
@@ -84,12 +92,21 @@ const Workspace = Schema.Struct({
   createdAt: Schema.String
 })
 
-const WorkspacesResponse = Schema.Struct({
-  workspaces: Schema.Array(Workspace)
+const WorkspacesResponse = paginatedResponseSchema(Workspace)
+
+const WorkspacesListParams = Schema.Struct({
+  cursor: Schema.optional(Schema.String),
+  limit: Schema.optional(Schema.String),
+  sortBy: Schema.optional(Schema.String),
+  sortOrder: Schema.optional(Schema.Literal('asc', 'desc'))
 })
 
 const CreateWorkspaceBody = Schema.Struct({
   name: Schema.String
+})
+
+const UpdateWorkspaceBody = Schema.Struct({
+  name: Schema.optional(Schema.String)
 })
 
 const Invitation = Schema.Struct({
@@ -104,8 +121,15 @@ const Invitation = Schema.Struct({
   createdAt: Schema.String
 })
 
-const InvitationsResponse = Schema.Struct({
-  invitations: Schema.Array(Invitation)
+const InvitationsResponse = paginatedResponseSchema(Invitation)
+
+const InvitationsListParams = Schema.Struct({
+  cursor: Schema.optional(Schema.String),
+  limit: Schema.optional(Schema.String),
+  sortBy: Schema.optional(Schema.String),
+  sortOrder: Schema.optional(Schema.Literal('asc', 'desc')),
+  'filter[status]': Schema.optional(Schema.String),
+  'filter[role]': Schema.optional(Schema.String)
 })
 
 const CreateInvitationBody = Schema.Struct({
@@ -114,11 +138,19 @@ const CreateInvitationBody = Schema.Struct({
   role: Schema.Literal('admin', 'member')
 })
 
+const UpdateInvitationBody = Schema.Struct({
+  role: Schema.optional(Schema.Literal('admin', 'member')),
+  status: Schema.optional(Schema.Literal('pending', 'accepted', 'revoked', 'expired'))
+})
+
 const AcceptInvitationResponse = Schema.Struct({
   accepted: Schema.Boolean
 })
 
 const InvitationTokenParam = HttpApiSchema.param('token', Schema.String)
+const InvitationIdParam = HttpApiSchema.param('invitationId', Schema.String)
+const WorkspaceIdParam = HttpApiSchema.param('workspaceId', Schema.String)
+const TaskIdParam = HttpApiSchema.param('taskId', Schema.String)
 
 const Task = Schema.Struct({
   id: Schema.String,
@@ -130,8 +162,32 @@ const Task = Schema.Struct({
   createdAt: Schema.String
 })
 
-const TasksResponse = Schema.Struct({
-  tasks: Schema.Array(Task)
+const IdsBody = Schema.Struct({
+  ids: Schema.Array(Schema.UUID)
+})
+
+const WorkspacesManyResponse = Schema.Struct({
+  data: Schema.Array(Workspace)
+})
+
+const InvitationsManyResponse = Schema.Struct({
+  data: Schema.Array(Invitation)
+})
+
+const TasksManyResponse = Schema.Struct({
+  data: Schema.Array(Task)
+})
+
+const TasksResponse = paginatedResponseSchema(Task)
+
+const TasksListParams = Schema.Struct({
+  workspaceId: Schema.String,
+  cursor: Schema.optional(Schema.String),
+  limit: Schema.optional(Schema.String),
+  sortBy: Schema.optional(Schema.String),
+  sortOrder: Schema.optional(Schema.Literal('asc', 'desc')),
+  'filter[status]': Schema.optional(Schema.String),
+  'filter[createdByUserId]': Schema.optional(Schema.String)
 })
 
 const CreateTaskBody = Schema.Struct({
@@ -140,10 +196,20 @@ const CreateTaskBody = Schema.Struct({
   description: Schema.optional(Schema.String)
 })
 
+const UpdateTaskBody = Schema.Struct({
+  title: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.NullOr(Schema.String)),
+  status: Schema.optional(Schema.Literal('todo', 'in_progress', 'done'))
+})
+
 const HealthResponse = Schema.Struct({
   status: Schema.Literal('healthy'),
   timestamp: Schema.String,
   service: Schema.String
+})
+
+const DeletedResponse = Schema.Struct({
+  deleted: Schema.Boolean
 })
 
 export const HealthGroup = HttpApiGroup.make('health')
@@ -156,23 +222,81 @@ export const AuthGroup = HttpApiGroup.make('auth')
   .add(HttpApiEndpoint.del('deleteMe', '/v1/auth/me').addSuccess(DeleteMeResponse))
 
 export const WorkspacesGroup = HttpApiGroup.make('workspaces')
-  .add(HttpApiEndpoint.get('listWorkspaces', '/v1/workspaces').addSuccess(WorkspacesResponse))
+  .add(
+    HttpApiEndpoint.get('listWorkspaces', '/v1/workspaces')
+      .setUrlParams(WorkspacesListParams)
+      .addSuccess(WorkspacesResponse)
+  )
   .add(HttpApiEndpoint.post('createWorkspace', '/v1/workspaces').setPayload(CreateWorkspaceBody).addSuccess(Workspace, { status: 201 }))
-  .add(HttpApiEndpoint.get('listInvitations', '/v1/invitations').addSuccess(InvitationsResponse))
+  .add(
+    HttpApiEndpoint.get('getWorkspace')`/v1/workspaces/${WorkspaceIdParam}`
+      .addSuccess(Workspace)
+  )
+  .add(
+    HttpApiEndpoint.post('getManyWorkspaces', '/v1/workspaces/batch/get-many')
+      .setPayload(IdsBody)
+      .addSuccess(WorkspacesManyResponse)
+  )
+  .add(
+    HttpApiEndpoint.patch('updateWorkspace')`/v1/workspaces/${WorkspaceIdParam}`
+      .setPayload(UpdateWorkspaceBody)
+      .addSuccess(Workspace)
+  )
+  .add(
+    HttpApiEndpoint.del('removeWorkspace')`/v1/workspaces/${WorkspaceIdParam}`
+      .addSuccess(DeletedResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('listInvitations', '/v1/invitations')
+      .setUrlParams(InvitationsListParams)
+      .addSuccess(InvitationsResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getInvitation')`/v1/invitations/${InvitationIdParam}`
+      .addSuccess(Invitation)
+  )
+  .add(
+    HttpApiEndpoint.post('getManyInvitations', '/v1/invitations/batch/get-many')
+      .setPayload(IdsBody)
+      .addSuccess(InvitationsManyResponse)
+  )
   .add(HttpApiEndpoint.post('createInvitation', '/v1/invitations').setPayload(CreateInvitationBody).addSuccess(Invitation, { status: 201 }))
+  .add(
+    HttpApiEndpoint.patch('updateInvitation')`/v1/invitations/${InvitationIdParam}`
+      .setPayload(UpdateInvitationBody)
+      .addSuccess(Invitation)
+  )
+  .add(
+    HttpApiEndpoint.del('removeInvitation')`/v1/invitations/${InvitationIdParam}`
+      .addSuccess(DeletedResponse)
+  )
   .add(HttpApiEndpoint.post('acceptInvitation')`/v1/invitations/${InvitationTokenParam}/accept`.addSuccess(AcceptInvitationResponse))
 
 export const TasksGroup = HttpApiGroup.make('tasks')
   .add(
     HttpApiEndpoint.get('listTasks', '/v1/tasks')
-      .setUrlParams(
-        Schema.Struct({
-          workspaceId: Schema.String
-        })
-      )
+      .setUrlParams(TasksListParams)
       .addSuccess(TasksResponse)
   )
   .add(HttpApiEndpoint.post('createTask', '/v1/tasks').setPayload(CreateTaskBody).addSuccess(Task, { status: 201 }))
+  .add(
+    HttpApiEndpoint.get('getTask')`/v1/tasks/${TaskIdParam}`
+      .addSuccess(Task)
+  )
+  .add(
+    HttpApiEndpoint.post('getManyTasks', '/v1/tasks/batch/get-many')
+      .setPayload(IdsBody)
+      .addSuccess(TasksManyResponse)
+  )
+  .add(
+    HttpApiEndpoint.patch('updateTask')`/v1/tasks/${TaskIdParam}`
+      .setPayload(UpdateTaskBody)
+      .addSuccess(Task)
+  )
+  .add(
+    HttpApiEndpoint.del('removeTask')`/v1/tasks/${TaskIdParam}`
+      .addSuccess(DeletedResponse)
+  )
 
 export class TxAgentApi extends HttpApi.make('tx-agent-kit')
   .addError(BadRequest, { status: 400 })

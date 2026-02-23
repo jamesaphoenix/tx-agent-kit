@@ -1,15 +1,10 @@
 import { Context } from 'effect'
 import type * as Effect from 'effect/Effect'
+import type { AuthSessionTokenPayload, AuthUserRecord } from '../domain/auth-domain.js'
 
 export const AuthRepositoryKind = 'custom' as const
 
-export interface AuthUserRecord {
-  id: string
-  email: string
-  passwordHash: string
-  name: string
-  createdAt: Date
-}
+export type { AuthSessionTokenPayload, AuthUserRecord }
 
 export class AuthUsersPort extends Context.Tag('AuthUsersPort')<
   AuthUsersPort,
@@ -25,5 +20,21 @@ export class AuthWorkspaceOwnershipPort extends Context.Tag('AuthWorkspaceOwners
   AuthWorkspaceOwnershipPort,
   {
     countOwnedByUser: (userId: string) => Effect.Effect<number, unknown>
+  }
+>() {}
+
+export class PasswordHasherPort extends Context.Tag('PasswordHasherPort')<
+  PasswordHasherPort,
+  {
+    hash: (plainText: string) => Effect.Effect<string, unknown>
+    verify: (plainText: string, hash: string) => Effect.Effect<boolean, unknown>
+  }
+>() {}
+
+export class SessionTokenPort extends Context.Tag('SessionTokenPort')<
+  SessionTokenPort,
+  {
+    sign: (payload: Pick<AuthSessionTokenPayload, 'sub' | 'email'>) => Effect.Effect<string, unknown>
+    verify: (token: string) => Effect.Effect<AuthSessionTokenPayload, unknown>
   }
 >() {}

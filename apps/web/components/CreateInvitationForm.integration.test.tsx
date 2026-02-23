@@ -50,6 +50,6 @@ describe('CreateInvitationForm integration', () => {
     writeAuthToken(invitee.token)
 
     const invitations = await clientApi.listInvitations()
-    expect(invitations.invitations.some((invitation) => invitation.status === 'pending')).toBe(true)
+    expect(invitations.data.some((invitation) => invitation.status === 'pending')).toBe(true)
   })
 })

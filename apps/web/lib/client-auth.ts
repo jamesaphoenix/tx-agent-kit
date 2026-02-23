@@ -1,5 +1,6 @@
 import { clearAuthToken, readAuthToken } from './auth-token'
 import { ApiClientError } from './client-api'
+import { sessionStoreActions } from '../stores/session-store'
 
 interface RouterLike {
   replace: (path: string) => void
@@ -23,11 +24,12 @@ export const handleUnauthorizedApiError = (
   router: RouterLike,
   nextPath: string
 ): boolean => {
-  if (!(error instanceof ApiClientError) || error.status !== 401) {
+  if (!(error instanceof ApiClientError) || (error.status !== 401 && error.status !== 403)) {
     return false
   }
 
   clearAuthToken()
+  sessionStoreActions.clear()
   router.replace(buildSignInPath(nextPath))
   return true
 }

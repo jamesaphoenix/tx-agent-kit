@@ -231,8 +231,8 @@ export const ${n.Entity}ServiceLive = (options: Make${n.Entity}ServiceOptions) =
   Layer.succeed(${n.Entity}Service, make${n.Entity}Service(options))
 `
 
-const coreRuntimeFile = (n: NameSet): string => `import { make${n.Entity}Repository } from '../repositories/${n.entitySlug}-repository.js'
-import { ${n.Entity}ServiceLive } from '../services/${n.entitySlug}-service.js'
+const coreRuntimeFile = (n: NameSet): string => `import { make${n.Entity}Repository } from '../adapters/${n.entitySlug}-repository.js'
+import { ${n.Entity}ServiceLive } from '../application/${n.entitySlug}-service.js'
 
 export const ${n.Entity}DomainLive = ${n.Entity}ServiceLive({
   repository: make${n.Entity}Repository()
@@ -241,8 +241,8 @@ export const ${n.Entity}DomainLive = ${n.Entity}ServiceLive({
 
 const coreServiceTestFile = (n: NameSet): string => `import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { make${n.Entity}Repository } from '../repositories/${n.entitySlug}-repository.js'
-import { make${n.Entity}Service } from '../services/${n.entitySlug}-service.js'
+import { make${n.Entity}Repository } from '../adapters/${n.entitySlug}-repository.js'
+import { make${n.Entity}Service } from '../application/${n.entitySlug}-service.js'
 
 describe('${n.Entity}Service', () => {
   it('runs create -> list -> getById -> update -> remove CRUD flow', async () => {
@@ -346,7 +346,7 @@ const apiRoutesFile = (n: NameSet): string => `import type {
   ${n.Entity}Id,
   Update${n.Entity}Input
 } from '@tx-agent-kit/core'
-import type { ${n.Entity}RouteServiceContract } from '../services/${n.entitySlug}-route-service.js'
+import type { ${n.Entity}RouteServiceContract } from '../application/${n.entitySlug}-route-service.js'
 
 export interface Make${n.Entity}RoutesOptions {
   service: ${n.Entity}RouteServiceContract
@@ -417,15 +417,15 @@ const mergeIndexExports = async (absolutePath: string, plannedContent: string): 
 
 const domainRootIndexFile = (): string => `export * from './domain/index.js'
 export * from './ports/index.js'
-export * from './repositories/index.js'
-export * from './services/index.js'
+export * from './application/index.js'
+export * from './adapters/index.js'
 export * from './runtime/index.js'
 `
 
 const apiDomainRootIndexFile = (): string => `export * from './domain/index.js'
 export * from './ports/index.js'
-export * from './repositories/index.js'
-export * from './services/index.js'
+export * from './application/index.js'
+export * from './adapters/index.js'
 export * from './routes/index.js'
 `
 
@@ -437,13 +437,13 @@ const coreFilePlan = (n: NameSet): PlannedFile[] => {
     { path: `${basePath}/domain/index.ts`, content: indexFile([n.entitySlug]) },
     { path: `${basePath}/ports/${n.entitySlug}-repository-port.ts`, content: corePortFile(n) },
     { path: `${basePath}/ports/index.ts`, content: indexFile([`${n.entitySlug}-repository-port`]) },
-    { path: `${basePath}/repositories/${n.entitySlug}-repository.ts`, content: coreRepositoryFile(n) },
-    { path: `${basePath}/repositories/index.ts`, content: indexFile([`${n.entitySlug}-repository`]) },
-    { path: `${basePath}/services/${n.entitySlug}-service.ts`, content: coreServiceFile(n) },
-    { path: `${basePath}/services/index.ts`, content: indexFile([`${n.entitySlug}-service`]) },
+    { path: `${basePath}/adapters/${n.entitySlug}-repository.ts`, content: coreRepositoryFile(n) },
+    { path: `${basePath}/adapters/index.ts`, content: indexFile([`${n.entitySlug}-repository`]) },
+    { path: `${basePath}/application/${n.entitySlug}-service.ts`, content: coreServiceFile(n) },
+    { path: `${basePath}/application/index.ts`, content: indexFile([`${n.entitySlug}-service`]) },
     { path: `${basePath}/runtime/${n.entitySlug}-live.ts`, content: coreRuntimeFile(n) },
     { path: `${basePath}/runtime/index.ts`, content: indexFile([`${n.entitySlug}-live`]) },
-    { path: `${basePath}/services/${n.entitySlug}-service.test.ts`, content: coreServiceTestFile(n) },
+    { path: `${basePath}/application/${n.entitySlug}-service.test.ts`, content: coreServiceTestFile(n) },
     { path: `${basePath}/index.ts`, content: domainRootIndexFile() }
   ]
 }
@@ -456,10 +456,10 @@ const apiFilePlan = (n: NameSet): PlannedFile[] => {
     { path: `${basePath}/domain/index.ts`, content: indexFile([`${n.entitySlug}-contracts`]) },
     { path: `${basePath}/ports/${n.entitySlug}-route-port.ts`, content: apiPortFile(n) },
     { path: `${basePath}/ports/index.ts`, content: indexFile([`${n.entitySlug}-route-port`]) },
-    { path: `${basePath}/repositories/${n.entitySlug}-service-adapter.ts`, content: apiRepositoryFile(n) },
-    { path: `${basePath}/repositories/index.ts`, content: indexFile([`${n.entitySlug}-service-adapter`]) },
-    { path: `${basePath}/services/${n.entitySlug}-route-service.ts`, content: apiServiceFile(n) },
-    { path: `${basePath}/services/index.ts`, content: indexFile([`${n.entitySlug}-route-service`]) },
+    { path: `${basePath}/adapters/${n.entitySlug}-service-adapter.ts`, content: apiRepositoryFile(n) },
+    { path: `${basePath}/adapters/index.ts`, content: indexFile([`${n.entitySlug}-service-adapter`]) },
+    { path: `${basePath}/application/${n.entitySlug}-route-service.ts`, content: apiServiceFile(n) },
+    { path: `${basePath}/application/index.ts`, content: indexFile([`${n.entitySlug}-route-service`]) },
     { path: `${basePath}/routes/${n.entitySlug}.ts`, content: apiRoutesFile(n) },
     { path: `${basePath}/routes/index.ts`, content: indexFile([n.entitySlug]) },
     { path: `${basePath}/routes/${n.entitySlug}.test.ts`, content: apiRoutesTestFile(n) },

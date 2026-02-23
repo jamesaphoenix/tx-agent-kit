@@ -19,6 +19,7 @@ PACKAGES=(
   "@tx-agent-kit/api"
   "@tx-agent-kit/worker"
   "@tx-agent-kit/web"
+  "@tx-agent-kit/mobile"
 )
 
 echo "Running type-check (quiet mode)"

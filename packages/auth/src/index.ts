@@ -27,7 +27,7 @@ const getSecret = (): Uint8Array => {
 
 export const hashPassword = (plain: string): Effect.Effect<string, AuthError> =>
   Effect.tryPromise({
-    try: async () => bcrypt.hash(plain, 12),
+    try: async () => bcrypt.hash(plain, getAuthEnv().AUTH_BCRYPT_ROUNDS),
     catch: () => new AuthError({ message: 'Failed to hash password' })
   })
 

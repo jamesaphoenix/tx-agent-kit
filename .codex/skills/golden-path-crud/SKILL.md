@@ -1,7 +1,13 @@
 ---
 name: golden-path-crud
-description: Generate tx-agent-kit CRUD layers (domain, ports, repositories, services, routes, tests) using the repository's built-in scaffold command and invariants.
+description: Generate tx-agent-kit CRUD layers using the repository scaffold and invariants.
+metadata:
+  short-description: Scaffold CRUD domain slices
 ---
+
+# golden-path-crud
+
+Generate CRUD scaffolds with the repository golden path.
 
 Use `skills/golden-path-crud/SKILL.md` as the source of truth.
 Run:

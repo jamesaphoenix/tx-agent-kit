@@ -1,5 +1,6 @@
 export { DB, DBLive, db, getPool, provideDB } from './client.js'
 export { DbError, dbDecodeFailed, dbQueryFailed, toDbError } from './errors.js'
+export { buildCursorPage } from './pagination.js'
 export * from './schema.js'
 export * from './effect-schemas/index.js'
 export * from './factories/index.js'

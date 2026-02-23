@@ -6,12 +6,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: 'worker-integration',
-      include: ['src/**/*.integration.test.ts'],
-      maxWorkers: 1,
-      fileParallelism: false,
-      sequence: {
-        groupOrder: 4
-      }
+      include: ['src/**/*.integration.test.ts']
     }
   })
 )

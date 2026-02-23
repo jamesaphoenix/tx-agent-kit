@@ -21,7 +21,7 @@ Agent-first TypeScript monorepo for building scalable apps with Effect, Temporal
 - Every DB table has a matching Effect schema in `packages/db/src/effect-schemas`.
 - Every DB table has a matching factory in `packages/db/src/factories`.
 - `console.*` is banned; use `@tx-agent-kit/logging`.
-- DDD import direction is enforced: `domain <- ports <- repositories/adapters <- services <- runtime/ui`.
+- DDD import direction is enforced with ports as the seam: `domain <- ports <- application <- runtime/ui` and `domain <- ports <- adapters <- runtime/ui`.
 - `apps/api/openapi.json` is generated from `apps/api` and is the external contract reference.
 - Routes and repositories must declare explicit kind markers (`crud` vs `custom`) and keep kind intent consistent.
 
@@ -91,7 +91,10 @@ docker compose -p tx-agent-kit down -v
 - `pnpm infra:ensure` is idempotent: it checks health first, only starts missing services, and never tears down containers.
 - `pnpm test:integration` is idempotent: it runs one Vitest workspace integration run with global setup (infra + DB reset + pgTAP once).
 - Select subset projects with `INTEGRATION_PROJECTS=web` or `INTEGRATION_PROJECTS=api,testkit`.
-- Tune non-web integration parallelism with `INTEGRATION_MAX_WORKERS` (default `2`).
+- Unit and integration workers default to host CPU parallelism.
+- Tune unit parallelism with `TEST_MAX_WORKERS`.
+- Tune integration parallelism with `INTEGRATION_MAX_WORKERS`.
+- Override only web integration workers with `WEB_INTEGRATION_MAX_WORKERS` when needed.
 - Use `pnpm test:integration --skip-pgtap` for faster local loops; keep pgTAP enabled in CI.
 - `pnpm db:test:reset` can be run manually before local integration/dev sessions.
 
@@ -114,7 +117,6 @@ Use `pnpm mcp:codex-config` to print TOML blocks for `~/.codex/config.toml` that
 ## Docs
 - Agent map and guardrails: `AGENTS.md`
 - Claude operating guide: `CLAUDE.md`
-- Golden-path CRUD skill: `skills/golden-path-crud/SKILL.md`
 - Architecture: `docs/ARCHITECTURE.md`
 - Commands: `docs/COMMANDS.md`
 - Quality and boundaries: `docs/QUALITY.md`

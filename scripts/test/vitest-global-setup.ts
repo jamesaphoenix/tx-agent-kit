@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { availableParallelism, cpus } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -8,10 +9,11 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(scriptDir, '../..')
 
 const defaultLockTimeoutSeconds = 120
+const maxAutoIntegrationWorkers = 6
+const maxAutoWebIntegrationWorkers = 4
 const composeProjectName = process.env.COMPOSE_PROJECT_NAME ?? 'tx-agent-kit'
 const integrationLockDir = `/tmp/${composeProjectName}-integration.lock`
 const integrationLockPidFilePath = resolve(integrationLockDir, 'pid')
-const defaultWebIntegrationMaxWorkers = 3
 const webIntegrationSlotClaimDirRelativePath = '.vitest/web-integration/slot-claims'
 
 const parsePositiveInt = (value: string | undefined, fallback: number): number => {
@@ -27,6 +29,14 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
   return parsed
 }
 
+const resolveAutoMaxWorkers = (): number => {
+  try {
+    return Math.max(1, availableParallelism())
+  } catch {
+    return Math.max(1, cpus().length)
+  }
+}
+
 const isProcessAlive = (pid: number): boolean => {
   try {
     process.kill(pid, 0)
@@ -37,7 +47,8 @@ const isProcessAlive = (pid: number): boolean => {
 }
 
 const tryReapStaleIntegrationLock = (
-  lockDir: string
+  lockDir: string,
+  timeoutSeconds: number
 ): boolean => {
   if (!existsSync(lockDir)) {
     return false
@@ -53,9 +64,9 @@ const tryReapStaleIntegrationLock = (
   }
 
   // Lock directories are expected to always include a pid marker.
-  // If it's missing, treat the lock as stale immediately.
+  // If it's missing, only treat the lock as stale after a grace period.
   const ageMs = Date.now() - statSync(lockDir).mtimeMs
-  if (ageMs >= 0) {
+  if (ageMs >= timeoutSeconds * 1000) {
     rmSync(lockDir, { recursive: true, force: true })
     return true
   }
@@ -80,7 +91,7 @@ const acquireIntegrationLock = async (
         throw error
       }
 
-      tryReapStaleIntegrationLock(lockDir)
+      tryReapStaleIntegrationLock(lockDir, timeoutSeconds)
 
       const elapsedSeconds = (Date.now() - startedAt) / 1000
       if (elapsedSeconds >= timeoutSeconds) {
@@ -97,27 +108,61 @@ const releaseIntegrationLock = (lockDir: string): void => {
   rmSync(lockDir, { recursive: true, force: true })
 }
 
-const resolveWebIntegrationMaxWorkers = (): number =>
-  parsePositiveInt(process.env.WEB_INTEGRATION_MAX_WORKERS, defaultWebIntegrationMaxWorkers)
+const resolveWebIntegrationMaxWorkers = (): number => {
+  const integrationMaxWorkers = parsePositiveInt(
+    process.env.INTEGRATION_MAX_WORKERS,
+    Math.min(resolveAutoMaxWorkers(), maxAutoIntegrationWorkers)
+  )
+  return parsePositiveInt(
+    process.env.WEB_INTEGRATION_MAX_WORKERS,
+    Math.min(integrationMaxWorkers, maxAutoWebIntegrationWorkers)
+  )
+}
 
 const resolveWebIntegrationStateDir = (): string => resolve(projectRoot, '.vitest/web-integration')
 const resolveWebIntegrationSlotClaimDir = (): string =>
   resolve(projectRoot, webIntegrationSlotClaimDirRelativePath)
 
-const stopProcess = async (pid: number): Promise<void> => {
+const resolveKnownWebHarnessSlots = (maxWorkers: number): number[] => {
+  const slots = new Set<number>()
+
+  for (let workerSlot = 1; workerSlot <= maxWorkers; workerSlot += 1) {
+    slots.add(workerSlot)
+  }
+
+  const stateDir = resolveWebIntegrationStateDir()
+  if (existsSync(stateDir)) {
+    for (const fileName of readdirSync(stateDir)) {
+      const match = /^api-slot-(\d+)\.pid$/u.exec(fileName)
+      const slotValue = match?.[1]
+      if (!slotValue) {
+        continue
+      }
+
+      const slot = Number.parseInt(slotValue, 10)
+      if (!Number.isNaN(slot) && slot > 0) {
+        slots.add(slot)
+      }
+    }
+  }
+
+  return [...slots].sort((left, right) => left - right)
+}
+
+const stopProcess = async (pid: number): Promise<boolean> => {
   if (!isProcessAlive(pid)) {
-    return
+    return true
   }
 
   try {
     process.kill(pid, 'SIGTERM')
   } catch {
-    return
+    return !isProcessAlive(pid)
   }
 
   for (let attempt = 0; attempt < 50; attempt += 1) {
     if (!isProcessAlive(pid)) {
-      return
+      return true
     }
     await sleep(100)
   }
@@ -125,15 +170,25 @@ const stopProcess = async (pid: number): Promise<void> => {
   try {
     process.kill(pid, 'SIGKILL')
   } catch {
-    // process may already be gone
+    return !isProcessAlive(pid)
   }
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (!isProcessAlive(pid)) {
+      return true
+    }
+    await sleep(100)
+  }
+
+  return !isProcessAlive(pid)
 }
 
 const cleanupPersistentWebHarnessProcesses = async (): Promise<void> => {
   const stateDir = resolveWebIntegrationStateDir()
   const maxWorkers = resolveWebIntegrationMaxWorkers()
+  const knownSlots = resolveKnownWebHarnessSlots(maxWorkers)
 
-  for (let workerSlot = 1; workerSlot <= maxWorkers; workerSlot += 1) {
+  for (const workerSlot of knownSlots) {
     const pidFilePath = resolve(stateDir, `api-slot-${workerSlot}.pid`)
     if (!existsSync(pidFilePath)) {
       continue
@@ -141,7 +196,10 @@ const cleanupPersistentWebHarnessProcesses = async (): Promise<void> => {
 
     const parsedPid = Number.parseInt(readFileSync(pidFilePath, 'utf8').trim(), 10)
     if (!Number.isNaN(parsedPid) && parsedPid > 0) {
-      await stopProcess(parsedPid)
+      const stopped = await stopProcess(parsedPid)
+      if (!stopped) {
+        throw new Error(`Failed to stop lingering web integration API process pid=${parsedPid} slot=${workerSlot}`)
+      }
     }
 
     rmSync(pidFilePath, { force: true })
@@ -168,6 +226,8 @@ const runGlobalIntegrationSetup = (): void => {
 }
 
 export default async () => {
+  process.env.AUTH_BCRYPT_ROUNDS ??= '4'
+
   const timeoutSeconds = parsePositiveInt(
     process.env.INTEGRATION_LOCK_TIMEOUT_SECONDS,
     defaultLockTimeoutSeconds

@@ -19,6 +19,7 @@ PACKAGES=(
   "@tx-agent-kit/api"
   "@tx-agent-kit/worker"
   "@tx-agent-kit/web"
+  "@tx-agent-kit/mobile"
 )
 
 echo "Running lint (quiet mode)"
@@ -46,10 +47,14 @@ if ! run_silent "lint ci env" "pnpm lint:ci-env"; then
   FAILED_PACKAGES+=("lint:ci-env")
 fi
 
+if ! run_silent "lint shell" "pnpm lint:shell"; then
+  FAILED_PACKAGES+=("lint:shell")
+fi
+
 if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then
   echo "Lint failed (${#FAILED_PACKAGES[@]} failed, $PASSED_COUNT passed)"
   printf '%s\n' "${FAILED_PACKAGES[@]}"
   exit 1
 fi
 
-echo "Lint completed ($PASSED_COUNT passed + invariants)"
+echo "Lint completed ($PASSED_COUNT passed + invariants + shell)"

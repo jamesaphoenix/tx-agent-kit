@@ -1,5 +1,17 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    "eslint.config.js",
+    "packages/tooling/eslint-config/**",
+    "packages/tooling/vitest-config/**",
+    "vitest.integration.workspace.ts",
+    "scripts/lint/**",
+    "scripts/test/**",
+    "scripts/test-quiet.sh",
+    "scripts/test-integration-quiet.sh",
+    "scripts/check-shell-invariants.sh",
+    "scripts/validate-ci-env.mjs"
+  ],
   "tasks": {
     "dev": {
       "cache": false,
@@ -19,12 +31,16 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "test:integration": {
       "dependsOn": ["^build"],
       "cache": false,
-      "outputs": ["coverage/**"]
+      "outputs": []
+    },
+    "generate:api": {
+      "dependsOn": ["^build"],
+      "outputs": ["lib/api/generated/**"]
     }
   }
 }

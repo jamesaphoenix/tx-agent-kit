@@ -1,8 +1,13 @@
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { availableParallelism, cpus } from 'node:os'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const slotClaimDirRelativePath = '.vitest/web-integration/slot-claims'
 const slotClaimPidRegex = /^pid=(\d+)$/
+const staleClaimWithoutPidMs = 5_000
+const workerSupportDir = dirname(fileURLToPath(import.meta.url))
+const repoRoot = resolve(workerSupportDir, '../../../..')
 
 const parsePositiveIndex = (value: string | undefined): number | null => {
   if (!value) {
@@ -18,19 +23,41 @@ const parsePositiveIndex = (value: string | undefined): number | null => {
 }
 
 const resolveMaxWorkers = (): number => {
-  const parsed = Number.parseInt(process.env.WEB_INTEGRATION_MAX_WORKERS ?? '3', 10)
-  if (Number.isNaN(parsed) || parsed < 1) {
-    return 3
+  const parseEnvWorkers = (value: string | undefined): number | null => {
+    if (!value) {
+      return null
+    }
+
+    const parsed = Number.parseInt(value, 10)
+    if (Number.isNaN(parsed) || parsed < 1) {
+      return null
+    }
+
+    return parsed
   }
 
-  return parsed
+  const explicitWebWorkers = parseEnvWorkers(process.env.WEB_INTEGRATION_MAX_WORKERS)
+  if (explicitWebWorkers !== null) {
+    return explicitWebWorkers
+  }
+
+  const explicitIntegrationWorkers = parseEnvWorkers(process.env.INTEGRATION_MAX_WORKERS)
+  if (explicitIntegrationWorkers !== null) {
+    return explicitIntegrationWorkers
+  }
+
+  try {
+    return Math.max(1, availableParallelism())
+  } catch {
+    return Math.max(1, cpus().length)
+  }
 }
 
 const toBoundedOneBasedIndex = (rawZeroBasedIndex: number, maxWorkers: number): number =>
   (rawZeroBasedIndex % maxWorkers) + 1
 
 const resolveSlotClaimDir = (): string => {
-  const claimDir = resolve(process.cwd(), slotClaimDirRelativePath)
+  const claimDir = resolve(repoRoot, slotClaimDirRelativePath)
   mkdirSync(claimDir, { recursive: true })
   return claimDir
 }
@@ -72,14 +99,41 @@ const readClaimPid = (slot: number): number | null => {
     return null
   }
 
-  const claimContents = readFileSync(claimPath, 'utf8')
-  return parseClaimPid(claimContents)
+  try {
+    const claimContents = readFileSync(claimPath, 'utf8')
+    return parseClaimPid(claimContents)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null
+    }
+
+    throw error
+  }
 }
 
 const clearClaimIfStale = (slot: number): void => {
+  const claimPath = resolveSlotClaimPath(slot)
+  if (!existsSync(claimPath)) {
+    return
+  }
+
   const pid = readClaimPid(slot)
-  if (pid === null || !isProcessAlive(pid)) {
-    rmSync(resolveSlotClaimPath(slot), { force: true })
+  if (pid !== null) {
+    if (!isProcessAlive(pid)) {
+      rmSync(claimPath, { force: true })
+    }
+    return
+  }
+
+  try {
+    const ageMs = Date.now() - statSync(claimPath).mtimeMs
+    if (ageMs >= staleClaimWithoutPidMs) {
+      rmSync(claimPath, { force: true })
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error
+    }
   }
 }
 
@@ -103,28 +157,41 @@ const tryClaimSlot = (slot: number, workerIdentity: string): boolean => {
   clearClaimIfStale(slot)
 
   const claimPath = resolveSlotClaimPath(slot)
-  const fd = (() => {
+  const claimBody = `pid=${process.pid}\nworker=${workerIdentity}\n`
+
+  const tryCreateClaim = (): boolean => {
     try {
-      return openSync(claimPath, 'wx')
+      writeFileSync(claimPath, claimBody, {
+        encoding: 'utf8',
+        flag: 'wx'
+      })
+      return true
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
         throw error
       }
-      return null
+      return false
     }
-  })()
-
-  if (fd === null) {
-    const activePid = readClaimPid(slot)
-    if (activePid !== null && activePid === process.pid) {
-      return true
-    }
-    return false
   }
 
-  const claimBody = `pid=${process.pid}\nworker=${workerIdentity}\n`
-  writeFileSync(fd, claimBody, { encoding: 'utf8' })
-  closeSync(fd)
+  let claimed = tryCreateClaim()
+
+  if (!claimed) {
+    const activePid = readClaimPid(slot)
+    if (activePid === null) {
+      clearClaimIfStale(slot)
+      claimed = tryCreateClaim()
+      if (!claimed) {
+        return false
+      }
+    } else {
+      if (activePid === process.pid) {
+        return true
+      }
+      return false
+    }
+  }
+
   registerReleaseHook(slot)
   return true
 }

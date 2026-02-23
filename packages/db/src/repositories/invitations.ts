@@ -1,10 +1,30 @@
 import crypto from 'node:crypto'
-import { and, eq, gte } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  lt,
+  or
+} from 'drizzle-orm'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
+import { buildCursorPage } from '../pagination.js'
 import { invitationRowSchema, type InvitationRowShape } from '../effect-schemas/invitations.js'
 import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
 import { invitations, workspaceMembers } from '../schema.js'
+
+interface ListParams {
+  readonly cursor?: string
+  readonly limit: number
+  readonly sortBy: string
+  readonly sortOrder: 'asc' | 'desc'
+  readonly filter: Readonly<Record<string, string>>
+}
 
 const decodeInvitationRows = Schema.decodeUnknown(Schema.Array(invitationRowSchema))
 const decodeInvitationRow = Schema.decodeUnknown(invitationRowSchema)
@@ -21,8 +41,161 @@ const decodeNullableInvitation = (
   )
 }
 
+const parseCountValue = (value: unknown): number => {
+  if (typeof value === 'number') {
+    return value
+  }
+
+  const parsed = Number.parseInt(String(value), 10)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+const buildListWhere = (inviteeUserId: string, params: ListParams) => {
+  const predicates = [eq(invitations.inviteeUserId, inviteeUserId)]
+
+  const status = params.filter.status
+  if (status === 'pending' || status === 'accepted' || status === 'revoked' || status === 'expired') {
+    predicates.push(eq(invitations.status, status))
+  }
+
+  const role = params.filter.role
+  if (role === 'owner' || role === 'admin' || role === 'member') {
+    predicates.push(eq(invitations.role, role))
+  }
+
+  if (predicates.length === 1) {
+    return predicates[0]
+  }
+
+  return and(...predicates)
+}
+
 export const invitationsRepository = {
-  listForInviteeUserId: (inviteeUserId: string) =>
+  listForInviteeUserId: (inviteeUserId: string, params: ListParams) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const sortBy = params.sortBy
+        const sortOrder = params.sortOrder
+        const baseWhere = buildListWhere(inviteeUserId, params)
+
+        const page = yield* buildCursorPage<InvitationRowShape>({
+          cursor: params.cursor,
+          limit: params.limit,
+          sortBy,
+          sortOrder,
+          runCount: () =>
+            Effect.gen(function* () {
+              const rows = yield* db
+                .select({
+                  count: count()
+                })
+                .from(invitations)
+                .where(baseWhere)
+                .execute()
+
+              return parseCountValue(rows[0]?.count)
+            }).pipe(Effect.mapError((error) => toDbError('Failed to count invitations for invitee', error))),
+          runPage: (cursor, limitPlusOne) =>
+            Effect.gen(function* () {
+              if (sortBy === 'expiresAt') {
+                const cursorWhere = cursor
+                  ? sortOrder === 'asc'
+                    ? or(
+                        gt(invitations.expiresAt, new Date(cursor.sortValue)),
+                        and(eq(invitations.expiresAt, new Date(cursor.sortValue)), gt(invitations.id, cursor.id))
+                      )
+                    : or(
+                        lt(invitations.expiresAt, new Date(cursor.sortValue)),
+                        and(eq(invitations.expiresAt, new Date(cursor.sortValue)), lt(invitations.id, cursor.id))
+                      )
+                  : undefined
+
+                const rows = yield* db
+                  .select({
+                    id: invitations.id,
+                    workspaceId: invitations.workspaceId,
+                    inviteeUserId: invitations.inviteeUserId,
+                    email: invitations.email,
+                    role: invitations.role,
+                    status: invitations.status,
+                    invitedByUserId: invitations.invitedByUserId,
+                    token: invitations.token,
+                    expiresAt: invitations.expiresAt,
+                    createdAt: invitations.createdAt
+                  })
+                  .from(invitations)
+                  .where(cursorWhere ? and(baseWhere, cursorWhere) : baseWhere)
+                  .orderBy(
+                    sortOrder === 'asc' ? asc(invitations.expiresAt) : desc(invitations.expiresAt),
+                    sortOrder === 'asc' ? asc(invitations.id) : desc(invitations.id)
+                  )
+                  .limit(limitPlusOne)
+                  .execute()
+
+                return yield* decodeInvitationRows(rows).pipe(
+                  Effect.mapError((error) => dbDecodeFailed('invitation list decode failed', error))
+                )
+              }
+
+              const cursorWhere = cursor
+                ? sortOrder === 'asc'
+                  ? or(
+                      gt(invitations.createdAt, new Date(cursor.sortValue)),
+                      and(eq(invitations.createdAt, new Date(cursor.sortValue)), gt(invitations.id, cursor.id))
+                    )
+                  : or(
+                      lt(invitations.createdAt, new Date(cursor.sortValue)),
+                      and(eq(invitations.createdAt, new Date(cursor.sortValue)), lt(invitations.id, cursor.id))
+                    )
+                : undefined
+
+              const rows = yield* db
+                .select({
+                  id: invitations.id,
+                  workspaceId: invitations.workspaceId,
+                  inviteeUserId: invitations.inviteeUserId,
+                  email: invitations.email,
+                  role: invitations.role,
+                  status: invitations.status,
+                  invitedByUserId: invitations.invitedByUserId,
+                  token: invitations.token,
+                  expiresAt: invitations.expiresAt,
+                  createdAt: invitations.createdAt
+                })
+                .from(invitations)
+                .where(cursorWhere ? and(baseWhere, cursorWhere) : baseWhere)
+                .orderBy(
+                  sortOrder === 'asc' ? asc(invitations.createdAt) : desc(invitations.createdAt),
+                  sortOrder === 'asc' ? asc(invitations.id) : desc(invitations.id)
+                )
+                .limit(limitPlusOne)
+                .execute()
+
+              return yield* decodeInvitationRows(rows).pipe(
+                Effect.mapError((error) => dbDecodeFailed('invitation list decode failed', error))
+              )
+            }).pipe(Effect.mapError((error) => toDbError('Failed to list invitations for invitee', error))),
+          getCursorId: (row) => row.id,
+          getCursorSortValue: (row) => {
+            if (sortBy === 'expiresAt') {
+              return row.expiresAt.toISOString()
+            }
+
+            return row.createdAt.toISOString()
+          }
+        })
+
+        return {
+          data: page.data,
+          total: page.total,
+          nextCursor: page.nextCursor,
+          prevCursor: page.prevCursor
+        }
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to list invitations for invitee', error))),
+
+  getById: (id: string) =>
     provideDB(
       Effect.gen(function* () {
         const db = yield* DB
@@ -40,14 +213,44 @@ export const invitationsRepository = {
             createdAt: invitations.createdAt
           })
           .from(invitations)
-          .where(eq(invitations.inviteeUserId, inviteeUserId))
+          .where(eq(invitations.id, id))
+          .limit(1)
+          .execute()
+
+        return yield* decodeNullableInvitation(rows[0] ?? null)
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to fetch invitation by id', error))),
+
+  getManyByIds: (ids: ReadonlyArray<string>) =>
+    provideDB(
+      Effect.gen(function* () {
+        if (ids.length === 0) {
+          return [] as const
+        }
+
+        const db = yield* DB
+        const rows = yield* db
+          .select({
+            id: invitations.id,
+            workspaceId: invitations.workspaceId,
+            inviteeUserId: invitations.inviteeUserId,
+            email: invitations.email,
+            role: invitations.role,
+            status: invitations.status,
+            invitedByUserId: invitations.invitedByUserId,
+            token: invitations.token,
+            expiresAt: invitations.expiresAt,
+            createdAt: invitations.createdAt
+          })
+          .from(invitations)
+          .where(inArray(invitations.id, [...ids]))
           .execute()
 
         return yield* decodeInvitationRows(rows).pipe(
           Effect.mapError((error) => dbDecodeFailed('invitation list decode failed', error))
         )
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to list invitations for invitee', error))),
+    ).pipe(Effect.mapError((error) => toDbError('Failed to fetch invitations by ids', error))),
 
   create: (input: {
     workspaceId: string
@@ -72,6 +275,61 @@ export const invitationsRepository = {
         return yield* decodeNullableInvitation(rows[0] ?? null)
       })
     ).pipe(Effect.mapError((error) => toDbError('Failed to create invitation', error))),
+
+  updateById: (input: {
+    id: string
+    role?: 'admin' | 'member'
+    status?: 'pending' | 'accepted' | 'revoked' | 'expired'
+  }) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+
+        const patch: {
+          role?: 'admin' | 'member'
+          status?: 'pending' | 'accepted' | 'revoked' | 'expired'
+        } = {}
+
+        if (input.role !== undefined) {
+          patch.role = input.role
+        }
+
+        if (input.status !== undefined) {
+          patch.status = input.status
+        }
+
+        if (Object.keys(patch).length === 0) {
+          const rows = yield* db
+            .select({
+              id: invitations.id,
+              workspaceId: invitations.workspaceId,
+              inviteeUserId: invitations.inviteeUserId,
+              email: invitations.email,
+              role: invitations.role,
+              status: invitations.status,
+              invitedByUserId: invitations.invitedByUserId,
+              token: invitations.token,
+              expiresAt: invitations.expiresAt,
+              createdAt: invitations.createdAt
+            })
+            .from(invitations)
+            .where(eq(invitations.id, input.id))
+            .limit(1)
+            .execute()
+
+          return yield* decodeNullableInvitation(rows[0] ?? null)
+        }
+
+        const rows = yield* db
+          .update(invitations)
+          .set(patch)
+          .where(eq(invitations.id, input.id))
+          .returning()
+          .execute()
+
+        return yield* decodeNullableInvitation(rows[0] ?? null)
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to update invitation by id', error))),
 
   acceptByToken: (token: string, userId: string) =>
     provideDB(

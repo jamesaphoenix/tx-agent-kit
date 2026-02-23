@@ -37,15 +37,15 @@ export default function DashboardPage() {
     try {
       const principal = await clientApi.me()
       const workspacePayload = await clientApi.listWorkspaces()
-      const firstWorkspace = workspacePayload.workspaces[0]
+      const firstWorkspace = workspacePayload.data[0]
       const tasksPayload = firstWorkspace
         ? await clientApi.listTasks(firstWorkspace.id)
-        : { tasks: [] }
+        : { data: [] }
 
       setState({
         principal,
-        workspaces: workspacePayload.workspaces,
-        tasks: tasksPayload.tasks
+        workspaces: workspacePayload.data,
+        tasks: tasksPayload.data
       })
     } catch (err) {
       if (handleUnauthorizedApiError(err, router, '/dashboard')) {

@@ -6,7 +6,7 @@
 - `packages/db`: Drizzle schema, client, repositories, migrations.
 - `packages/db/src/effect-schemas`: Table-aligned Effect schemas (one schema per table).
 - `packages/core`: Effect services composing db/auth behavior.
-- `packages/core/src/domains/*`: DDD slices (`domain -> ports -> repositories/adapters -> services -> runtime/ui`).
+- `packages/core/src/domains/*`: DDD slices (`domain -> ports -> application/adapters -> runtime/ui`).
 - `packages/auth`: Password and JWT primitives.
 - `packages/logging`: Structured JSON logger helpers (mandatory over `console.*`).
 - `packages/contracts`: Shared API schemas and types.

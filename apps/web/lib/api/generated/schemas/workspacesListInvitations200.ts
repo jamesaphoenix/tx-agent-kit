@@ -5,8 +5,11 @@
  * Contract for apps/api. Domain behavior is modeled as closed invariants at API boundaries.
  * OpenAPI spec version: 0.1.0
  */
-import type { WorkspacesListInvitations200InvitationsItem } from './workspacesListInvitations200InvitationsItem';
+import type { WorkspacesListInvitations200DataItem } from './workspacesListInvitations200DataItem';
 
 export type WorkspacesListInvitations200 = {
-  invitations: WorkspacesListInvitations200InvitationsItem[];
+  data: WorkspacesListInvitations200DataItem[];
+  total: number;
+  nextCursor: string | null;
+  prevCursor: string | null;
 };

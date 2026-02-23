@@ -32,8 +32,14 @@ import type {
   NotFound,
   TasksCreateTask201,
   TasksCreateTaskBody,
+  TasksGetManyTasks200,
+  TasksGetManyTasksBody,
+  TasksGetTask200,
   TasksListTasks200,
   TasksListTasksParams,
+  TasksRemoveTask200,
+  TasksUpdateTask200,
+  TasksUpdateTaskBody,
   Unauthorized
 } from '.././schemas';
 
@@ -190,5 +196,259 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getTasksCreateTaskMutationOptions(options), queryClient);
+    }
+    export const tasksGetTask = (
+    taskId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<TasksGetTask200>(
+      {url: `/v1/tasks/${taskId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
+
+export const getTasksGetTaskQueryKey = (taskId: string,) => {
+    return [
+    `/v1/tasks/${taskId}`
+    ] as const;
+    }
+
+    
+export const getTasksGetTaskQueryOptions = <TData = Awaited<ReturnType<typeof tasksGetTask>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tasksGetTask>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTasksGetTaskQueryKey(taskId);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof tasksGetTask>>> = ({ signal }) => tasksGetTask(taskId, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(taskId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof tasksGetTask>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type TasksGetTaskQueryResult = NonNullable<Awaited<ReturnType<typeof tasksGetTask>>>
+export type TasksGetTaskQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+
+
+export function useTasksGetTask<TData = Awaited<ReturnType<typeof tasksGetTask>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+ taskId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tasksGetTask>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tasksGetTask>>,
+          TError,
+          Awaited<ReturnType<typeof tasksGetTask>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTasksGetTask<TData = Awaited<ReturnType<typeof tasksGetTask>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+ taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tasksGetTask>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tasksGetTask>>,
+          TError,
+          Awaited<ReturnType<typeof tasksGetTask>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTasksGetTask<TData = Awaited<ReturnType<typeof tasksGetTask>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+ taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tasksGetTask>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useTasksGetTask<TData = Awaited<ReturnType<typeof tasksGetTask>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+ taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tasksGetTask>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getTasksGetTaskQueryOptions(taskId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+export const tasksUpdateTask = (
+    taskId: string,
+    tasksUpdateTaskBody: TasksUpdateTaskBody,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<TasksUpdateTask200>(
+      {url: `/v1/tasks/${taskId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: tasksUpdateTaskBody, signal
+    },
+      options);
+    }
+  
+
+
+export const getTasksUpdateTaskMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof tasksUpdateTask>>, TError,{taskId: string;data: TasksUpdateTaskBody}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof tasksUpdateTask>>, TError,{taskId: string;data: TasksUpdateTaskBody}, TContext> => {
+
+const mutationKey = ['tasksUpdateTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof tasksUpdateTask>>, {taskId: string;data: TasksUpdateTaskBody}> = (props) => {
+          const {taskId,data} = props ?? {};
+
+          return  tasksUpdateTask(taskId,data,requestOptions)
+        }
+
+
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TasksUpdateTaskMutationResult = NonNullable<Awaited<ReturnType<typeof tasksUpdateTask>>>
+    export type TasksUpdateTaskMutationBody = TasksUpdateTaskBody
+    export type TasksUpdateTaskMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+
+    export const useTasksUpdateTask = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof tasksUpdateTask>>, TError,{taskId: string;data: TasksUpdateTaskBody}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof tasksUpdateTask>>,
+        TError,
+        {taskId: string;data: TasksUpdateTaskBody},
+        TContext
+      > => {
+      return useMutation(getTasksUpdateTaskMutationOptions(options), queryClient);
+    }
+    export const tasksRemoveTask = (
+    taskId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<TasksRemoveTask200>(
+      {url: `/v1/tasks/${taskId}`, method: 'DELETE', signal
+    },
+      options);
+    }
+  
+
+
+export const getTasksRemoveTaskMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof tasksRemoveTask>>, TError,{taskId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof tasksRemoveTask>>, TError,{taskId: string}, TContext> => {
+
+const mutationKey = ['tasksRemoveTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof tasksRemoveTask>>, {taskId: string}> = (props) => {
+          const {taskId} = props ?? {};
+
+          return  tasksRemoveTask(taskId,requestOptions)
+        }
+
+
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TasksRemoveTaskMutationResult = NonNullable<Awaited<ReturnType<typeof tasksRemoveTask>>>
+    
+    export type TasksRemoveTaskMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+
+    export const useTasksRemoveTask = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof tasksRemoveTask>>, TError,{taskId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof tasksRemoveTask>>,
+        TError,
+        {taskId: string},
+        TContext
+      > => {
+      return useMutation(getTasksRemoveTaskMutationOptions(options), queryClient);
+    }
+    export const tasksGetManyTasks = (
+    tasksGetManyTasksBody: TasksGetManyTasksBody,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<TasksGetManyTasks200>(
+      {url: `/v1/tasks/batch/get-many`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: tasksGetManyTasksBody, signal
+    },
+      options);
+    }
+  
+
+
+export const getTasksGetManyTasksMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof tasksGetManyTasks>>, TError,{data: TasksGetManyTasksBody}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof tasksGetManyTasks>>, TError,{data: TasksGetManyTasksBody}, TContext> => {
+
+const mutationKey = ['tasksGetManyTasks'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof tasksGetManyTasks>>, {data: TasksGetManyTasksBody}> = (props) => {
+          const {data} = props ?? {};
+
+          return  tasksGetManyTasks(data,requestOptions)
+        }
+
+
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TasksGetManyTasksMutationResult = NonNullable<Awaited<ReturnType<typeof tasksGetManyTasks>>>
+    export type TasksGetManyTasksMutationBody = TasksGetManyTasksBody
+    export type TasksGetManyTasksMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+
+    export const useTasksGetManyTasks = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof tasksGetManyTasks>>, TError,{data: TasksGetManyTasksBody}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof tasksGetManyTasks>>,
+        TError,
+        {data: TasksGetManyTasksBody},
+        TContext
+      > => {
+      return useMutation(getTasksGetManyTasksMutationOptions(options), queryClient);
     }
     

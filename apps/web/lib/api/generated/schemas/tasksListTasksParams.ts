@@ -5,7 +5,14 @@
  * Contract for apps/api. Domain behavior is modeled as closed invariants at API boundaries.
  * OpenAPI spec version: 0.1.0
  */
+import type { TasksListTasksSortOrder } from './tasksListTasksSortOrder';
 
 export type TasksListTasksParams = {
 workspaceId: string;
+cursor?: string;
+limit?: string;
+sortBy?: string;
+sortOrder?: TasksListTasksSortOrder;
+'filter[status]'?: string;
+'filter[createdByUserId]'?: string;
 };

@@ -6,10 +6,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: 'testkit-integration',
-      include: ['src/**/*.integration.test.ts'],
-      sequence: {
-        groupOrder: 2
-      }
+      include: ['src/**/*.integration.test.ts']
     }
   })
 )

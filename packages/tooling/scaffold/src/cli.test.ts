@@ -71,7 +71,8 @@ describe('crud scaffold planner', () => {
     const apiDomainRootIndex = planned.find((file) => file.path.endsWith('apps/api/src/domains/billing/index.ts'))
 
     expect(coreDomainRootIndex?.content).toContain("export * from './domain/index.js'")
-    expect(coreDomainRootIndex?.content).toContain("export * from './services/index.js'")
+    expect(coreDomainRootIndex?.content).toContain("export * from './application/index.js'")
+    expect(coreDomainRootIndex?.content).toContain("export * from './adapters/index.js'")
     expect(apiDomainRootIndex?.content).toContain("export * from './routes/index.js'")
   })
 
@@ -119,7 +120,7 @@ describe('crud scaffold planner', () => {
   it('brands generated repository IDs by casting the full id expression', () => {
     const planned = planCrudScaffold({ domain: 'billing', entity: 'invoice' })
     const repositoryFile = planned.find((file) =>
-      file.path.endsWith('/repositories/invoice-repository.ts')
+      file.path.endsWith('/adapters/invoice-repository.ts')
     )
     expect(repositoryFile?.content).toContain(
       "const idFactory = options.idFactory ?? (() => ('invoice-' + String(nextId++)) as InvoiceId)"
@@ -195,12 +196,12 @@ describe('crud scaffold apply', () => {
     const repoRoot = await createFixtureRepo()
     await applyCrudScaffold({ repoRoot, domain: 'billing', entity: 'invoice' })
 
-    const targetPath = join(repoRoot, 'packages/core/src/domains/billing/services/invoice-service.ts')
+    const targetPath = join(repoRoot, 'packages/core/src/domains/billing/application/invoice-service.ts')
     await writeFile(targetPath, 'BROKEN_FILE\n', 'utf8')
 
     const forced = await applyCrudScaffold({ repoRoot, domain: 'billing', entity: 'invoice', force: true })
     expect(forced.written.length).toBeGreaterThan(0)
-    expect(forced.written).toContain('packages/core/src/domains/billing/services/invoice-service.ts')
+    expect(forced.written).toContain('packages/core/src/domains/billing/application/invoice-service.ts')
 
     const rewritten = await readFile(targetPath, 'utf8')
     expect(rewritten).toContain('makeInvoiceService')
@@ -219,7 +220,7 @@ describe('crud scaffold apply', () => {
     expect(dryRun.written).toHaveLength(0)
     expect(dryRun.planned).toHaveLength(24)
 
-    const expectedFile = join(repoRoot, 'packages/core/src/domains/billing/services/invoice-service.ts')
+    const expectedFile = join(repoRoot, 'packages/core/src/domains/billing/application/invoice-service.ts')
     expect(existsSync(expectedFile)).toBe(false)
   })
 
@@ -265,7 +266,7 @@ describe('crud scaffold apply', () => {
     const repoRoot = await createFixtureRepo()
     await applyCrudScaffold({ repoRoot, domain: 'billing', entity: 'invoice' })
 
-    const coreTestPath = join(repoRoot, 'packages/core/src/domains/billing/services/invoice-service.test.ts')
+    const coreTestPath = join(repoRoot, 'packages/core/src/domains/billing/application/invoice-service.test.ts')
     const apiTestPath = join(repoRoot, 'apps/api/src/domains/billing/routes/invoice.test.ts')
 
     expect(existsSync(coreTestPath)).toBe(true)
@@ -285,8 +286,8 @@ describe('crud scaffold apply', () => {
     const requiredPaths = [
       'apps/api/src/domains/billing/domain/index.ts',
       'apps/api/src/domains/billing/ports/index.ts',
-      'apps/api/src/domains/billing/repositories/index.ts',
-      'apps/api/src/domains/billing/services/index.ts'
+      'apps/api/src/domains/billing/application/index.ts',
+      'apps/api/src/domains/billing/adapters/index.ts'
     ]
 
     for (const relativePath of requiredPaths) {

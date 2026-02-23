@@ -2,6 +2,7 @@ import { HttpApiBuilder, HttpServerRequest } from '@effect/platform'
 import { AuthService, principalFromAuthorization } from '@tx-agent-kit/core'
 import { Effect } from 'effect'
 import { TxAgentApi, mapCoreError } from '../api.js'
+import { toApiAuthPrincipal, toApiAuthSession } from '../mappers/auth-mapper.js'
 
 export const AuthRouteKind = 'custom' as const
 
@@ -10,19 +11,25 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) =>
     .handle('signUp', ({ payload }) =>
       Effect.gen(function* () {
         const authService = yield* AuthService
-        return yield* authService.signUp(payload)
+        const session = yield* authService.signUp(payload)
+        return toApiAuthSession(session)
       }).pipe(Effect.mapError(mapCoreError))
     )
     .handle('signIn', ({ payload }) =>
       Effect.gen(function* () {
         const authService = yield* AuthService
-        return yield* authService.signIn(payload)
+        const session = yield* authService.signIn(payload)
+        return toApiAuthSession(session)
       }).pipe(Effect.mapError(mapCoreError))
     )
     .handle('me', () =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
-        return yield* principalFromAuthorization(request.headers.authorization).pipe(Effect.mapError(mapCoreError))
+        const principal = yield* principalFromAuthorization(request.headers.authorization).pipe(
+          Effect.mapError(mapCoreError)
+        )
+
+        return toApiAuthPrincipal(principal)
       })
     )
     .handle('deleteMe', () =>

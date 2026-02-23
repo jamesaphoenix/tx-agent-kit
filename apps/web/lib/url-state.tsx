@@ -4,12 +4,12 @@ import type { ReactNode } from 'react'
 import { parseAsInteger, parseAsString, useQueryState } from 'nuqs'
 import { NuqsAdapter } from 'nuqs/adapters/next/app'
 
-const sanitizeInternalPath = (value: string | null, fallback: string): string => {
+export const sanitizeInternalPath = (value: string | null, fallback: string): string => {
   if (typeof value !== 'string') {
     return fallback
   }
 
-  return value.startsWith('/') ? value : fallback
+  return value.startsWith('/') && !value.startsWith('//') ? value : fallback
 }
 
 export const UrlStateProvider = ({ children }: { children: ReactNode }) => {

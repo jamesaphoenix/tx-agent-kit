@@ -42,8 +42,9 @@
 `pnpm test:integration`
 - Integration runs through a single Vitest workspace with one global setup (`vitest.integration.workspace.ts`).
 - Select subsets with `INTEGRATION_PROJECTS=web` or `INTEGRATION_PROJECTS=api,testkit pnpm test:integration`.
-- Tune non-web integration worker parallelism with `INTEGRATION_MAX_WORKERS`.
-- Tune web suite workers with `WEB_INTEGRATION_MAX_WORKERS`.
+- Unit suites default to host CPU parallelism; cap with `TEST_MAX_WORKERS=<n>`.
+- Integration suites default to host CPU parallelism; cap with `INTEGRATION_MAX_WORKERS=<n>`.
+- Override web suite workers with `WEB_INTEGRATION_MAX_WORKERS=<n>` (defaults to `INTEGRATION_MAX_WORKERS`).
 - For faster local iteration, skip pgTAP during integration setup with `pnpm test:integration --skip-pgtap` (keep pgTAP enabled in CI).
 - Web integration keeps one API+DB harness per worker slot warm across files and performs per-test resets.
 

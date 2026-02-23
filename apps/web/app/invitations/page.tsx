@@ -40,8 +40,8 @@ export default function InvitationsPage() {
       ])
 
       setState({
-        invitations: invitationsPayload.invitations,
-        workspaces: workspacesPayload.workspaces
+        invitations: invitationsPayload.data,
+        workspaces: workspacesPayload.data
       })
     } catch (err) {
       if (handleUnauthorizedApiError(err, router, '/invitations')) {

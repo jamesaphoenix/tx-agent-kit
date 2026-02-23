@@ -13,12 +13,29 @@ export default [
       '**/coverage/**',
       '**/.turbo/**',
       '**/*.d.ts',
-      '**/drizzle/**'
+      '**/drizzle/**',
+      '**/.expo/**',
+      'apps/mobile/*.config.{js,mjs,ts}',
+      'apps/mobile/babel.config.js',
+      'apps/mobile/vitest.component-setup.ts'
     ]
   },
   ...baseConfig,
   ...domainInvariantConfig,
   ...promiseConfig,
   ...testingConfig,
-  ...boundariesConfig
+  ...boundariesConfig,
+  {
+    files: ['apps/mobile/**/*.test.ts', 'apps/mobile/**/*.test.tsx'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/require-await': 'off',
+      'promise/param-names': 'off'
+    }
+  }
 ]

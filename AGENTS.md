@@ -29,12 +29,12 @@ Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.
 - Table schema parity: each `pgTable(...)` has a matching Effect schema file in `packages/db/src/effect-schemas/`.
 - Table factory parity: each `pgTable(...)` has a matching test-data factory in `packages/db/src/factories/*.factory.ts`.
 - Route/repository intent is explicit: every API route and core repository port declares a kind marker (`crud` or `custom`) and markers must stay consistent.
-- Domain layering: dependencies must flow inward (`domain <- ports <- repositories/adapters <- services <- runtime/ui`).
+- Domain layering: dependencies must flow inward with ports as the seam (`domain <- ports <- application <- runtime/ui` and `domain <- ports <- adapters <- runtime/ui`).
 - Domain legibility: no default exports inside domain layer files; use named exports only.
 - Source hygiene: TODO/FIXME/HACK comments are forbidden in `apps/` and `packages/` source modules.
 - Domain determinism: avoid `Date.now`, `new Date`, and `Math.random` in domain layers; inject clock/random providers via ports.
 - MCP entrypoints are centralized in `scripts/mcp/*`; do not hardcode ad hoc MCP startup commands in docs/scripts.
-- Domain/services/routes/workflows must not read `process.env` directly; use typed config modules/layers.
+- Domain/application/routes/workflows must not read `process.env` directly; use typed config modules/layers.
 - Web env access is centralized in `apps/web/lib/env.ts`; worker env access is centralized in `apps/worker/src/config/env.ts`.
 - Source env policy: all `apps/**/src` and `packages/**/src` modules read env only through dedicated env modules (`apps/api/src/config/*`, `apps/worker/src/config/env.ts`, `packages/*/src/env.ts`).
 - `as any` assertions are forbidden in source modules; use precise types or schema decoding from unknown.
@@ -63,20 +63,19 @@ Create domains under:
 packages/core/src/domains/<domain>/
   domain/
   ports/
-  repositories/
-  services/
+  application/
+  adapters/
   runtime/        # optional
-  adapters/       # optional
   ui/             # optional
 ```
 
 Rules:
 - `domain/` contains pure business rules/entities/value objects.
 - `ports/` contains interfaces and capability contracts.
-- `repositories/` and `adapters/` implement ports (DB, HTTP, external systems).
-- `services/` orchestrates use-cases across domain + ports + repositories.
+- `application/` orchestrates use-cases across domain + ports.
+- `adapters/` implement ports (DB, HTTP, external systems).
 - `runtime/` wires layers into Effect `Layer`s and app entrypoints.
-- `ui/` may depend on runtime/services/domain but never directly on DB.
+- `ui/` may depend on runtime/application/domain but never directly on DB.
 
 ## DB + Schema Contract
 When adding a table in `packages/db/src/schema.ts`:
@@ -97,9 +96,10 @@ When adding a table in `packages/db/src/schema.ts`:
 
 ## Enforcement
 - ESLint rules: `packages/tooling/eslint-config/domain-invariants.js`.
-- Structural invariant checker: `scripts/lint/enforce-domain-invariants.mjs`.
+- Structural and layering invariants are enforced in ESLint (`domain-structure/*` rules).
+- Structural/runtime invariant checker: `scripts/lint/enforce-domain-invariants.mjs`.
 - Shell invariant checker: `scripts/check-shell-invariants.sh`.
-- Full gate: `pnpm lint` (workspace ESLint + structural invariants + shell invariants).
+- Full gate: `pnpm lint` (workspace ESLint + invariant checker + shell invariants).
 
 ## Worktree + Infra Discipline
 - Use `pnpm infra:ensure` (idempotent, no container teardown).

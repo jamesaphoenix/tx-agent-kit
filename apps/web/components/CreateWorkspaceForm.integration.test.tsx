@@ -31,6 +31,6 @@ describe('CreateWorkspaceForm integration', () => {
     })
 
     const workspaces = await clientApi.listWorkspaces()
-    expect(workspaces.workspaces.some((workspace) => workspace.name === 'Integration Workspace')).toBe(true)
+    expect(workspaces.data.some((workspace) => workspace.name === 'Integration Workspace')).toBe(true)
   })
 })

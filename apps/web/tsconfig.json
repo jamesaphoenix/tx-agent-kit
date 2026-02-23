@@ -20,6 +20,7 @@
       "@tx-agent-kit/testkit": ["../../packages/testkit/src/index.ts"],
       "@tx-agent-kit/temporal-client": ["../../packages/temporal-client/src/index.ts"]
     },
+    "typeRoots": ["./node_modules/@types", "../../node_modules/@types"],
     "types": ["node", "react", "react-dom"],
     "plugins": [{ "name": "next" }],
     "noEmit": true

@@ -9,6 +9,7 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
 
 ## Hard Constraints
 - Use `effect/Schema` only for validation/contracts.
+- Domain record interfaces (`*Record` types) must be defined in `domain/` and imported by `ports/`; `export interface` is banned in port files.
 - Never import `drizzle-orm` outside `packages/db`.
 - Never query DB directly from `apps/web`.
 - Do not import `effect`/`effect/*` from `apps/web`; keep web as a dumb API consumer.
@@ -45,6 +46,7 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
 - Critical-flow integration baseline is enforced:
   - API coverage includes `/v1/auth/sign-up`, `/v1/auth/sign-in`, `/v1/auth/me`, `/v1/workspaces`, `/v1/tasks`, `/v1/invitations`, plus invitation idempotency.
   - Web coverage includes `AuthForm`, `CreateWorkspaceForm`, `CreateTaskForm`, `CreateInvitationForm`, `AcceptInvitationForm`, and `SignOutButton` integration suites.
+  - Mobile coverage includes `AuthForm`, `CreateWorkspaceForm`, `CreateTaskForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `AuthBootstrapProvider` component test suites, plus `env`, `auth-token`, `axios`, `client-api`, `client-auth`, `url-state`, and `session-store` unit test suites.
 
 ## DDD Construction Pattern
 For each domain, create:

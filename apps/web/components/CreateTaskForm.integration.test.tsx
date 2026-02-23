@@ -37,7 +37,7 @@ describe('CreateTaskForm integration', () => {
     })
 
     const tasks = await clientApi.listTasks(workspace.id)
-    expect(tasks.tasks).toHaveLength(1)
-    expect(tasks.tasks[0]?.title).toBe('Integration task title')
+    expect(tasks.data).toHaveLength(1)
+    expect(tasks.data[0]?.title).toBe('Integration task title')
   })
 })

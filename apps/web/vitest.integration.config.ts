@@ -1,21 +1,10 @@
 import { fileURLToPath } from 'node:url'
 import integrationConfig from '@tx-agent-kit/vitest-config/integration'
+import { resolveIntegrationMaxWorkers } from '@tx-agent-kit/vitest-config/workers'
 import { defineConfig, mergeConfig } from 'vitest/config'
 
-const parsePositiveInt = (value: string | undefined, fallback: number): number => {
-  if (!value) {
-    return fallback
-  }
-
-  const parsed = Number.parseInt(value, 10)
-  if (Number.isNaN(parsed) || parsed < 1) {
-    return fallback
-  }
-
-  return parsed
-}
-
-const webIntegrationMaxWorkers = parsePositiveInt(process.env.WEB_INTEGRATION_MAX_WORKERS, 3)
+const webIntegrationMaxWorkers = resolveIntegrationMaxWorkers()
+process.env.WEB_INTEGRATION_MAX_WORKERS = String(webIntegrationMaxWorkers)
 
 export default mergeConfig(
   integrationConfig,
@@ -37,10 +26,7 @@ export default mergeConfig(
       exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/coverage/**'],
       pool: 'forks',
       maxWorkers: webIntegrationMaxWorkers,
-      fileParallelism: true,
-      sequence: {
-        groupOrder: 3
-      },
+      fileParallelism: webIntegrationMaxWorkers > 1,
       isolate: true,
       passWithNoTests: true
     },

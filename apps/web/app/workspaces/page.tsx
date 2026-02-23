@@ -24,7 +24,7 @@ export default function WorkspacesPage() {
 
     try {
       const payload = await clientApi.listWorkspaces()
-      setWorkspaces(payload.workspaces)
+      setWorkspaces(payload.data)
     } catch (err) {
       if (handleUnauthorizedApiError(err, router, '/workspaces')) {
         return

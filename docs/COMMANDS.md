@@ -6,10 +6,10 @@
 - `pnpm dev`: run web + api + worker.
 - `pnpm openapi:generate`: regenerate `apps/api/openapi.json` from API definitions.
 - `pnpm api:client:generate`: regenerate `apps/api/openapi.json` and web Orval hooks in `apps/web/lib/api/generated`.
-- `pnpm scaffold:crud --domain <domain> --entity <entity> [--dry-run] [--force]`: generate `domain -> ports -> repositories -> services -> routes -> tests` scaffold.
+- `pnpm scaffold:crud --domain <domain> --entity <entity> [--dry-run] [--force]`: generate `domain -> ports -> application/adapters -> routes -> tests` scaffold.
 
 ## Quality Gates
-- `pnpm lint`: full lint gate (`eslint` + domain invariants + shell invariants).
+- `pnpm lint`: full lint gate (`eslint` + structural/runtime invariants + shell invariants).
 - `pnpm type-check`: workspace TypeScript checks.
 - `pnpm test`: workspace unit tests.
 - `pnpm test:integration`: single Vitest workspace integration run with global setup (infra + DB reset + pgTAP once).
@@ -23,9 +23,10 @@
 - `pnpm test:quiet`
 - `pnpm test:integration:quiet`
 - Integration workspace runners use a shared lock (`/tmp/tx-agent-kit-integration.lock`) with PID-aware stale-lock reaping.
+- `TEST_MAX_WORKERS=8 pnpm test`: cap workspace unit-test workers (defaults to host CPU parallelism).
 - `INTEGRATION_PROJECTS=web pnpm test:integration`: run selected integration project(s) (`api,testkit,web,worker`).
-- `INTEGRATION_MAX_WORKERS=2 pnpm test:integration`: tune non-web integration file parallelism (defaults to `2`).
-- `WEB_INTEGRATION_MAX_WORKERS=3 pnpm --filter @tx-agent-kit/web test:integration`: tune web integration Vitest workers (default `3`).
+- `INTEGRATION_MAX_WORKERS=4 pnpm test:integration`: cap non-web integration workers (defaults to host CPU parallelism).
+- `WEB_INTEGRATION_MAX_WORKERS=2 pnpm --filter @tx-agent-kit/web test:integration`: override web integration workers (defaults to `INTEGRATION_MAX_WORKERS`, then host CPU parallelism).
 - `pnpm test:integration --skip-pgtap`: skip pgTAP in global setup for faster local red/green loops.
 - Web integration uses one warm API+DB harness per Vitest pool slot (instead of booting per file).
 
