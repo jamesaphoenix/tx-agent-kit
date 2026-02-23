@@ -59,7 +59,67 @@ export const domainInvariantConfig = [
       'domain-structure/require-domain-structure': 'error',
       'domain-structure/enforce-layer-boundaries': 'error',
       'domain-structure/ports-no-layer-providers': 'error',
-      'domain-structure/adapters-must-import-port': 'error'
+      'domain-structure/adapters-must-import-port': 'error',
+      'domain-structure/pure-domain-no-effect-imports': 'error',
+      'domain-structure/pure-domain-no-infra-imports': 'error',
+      'domain-structure/no-throw-try-outside-adapters': 'error'
+    }
+  },
+  {
+    files: [
+      'packages/db/src/**/*.{ts,tsx}',
+      'packages/contracts/src/**/*.{ts,tsx}',
+      'apps/api/src/**/*.{ts,tsx}'
+    ],
+    ignores: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.integration.test.ts',
+      '**/*.integration.test.tsx',
+      'packages/contracts/src/literals.ts'
+    ],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/no-inline-string-union-enums': 'error'
+    }
+  },
+  {
+    files: [
+      'packages/contracts/src/**/*.{ts,tsx}',
+      'packages/db/src/effect-schemas/**/*.{ts,tsx}',
+      'apps/api/src/**/*.{ts,tsx}'
+    ],
+    ignores: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.integration.test.ts',
+      '**/*.integration.test.tsx'
+    ],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/no-raw-schema-literal-enums': 'error'
+    }
+  },
+  {
+    files: ['packages/db/src/schema.ts'],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/no-inline-pgenum-array': 'error'
+    }
+  },
+  {
+    files: ['packages/core/src/domains/*/adapters/**/*.{ts,tsx}'],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/core-adapters-use-db-row-mappers': 'error'
     }
   },
   {
@@ -431,11 +491,6 @@ export const domainInvariantConfig = [
         {
           paths: [
             {
-              name: '@tx-agent-kit/contracts',
-              message:
-                'Domain must stay transport-agnostic. Define domain models in `domain/` and map to API contracts in route-layer mappers.'
-            },
-            {
               name: '@tx-agent-kit/auth',
               message:
                 'Domain must stay infra-agnostic. Depend on auth capabilities via ports and provide implementations in adapters/application.'
@@ -458,7 +513,12 @@ export const domainInvariantConfig = [
           ],
           patterns: [
             {
-              group: ['@tx-agent-kit/contracts/*', '@tx-agent-kit/auth/*'],
+              regex: '^@tx-agent-kit/contracts/(?!literals(?:\\.js)?$).*',
+              message:
+                'Domain must stay boundary-free. Only shared domain literals may be imported from contracts (`@tx-agent-kit/contracts/literals.js`).'
+            },
+            {
+              group: ['@tx-agent-kit/auth/*'],
               message:
                 'Domain must stay boundary-free. Use domain-native models and capability ports, then map in outer layers.'
             },

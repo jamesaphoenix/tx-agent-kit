@@ -11,6 +11,14 @@ import {
   lt,
   or
 } from 'drizzle-orm'
+import {
+  invitationStatuses,
+  workspaceMemberRoles,
+  type SortOrder,
+  type InvitationAssignableRole,
+  type InvitationRole,
+  type InvitationStatus
+} from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
 import { buildCursorPage } from '../pagination.js'
@@ -22,7 +30,7 @@ interface ListParams {
   readonly cursor?: string
   readonly limit: number
   readonly sortBy: string
-  readonly sortOrder: 'asc' | 'desc'
+  readonly sortOrder: SortOrder
   readonly filter: Readonly<Record<string, string>>
 }
 
@@ -50,16 +58,22 @@ const parseCountValue = (value: unknown): number => {
   return Number.isNaN(parsed) ? 0 : parsed
 }
 
+const isInvitationStatus = (value: string): value is InvitationStatus =>
+  invitationStatuses.some((status) => status === value)
+
+const isInvitationRole = (value: string): value is InvitationRole =>
+  workspaceMemberRoles.some((role) => role === value)
+
 const buildListWhere = (inviteeUserId: string, params: ListParams) => {
   const predicates = [eq(invitations.inviteeUserId, inviteeUserId)]
 
   const status = params.filter.status
-  if (status === 'pending' || status === 'accepted' || status === 'revoked' || status === 'expired') {
+  if (status && isInvitationStatus(status)) {
     predicates.push(eq(invitations.status, status))
   }
 
   const role = params.filter.role
-  if (role === 'owner' || role === 'admin' || role === 'member') {
+  if (role && isInvitationRole(role)) {
     predicates.push(eq(invitations.role, role))
   }
 
@@ -256,7 +270,7 @@ export const invitationsRepository = {
     workspaceId: string
     inviteeUserId: string
     email: string
-    role: 'admin' | 'member'
+    role: InvitationAssignableRole
     invitedByUserId: string
   }) =>
     provideDB(
@@ -278,16 +292,16 @@ export const invitationsRepository = {
 
   updateById: (input: {
     id: string
-    role?: 'admin' | 'member'
-    status?: 'pending' | 'accepted' | 'revoked' | 'expired'
+    role?: InvitationAssignableRole
+    status?: InvitationStatus
   }) =>
     provideDB(
       Effect.gen(function* () {
         const db = yield* DB
 
         const patch: {
-          role?: 'admin' | 'member'
-          status?: 'pending' | 'accepted' | 'revoked' | 'expired'
+          role?: InvitationAssignableRole
+          status?: InvitationStatus
         } = {}
 
         if (input.role !== undefined) {

@@ -17,6 +17,7 @@ import {
   type CreateInvitationCommand,
   type CreateWorkspaceCommand,
   type Invitation,
+  type WorkspaceMemberRole,
   type UpdateInvitationCommand,
   type UpdateWorkspaceCommand,
   type Workspace
@@ -30,7 +31,7 @@ import {
 const hasInvitationReadAccess = (
   principalUserId: string,
   inviteeUserId: string | null,
-  workspaceRole: 'owner' | 'admin' | 'member' | null
+  workspaceRole: WorkspaceMemberRole | null
 ): boolean => {
   if (inviteeUserId === principalUserId) {
     return true

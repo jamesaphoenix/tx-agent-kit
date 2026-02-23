@@ -1,5 +1,10 @@
 import { sql } from 'drizzle-orm'
 import {
+  invitationStatuses,
+  taskStatuses,
+  workspaceMemberRoles
+} from '@tx-agent-kit/contracts'
+import {
   index,
   primaryKey,
   pgEnum,
@@ -10,9 +15,9 @@ import {
   uniqueIndex
 } from 'drizzle-orm/pg-core'
 
-export const membershipRoleEnum = pgEnum('membership_role', ['owner', 'admin', 'member'])
-export const invitationStatusEnum = pgEnum('invitation_status', ['pending', 'accepted', 'revoked', 'expired'])
-export const taskStatusEnum = pgEnum('task_status', ['todo', 'in_progress', 'done'])
+export const membershipRoleEnum = pgEnum('membership_role', workspaceMemberRoles)
+export const invitationStatusEnum = pgEnum('invitation_status', invitationStatuses)
+export const taskStatusEnum = pgEnum('task_status', taskStatuses)
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),

@@ -1,6 +1,7 @@
 import * as Schema from 'effect/Schema'
+import { workspaceMemberRoles } from '@tx-agent-kit/contracts'
 
-export const membershipRoleSchema = Schema.Literal('owner', 'admin', 'member')
+export const membershipRoleSchema = Schema.Literal(...workspaceMemberRoles)
 
 export const workspaceMemberRowSchema = Schema.Struct({
   id: Schema.UUID,

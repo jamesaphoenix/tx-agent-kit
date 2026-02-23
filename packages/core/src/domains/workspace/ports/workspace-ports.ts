@@ -2,6 +2,7 @@ import { Context } from 'effect'
 import type * as Effect from 'effect/Effect'
 import type { ListParams, PaginatedResult } from '../../../pagination.js'
 import type {
+  InvitationAssignableRole,
   InvitationRole,
   InvitationRecord,
   InvitationStatus,
@@ -13,6 +14,7 @@ import type {
 export const WorkspaceRepositoryKind = 'crud' as const
 
 export type {
+  InvitationAssignableRole,
   WorkspaceMemberRole,
   InvitationRole,
   InvitationStatus,
@@ -53,12 +55,12 @@ export class WorkspaceInvitationStorePort extends Context.Tag('WorkspaceInvitati
       workspaceId: string
       inviteeUserId: string
       email: string
-      role: 'admin' | 'member'
+      role: InvitationAssignableRole
       invitedByUserId: string
     }) => Effect.Effect<InvitationRecord | null, unknown>
     updateById: (input: {
       id: string
-      role?: 'admin' | 'member'
+      role?: InvitationAssignableRole
       status?: InvitationStatus
     }) => Effect.Effect<InvitationRecord | null, unknown>
     acceptByToken: (token: string, userId: string) => Effect.Effect<InvitationRecord | null, unknown>

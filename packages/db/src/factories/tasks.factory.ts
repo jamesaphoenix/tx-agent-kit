@@ -1,4 +1,5 @@
 import type { tasks } from '../schema.js'
+import { taskStatuses, type TaskStatus } from '@tx-agent-kit/contracts'
 import { generateId, generateTimestamp, generateUniqueValue } from './factory-helpers.js'
 
 type TaskInsert = typeof tasks.$inferInsert
@@ -9,7 +10,7 @@ export interface CreateTaskFactoryOptions {
   id?: string
   title?: string
   description?: string | null
-  status?: 'todo' | 'in_progress' | 'done'
+  status?: TaskStatus
   createdAt?: Date
 }
 
@@ -19,7 +20,7 @@ export const createTaskFactory = (options: CreateTaskFactoryOptions): TaskInsert
     workspaceId: options.workspaceId,
     title: options.title ?? generateUniqueValue('Task'),
     description: options.description ?? null,
-    status: options.status ?? 'todo',
+    status: options.status ?? taskStatuses[0],
     createdByUserId: options.createdByUserId,
     createdAt: options.createdAt ?? generateTimestamp()
   }

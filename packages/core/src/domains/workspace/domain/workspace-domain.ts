@@ -1,6 +1,18 @@
-export type WorkspaceMemberRole = 'owner' | 'admin' | 'member'
-export type InvitationRole = WorkspaceMemberRole
-export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired'
+import {
+  invitationAssignableRoles,
+  invitationStatuses,
+  type InvitationAssignableRole,
+  type InvitationRole,
+  type InvitationStatus,
+  type WorkspaceMemberRole
+} from '@tx-agent-kit/contracts'
+
+export type {
+  InvitationAssignableRole,
+  InvitationRole,
+  InvitationStatus,
+  WorkspaceMemberRole
+} from '@tx-agent-kit/contracts'
 
 export interface WorkspaceRecord {
   id: string
@@ -61,11 +73,11 @@ export interface UpdateWorkspaceCommand {
 export interface CreateInvitationCommand {
   workspaceId: string
   email: string
-  role: 'admin' | 'member'
+  role: InvitationAssignableRole
 }
 
 export interface UpdateInvitationCommand {
-  role?: 'admin' | 'member'
+  role?: InvitationAssignableRole
   status?: InvitationStatus
 }
 
@@ -90,14 +102,19 @@ export const canManageWorkspace = (role: WorkspaceMemberRole): boolean => role =
 export const canDeleteWorkspace = (role: WorkspaceMemberRole): boolean => role === 'owner'
 export const canManageInvitation = (role: WorkspaceMemberRole): boolean => role === 'owner' || role === 'admin'
 
+const isInvitationAssignableRole = (role: string): role is InvitationAssignableRole =>
+  invitationAssignableRoles.some((value) => value === role)
+
+const isInvitationStatus = (status: string): status is InvitationStatus =>
+  invitationStatuses.some((value) => value === status)
+
 export const isValidInvitationRoleUpdate = (
   role: string | undefined
-): role is 'admin' | 'member' | undefined => role === undefined || role === 'admin' || role === 'member'
+): role is InvitationAssignableRole | undefined => role === undefined || isInvitationAssignableRole(role)
 
 export const isValidInvitationStatusUpdate = (
   status: string | undefined
-): status is InvitationStatus | undefined =>
-  status === undefined || status === 'pending' || status === 'accepted' || status === 'revoked' || status === 'expired'
+): status is InvitationStatus | undefined => status === undefined || isInvitationStatus(status)
 
 export const toWorkspace = (row: WorkspaceRecord): Workspace => ({
   id: row.id,

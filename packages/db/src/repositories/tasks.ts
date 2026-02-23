@@ -11,6 +11,7 @@ import {
   sql,
   type SQL
 } from 'drizzle-orm'
+import { taskStatuses, type SortOrder, type TaskStatus } from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
 import { buildCursorPage } from '../pagination.js'
@@ -22,7 +23,7 @@ interface ListParams {
   readonly cursor?: string
   readonly limit: number
   readonly sortBy: string
-  readonly sortOrder: 'asc' | 'desc'
+  readonly sortOrder: SortOrder
   readonly filter: Readonly<Record<string, string>>
 }
 
@@ -60,8 +61,10 @@ const combinePredicates = (predicates: ReadonlyArray<SQL<unknown>>): SQL<unknown
   return rest.reduce<SQL<unknown>>((acc, predicate) => and(acc, predicate) ?? acc, first)
 }
 
-const isTaskStatus = (value: string): value is 'todo' | 'in_progress' | 'done' =>
-  value === 'todo' || value === 'in_progress' || value === 'done'
+const isTaskStatus = (value: string): value is TaskStatus =>
+  taskStatuses.some((status) => status === value)
+
+const defaultTaskStatus: TaskStatus = taskStatuses[0]
 
 const buildFilterWhere = (workspaceId: string, params: ListParams): SQL<unknown> => {
   const predicates: Array<SQL<unknown>> = [eq(tasks.workspaceId, workspaceId)]
@@ -188,12 +191,12 @@ export const tasksRepository = {
               const cursorWhere = cursor
                 ? sortOrder === 'asc'
                   ? or(
-                      gt(tasks.status, cursorStatus ?? 'todo'),
-                      and(eq(tasks.status, cursorStatus ?? 'todo'), gt(tasks.id, cursor.id))
+                      gt(tasks.status, cursorStatus ?? defaultTaskStatus),
+                      and(eq(tasks.status, cursorStatus ?? defaultTaskStatus), gt(tasks.id, cursor.id))
                     )
                   : or(
-                      lt(tasks.status, cursorStatus ?? 'todo'),
-                      and(eq(tasks.status, cursorStatus ?? 'todo'), lt(tasks.id, cursor.id))
+                      lt(tasks.status, cursorStatus ?? defaultTaskStatus),
+                      and(eq(tasks.status, cursorStatus ?? defaultTaskStatus), lt(tasks.id, cursor.id))
                     )
                 : undefined
 
@@ -321,7 +324,7 @@ export const tasksRepository = {
     id: string
     title?: string
     description?: string | null
-    status?: 'todo' | 'in_progress' | 'done'
+    status?: TaskStatus
   }) =>
     provideDB(
       Effect.gen(function* () {
@@ -330,7 +333,7 @@ export const tasksRepository = {
         const patch: {
           title?: string
           description?: string | null
-          status?: 'todo' | 'in_progress' | 'done'
+          status?: TaskStatus
         } = {}
 
         if (input.title !== undefined) {

@@ -1,7 +1,8 @@
 import * as Schema from 'effect/Schema'
+import { invitationStatuses, workspaceMemberRoles } from '@tx-agent-kit/contracts'
 
-export const invitationStatusSchema = Schema.Literal('pending', 'accepted', 'revoked', 'expired')
-export const invitationRoleSchema = Schema.Literal('owner', 'admin', 'member')
+export const invitationStatusSchema = Schema.Literal(...invitationStatuses)
+export const invitationRoleSchema = Schema.Literal(...workspaceMemberRoles)
 
 export const invitationRowSchema = Schema.Struct({
   id: Schema.UUID,

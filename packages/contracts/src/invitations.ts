@@ -1,8 +1,9 @@
 import * as Schema from 'effect/Schema'
 import { emailSchema, paginatedResponseSchema } from './common.js'
+import { invitationAssignableRoles, invitationStatuses } from './literals.js'
 
-export const invitationStatusSchema = Schema.Literal('pending', 'accepted', 'revoked', 'expired')
-export const invitationRoleSchema = Schema.Literal('admin', 'member')
+export const invitationStatusSchema = Schema.Literal(...invitationStatuses)
+export const invitationRoleSchema = Schema.Literal(...invitationAssignableRoles)
 
 export const invitationSchema = Schema.Struct({
   id: Schema.UUID,

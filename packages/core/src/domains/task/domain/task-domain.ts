@@ -1,9 +1,16 @@
+import {
+  taskStatuses,
+  type TaskStatus
+} from '@tx-agent-kit/contracts'
+
+export type { TaskStatus } from '@tx-agent-kit/contracts'
+
 export interface TaskRecord {
   id: string
   workspaceId: string
   title: string
   description: string | null
-  status: 'todo' | 'in_progress' | 'done'
+  status: TaskStatus
   createdByUserId: string
   createdAt: Date
 }
@@ -13,7 +20,7 @@ export interface Task {
   workspaceId: string
   title: string
   description: string | null
-  status: 'todo' | 'in_progress' | 'done'
+  status: TaskStatus
   createdByUserId: string
   createdAt: Date
 }
@@ -27,7 +34,7 @@ export interface CreateTaskCommand {
 export interface UpdateTaskCommand {
   title?: string
   description?: string | null
-  status?: 'todo' | 'in_progress' | 'done'
+  status?: TaskStatus
 }
 
 const maxTaskTitleLength = 200
@@ -41,8 +48,11 @@ export const isValidTaskTitle = (title: string): boolean => {
 export const isValidTaskDescription = (description: string | undefined): boolean =>
   description == null || description.length <= maxTaskDescriptionLength
 
-export const isValidTaskStatus = (status: string | undefined): status is 'todo' | 'in_progress' | 'done' =>
-  status === undefined || status === 'todo' || status === 'in_progress' || status === 'done'
+const isTaskStatus = (status: string): status is TaskStatus =>
+  taskStatuses.some((value) => value === status)
+
+export const isValidTaskStatus = (status: string | undefined): status is TaskStatus | undefined =>
+  status === undefined || isTaskStatus(status)
 
 export const normalizeTaskDescription = (description: string | undefined): string | undefined => {
   if (description == null) {

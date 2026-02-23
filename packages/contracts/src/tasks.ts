@@ -1,7 +1,8 @@
 import * as Schema from 'effect/Schema'
 import { paginatedResponseSchema } from './common.js'
+import { taskStatuses } from './literals.js'
 
-export const taskStatusSchema = Schema.Literal('todo', 'in_progress', 'done')
+export const taskStatusSchema = Schema.Literal(...taskStatuses)
 
 export const taskSchema = Schema.Struct({
   id: Schema.UUID,

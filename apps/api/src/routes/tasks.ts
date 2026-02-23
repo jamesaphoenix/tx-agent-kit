@@ -1,5 +1,6 @@
 import { HttpApiBuilder, HttpServerRequest } from '@effect/platform'
 import { principalFromAuthorization, TaskService } from '@tx-agent-kit/core'
+import { type TaskStatus } from '@tx-agent-kit/contracts'
 import { Effect } from 'effect'
 import { BadRequest, TxAgentApi, mapCoreError } from '../api.js'
 import { parseListQuery } from './list-query.js'
@@ -11,7 +12,7 @@ const toApiTask = (task: {
   workspaceId: string
   title: string
   description: string | null
-  status: 'todo' | 'in_progress' | 'done'
+  status: TaskStatus
   createdByUserId: string
   createdAt: Date
 }) => ({

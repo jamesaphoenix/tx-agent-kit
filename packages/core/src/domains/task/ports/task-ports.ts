@@ -1,7 +1,7 @@
 import { Context } from 'effect'
 import type * as Effect from 'effect/Effect'
 import type { ListParams, PaginatedResult } from '../../../pagination.js'
-import type { TaskRecord } from '../domain/task-domain.js'
+import type { TaskRecord, TaskStatus } from '../domain/task-domain.js'
 
 export const TaskRepositoryKind = 'crud' as const
 
@@ -27,7 +27,7 @@ export class TaskStorePort extends Context.Tag('TaskStorePort')<
       id: string
       title?: string
       description?: string | null
-      status?: 'todo' | 'in_progress' | 'done'
+      status?: TaskStatus
     }) => Effect.Effect<TaskRecord | null, unknown>
     remove: (id: string) => Effect.Effect<{ deleted: true }, unknown>
   }

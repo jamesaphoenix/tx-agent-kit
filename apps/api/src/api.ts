@@ -1,4 +1,10 @@
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from '@effect/platform'
+import {
+  invitationAssignableRoles,
+  invitationStatuses,
+  sortOrders,
+  taskStatuses
+} from '@tx-agent-kit/contracts'
 import * as Schema from 'effect/Schema'
 
 export class BadRequest extends Schema.TaggedError<BadRequest>()('BadRequest', {
@@ -98,7 +104,7 @@ const WorkspacesListParams = Schema.Struct({
   cursor: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.String),
   sortBy: Schema.optional(Schema.String),
-  sortOrder: Schema.optional(Schema.Literal('asc', 'desc'))
+  sortOrder: Schema.optional(Schema.Literal(...sortOrders))
 })
 
 const CreateWorkspaceBody = Schema.Struct({
@@ -113,8 +119,8 @@ const Invitation = Schema.Struct({
   id: Schema.String,
   workspaceId: Schema.String,
   email: Schema.String,
-  role: Schema.Literal('admin', 'member'),
-  status: Schema.Literal('pending', 'accepted', 'revoked', 'expired'),
+  role: Schema.Literal(...invitationAssignableRoles),
+  status: Schema.Literal(...invitationStatuses),
   invitedByUserId: Schema.String,
   token: Schema.String,
   expiresAt: Schema.String,
@@ -127,7 +133,7 @@ const InvitationsListParams = Schema.Struct({
   cursor: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.String),
   sortBy: Schema.optional(Schema.String),
-  sortOrder: Schema.optional(Schema.Literal('asc', 'desc')),
+  sortOrder: Schema.optional(Schema.Literal(...sortOrders)),
   'filter[status]': Schema.optional(Schema.String),
   'filter[role]': Schema.optional(Schema.String)
 })
@@ -135,12 +141,12 @@ const InvitationsListParams = Schema.Struct({
 const CreateInvitationBody = Schema.Struct({
   workspaceId: Schema.String,
   email: Schema.String,
-  role: Schema.Literal('admin', 'member')
+  role: Schema.Literal(...invitationAssignableRoles)
 })
 
 const UpdateInvitationBody = Schema.Struct({
-  role: Schema.optional(Schema.Literal('admin', 'member')),
-  status: Schema.optional(Schema.Literal('pending', 'accepted', 'revoked', 'expired'))
+  role: Schema.optional(Schema.Literal(...invitationAssignableRoles)),
+  status: Schema.optional(Schema.Literal(...invitationStatuses))
 })
 
 const AcceptInvitationResponse = Schema.Struct({
@@ -157,7 +163,7 @@ const Task = Schema.Struct({
   workspaceId: Schema.String,
   title: Schema.String,
   description: Schema.NullOr(Schema.String),
-  status: Schema.Literal('todo', 'in_progress', 'done'),
+  status: Schema.Literal(...taskStatuses),
   createdByUserId: Schema.String,
   createdAt: Schema.String
 })
@@ -185,7 +191,7 @@ const TasksListParams = Schema.Struct({
   cursor: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.String),
   sortBy: Schema.optional(Schema.String),
-  sortOrder: Schema.optional(Schema.Literal('asc', 'desc')),
+  sortOrder: Schema.optional(Schema.Literal(...sortOrders)),
   'filter[status]': Schema.optional(Schema.String),
   'filter[createdByUserId]': Schema.optional(Schema.String)
 })
@@ -199,7 +205,7 @@ const CreateTaskBody = Schema.Struct({
 const UpdateTaskBody = Schema.Struct({
   title: Schema.optional(Schema.String),
   description: Schema.optional(Schema.NullOr(Schema.String)),
-  status: Schema.optional(Schema.Literal('todo', 'in_progress', 'done'))
+  status: Schema.optional(Schema.Literal(...taskStatuses))
 })
 
 const HealthResponse = Schema.Struct({

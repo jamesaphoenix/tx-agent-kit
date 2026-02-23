@@ -6,22 +6,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/run-silent.sh"
 
 FILTER="${1:-}"
-PACKAGES=(
-  "@tx-agent-kit/contracts"
-  "@tx-agent-kit/logging"
-  "@tx-agent-kit/auth"
-  "@tx-agent-kit/db"
-  "@tx-agent-kit/core"
-  "@tx-agent-kit/observability"
-  "@tx-agent-kit/api"
-  "@tx-agent-kit/worker"
-  "@tx-agent-kit/web"
-)
+PACKAGES=()
+while IFS= read -r package_name; do
+  [[ -n "$package_name" ]] && PACKAGES+=("$package_name")
+done < <(node "$SCRIPT_DIR/lib/discover-packages-with-script.mjs" build)
 
 echo "Running build (quiet mode)"
 
 FAILED_PACKAGES=()
 PASSED_COUNT=0
+
+if [[ ${#PACKAGES[@]} -eq 0 ]]; then
+  echo "No workspace packages expose a build script."
+  exit 1
+fi
 
 for pkg in "${PACKAGES[@]}"; do
   if [[ -n "$FILTER" ]] && [[ "$pkg" != *"$FILTER"* ]]; then

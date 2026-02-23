@@ -1,6 +1,7 @@
 import { hashPassword, signSessionToken, verifyPassword, verifySessionToken } from '@tx-agent-kit/auth'
 import { usersRepository, workspacesRepository } from '@tx-agent-kit/db'
-import { Layer } from 'effect'
+import { Effect, Layer } from 'effect'
+import { mapNullable, toAuthUserRecord } from '../../../adapters/db-row-mappers.js'
 import {
   AuthUsersPort,
   AuthWorkspaceOwnershipPort,
@@ -9,10 +10,13 @@ import {
 } from '../ports/auth-ports.js'
 
 export const AuthUsersPortLive = Layer.succeed(AuthUsersPort, {
-  create: (input: { email: string; passwordHash: string; name: string }) => usersRepository.create(input),
-  findByEmail: (email: string) => usersRepository.findByEmail(email),
-  findById: (id: string) => usersRepository.findById(id),
-  deleteById: (id: string) => usersRepository.deleteById(id)
+  create: (input: { email: string; passwordHash: string; name: string }) =>
+    usersRepository.create(input).pipe(Effect.map((row) => mapNullable(row, toAuthUserRecord))),
+  findByEmail: (email: string) =>
+    usersRepository.findByEmail(email).pipe(Effect.map((row) => mapNullable(row, toAuthUserRecord))),
+  findById: (id: string) => usersRepository.findById(id).pipe(Effect.map((row) => mapNullable(row, toAuthUserRecord))),
+  deleteById: (id: string) =>
+    usersRepository.deleteById(id).pipe(Effect.map((row) => mapNullable(row, toAuthUserRecord)))
 })
 
 export const AuthWorkspaceOwnershipPortLive = Layer.succeed(AuthWorkspaceOwnershipPort, {

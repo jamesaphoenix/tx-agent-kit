@@ -10,6 +10,7 @@ coverage
 .next
 .DS_Store
 *.log
+*.map
 apps/*/.next
 apps/*/dist
 packages/*/dist

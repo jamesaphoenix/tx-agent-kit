@@ -1,4 +1,4 @@
-import { decodeCursor, encodeCursor, type CursorPayload } from '@tx-agent-kit/contracts'
+import { decodeCursor, encodeCursor, type CursorPayload, type SortOrder } from '@tx-agent-kit/contracts'
 import { Effect } from 'effect'
 import { dbQueryFailed, type DbError } from './errors.js'
 
@@ -13,7 +13,7 @@ export interface BuildCursorPageOptions<T> {
   readonly cursor?: string
   readonly limit: number
   readonly sortBy: string
-  readonly sortOrder: 'asc' | 'desc'
+  readonly sortOrder: SortOrder
   readonly runCount: () => Effect.Effect<number, DbError>
   readonly runPage: (cursor: CursorPayload | null, limitPlusOne: number) => Effect.Effect<ReadonlyArray<T>, DbError>
   readonly getCursorId: (row: T) => string

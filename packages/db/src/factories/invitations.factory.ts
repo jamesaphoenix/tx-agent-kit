@@ -1,5 +1,11 @@
 import type { invitations } from '../schema.js'
 import {
+  invitationStatuses,
+  workspaceMemberRoles,
+  type InvitationRole,
+  type InvitationStatus
+} from '@tx-agent-kit/contracts'
+import {
   generateEmail,
   generateFutureTimestamp,
   generateId,
@@ -15,8 +21,8 @@ export interface CreateInvitationFactoryOptions {
   inviteeUserId?: string | null
   id?: string
   email?: string
-  role?: 'owner' | 'admin' | 'member'
-  status?: 'pending' | 'accepted' | 'revoked' | 'expired'
+  role?: InvitationRole
+  status?: InvitationStatus
   token?: string
   expiresAt?: Date
   createdAt?: Date
@@ -30,8 +36,8 @@ export const createInvitationFactory = (
     workspaceId: options.workspaceId,
     inviteeUserId: options.inviteeUserId ?? null,
     email: options.email ?? generateEmail('invite'),
-    role: options.role ?? 'member',
-    status: options.status ?? 'pending',
+    role: options.role ?? workspaceMemberRoles[2],
+    status: options.status ?? invitationStatuses[0],
     invitedByUserId: options.invitedByUserId,
     token: options.token ?? generateToken('invite'),
     expiresAt: options.expiresAt ?? generateFutureTimestamp(7 * 24 * 60 * 60 * 1000),

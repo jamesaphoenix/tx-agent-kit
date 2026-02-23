@@ -1,5 +1,6 @@
 import { HttpApiBuilder, HttpServerRequest } from '@effect/platform'
 import { principalFromAuthorization, WorkspaceService } from '@tx-agent-kit/core'
+import { type InvitationStatus, type WorkspaceMemberRole } from '@tx-agent-kit/contracts'
 import { Effect } from 'effect'
 import { BadRequest, TxAgentApi, mapCoreError } from '../api.js'
 import { parseListQuery } from './list-query.js'
@@ -22,8 +23,8 @@ const toApiInvitation = (invitation: {
   id: string
   workspaceId: string
   email: string
-  role: 'owner' | 'admin' | 'member'
-  status: 'pending' | 'accepted' | 'revoked' | 'expired'
+  role: WorkspaceMemberRole
+  status: InvitationStatus
   invitedByUserId: string
   token: string
   expiresAt: Date

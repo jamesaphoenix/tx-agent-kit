@@ -1,10 +1,11 @@
 import * as Schema from 'effect/Schema'
+import { sortOrders, type SortOrder } from './literals.js'
 
 export const emailSchema = Schema.String.pipe(
   Schema.pattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
 )
 
-export const sortOrderSchema = Schema.Literal('asc', 'desc')
+export const sortOrderSchema = Schema.Literal(...sortOrders)
 
 export const listQueryParamsSchema = Schema.Struct({
   cursor: Schema.optional(Schema.String),
@@ -25,7 +26,7 @@ export const paginatedResponseSchema = <A, I, R>(itemSchema: Schema.Schema<A, I,
 export interface CursorPayload {
   readonly v: 1
   readonly sortBy: string
-  readonly sortOrder: 'asc' | 'desc'
+  readonly sortOrder: SortOrder
   readonly sortValue: string
   readonly id: string
 }

@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, gt, inArray, lt, or } from 'drizzle-orm'
+import { type SortOrder, type WorkspaceMemberRole } from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
 import { buildCursorPage } from '../pagination.js'
@@ -11,7 +12,7 @@ interface ListParams {
   readonly cursor?: string
   readonly limit: number
   readonly sortBy: string
-  readonly sortOrder: 'asc' | 'desc'
+  readonly sortOrder: SortOrder
   readonly filter: Readonly<Record<string, string>>
 }
 
@@ -326,7 +327,7 @@ export const workspacesRepository = {
     provideDB(
       Effect.gen(function* () {
         if (workspaceIds.length === 0) {
-          return new Map<string, 'owner' | 'admin' | 'member'>()
+          return new Map<string, WorkspaceMemberRole>()
         }
 
         const db = yield* DB
