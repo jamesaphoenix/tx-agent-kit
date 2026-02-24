@@ -3,30 +3,28 @@ title: Data Flow
 description: End-to-end data flow from client applications through the API to the database and worker
 ---
 
-# Data Flow
-
 This page traces the end-to-end data flow through tx-agent-kit, from a user action in the browser to the database and back.
 
 ## Overview
 
 ```
-┌───────────┐     HTTP      ┌───────────┐    Effect    ┌───────────┐
-│  Web/Mobile│ ──────────▶  │    API     │ ──────────▶ │   Core    │
-│  (Client)  │              │ (Effect    │              │ (Domain   │
-│            │ ◀────────── │  HttpApi)  │ ◀────────── │  Logic)   │
-└───────────┘   JSON        └─────┬─────┘   Result     └───────────┘
-                                  │
-                          ┌───────▼───────┐
-                          │      DB       │
-                          │  (Drizzle/    │
-                          │  PostgreSQL)  │
-                          └───────┬───────┘
-                                  │
-                          ┌───────▼───────┐
-                          │    Worker     │
-                          │  (Temporal    │
-                          │  Workflows)   │
-                          └───────────────┘
+┌─────────────┐      HTTP      ┌─────────────┐     Effect     ┌─────────────┐
+│ Web/Mobile  │ ────────────▶ │ API         │ ────────────▶  │ Core        │
+│ (Client)    │               │ (Effect     │                │ (Domain     │
+│             │ ◀──────────── │ HttpApi)    │ ◀────────────  │ Logic)      │
+└─────────────┘      JSON      └──────┬──────┘     Result     └─────────────┘
+                                      │
+                              ┌───────▼───────┐
+                              │ DB            │
+                              │ (Drizzle/     │
+                              │ PostgreSQL)   │
+                              └───────┬───────┘
+                                      │
+                              ┌───────▼───────┐
+                              │ Worker        │
+                              │ (Temporal     │
+                              │ Workflows)    │
+                              └───────────────┘
 ```
 
 ## Request lifecycle
