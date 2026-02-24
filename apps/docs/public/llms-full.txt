@@ -154,13 +154,13 @@ Every single enforced rule in one place, organized by category. API-first web, c
 ## Infrastructure: the local and remote stack
 
 /docs/infrastructure
-Two worlds. Docker runs the shared services (Postgres, Temporal, Redis, OTEL collector, observability UIs). Your apps run as regular Node processes for fast hot-reload. This split is intentional: infra changes rarely, apps change constantly.
+Two worlds. Docker runs the shared services (Postgres, Redis, OTEL collector, observability UIs). Temporal runs via local CLI in dev or Temporal Cloud in deployed environments. Your apps run as regular Node processes for fast hot-reload. This split is intentional: infra changes rarely, apps change constantly.
 
 /docs/infrastructure/docker-stack
-The full Docker Compose stack: PostgreSQL on 5432, Temporal on 7233 (UI on 8233), Redis on 6379, OTEL Collector on 4318/4317, Jaeger on 16686, Prometheus on 9090, Grafana on 3001, Loki on 3100. `pnpm infra:ensure` starts everything idempotently. `pnpm infra:down` stops it.
+The full Docker Compose stack: PostgreSQL on 5432, Redis on 6379, OTEL Collector on 4318/4317, Jaeger on 16686, Prometheus on 9090, Grafana on 3001, Loki on 3100. `pnpm infra:ensure` starts everything idempotently. `pnpm infra:down` stops it.
 
 /docs/infrastructure/local-development
-The four-step workflow: `pnpm env:configure` seeds your .env with safe defaults, `pnpm infra:ensure` spins up Docker, `pnpm db:migrate` applies Drizzle migrations, `pnpm dev` starts web, API, and worker. Use `dev:web`, `dev:api`, `dev:worker`, or `dev:mobile` individually.
+The workflow: `pnpm env:configure` seeds your .env with safe defaults, `pnpm infra:ensure` spins up Docker, `pnpm temporal:dev:up` ensures local Temporal CLI, `pnpm db:migrate` applies Drizzle migrations, `pnpm dev` starts web, API, and worker. Use `dev:web`, `dev:api`, `dev:worker`, or `dev:mobile` individually.
 
 /docs/infrastructure/worktrees
 Working on multiple branches simultaneously? `pnpm worktree:ports <name>` generates deterministic, collision-free ports from the worktree name. scripts/worktree/setup.sh writes a .env with isolated WORKTREE_PORT_OFFSET, WEB_PORT, API_PORT, MOBILE_PORT, WORKER_INSPECT_PORT, TEMPORAL_TASK_QUEUE, and API_BASE_URL. All worktrees share the same Docker infra containers.

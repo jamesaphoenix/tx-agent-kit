@@ -15,8 +15,8 @@ Four applications target different runtime environments:
 |-----|-----------|------|---------|
 | `apps/api` | Effect HttpApi | 4000 | REST API server for auth, workspaces, tasks, invitations |
 | `apps/web` | Next.js | 3000 | Client-only SPA dashboard |
-| `apps/worker` | Temporal | — | Background workflow execution |
-| `apps/mobile` | Expo React Native | — | Cross-platform mobile client |
+| `apps/worker` | Temporal | - | Background workflow execution |
+| `apps/mobile` | Expo React Native | - | Cross-platform mobile client |
 
 Each app has a strict responsibility boundary. The API serves HTTP endpoints and orchestrates domain logic; it is the only app that touches the database. The web app is a pure client-side SPA that never queries the database, never runs server-side code, and never imports Effect. The worker runs Temporal workflows for background processing, and all workflows must be deterministic. The mobile app is an Expo project sharing the same API client patterns as the web app.
 

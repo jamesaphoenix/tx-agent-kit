@@ -5,7 +5,7 @@ description: Inward-only dependency direction and how it is enforced
 
 # Dependency Flow
 
-tx-agent-kit enforces a strict inward-only dependency direction. Inner layers never depend on outer layers. This is not a guideline — it is mechanically enforced by ESLint boundary rules and structural invariant checks.
+tx-agent-kit enforces a strict inward-only dependency direction. Inner layers never depend on outer layers. This is not a guideline. It is mechanically enforced by ESLint boundary rules and structural invariant checks.
 
 ## The dependency rule
 
@@ -13,7 +13,7 @@ Each layer can only import from layers at the same level or further inward:
 
 ```
                     ┌─────────────┐
-                    │   domain    │  (innermost — no deps)
+                    │   domain    │  (innermost, no deps)
                     └──────┬──────┘
                            │
                     ┌──────▼──────┐
@@ -29,7 +29,7 @@ Each layer can only import from layers at the same level or further inward:
          └─────────────────┬─────────────────┘
                            │
               ┌────────────▼────────────┐
-              │     runtime / ui        │  (orchestration — imports all)
+              │     runtime / ui        │  (orchestration, imports all)
               └─────────────────────────┘
 ```
 
@@ -107,9 +107,9 @@ The inward dependency direction provides concrete benefits.
 
 Consider adding a validation rule that invoices cannot exceed a workspace's credit limit:
 
-1. **Domain layer** — Add a pure function `isWithinCreditLimit(invoice, workspace)` to `domain/`
-2. **Port layer** — No changes needed (workspace data comes through existing ports)
-3. **Application layer** — Call `isWithinCreditLimit` before creating an invoice in the service
-4. **Repository layer** — No changes needed
+1. **Domain layer**: Add a pure function `isWithinCreditLimit(invoice, workspace)` to `domain/`
+2. **Port layer**: No changes needed (workspace data comes through existing ports)
+3. **Application layer**: Call `isWithinCreditLimit` before creating an invoice in the service
+4. **Repository layer**: No changes needed
 
 The change is isolated to the inner layers. No database migrations, no API changes, no infrastructure modifications. The dependency direction keeps the blast radius small.

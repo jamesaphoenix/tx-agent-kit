@@ -5,7 +5,7 @@ description: How domain-driven design is implemented in tx-agent-kit
 
 # DDD Construction Pattern
 
-tx-agent-kit implements domain-driven design (DDD) with a specific construction pattern that separates concerns into well-defined layers. This pattern is enforced mechanically — not just documented.
+tx-agent-kit implements domain-driven design (DDD) with a specific construction pattern that separates concerns into well-defined layers. This pattern is enforced mechanically, not just documented.
 
 ## Directory structure
 
@@ -57,7 +57,7 @@ export const canTransition = (
 }
 ```
 
-All functions in `domain/` must be pure — no `Date.now`, `new Date`, `Math.random`, or any side effects. Only named exports are allowed (no default exports). The layer cannot import from `packages/db`, `effect`, or any adapter. All `*Record` interfaces that ports reference must originate here.
+All functions in `domain/` must be pure: no `Date.now`, `new Date`, `Math.random`, or any side effects. Only named exports are allowed (no default exports). The layer cannot import from `packages/db`, `effect`, or any adapter. All `*Record` interfaces that ports reference must originate here.
 
 ### `ports/`
 
@@ -76,7 +76,7 @@ export type InvoiceRepositoryPort = {
 }
 ```
 
-Port files must use `export type` and import record types from `domain/` — `export interface` declarations are banned. Ports can only import from `domain/` and other `ports/` files; they cannot reference concrete implementations.
+Port files must use `export type` and import record types from `domain/`. `export interface` declarations are banned. Ports can only import from `domain/` and other `ports/` files; they cannot reference concrete implementations.
 
 ### `application/`
 

@@ -51,7 +51,7 @@ OpenTelemetry automatically propagates trace context across HTTP boundaries usin
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP HTTP endpoint |
-| `OTEL_LOG_LEVEL` | — | Set to `debug` for OTEL SDK diagnostics |
+| `OTEL_LOG_LEVEL` | n/a | Set to `debug` for OTEL SDK diagnostics |
 
 The trace exporter sends spans to `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces` via HTTP POST with JSON encoding.
 

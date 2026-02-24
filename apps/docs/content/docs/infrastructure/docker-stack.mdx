@@ -1,6 +1,6 @@
 ---
 title: Docker Stack
-description: Docker Compose services for PostgreSQL, Temporal, Redis, and the observability stack
+description: Docker Compose services for PostgreSQL, Redis, and the observability stack
 ---
 
 # Docker Stack
@@ -21,17 +21,9 @@ All shared infrastructure runs through `docker-compose.yml` under the `infra` pr
 
 The application database stores all domain data. Worktrees use separate PostgreSQL schemas within the same database instance, so a single container serves all parallel branches.
 
-### Temporal
+### Temporal runtime note
 
-| Property | Value |
-|----------|-------|
-| Server image | `temporalio/auto-setup:1.29.3` |
-| Server port | 7233 |
-| UI image | `temporalio/ui:2.45.3` |
-| UI port | 8233 |
-| Backend | Dedicated PostgreSQL on port 5433 |
-
-Temporal auto-setup initializes its own schema on first boot. The server exposes gRPC on port 7233 for worker connections. The UI provides workflow visibility at `http://localhost:8233`.
+Temporal is no longer part of the local Docker infra profile. Local development uses host Temporal CLI (`pnpm temporal:dev:up`) and deployed environments use Temporal Cloud via environment-driven settings.
 
 ### Redis
 

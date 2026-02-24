@@ -13,31 +13,31 @@ Extended docs: https://agentkit.txdocs.dev/llms-full.txt
 
 ## Repo orientation
 
-CLAUDE.md — Agent operating guide (constraints, DDD pattern, workflow, enforcement)
-AGENTS.md — Symlink to CLAUDE.md (both agent runtimes read the same file)
-docs/ARCHITECTURE.md — System architecture and boundaries
-docs/QUALITY.md — All enforced invariants with rationale
-docs/COMMANDS.md — Every pnpm script, organized by purpose
-docs/RUNBOOKS.md — Operational procedures
-docs/DEPLOYMENT.md — Build, migrate, deploy, smoke test
-apps/api/openapi.json — Generated OpenAPI spec (source of truth for API contract)
+CLAUDE.md:Agent operating guide (constraints, DDD pattern, workflow, enforcement)
+AGENTS.md:Symlink to CLAUDE.md (both agent runtimes read the same file)
+docs/ARCHITECTURE.md:System architecture and boundaries
+docs/QUALITY.md:All enforced invariants with rationale
+docs/COMMANDS.md:Every pnpm script, organized by purpose
+docs/RUNBOOKS.md:Operational procedures
+docs/DEPLOYMENT.md:Build, migrate, deploy, smoke test
+apps/api/openapi.json:Generated OpenAPI spec (source of truth for API contract)
 
 
 ## Stack
 
-apps/api — Effect HttpApi server. Auth, workspaces, tasks, invitations. Generates its own OpenAPI spec.
-apps/web — Client-only Next.js SPA. No server code, no Effect, no Drizzle. Typed API clients only.
-apps/worker — Temporal worker. Deterministic workflows, activities handle side effects.
-apps/mobile — Expo React Native. Same API, same contracts as web.
-apps/docs — Fumadocs documentation site (port 3002).
-packages/core — DDD domain slices under packages/core/src/domains/<domain>/. Business logic lives here.
-packages/db — Drizzle schema, repositories, migrations, pgTAP tests. Only package that imports drizzle-orm.
-packages/contracts — Shared API schemas using effect/Schema. Single source of truth for validation.
-packages/auth — Password hashing and JWT. Thin on purpose.
-packages/logging — Structured JSON logger. console.* is lint-banned everywhere.
-packages/observability — OpenTelemetry bootstrap. Traces, metrics, logs via OTLP.
-packages/testkit — Integration harnesses, lock-guarded runners, DB reset helpers.
-packages/tooling — ESLint configs, domain invariant rules, scaffold CLI.
+apps/api:Effect HttpApi server. Auth, workspaces, tasks, invitations. Generates its own OpenAPI spec.
+apps/web:Client-only Next.js SPA. No server code, no Effect, no Drizzle. Typed API clients only.
+apps/worker:Temporal worker. Deterministic workflows, activities handle side effects.
+apps/mobile:Expo React Native. Same API, same contracts as web.
+apps/docs:Fumadocs documentation site (port 3002).
+packages/core:DDD domain slices under packages/core/src/domains/<domain>/. Business logic lives here.
+packages/db:Drizzle schema, repositories, migrations, pgTAP tests. Only package that imports drizzle-orm.
+packages/contracts:Shared API schemas using effect/Schema. Single source of truth for validation.
+packages/auth:Password hashing and JWT. Thin on purpose.
+packages/logging:Structured JSON logger. console.* is lint-banned everywhere.
+packages/observability:OpenTelemetry bootstrap. Traces, metrics, logs via OTLP.
+packages/testkit:Integration harnesses, lock-guarded runners, DB reset helpers.
+packages/tooling:ESLint configs, domain invariant rules, scaffold CLI.
 
 
 ## Prerequisites
@@ -83,11 +83,11 @@ Env governance: source modules read env through dedicated env modules, never pro
 ## DDD pattern
 
 packages/core/src/domains/<domain>/
-  domain/       — Entities, value objects, pure rules
-  ports/        — Interfaces and capability contracts
-  application/  — Use-case orchestration
-  adapters/     — Port implementations
-  runtime/      — Layer wiring (optional)
+  domain/      :Entities, value objects, pure rules
+  ports/       :Interfaces and capability contracts
+  application/ :Use-case orchestration
+  adapters/    :Port implementations
+  runtime/     :Layer wiring (optional)
 
 Dependencies point inward: domain <- ports <- application <- adapters <- runtime.
 
@@ -106,9 +106,9 @@ Validate: pnpm lint && pnpm type-check && pnpm test.
 
 ## Enforcement layers
 
-ESLint: packages/tooling/eslint-config/domain-invariants.js — Import bans, pattern bans, boundary rules.
-Structural: scripts/lint/enforce-domain-invariants.mjs — Table parity, kind consistency, folder structure.
-Shell: scripts/check-shell-invariants.sh — Env governance, integration baselines.
+ESLint: packages/tooling/eslint-config/domain-invariants.js:Import bans, pattern bans, boundary rules.
+Structural: scripts/lint/enforce-domain-invariants.mjs:Table parity, kind consistency, folder structure.
+Shell: scripts/check-shell-invariants.sh:Env governance, integration baselines.
 Gate: pnpm lint runs all three layers. Failure blocks merge.
 
 
@@ -133,10 +133,10 @@ Worktrees get collision-free ports via pnpm worktree:ports <name>.
 
 ## Deployment
 
-pnpm deploy:build-images — Immutable containers, digest-pinned.
-pnpm deploy:migrate:staging — Drizzle migrations via 1Password.
-pnpm deploy:staging — op inject, docker compose up, smoke test.
-pnpm deploy:smoke — Health, auth, CRUD, idempotency verification.
+pnpm deploy:build-images:Immutable containers, digest-pinned.
+pnpm deploy:migrate:staging:Drizzle migrations via 1Password.
+pnpm deploy:staging:op inject, docker compose up, smoke test.
+pnpm deploy:smoke:Health, auth, CRUD, idempotency verification.
 
 
 ## API reference

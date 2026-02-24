@@ -105,4 +105,4 @@ export class TaskService extends Context.Tag('TaskService')<TaskService, {
 
 ## Governance Rules
 
-All domain layer files must use named exports; `export default` is forbidden. Environment reads must go through dedicated config modules rather than accessing `process.env` directly. Type assertions to `any` are not permitted — model unknowns explicitly and decode with schema at boundaries. Suppression directives such as `@ts-ignore` are likewise forbidden; fix the underlying type issue instead of suppressing the error.
+All domain layer files must use named exports; `export default` is forbidden. Environment reads must go through dedicated config modules rather than accessing `process.env` directly. Type assertions to `any` are not permitted. Model unknowns explicitly and decode with schema at boundaries. Suppression directives such as `@ts-ignore` are likewise forbidden; fix the underlying type issue instead of suppressing the error.

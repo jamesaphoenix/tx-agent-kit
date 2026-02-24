@@ -1,24 +1,24 @@
 ---
 title: Agent-First Engineering
-description: The thesis behind tx-agent-kit — agents implement, humans steer
+description: The thesis behind tx-agent-kit. Agents implement, humans steer
 ---
 
 # Agent-First Engineering
 
-tx-agent-kit is built on a specific thesis about how software gets built in the age of capable AI agents. This is not a philosophical abstraction — it is a concrete operating model that shapes every decision in the repository.
+tx-agent-kit is built on a specific thesis about how software gets built in the age of capable AI agents. This is not a philosophical abstraction. It is a concrete operating model that shapes every decision in the repository.
 
 ## The thesis
 
 Software engineering is splitting into two distinct activities:
 
-1. **Steering** — deciding what to build, why it matters, and what "done" looks like.
-2. **Implementing** — writing the code, running the tests, iterating until the checks pass.
+1. **Steering**: deciding what to build, why it matters, and what "done" looks like.
+2. **Implementing**: writing the code, running the tests, iterating until the checks pass.
 
 Humans are better at steering. Agents are better at implementing. The best results come from clear separation of these roles with well-defined interfaces between them.
 
 ## Origins
 
-This approach is inspired by OpenAI's Harness Engineering post (February 2026), which argued that the role of the engineer is shifting from writing code to building the harness — the scaffolding of docs, linters, tests, and scripts that enable agents to operate effectively.
+This approach is inspired by OpenAI's Harness Engineering post (February 2026), which argued that the role of the engineer is shifting from writing code to building the harness: the scaffolding of docs, linters, tests, and scripts that enable agents to operate effectively.
 
 tx-agent-kit takes this idea and makes it concrete. The repository is designed from the ground up to be the harness: every architectural constraint is mechanically enforced, every convention is encoded in a check, and every workflow is documented in the repo itself.
 
@@ -32,7 +32,7 @@ When you work with tx-agent-kit, the workflow looks like this:
 4. **The agent iterates.** If checks fail, the agent reads the error, fixes the code, and re-runs.
 5. **You review and accept.** The final code has passed all mechanical checks. You review for intent alignment.
 
-The key insight is that step 3 — mechanical enforcement — is what makes this work. Without it, the agent is guessing at conventions. With it, the agent has a concrete feedback loop.
+The key insight is that step 3, mechanical enforcement, is what makes this work. Without it, the agent is guessing at conventions. With it, the agent has a concrete feedback loop.
 
 ## The improvement cycle
 
@@ -59,4 +59,4 @@ Over time, the repository becomes a better and better harness. Each failure make
 | Code review catches style issues | Linters catch style issues before review |
 | Tribal knowledge about "how we do things" | Mechanical knowledge in the repo |
 
-The agent-first approach is strictly better even if you never use an AI agent. Mechanical enforcement benefits human developers equally — it just happens to also make agents effective.
+The agent-first approach is strictly better even if you never use an AI agent. Mechanical enforcement benefits human developers equally. It just happens to also make agents effective.

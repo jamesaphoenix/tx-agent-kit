@@ -5,7 +5,7 @@ description: Structured JSON logger with OpenTelemetry log emission, mandatory o
 
 # Logging (`packages/logging`)
 
-The logging package provides structured JSON logging with automatic OpenTelemetry log record emission. It is the only approved logging mechanism — `console.*` calls are banned by ESLint across the entire codebase.
+The logging package provides structured JSON logging with automatic OpenTelemetry log record emission. It is the only approved logging mechanism. `console.*` calls are banned by ESLint across the entire codebase.
 
 ## Usage
 
@@ -48,7 +48,7 @@ Creates a structured logger instance for the given service name.
 | `info` | INFO | `(message, context?)` |
 | `warn` | WARN | `(message, context?)` |
 | `error` | ERROR | `(message, context?, error?)` |
-| `child` | — | `(scope, context?)` returns a new logger |
+| `child` | n/a | `(scope, context?)` returns a new logger |
 
 ### Helper Functions
 

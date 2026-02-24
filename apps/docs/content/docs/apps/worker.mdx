@@ -49,7 +49,7 @@ export const activities = {
 }
 ```
 
-The `processTask` activity demonstrates idempotent processing — calling it twice for the same task returns `{ alreadyProcessed: true }` on the second call.
+The `processTask` activity demonstrates idempotent processing: calling it twice for the same task returns `{ alreadyProcessed: true }` on the second call.
 
 ## Configuration
 
@@ -57,9 +57,13 @@ Environment variables are centralized in `apps/worker/src/config/env.ts`:
 
 | Variable | Description |
 |----------|-------------|
+| `TEMPORAL_RUNTIME_MODE` | Runtime mode (`cli` or `cloud`) |
 | `TEMPORAL_ADDRESS` | Temporal server address |
 | `TEMPORAL_NAMESPACE` | Temporal namespace |
 | `TEMPORAL_TASK_QUEUE` | Task queue name (default: `tx-agent-kit`) |
+| `TEMPORAL_API_KEY` | Required when runtime mode is `cloud` |
+| `TEMPORAL_TLS_ENABLED` | Must be `true` when runtime mode is `cloud` |
+| `TEMPORAL_TLS_SERVER_NAME` | Optional TLS SNI override for cloud/private endpoints |
 
 Direct `process.env` access is forbidden outside the config module.
 
@@ -79,4 +83,4 @@ The worker handles `SIGINT` and `SIGTERM` signals for clean shutdown. It stops a
 
 ## Integration Testing
 
-The worker integration suite at `apps/worker/src/activities.integration.test.ts` validates that first-time task processing returns `{ alreadyProcessed: false }`, duplicate processing returns `{ alreadyProcessed: true }`, and test fixtures are seeded per test (no shared table truncation).
+The worker Temporal integration suite at `apps/worker/src/activities.integration.test.ts` validates that first-time task processing returns `{ alreadyProcessed: false }`, duplicate processing returns `{ alreadyProcessed: true }`, and test fixtures are seeded per test (no shared table truncation).

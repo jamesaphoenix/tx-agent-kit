@@ -5,7 +5,7 @@ description: Expo React Native app consuming the API with component and unit tes
 
 # Mobile App (`apps/mobile`)
 
-The mobile application is built with [Expo](https://expo.dev/) and React Native. It provides the same core functionality as the web app — authentication, workspace management, task tracking, and invitations — through a native mobile interface.
+The mobile application is built with [Expo](https://expo.dev/) and React Native. It provides the same core functionality as the web app, including authentication, workspace management, task tracking, and invitations, through a native mobile interface.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ There is no local database or offline-first logic. The app is a thin client that
 | Auth Token | `lib/auth-token.ts` | Secure token storage using the platform's native secure storage mechanisms |
 | Axios Client | `lib/axios.ts` | Pre-configured Axios instance pointing to `API_BASE_URL` with auth token injection |
 | Client API | `lib/client-api.ts` | Typed API client methods wrapping Axios calls with proper request/response typing |
-| Client Auth | `lib/client-auth.ts` | Authentication flow logic — sign-up, sign-in, token refresh, and session management |
+| Client Auth | `lib/client-auth.ts` | Authentication flow logic: sign-up, sign-in, token refresh, and session management |
 | URL State | `lib/url-state.ts` | Navigation state management adapted for React Navigation rather than browser URLs |
 | Session Store | `stores/session-store.ts` | Centralized session state management for the authenticated user context |
 

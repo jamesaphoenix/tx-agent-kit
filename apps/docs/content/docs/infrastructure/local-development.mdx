@@ -5,7 +5,7 @@ description: Full local development workflow from env configuration to running a
 
 # Local Development
 
-The local development workflow follows a strict sequence: configure environment, start infrastructure, run migrations, start applications.
+The local development workflow follows a strict sequence: configure environment, start infrastructure, start Temporal runtime, run migrations, then start applications.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ The local development workflow follows a strict sequence: configure environment,
 | Node.js | >= 22 |
 | pnpm | 10.x (`corepack enable && corepack prepare pnpm@10.28.0 --activate`) |
 | Docker | Must be running (for infrastructure services) |
-| 1Password CLI | `op` binary, optional for local dev — only needed if using secrets from 1Password vaults |
+| 1Password CLI | `op` binary, optional for local dev. Only needed if using secrets from 1Password vaults |
 
 ## Step-by-step setup
 
@@ -40,11 +40,12 @@ This script copies `.env.example` to `.env` (if it does not exist) and upserts a
 | `AUTH_SECRET` | `local-dev-auth-secret-123456` |
 | `API_CORS_ORIGIN` | `http://localhost:3000` |
 | `API_BASE_URL` | `http://localhost:4000` |
+| `TEMPORAL_RUNTIME_MODE` | `cli` |
 | `TEMPORAL_ADDRESS` | `localhost:7233` |
 | `TEMPORAL_TASK_QUEUE` | `tx-agent-kit` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` |
 
-The script is idempotent — running it again updates existing keys without duplicating them.
+The script is idempotent. Running it again updates existing keys without duplicating them.
 
 ### 3. Start infrastructure
 
@@ -52,11 +53,19 @@ The script is idempotent — running it again updates existing keys without dupl
 pnpm infra:ensure
 ```
 
-This starts all Docker Compose services under the `infra` profile and waits for health checks to pass. Services include PostgreSQL, Temporal, Redis, the OTEL collector, Jaeger, Prometheus, Grafana, and Loki.
+This starts all Docker Compose services under the `infra` profile and waits for health checks to pass. Services include PostgreSQL, Redis, the OTEL collector, Jaeger, Prometheus, Grafana, and Loki.
 
 If infrastructure is already running, the command exits immediately. See [Docker Stack](/docs/infrastructure/docker-stack) for service details.
 
-### 4. Run database migrations
+### 4. Start local Temporal CLI runtime
+
+```bash
+pnpm temporal:dev:up
+```
+
+Use `pnpm temporal:dev:status` to verify readiness.
+
+### 5. Run database migrations
 
 ```bash
 pnpm db:migrate
@@ -64,7 +73,7 @@ pnpm db:migrate
 
 Drizzle ORM migrations run against the database specified in `DATABASE_URL`. Migrations are defined in `packages/db/src/migrations/`.
 
-### 5. Start all applications
+### 6. Start all applications
 
 ```bash
 pnpm dev
@@ -76,7 +85,7 @@ This runs all application dev servers in parallel via Turborepo:
 |-----|-----|------|
 | Web | `http://localhost:3000` | 3000 |
 | API | `http://localhost:4000` | 4000 |
-| Worker | (background process) | — |
+| Worker | (background process) | n/a |
 | Mobile | Expo DevTools | 8081 |
 
 You can also start individual applications:
@@ -99,8 +108,8 @@ curl http://localhost:4000/health
 # Open web app
 open http://localhost:3000
 
-# Open Temporal UI
-open http://localhost:8233
+# Check Temporal CLI runtime
+pnpm temporal:dev:status
 
 # Open Grafana dashboards
 open http://localhost:3001

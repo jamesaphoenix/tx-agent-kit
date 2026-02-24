@@ -1,6 +1,6 @@
 ---
 title: Mechanical Enforcement
-description: Why architectural decisions are enforced in code — ESLint rules, structural checks, and shell invariants
+description: Why architectural decisions are enforced in code: ESLint rules, structural checks, and shell invariants
 ---
 
 # Mechanical Enforcement
@@ -104,6 +104,6 @@ This process ensures that every new constraint is immediately actionable. There 
 
 ## Why not just code review?
 
-Code review is valuable for intent verification — does this code do what we want? But code review is a poor enforcement mechanism for structural conventions. Different reviewers catch different things, so enforcement is inconsistent. Feedback comes hours or days after the code is written, so the loop is slow. Agents cannot learn from code review comments on other PRs, so it does not scale to AI workflows. And nitpicking structural issues in review is demoralizing for developers, creating unnecessary friction.
+Code review is valuable for intent verification: does this code do what we want? But code review is a poor enforcement mechanism for structural conventions. Different reviewers catch different things, so enforcement is inconsistent. Feedback comes hours or days after the code is written, so the loop is slow. Agents cannot learn from code review comments on other PRs, so it does not scale to AI workflows. And nitpicking structural issues in review is demoralizing for developers, creating unnecessary friction.
 
 Mechanical enforcement handles structural conventions instantly, consistently, and automatically. Code review can then focus on what it does best: verifying intent and catching logical errors.

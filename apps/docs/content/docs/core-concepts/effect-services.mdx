@@ -19,7 +19,7 @@ Effect is used in five packages:
 | `apps/api` | HttpApi server, route handlers, layer composition |
 | `apps/worker` | Activity implementations, workflow helpers |
 
-Effect is deliberately excluded from `apps/web` and `apps/mobile`. The frontend apps are pure TypeScript consumers of an HTTP API. They do not need Effect's dependency injection or error handling — they use standard try/catch and API client libraries.
+Effect is deliberately excluded from `apps/web` and `apps/mobile`. The frontend apps are pure TypeScript consumers of an HTTP API. They do not need Effect's dependency injection or error handling. They use standard try/catch and API client libraries.
 
 ## Services and dependency injection
 
@@ -81,7 +81,7 @@ Effect.runPromise(
 )
 ```
 
-This composition happens at the application boundary — in `apps/api` route wiring or `apps/worker` bootstrap. Domain code never sees concrete implementations.
+This composition happens at the application boundary, in `apps/api` route wiring or `apps/worker` bootstrap. Domain code never sees concrete implementations.
 
 ## Typed errors
 

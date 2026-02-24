@@ -9,7 +9,7 @@ This page describes every app and package in the monorepo, their responsibilitie
 
 ## Applications
 
-### `apps/api` — Effect HttpApi Server
+### `apps/api`: Effect HttpApi Server
 
 The API server is built with Effect HttpApi, providing typed REST endpoints for all domain operations. It handles authentication (sign-up, sign-in, JWT token management), CRUD operations for workspaces, tasks, and invitations, OpenAPI spec generation, and request validation using `effect/Schema` contracts.
 
@@ -21,7 +21,7 @@ The API server is built with Effect HttpApi, providing typed REST endpoints for 
 
 The API is the only application that directly uses `packages/db` for persistence. Routes must consume contracts from `packages/contracts` for request and response types. Whenever routes change, the OpenAPI spec must be regenerated with `pnpm openapi:generate`.
 
-### `apps/web` — Client-Only Next.js SPA
+### `apps/web`: Client-Only Next.js SPA
 
 The web application is a strictly client-side Next.js SPA. It communicates with the API server via HTTP and never performs server-side operations. It provides the dashboard UI for workspaces, tasks, and invitations, manages authentication flows (sign-up, sign-in, sign-out), and uses URL-based state management.
 
@@ -46,7 +46,7 @@ The web app operates under strict constraints to preserve its client-only nature
 | No direct `window.location` reads | Must use `lib/url-state.tsx` |
 | Every `.tsx` file starts with `'use client'` | Enforced by lint rules |
 
-### `apps/worker` — Temporal Worker
+### `apps/worker`: Temporal Worker
 
 The worker runs Temporal workflows and activities for background processing. It owns workflow definitions for long-running business processes, activity implementations that interact with domain services, and the worker bootstrap and registration lifecycle.
 
@@ -58,7 +58,7 @@ The worker runs Temporal workflows and activities for background processing. It 
 
 Temporal imposes determinism requirements on workflows: they must not call `Date.now`, `new Date`, or `Math.random`, and must not use native timers like `setTimeout` or `setInterval`. Workflows also must not import infrastructure packages directly. All environment variable reads are centralized in `src/config/env.ts`.
 
-### `apps/mobile` — Expo React Native
+### `apps/mobile`: Expo React Native
 
 The mobile app is a cross-platform Expo React Native client that mirrors the web app's feature set through a native interface. It consumes the same API contract as the web app, using identical request/response schemas from `packages/contracts`, but swaps out the browser-specific transport and storage layers for React Native equivalents.
 
@@ -73,11 +73,11 @@ The mobile app has full integration test coverage including component test suite
 
 ## Packages
 
-### `packages/core` — DDD Domain Slices
+### `packages/core`: DDD Domain Slices
 
-All domain logic lives here, organized by bounded context. Each domain follows the DDD construction pattern with `domain/`, `ports/`, and `application/` directories. No persistence implementations live in this package — those belong in `packages/db/src/repositories/`. See the [DDD Pattern](/docs/architecture/ddd-pattern) page for the full layer breakdown.
+All domain logic lives here, organized by bounded context. Each domain follows the DDD construction pattern with `domain/`, `ports/`, and `application/` directories. No persistence implementations live in this package. Those belong in `packages/db/src/repositories/`. See the [DDD Pattern](/docs/architecture/ddd-pattern) page for the full layer breakdown.
 
-### `packages/db` — Database Layer
+### `packages/db`: Database Layer
 
 Everything related to PostgreSQL lives in this package: Drizzle schema definitions, migrations, repository implementations, effect-schemas for runtime validation, and factories for test data generation.
 
@@ -89,26 +89,26 @@ Everything related to PostgreSQL lives in this package: Drizzle schema definitio
 | `src/factories/` | Test data factories |
 | `drizzle/` | Migration files |
 
-### `packages/contracts` — Shared API Schemas
+### `packages/contracts`: Shared API Schemas
 
 This package holds `effect/Schema` definitions shared between the API server and its consumers. These schemas define the shape of API requests, responses, and domain identifiers, forming the single source of truth for the API contract.
 
-### `packages/auth` — Authentication Primitives
+### `packages/auth`: Authentication Primitives
 
 Password hashing (bcrypt/argon2) and JWT token creation/verification. The API server uses this package for all auth flows.
 
-### `packages/logging` — Structured Logger
+### `packages/logging`: Structured Logger
 
-A structured JSON logger that replaces `console.*` across the codebase. All source modules must use this package for logging — direct `console.*` calls are lint-banned.
+A structured JSON logger that replaces `console.*` across the codebase. All source modules must use this package for logging. Direct `console.*` calls are lint-banned.
 
-### `packages/observability` — OpenTelemetry Bootstrap
+### `packages/observability`: OpenTelemetry Bootstrap
 
 Configures OpenTelemetry tracing and metrics. Provides bootstrap functions for instrumenting the API server and worker at startup.
 
-### `packages/testkit` — Test Utilities
+### `packages/testkit`: Test Utilities
 
 Shared test harnesses, database reset utilities, and integration test helpers used across all apps and packages. This includes the standardized `createDbAuthContext(...)` harness for API integration tests.
 
-### `packages/tooling` — Developer Tooling
+### `packages/tooling`: Developer Tooling
 
 Contains the shared ESLint configuration (including domain invariant rules in `domain-invariants.js`), the scaffold CLI for generating new domains (`pnpm scaffold:crud`), and build tooling configuration.

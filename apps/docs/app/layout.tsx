@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     default: 'tx-agent-kit docs',
   },
   description:
-    'Documentation for tx-agent-kit — an agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.',
+    'Documentation for tx-agent-kit: an agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

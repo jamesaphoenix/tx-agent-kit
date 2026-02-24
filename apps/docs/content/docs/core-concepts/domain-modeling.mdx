@@ -28,7 +28,7 @@ export interface TaskRecord {
 export type TaskStatus = "open" | "in_progress" | "completed" | "cancelled"
 ```
 
-Key conventions for entities: use `readonly` properties to signal immutability intent, use the `*Record` naming convention (e.g., `TaskRecord`, `InvoiceRecord`), define them in `domain/` so `ports/` can import them (port files cannot define interfaces), and use named exports only — default exports are banned in domain files.
+Key conventions for entities: use `readonly` properties to signal immutability intent, use the `*Record` naming convention (e.g., `TaskRecord`, `InvoiceRecord`), define them in `domain/` so `ports/` can import them (port files cannot define interfaces), and use named exports only. Default exports are banned in domain files.
 
 ## Value objects
 
@@ -134,13 +134,13 @@ The domain layer has strict exclusions:
 
 | Excluded | Reason |
 |----------|--------|
-| Database queries | Infrastructure concern — belongs in `packages/db/src/repositories/` |
-| HTTP calls | Infrastructure concern — belongs in `adapters/` |
-| `Date.now()` / `new Date()` | Non-deterministic — inject time as parameter |
-| `Math.random()` | Non-deterministic — inject via ports |
-| `console.log` | Side effect — use `@tx-agent-kit/logging` in outer layers |
-| `process.env` | Configuration — use typed env modules |
+| Database queries | Infrastructure concern. Belongs in `packages/db/src/repositories/` |
+| HTTP calls | Infrastructure concern. Belongs in `adapters/` |
+| `Date.now()` / `new Date()` | Non-deterministic. Inject time as parameter |
+| `Math.random()` | Non-deterministic. Inject via ports |
+| `console.log` | Side effect. Use `@tx-agent-kit/logging` in outer layers |
+| `process.env` | Configuration. Use typed env modules |
 | Effect services | Domain should be plain TypeScript; Effect is for orchestration |
-| Default exports | Convention — named exports only |
+| Default exports | Convention. Named exports only |
 
 By keeping the domain layer pure and minimal, it becomes the most stable and testable part of the codebase.

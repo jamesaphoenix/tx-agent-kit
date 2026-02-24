@@ -13,7 +13,7 @@ Inspired by OpenAI's Harness Engineering post (February 2026), tx-agent-kit enco
 
 **Humans** steer intent, define acceptance criteria, and make architectural decisions. **Agents** implement features, validate correctness, and iterate through mechanical checks. **The repository** is the single source of truth. `CLAUDE.md` and `AGENTS.md` encode taste and constraints so agents can operate autonomously within defined guardrails.
 
-If an agent fails repeatedly, the response is not to micromanage — it is to improve scaffolding: better docs, stricter linters, more tests, smarter scripts.
+If an agent fails repeatedly, the response is not to micromanage. It is to improve scaffolding: better docs, stricter linters, more tests, smarter scripts.
 
 ## What is included
 
@@ -34,7 +34,7 @@ Start with **[Philosophy](/docs/philosophy)** to understand the agent-first thes
 
 ## Design principles
 
-1. **Encode taste in tooling.** If a convention matters, it is enforced by a linter rule, a structural invariant check, or a shell script — not a wiki page.
+1. **Encode taste in tooling.** If a convention matters, it is enforced by a linter rule, a structural invariant check, or a shell script, not a wiki page.
 2. **Inward-only dependencies.** Domain logic never depends on infrastructure. The dependency arrow always points inward.
 3. **Schema-first contracts.** `effect/Schema` is the single validation library. Contracts are shared, typed, and enforced at compile time.
 4. **Deterministic domains.** No `Date.now`, `Math.random`, or side effects in domain code. Everything is injectable and testable.

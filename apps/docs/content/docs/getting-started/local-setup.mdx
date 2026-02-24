@@ -52,7 +52,7 @@ This starts the shared local infrastructure via Docker Compose:
 | Redis | 6379 | Caching and sessions |
 | OTEL Collector | 4317 (gRPC), 4318 (HTTP) | Telemetry pipeline |
 
-The command is idempotent — running it multiple times will not create duplicate containers. It also works correctly across git worktrees, deriving ports from the worktree to avoid collisions.
+The command is idempotent. Running it multiple times will not create duplicate containers. It also works correctly across git worktrees, deriving ports from the worktree to avoid collisions.
 
 ## 5. Start local Temporal runtime
 

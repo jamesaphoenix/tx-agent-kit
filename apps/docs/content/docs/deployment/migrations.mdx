@@ -61,7 +61,7 @@ This creates a new trigger migration file and a corresponding pgTAP test. Trigge
 
 ## Safety considerations
 
-Migrations run in a transaction by default, so a failure rolls back cleanly without leaving partial state. Always test locally before running against staging. The staging environment is the proving ground — run `pnpm deploy:migrate:staging` and verify before touching production. Destructive migrations (dropping columns or tables) should be multi-step: first deploy code that stops using the column, then deploy the migration that drops it.
+Migrations run in a transaction by default, so a failure rolls back cleanly without leaving partial state. Always test locally before running against staging. The staging environment is the proving ground. Run `pnpm deploy:migrate:staging` and verify before touching production. Destructive migrations (dropping columns or tables) should be multi-step: first deploy code that stops using the column, then deploy the migration that drops it.
 
 ## Local development
 

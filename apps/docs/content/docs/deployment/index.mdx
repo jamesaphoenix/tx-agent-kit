@@ -11,10 +11,10 @@ tx-agent-kit deploys staging and production environments using immutable contain
 
 The deployment workflow has four stages:
 
-1. Build images — build and optionally push container images for `api` and `worker`.
-2. Run migrations — apply database schema changes to the target environment.
-3. Deploy with Compose — render secrets, pull images, start services, run smoke checks.
-4. Smoke tests — verify critical API flows are working in the deployed environment.
+1. Build images: build and optionally push container images for `api` and `worker`.
+2. Run migrations: apply database schema changes to the target environment.
+3. Deploy with Compose: render secrets, pull images, start services, run smoke checks.
+4. Smoke tests: verify critical API flows are working in the deployed environment.
 
 ## What gets deployed
 

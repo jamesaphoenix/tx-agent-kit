@@ -35,15 +35,15 @@ export type CreateTaskInput = {
 
 Ports in tx-agent-kit follow strict conventions enforced by structural invariant checks.
 
-Port files must use `export type` instead of `export interface`. This is a mechanical enforcement — the structural invariant script checks for `export interface` in any file under `ports/` and fails the build if found.
+Port files must use `export type` instead of `export interface`. This is a mechanical enforcement. The structural invariant script checks for `export interface` in any file under `ports/` and fails the build if found.
 
 ```typescript
-// WRONG — will fail structural invariant check
+// WRONG - will fail structural invariant check
 export interface TaskRepositoryPort {
   findById(id: string): Effect.Effect<TaskRecord | null>
 }
 
-// CORRECT — use export type
+// CORRECT - use export type
 export type TaskRepositoryPort = {
   readonly findById: (id: string) => Effect.Effect<TaskRecord | null>
 }
@@ -97,14 +97,14 @@ export const makeTaskRepository = (db: DrizzleClient): TaskRepositoryPort => ({
 
 In many hexagonal architecture implementations, adapters live next to the domain. tx-agent-kit takes a different approach: **persistence adapters live in `packages/db/src/repositories/`**.
 
-This decision is deliberate. First, `packages/core` stays free of `drizzle-orm` — if repositories lived in core, core would need a dependency on the database library. Second, all database code is colocated: schema, migrations, repositories, effect-schemas, and factories all live together in `packages/db`. Third, the structural invariant enforces it — the check script verifies that `packages/core/src/domains/*/repositories/` does not exist.
+This decision is deliberate. First, `packages/core` stays free of `drizzle-orm`. If repositories lived in core, core would need a dependency on the database library. Second, all database code is colocated: schema, migrations, repositories, effect-schemas, and factories all live together in `packages/db`. Third, the structural invariant enforces it. The check script verifies that `packages/core/src/domains/*/repositories/` does not exist.
 
 ## Wiring ports to adapters
 
 The connection between abstract ports and concrete adapters happens through Effect's layer system in the application bootstrap:
 
 ```typescript
-// apps/api — layer wiring
+// apps/api - layer wiring
 import { TaskRepository } from "@tx-agent-kit/core/domains/tasks/ports/task-repository.port.js"
 import { makeTaskRepository } from "@tx-agent-kit/db/repositories/task.repository.js"
 

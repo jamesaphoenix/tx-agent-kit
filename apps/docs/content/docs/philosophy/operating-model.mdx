@@ -1,25 +1,25 @@
 ---
 title: Operating Model
-description: How humans and agents collaborate — humans define what and why, agents handle how
+description: How humans and agents collaborate. Humans define what and why, agents handle how
 ---
 
 # Operating Model
 
-tx-agent-kit defines a clear operating model for how humans and agents collaborate. This model is not aspirational — it is the actual workflow the repository is designed to support.
+tx-agent-kit defines a clear operating model for how humans and agents collaborate. This model is not aspirational. It is the actual workflow the repository is designed to support.
 
 ## Roles
 
 ### Humans steer
 
-Humans own the questions that require judgment and context: what should this feature do, what problem does it solve, how do we know it is done, and what edge cases matter. They make architectural decisions — whether to introduce a new domain or extend an existing one — and they perform the final review to verify that the implementation matches their intent. Humans do not need to write implementation code, but they must be able to read it and confirm it aligns with what they asked for.
+Humans own the questions that require judgment and context: what should this feature do, what problem does it solve, how do we know it is done, and what edge cases matter. They make architectural decisions, whether to introduce a new domain or extend an existing one, and they perform the final review to verify that the implementation matches their intent. Humans do not need to write implementation code, but they must be able to read it and confirm it aligns with what they asked for.
 
 ### Agents implement
 
-Agents pick up where intent ends and execution begins. They read the harness — `CLAUDE.md`, the DDD construction pattern, the scaffold CLI — and use it to generate code that follows the golden path for CRUD domains or to write custom logic where the scaffold does not apply. They run `pnpm lint && pnpm type-check && pnpm test`, read the errors when checks fail, fix the code, and re-run until the suite is green. Agents do not make architectural decisions, but they should flag when the current architecture does not support a requested feature.
+Agents pick up where intent ends and execution begins. They read the harness: `CLAUDE.md`, the DDD construction pattern, the scaffold CLI. They use it to generate code that follows the golden path for CRUD domains or to write custom logic where the scaffold does not apply. They run `pnpm lint && pnpm type-check && pnpm test`, read the errors when checks fail, fix the code, and re-run until the suite is green. Agents do not make architectural decisions, but they should flag when the current architecture does not support a requested feature.
 
 ## The system of record
 
-In this model, the repository is the single source of truth. Not a wiki, not a Notion page, not a Slack channel — the repo.
+In this model, the repository is the single source of truth. Not a wiki, not a Notion page, not a Slack channel. The repo.
 
 The key files that encode the system of record:
 
@@ -38,7 +38,7 @@ When a decision changes, it changes in the repo. When a convention is added, it 
 
 External documentation (wikis, Confluence, Google Docs) has a fundamental problem: it drifts from reality. The code changes but the documentation does not get updated. Within weeks, the documentation is misleading. Within months, it is actively harmful.
 
-Repo-local documentation avoids this for four reasons. It lives next to the code, so when you change the code the documentation is right there. It can be mechanically checked — a script can verify that documented commands still work. It is versioned, so you can see when documentation changed and why. And agents can read it, since an agent working in the repo has access to all documentation without needing external API access.
+Repo-local documentation avoids this for four reasons. It lives next to the code, so when you change the code the documentation is right there. It can be mechanically checked. A script can verify that documented commands still work. It is versioned, so you can see when documentation changed and why. And agents can read it, since an agent working in the repo has access to all documentation without needing external API access.
 
 ## Workflow example
 

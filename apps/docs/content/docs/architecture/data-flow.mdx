@@ -33,21 +33,21 @@ This page traces the end-to-end data flow through tx-agent-kit, from a user acti
 
 ### 1. Client sends request
 
-The web app (or mobile app) sends an HTTP request to the API server. The web app uses a typed API client layer generated from the OpenAPI spec — it never uses raw `fetch`.
+The web app (or mobile app) sends an HTTP request to the API server. The web app uses a typed API client layer generated from the OpenAPI spec. It never uses raw `fetch`.
 
 ```typescript
-// apps/web — using generated API hooks
+// apps/web - using generated API hooks
 const { data: tasks } = useListTasks({ workspaceId })
 ```
 
-The request goes directly to `API_BASE_URL` (e.g., `http://localhost:4000`). There is no proxy layer or BFF — the web app is a pure client that communicates with the API over HTTP.
+The request goes directly to `API_BASE_URL` (e.g., `http://localhost:4000`). There is no proxy layer or BFF. The web app is a pure client that communicates with the API over HTTP.
 
 ### 2. API receives and validates
 
 The Effect HttpApi server receives the request, matches it to a route, and validates the input using `effect/Schema` contracts from `packages/contracts`:
 
 ```typescript
-// apps/api — route handler
+// apps/api - route handler
 const CreateTaskRoute = HttpApiEndpoint.post("createTask", "/v1/tasks")
   .setPayload(CreateTaskRequest)   // effect/Schema from packages/contracts
   .addSuccess(TaskResponse)
@@ -76,7 +76,7 @@ The application service calls domain functions for business rule validation, inv
 The repository implementation in `packages/db` translates domain operations into Drizzle queries:
 
 ```typescript
-// packages/db — repository implementation
+// packages/db - repository implementation
 create: (input) => Effect.tryPromise(() =>
   db.insert(tasks).values({
     id: generateId(),
@@ -116,7 +116,7 @@ export const sendInvoiceEmail = async (invoiceId: string) => {
 }
 ```
 
-Workflows are deterministic and durable — they survive worker restarts and can be replayed.
+Workflows are deterministic and durable. They survive worker restarts and can be replayed.
 
 ## Strict boundaries
 

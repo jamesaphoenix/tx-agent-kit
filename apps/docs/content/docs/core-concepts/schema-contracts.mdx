@@ -5,11 +5,11 @@ description: How effect/Schema provides a single validation layer shared across 
 
 # Schema Contracts
 
-tx-agent-kit uses `effect/Schema` as the single validation library across the entire stack. No zod, no joi, no yup — one library for all validation, serialization, and API contracts.
+tx-agent-kit uses `effect/Schema` as the single validation library across the entire stack. No zod, no joi, no yup. One library for all validation, serialization, and API contracts.
 
 ## Why a single validation library
 
-Multiple validation libraries create inconsistencies. Imagine Zod in the API, Yup in the frontend, and manual checks in the worker — each with different behavior for edge cases. Schema definitions get duplicated across packages with subtle differences, and there is no guarantee that what the API validates matches what the consumer expects.
+Multiple validation libraries create inconsistencies. Imagine Zod in the API, Yup in the frontend, and manual checks in the worker, each with different behavior for edge cases. Schema definitions get duplicated across packages with subtle differences, and there is no guarantee that what the API validates matches what the consumer expects.
 
 `effect/Schema` eliminates this by providing a single schema definition that is shared between the API server and its consumers.
 
@@ -49,7 +49,7 @@ These schemas serve multiple purposes:
 
 ## Effect schemas in packages/db
 
-The database layer has its own set of effect schemas in `packages/db/src/effect-schemas/`. These schemas maintain **table-to-schema parity** — every Drizzle table has a corresponding effect schema:
+The database layer has its own set of effect schemas in `packages/db/src/effect-schemas/`. These schemas maintain **table-to-schema parity**: every Drizzle table has a corresponding effect schema:
 
 ```typescript
 // packages/db/src/effect-schemas/task.ts
@@ -86,7 +86,7 @@ The contract schemas handle JSON serialization concerns (dates as strings, neste
 The Effect HttpApi automatically validates requests against contract schemas:
 
 ```typescript
-// apps/api — route definition
+// apps/api - route definition
 const TaskRoutes = HttpApiGroup.make("tasks").pipe(
   HttpApiGroup.add(
     HttpApiEndpoint.post("createTask", "/v1/tasks")
@@ -144,4 +144,4 @@ export const makeTask = (overrides?: Partial<TaskRecord>): TaskRecord => ({
 })
 ```
 
-Factories maintain **table-to-factory parity** — every table has a factory. This is enforced as an architectural invariant.
+Factories maintain **table-to-factory parity**: every table has a factory. This is enforced as an architectural invariant.

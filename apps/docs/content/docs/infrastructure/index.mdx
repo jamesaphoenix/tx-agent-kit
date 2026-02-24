@@ -14,8 +14,6 @@ All backing services run inside Docker containers through a single `docker-compo
 | Service | Port | Purpose |
 |---------|------|---------|
 | PostgreSQL | 5432 | Application database |
-| Temporal Server | 7233 | Workflow orchestration |
-| Temporal UI | 8233 | Temporal dashboard |
 | Redis | 6379 | Caching and session state |
 | OTEL Collector | 4318 (HTTP), 4317 (gRPC) | Telemetry signal routing |
 | Jaeger | 16686 | Distributed trace viewer |
@@ -23,7 +21,11 @@ All backing services run inside Docker containers through a single `docker-compo
 | Grafana | 3001 | Dashboards and visualization |
 | Loki | 3100 | Log aggregation |
 
-The `pnpm infra:ensure` command starts all services idempotently — if they are already running, it exits immediately. Services are health-checked before the command returns.
+The `pnpm infra:ensure` command starts all services idempotently. If they are already running, it exits immediately. Services are health-checked before the command returns.
+
+Temporal runtime is managed separately:
+- Local: `pnpm temporal:dev:up` starts host Temporal CLI (`TEMPORAL_RUNTIME_MODE=cli`).
+- Deployed environments: `TEMPORAL_RUNTIME_MODE=cloud` with Temporal Cloud address/namespace/API key.
 
 ## Application processes (local Node.js)
 
@@ -33,7 +35,7 @@ During development, applications run as local Node.js processes managed by Turbo
 |-------------|---------|-------------|------|
 | API | `apps/api` | Effect HTTP server | 4000 |
 | Web | `apps/web` | Next.js dev server | 3000 |
-| Worker | `apps/worker` | Temporal worker process | — |
+| Worker | `apps/worker` | Temporal worker process | n/a |
 | Mobile | `apps/mobile` | Expo development server | 8081 |
 
 This split is intentional. Infrastructure services are long-lived and shared; application code changes frequently and benefits from fast local reload.
@@ -52,6 +54,9 @@ pnpm env:configure
 
 # Start Docker infrastructure
 pnpm infra:ensure
+
+# Start local Temporal runtime
+pnpm temporal:dev:up
 
 # Run database migrations
 pnpm db:migrate

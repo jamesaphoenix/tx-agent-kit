@@ -43,7 +43,7 @@ These are not suggestions. They are compile-time and lint-time errors. You canno
 
 ## Encoding taste
 
-Every codebase has "taste" — the implicit conventions that experienced engineers enforce through code review. Statements like "we use named exports, not default exports, in domain files" or "we never import from the database package in the web app" or "we always validate at the boundary, not deep in business logic" represent this taste.
+Every codebase has "taste": the implicit conventions that experienced engineers enforce through code review. Statements like "we use named exports, not default exports, in domain files" or "we never import from the database package in the web app" or "we always validate at the boundary, not deep in business logic" represent this taste.
 
 In a traditional project, this taste lives in people's heads. New team members learn it through osmosis and correction. AI agents never learn it because they cannot observe code reviews.
 
@@ -51,7 +51,7 @@ tx-agent-kit **encodes taste in code**. The ESLint config at `packages/tooling/e
 
 ## Benefits beyond agents
 
-This approach pays dividends even without AI agents. New developers get immediate feedback on violations instead of waiting for code review, so onboarding is faster. The architecture cannot drift because the checks run on every commit, keeping the codebase consistent. Code reviewers can focus on logic and intent because structural concerns are already handled, reducing review burden. And the lint rules and invariant scripts themselves serve as living documentation of architectural decisions — the constraints are self-documenting.
+This approach pays dividends even without AI agents. New developers get immediate feedback on violations instead of waiting for code review, so onboarding is faster. The architecture cannot drift because the checks run on every commit, keeping the codebase consistent. Code reviewers can focus on logic and intent because structural concerns are already handled, reducing review burden. And the lint rules and invariant scripts themselves serve as living documentation of architectural decisions. The constraints are self-documenting.
 
 ## The scaffold CLI
 
@@ -61,7 +61,7 @@ Beyond enforcement, tx-agent-kit provides a scaffold CLI that generates correct-
 pnpm scaffold:crud --domain billing --entity invoice --dry-run
 ```
 
-This generates the full DDD slice — domain, ports, application logic, adapters, routes, and tests — following every convention automatically. The generated code passes all lint checks and type checks out of the box.
+This generates the full DDD slice: domain, ports, application logic, adapters, routes, and tests. It follows every convention automatically. The generated code passes all lint checks and type checks out of the box.
 
 The scaffold CLI is the positive complement to enforcement. Enforcement says "you must not do X." The scaffold says "here is the correct way to do Y."
 
