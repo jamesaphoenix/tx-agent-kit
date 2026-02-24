@@ -57,6 +57,14 @@ schema_exists() {
   return 1
 }
 
+collect_active_worktree_names() {
+  git -C "$ROOT_DIR" worktree list --porcelain 2>/dev/null \
+    | awk '/^worktree /{print $2}' \
+    | while IFS= read -r worktree_path; do
+      basename "$worktree_path"
+    done
+}
+
 create_worktree() {
   local branch_name="${1:-}"
   if ! validate_name "$branch_name" "branch name"; then
@@ -80,7 +88,8 @@ create_worktree() {
 
   log_success "Created worktree: worktrees/$branch_name"
   log_info "Port allocation:"
-  get_port_summary "$branch_name" | while IFS= read -r line; do
+  mapfile -t active_worktree_names < <(collect_active_worktree_names)
+  get_port_summary "$branch_name" "${active_worktree_names[@]}" | while IFS= read -r line; do
     printf '  %s\n' "$line"
   done
 
@@ -92,6 +101,7 @@ create_worktree() {
 
 list_worktrees() {
   cd "$ROOT_DIR"
+  mapfile -t active_worktree_names < <(collect_active_worktree_names)
 
   log_info "Active worktrees:"
   git worktree list | while IFS= read -r line; do
@@ -125,7 +135,7 @@ list_worktrees() {
       esac
     fi
 
-    get_port_summary "$name" | while IFS= read -r summary; do
+    get_port_summary "$name" "${active_worktree_names[@]}" | while IFS= read -r summary; do
       printf '  %s\n' "$summary"
     done
   done

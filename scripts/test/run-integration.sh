@@ -72,6 +72,8 @@ fi
 PASSTHROUGH_ARGS=()
 REQUESTED_PROJECT_IDS="${INTEGRATION_PROJECTS:-}"
 REQUEST_SKIP_PGTAP="${INTEGRATION_SKIP_PGTAP:-}"
+REQUEST_DRY_RUN="${INTEGRATION_DRY_RUN:-}"
+REQUESTED_BY_FILTER=0
 
 i=0
 while [[ $i -lt ${#ARGS[@]} ]]; do
@@ -83,6 +85,10 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
     if [[ -z "$matched_ids" ]]; then
       echo "No integration projects matched filter: '$filter'"
       exit 1
+    fi
+    if [[ "$REQUESTED_BY_FILTER" == "0" ]]; then
+      REQUESTED_PROJECT_IDS=""
+      REQUESTED_BY_FILTER=1
     fi
     if [[ -n "$REQUESTED_PROJECT_IDS" ]]; then
       REQUESTED_PROJECT_IDS="$REQUESTED_PROJECT_IDS,$matched_ids"
@@ -105,6 +111,10 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
       echo "No integration projects matched filter: '$filter'"
       exit 1
     fi
+    if [[ "$REQUESTED_BY_FILTER" == "0" ]]; then
+      REQUESTED_PROJECT_IDS=""
+      REQUESTED_BY_FILTER=1
+    fi
     if [[ -n "$REQUESTED_PROJECT_IDS" ]]; then
       REQUESTED_PROJECT_IDS="$REQUESTED_PROJECT_IDS,$matched_ids"
     else
@@ -116,6 +126,12 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
 
   if [[ "$arg" == "--skip-pgtap" ]]; then
     REQUEST_SKIP_PGTAP="1"
+    i=$((i + 1))
+    continue
+  fi
+
+  if [[ "$arg" == "--dry-run" ]]; then
+    REQUEST_DRY_RUN="1"
     i=$((i + 1))
     continue
   fi
@@ -133,6 +149,36 @@ if [[ -n "$REQUEST_SKIP_PGTAP" ]]; then
   export INTEGRATION_SKIP_PGTAP
   INTEGRATION_SKIP_PGTAP="$REQUEST_SKIP_PGTAP"
 fi
+
+if [[ -n "$REQUEST_DRY_RUN" ]]; then
+  echo "Integration runner dry-run summary:"
+  echo "  INTEGRATION_PROJECTS=${INTEGRATION_PROJECTS:-all}"
+  echo "  INTEGRATION_SKIP_PGTAP=${INTEGRATION_SKIP_PGTAP:-0}"
+  if [[ ${#PASSTHROUGH_ARGS[@]} -gt 0 ]]; then
+    echo "  PASSTHROUGH_ARGS=${PASSTHROUGH_ARGS[*]}"
+  else
+    echo "  PASSTHROUGH_ARGS=(none)"
+  fi
+  exit 0
+fi
+
+if [[ "${INTEGRATION_SKIP_INFRA_ENSURE:-0}" != "1" ]]; then
+  echo "Ensuring integration infrastructure..."
+  pnpm infra:ensure
+
+  local_temporal_mode="${TEMPORAL_RUNTIME_MODE:-cli}"
+  if [[ "$local_temporal_mode" == "cli" ]]; then
+    echo "Ensuring local Temporal CLI runtime..."
+    pnpm temporal:dev:up
+  fi
+
+else
+  echo "Skipping infra ensure bootstrap (INTEGRATION_SKIP_INFRA_ENSURE=1)."
+  echo "Observability health validation remains mandatory."
+fi
+
+echo "Verifying observability infrastructure health..."
+pnpm test:infra:observability
 
 echo "Running integration tests..."
 if [[ ${#PASSTHROUGH_ARGS[@]} -gt 0 ]]; then

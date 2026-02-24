@@ -8,6 +8,7 @@ source "$SCRIPT_DIR/run-silent.sh"
 
 FILTER=""
 REQUEST_SKIP_PGTAP="${INTEGRATION_SKIP_PGTAP:-}"
+REQUEST_DRY_RUN="${INTEGRATION_DRY_RUN:-}"
 
 discover_integration_project_map() {
   node "$PROJECT_ROOT/scripts/lib/discover-integration-projects.mjs"
@@ -42,16 +43,6 @@ resolve_project_ids_from_filter() {
 
 echo "Running integration tests (quiet mode, global workspace setup)"
 
-if ! run_silent "infra ensure" "pnpm infra:ensure"; then
-  echo "Integration tests failed"
-  exit 1
-fi
-
-if ! run_silent "observability infra health" "pnpm test:infra:observability"; then
-  echo "Integration tests failed"
-  exit 1
-fi
-
 ARGS=("$@")
 i=0
 while [[ $i -lt ${#ARGS[@]} ]]; do
@@ -84,6 +75,12 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
     continue
   fi
 
+  if [[ "$arg" == "--dry-run" ]]; then
+    REQUEST_DRY_RUN="1"
+    i=$((i + 1))
+    continue
+  fi
+
   if [[ -z "$FILTER" ]]; then
     FILTER="$arg"
     i=$((i + 1))
@@ -93,6 +90,44 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
   echo "Unknown argument: $arg"
   exit 1
 done
+
+if [[ -n "$REQUEST_DRY_RUN" ]]; then
+  if [[ -n "$FILTER" ]]; then
+    if ! project_ids="$(resolve_project_ids_from_filter "$FILTER")"; then
+      echo "No integration projects matched filter: '$FILTER'"
+      exit 1
+    fi
+    echo "Integration quiet runner dry-run summary:"
+    echo "  INTEGRATION_PROJECTS=$project_ids"
+  else
+    echo "Integration quiet runner dry-run summary:"
+    echo "  INTEGRATION_PROJECTS=all"
+  fi
+  echo "  INTEGRATION_SKIP_PGTAP=${REQUEST_SKIP_PGTAP:-0}"
+  exit 0
+fi
+
+if [[ "${INTEGRATION_SKIP_INFRA_ENSURE:-0}" != "1" ]]; then
+  if ! run_silent "infra ensure" "pnpm infra:ensure"; then
+    echo "Integration tests failed"
+    exit 1
+  fi
+
+  if [[ "${TEMPORAL_RUNTIME_MODE:-cli}" == "cli" ]]; then
+    if ! run_silent "temporal cli ensure" "pnpm temporal:dev:up"; then
+      echo "Integration tests failed"
+      exit 1
+    fi
+  fi
+else
+  echo "Skipping infra ensure bootstrap (INTEGRATION_SKIP_INFRA_ENSURE=1)"
+  echo "Observability health check remains mandatory"
+fi
+
+if ! run_silent "observability infra health" "pnpm test:infra:observability"; then
+  echo "Integration tests failed"
+  exit 1
+fi
 
 env_prefix_cmd=""
 if [[ -n "$REQUEST_SKIP_PGTAP" ]]; then
