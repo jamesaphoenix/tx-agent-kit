@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "turbo run dev --parallel",
+    "dev": "bash -lc 'set -a; [[ -f ./.env ]] && source ./.env; set +a; pnpm infra:ensure; pnpm temporal:dev:up; exec turbo run dev --parallel'",
     "dev:web": "turbo run dev --filter=@tx-agent-kit/web",
     "dev:api": "turbo run dev --filter=@tx-agent-kit/api",
     "dev:worker": "turbo run dev --filter=@tx-agent-kit/worker",
@@ -37,6 +37,9 @@
     "test:run-silent": "./scripts/test-run-silent.sh",
     "verify:temporal-types": "tsx ./scripts/verify-temporal-types.ts",
     "test:temporal-types": "vitest run -c scripts/vitest.config.ts",
+    "test:temporal:integration": "./scripts/test/run-temporal-integration.sh",
+    "test:temporal:cloud:integration": "./scripts/test/run-temporal-cloud-integration.sh",
+    "test:dev:hot-reload": "./scripts/test/dev-hot-reload.sh",
     "mcp:prometheus": "./scripts/mcp/prometheus.sh",
     "mcp:jaeger": "./scripts/mcp/jaeger.sh",
     "mcp:context7": "./scripts/mcp/context7.sh",
@@ -47,6 +50,9 @@
     "infra:ensure": "./scripts/start-dev-services.sh",
     "infra:up": "./scripts/start-dev-services.sh",
     "infra:down": "docker compose -p tx-agent-kit down -v",
+    "temporal:dev:up": "./scripts/temporal/start-dev.sh",
+    "temporal:dev:down": "./scripts/temporal/stop-dev.sh",
+    "temporal:dev:status": "./scripts/temporal/status.sh",
     "worktree:ports": "./scripts/worktree/derive-ports.sh",
     "db:migrate": "pnpm --filter @tx-agent-kit/db db:migrate",
     "db:trigger:new": "node ./scripts/tx-cli.mjs db:trigger:new",
@@ -62,7 +68,8 @@
     "deploy:gcp:toy:bootstrap": "./scripts/deploy/gcp/bootstrap-toy-project.sh",
     "deploy:gcp:toy:teardown": "./scripts/deploy/gcp/teardown-toy-project.sh",
     "test:gcp:e2e": "./scripts/deploy/gcp/test-e2e.sh",
-    "test:gcp:e2e:teardown": "./scripts/deploy/gcp/teardown-toy-project.sh"
+    "test:gcp:e2e:teardown": "./scripts/deploy/gcp/teardown-toy-project.sh",
+    "sync:agent-docs": "./scripts/sync-agent-docs.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

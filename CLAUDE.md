@@ -1,6 +1,18 @@
-# tx-agent-kit Claude Guide
+# tx-agent-kit
+
+Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.
 
 This repository uses an agent-first workflow inspired by OpenAI's Harness Engineering post (February 11, 2026).
+
+## Repo Map
+- Architecture: `docs/ARCHITECTURE.md`
+- Quality + lint invariants: `docs/QUALITY.md`
+- Runbooks: `docs/RUNBOOKS.md`
+- Command catalog: `docs/COMMANDS.md`
+- API contract: `apps/api/openapi.json` (generated via `pnpm openapi:generate`)
+- MCP wrappers: `scripts/mcp/*` and project MCP map `.mcp.json`
+- Skills: `.claude/skills/*`
+- Golden-path CRUD skill (Codex + Claude): `skills/golden-path-crud/SKILL.md`
 
 ## Operating Model
 - Humans steer intent and acceptance criteria.
@@ -83,6 +95,23 @@ Golden path for CRUD domain setup:
 5. Expose API behavior from `apps/api`, then regenerate OpenAPI.
 6. Regenerate web API hooks from OpenAPI when API contract changes.
 7. Run `pnpm lint && pnpm type-check && pnpm test`.
+
+## DB + Schema Contract
+When adding a table in `packages/db/src/schema.ts`:
+1. Add matching file in `packages/db/src/effect-schemas/<table-name>.ts`.
+2. Export `*RowSchema` and `*RowShape` from that file.
+3. Re-export it in `packages/db/src/effect-schemas/index.ts`.
+4. Add matching factory file in `packages/db/src/factories/<table-name>.factory.ts`.
+5. Re-export the factory in `packages/db/src/factories/index.ts`.
+6. If you add a DB trigger, add pgTAP coverage that references the trigger name (`packages/db/pgtap/*.pgtap.sql`).
+
+## Route + Repository Kind Contract
+- In `packages/core/src/domains/*/ports/*.ts`, declare:
+  - `export const <Name>RepositoryKind = 'crud' | 'custom' as const`
+- In `apps/api/src/routes/*.ts` and `apps/api/src/domains/*/routes/*.ts`, declare:
+  - `export const <Name>RouteKind = 'crud' | 'custom' as const`
+- If kind is `crud`, expose full CRUD surface (`list/getById/create/update/remove`).
+- If kind is `custom`, do not expose full CRUD surface.
 
 ## Mechanical Enforcement
 - ESLint restrictions live in `packages/tooling/eslint-config/domain-invariants.js`.
