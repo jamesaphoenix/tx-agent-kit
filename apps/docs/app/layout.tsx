@@ -36,7 +36,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="flex min-h-screen flex-col">
         <Banner id="tx-docs-promo" variant="rainbow">
           <span className="font-medium">
-            Built by the team behind tx
+            Built by the creator of tx
             <span className="mx-2 opacity-50">|</span>
             Primitives for memory, tasks &amp; orchestration
             <a
