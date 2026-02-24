@@ -1,0 +1,147 @@
+# tx-agent-kit
+
+> Agent-first TypeScript monorepo. You tell the agent what to build. The agent builds it. The repo makes sure it's built right.
+
+Production starter with Effect HTTP, Temporal, Next.js, Drizzle, and Expo. 50+ mechanical invariants enforced by lint rules, structural scripts, and shell checks. Every architectural decision is a build error, not a code review comment.
+
+## Docs site
+
+Full documentation: https://agentkit.txdocs.dev
+Agent-consumable docs: https://agentkit.txdocs.dev/llms.txt
+Extended docs: https://agentkit.txdocs.dev/llms-full.txt
+
+
+## Repo orientation
+
+CLAUDE.md — Agent operating guide (constraints, DDD pattern, workflow, enforcement)
+AGENTS.md — Symlink to CLAUDE.md (both agent runtimes read the same file)
+docs/ARCHITECTURE.md — System architecture and boundaries
+docs/QUALITY.md — All enforced invariants with rationale
+docs/COMMANDS.md — Every pnpm script, organized by purpose
+docs/RUNBOOKS.md — Operational procedures
+docs/DEPLOYMENT.md — Build, migrate, deploy, smoke test
+apps/api/openapi.json — Generated OpenAPI spec (source of truth for API contract)
+
+
+## Stack
+
+apps/api — Effect HttpApi server. Auth, workspaces, tasks, invitations. Generates its own OpenAPI spec.
+apps/web — Client-only Next.js SPA. No server code, no Effect, no Drizzle. Typed API clients only.
+apps/worker — Temporal worker. Deterministic workflows, activities handle side effects.
+apps/mobile — Expo React Native. Same API, same contracts as web.
+apps/docs — Fumadocs documentation site (port 3002).
+packages/core — DDD domain slices under packages/core/src/domains/<domain>/. Business logic lives here.
+packages/db — Drizzle schema, repositories, migrations, pgTAP tests. Only package that imports drizzle-orm.
+packages/contracts — Shared API schemas using effect/Schema. Single source of truth for validation.
+packages/auth — Password hashing and JWT. Thin on purpose.
+packages/logging — Structured JSON logger. console.* is lint-banned everywhere.
+packages/observability — OpenTelemetry bootstrap. Traces, metrics, logs via OTLP.
+packages/testkit — Integration harnesses, lock-guarded runners, DB reset helpers.
+packages/tooling — ESLint configs, domain invariant rules, scaffold CLI.
+
+
+## Prerequisites
+
+Node.js 22+, pnpm 10+, Docker Desktop 24+, Temporal CLI. 1Password CLI optional (deploy only).
+
+
+## Quickstart
+
+pnpm install
+pnpm env:configure
+pnpm infra:ensure
+pnpm temporal:dev:up
+pnpm db:migrate
+pnpm dev
+
+
+## Local endpoints
+
+Web: http://localhost:3000
+API: http://localhost:4000
+Docs: http://localhost:3002
+Temporal UI: http://localhost:8233
+Prometheus: http://localhost:9090
+Jaeger: http://localhost:16686
+Grafana: http://localhost:3001
+
+
+## Key constraints
+
+Validation: effect/Schema only. Zod is banned.
+Logging: console.* is banned. Use @tx-agent-kit/logging.
+Persistence: only packages/db imports drizzle-orm.
+Web boundary: apps/web never imports DB, Effect, or server modules. Every .tsx starts with 'use client'.
+Domain determinism: no Date.now, new Date, or Math.random in domain code. Inject via ports.
+Temporal determinism: no native timers, no infra imports inside workflows.
+Kind markers: routes and repositories declare crud or custom. Enforced by structural checks.
+Type safety: as any, chained assertions, and suppression directives are banned in source.
+Test colocation: use file.test.ts and file.integration.test.ts. No __tests__/ dirs or .spec.ts files.
+Env governance: source modules read env through dedicated env modules, never process.env directly.
+
+
+## DDD pattern
+
+packages/core/src/domains/<domain>/
+  domain/       — Entities, value objects, pure rules
+  ports/        — Interfaces and capability contracts
+  application/  — Use-case orchestration
+  adapters/     — Port implementations
+  runtime/      — Layer wiring (optional)
+
+Dependencies point inward: domain <- ports <- application <- adapters <- runtime.
+
+
+## Golden path (new feature)
+
+pnpm scaffold:crud --domain <name> --entity <name> --dry-run
+pnpm scaffold:crud --domain <name> --entity <name>
+Add contracts in packages/contracts with effect/Schema.
+Add domain logic in packages/core/src/domains/<name>/.
+Update packages/db/src/schema.ts + matching effect-schemas/ and factories/.
+Expose routes in apps/api, run pnpm openapi:generate.
+Regenerate clients: pnpm api:client:generate.
+Validate: pnpm lint && pnpm type-check && pnpm test.
+
+
+## Enforcement layers
+
+ESLint: packages/tooling/eslint-config/domain-invariants.js — Import bans, pattern bans, boundary rules.
+Structural: scripts/lint/enforce-domain-invariants.mjs — Table parity, kind consistency, folder structure.
+Shell: scripts/check-shell-invariants.sh — Env governance, integration baselines.
+Gate: pnpm lint runs all three layers. Failure blocks merge.
+
+
+## Quality gates
+
+pnpm lint              # ESLint + structural + shell invariants
+pnpm type-check        # TypeScript compilation
+pnpm test              # Unit tests (Vitest)
+pnpm test:integration  # Integration tests (lock-guarded, idempotent DB reset)
+pnpm test:db:pgtap     # Database trigger contract tests
+
+Quiet variants (pnpm lint:quiet, test:quiet, etc.) reduce output for agent workflows.
+
+
+## Infrastructure
+
+Docker Compose runs: PostgreSQL (5432), Redis (6379), OTEL Collector (4318), Prometheus (9090), Jaeger (16686), Grafana (3001), Loki (3100).
+Temporal CLI runs as a standalone process on port 7233.
+pnpm infra:ensure is idempotent. pnpm temporal:dev:up is idempotent.
+Worktrees get collision-free ports via pnpm worktree:ports <name>.
+
+
+## Deployment
+
+pnpm deploy:build-images — Immutable containers, digest-pinned.
+pnpm deploy:migrate:staging — Drizzle migrations via 1Password.
+pnpm deploy:staging — op inject, docker compose up, smoke test.
+pnpm deploy:smoke — Health, auth, CRUD, idempotency verification.
+
+
+## API reference
+
+Four endpoint groups: Auth (/v1/auth/*), Workspaces (/v1/workspaces/*), Tasks (/v1/tasks/*), Invitations (/v1/invitations/*).
+Bearer JWT auth on all routes except sign-up, sign-in, and /health.
+Cursor-based pagination on list endpoints.
+Full spec: apps/api/openapi.json.
