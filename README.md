@@ -13,7 +13,7 @@ Agent-first TypeScript monorepo for building scalable apps with Effect, Temporal
 - `packages/contracts`: Shared contracts and `effect/Schema` definitions.
 - `packages/auth`: Password/JWT primitives.
 - `packages/observability`: OpenTelemetry bootstrap utilities.
-- `monitoring/local`: Prometheus, Jaeger, Grafana, OTel collector, Temporal local stack.
+- `monitoring/local`: Prometheus, Jaeger, Grafana, and OTel collector for local infra.
 
 ## Invariants
 - Web is API-first and never queries Postgres directly.
@@ -27,15 +27,35 @@ Agent-first TypeScript monorepo for building scalable apps with Effect, Temporal
 - Routes and repositories must declare explicit kind markers (`crud` vs `custom`) and keep kind intent consistent.
 
 ## Prerequisites
-- Node.js `>=22`
-- pnpm `10.x`
-- Docker (for infra and MCP Prometheus server)
+
+This is an opinionated stack. The toolchain below is required, not optional.
+
+| Tool | Version | Install |
+|------|---------|---------|
+| **Node.js** | 22+ | [nodejs.org](https://nodejs.org) |
+| **pnpm** | 10+ | `corepack enable && corepack prepare pnpm@latest --activate` |
+| **Docker Desktop** | 24+ | [docker.com](https://www.docker.com/products/docker-desktop/) |
+| **Temporal CLI** | Latest | `brew install temporal` or [docs.temporal.io/cli](https://docs.temporal.io/cli) |
+
+**Optional (for staging/production deploys):**
+| Tool | Version | Install |
+|------|---------|---------|
+| **1Password CLI** (`op`) | 2.x | [1password.com/downloads/command-line](https://1password.com/downloads/command-line/) |
+
+Verify:
+```bash
+node --version      # v22+
+pnpm --version      # 10+
+docker --version    # 24+
+temporal version    # any recent
+```
 
 ## Quickstart
 ```bash
 pnpm install
 pnpm env:configure
 pnpm infra:ensure
+pnpm temporal:dev:up
 pnpm db:migrate
 pnpm dev
 ```
@@ -43,7 +63,7 @@ pnpm dev
 ## Local Endpoints
 - Web: `http://localhost:3000`
 - API: `http://localhost:4000`
-- Temporal UI: `http://localhost:8233`
+- Temporal CLI status: `pnpm temporal:dev:status`
 - Prometheus: `http://localhost:9090`
 - Jaeger UI: `http://localhost:16686`
 - Loki: `http://localhost:3100`
@@ -52,6 +72,9 @@ pnpm dev
 ## Common Commands
 ```bash
 pnpm dev                 # run web + api + worker
+pnpm temporal:dev:up     # start local Temporal CLI (mode=cli)
+pnpm temporal:dev:down   # stop local Temporal CLI
+pnpm temporal:dev:status # inspect local Temporal CLI health
 pnpm dev:web             # web only
 pnpm dev:mobile          # mobile only
 pnpm dev:api             # api only
@@ -65,6 +88,9 @@ pnpm test
 pnpm test:quiet
 pnpm test:integration
 pnpm test:integration:quiet
+pnpm test:temporal:integration        # opt-in Temporal integration lane (not default integration)
+pnpm test:temporal:cloud:integration  # opt-in Temporal Cloud lane (requires guards/creds)
+pnpm test:dev:hot-reload              # opt-in hot-reload smoke (web/api/mobile/worker)
 pnpm openapi:generate
 pnpm api:client:generate
 pnpm mobile:generate:api
@@ -78,25 +104,29 @@ pnpm infra:ensure
 pnpm infra:down
 pnpm worktree:ports feature-my-branch
 pnpm test:run-silent
+pnpm tx --help
+pnpm tx db trigger new --name normalize-project-email --table invitations --timing BEFORE --events INSERT,UPDATE
+pnpm db:trigger:new --name normalize-project-email --table invitations --timing BEFORE --events INSERT,UPDATE
 pnpm scaffold:crud --domain billing --entity invoice --dry-run
-pnpm scaffold:crud --domain billing --entity invoice
+pnpm scaffold:crud --domain billing --entity invoice --with-db
 ```
 
-## Docker Profiles
+## Docker (Local Infra Only)
 ```bash
 docker compose -p tx-agent-kit --profile infra up -d
-docker compose -p tx-agent-kit --profile infra --profile app up --build
 docker compose -p tx-agent-kit down -v
 ```
 
-`infra` brings up Postgres, Temporal, Jaeger, Prometheus, Grafana, and OTel Collector.  
-`app` builds and runs API and worker containers.
-Local development still defaults to `pnpm dev` (web + api + worker as local processes) while reusing shared Docker infra.
+`infra` brings up Postgres, Redis, Jaeger, Prometheus, Grafana, and OTel Collector.
+Local development runs `web + api + worker` as hot-reloading local processes (`pnpm dev`) while reusing shared Docker infra and local Temporal CLI.
+Staging/production app containers (`api`, `worker`) are deployed via `docker-compose.staging.yml` / `docker-compose.prod.yml`.
 
 ## Worktrees + Idempotent Integration Tests
 - Infrastructure is shared across worktrees with a fixed compose project: `tx-agent-kit`.
-- Deterministic worktree port offsets include `WEB_PORT`, `API_PORT`, `MOBILE_PORT`, and `WORKER_INSPECT_PORT` via `pnpm worktree:ports <name>`.
+- Collision-aware deterministic worktree port offsets include `WEB_PORT`, `API_PORT`, `MOBILE_PORT`, and `WORKER_INSPECT_PORT` via `pnpm worktree:ports <name>`.
+- Worktree setup writes `TEMPORAL_TASK_QUEUE=tx-agent-kit-<worktree-name>` so local workers do not contend on the same queue.
 - `pnpm infra:ensure` is idempotent: it checks health first, only starts missing services, and never tears down containers.
+- Override infra readiness timeout when needed: `INFRA_READY_TIMEOUT_SECONDS=300 pnpm infra:ensure`.
 - `pnpm test:integration` is idempotent: it runs one Vitest workspace integration run with global setup (infra + DB reset + pgTAP once).
 - Select subset projects with `INTEGRATION_PROJECTS=web` or `INTEGRATION_PROJECTS=api,testkit`.
 - Unit and integration workers default to host CPU parallelism.

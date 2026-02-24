@@ -7,24 +7,48 @@ description: Prerequisites and quick overview for setting up tx-agent-kit
 
 This section walks you through setting up tx-agent-kit for local development, from prerequisites to running your first domain scaffold.
 
+## Opinionated stack
+
+tx-agent-kit is deliberately opinionated. It picks one tool per concern and enforces that choice mechanically through linters, structural checks, and shell invariants. This means the prerequisites are non-negotiable: you need the exact toolchain below, not alternatives.
+
+| Concern | Choice | Why |
+|---------|--------|-----|
+| Runtime | Node.js 22+ | Native ESM, `--watch`, stable `fetch` |
+| Package manager | pnpm 10+ | Workspace protocol, strict hoisting, lockfile |
+| Containers | Docker Desktop | Postgres, Redis, OTEL Collector, Prometheus, Jaeger, Grafana run as local infra |
+| Workflows | Temporal CLI | Local dev server for durable workflows (`temporal server start-dev`) |
+| Backend framework | Effect | Typed errors, dependency injection, HttpApi |
+| ORM | Drizzle | SQL-first migrations, typed schema, Studio UI |
+| Validation | effect/Schema | Shared contracts across API, web, and mobile (zod is banned) |
+| Frontend | Next.js 16 | Client-only SPA, no SSR, no API routes |
+| Mobile | Expo | React Native with shared contracts |
+| Secrets (deploy) | 1Password CLI | `op://` references in deploy templates; not required for local dev |
+
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
+### Required for local development
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| **Node.js** | 22+ | JavaScript runtime |
-| **pnpm** | 10+ | Package manager (monorepo workspaces) |
-| **Docker** | Latest | Local infrastructure (Postgres, Temporal, Redis, OTEL) |
-| **1Password CLI** (`op`) | Latest | Secrets management (no plaintext `.env` in git) |
+| Tool | Version | Install | Purpose |
+|------|---------|---------|---------|
+| **Node.js** | 22+ | [nodejs.org](https://nodejs.org) | JavaScript runtime |
+| **pnpm** | 10+ | `corepack enable && corepack prepare pnpm@latest --activate` | Monorepo package manager |
+| **Docker Desktop** | 24+ | [docker.com](https://www.docker.com/products/docker-desktop/) | Local infra (Postgres, Redis, monitoring stack) |
+| **Temporal CLI** | Latest | `brew install temporal` or [docs.temporal.io/cli](https://docs.temporal.io/cli) | Local workflow dev server |
+
+### Optional (for staging/production deploys)
+
+| Tool | Version | Install | Purpose |
+|------|---------|---------|---------|
+| **1Password CLI** (`op`) | 2.x | [1password.com/downloads/command-line](https://1password.com/downloads/command-line/) | Resolve `op://` secrets for deploy templates |
+| **Vercel CLI** | Latest | `npm i -g vercel` | Deploy docs site and previews |
 
 ### Verify your setup
 
 ```bash
-node --version    # v22.x.x or higher
-pnpm --version    # 10.x.x or higher
-docker --version  # Docker Engine 24+ recommended
-op --version      # 1Password CLI 2.x
+node --version      # v22.x.x or higher
+pnpm --version      # 10.x.x or higher
+docker --version    # Docker Engine 24+ recommended
+temporal version    # Temporal CLI (any recent version)
 ```
 
 ## Quick overview
@@ -38,6 +62,7 @@ tx-agent-kit/
     web/        # Next.js client-only SPA (port 3000)
     worker/     # Temporal worker + workflows
     mobile/     # Expo React Native app
+    docs/       # Fumadocs documentation site (port 3002)
   packages/
     core/       # DDD domain slices
     db/         # Drizzle schema, migrations, repositories
@@ -49,16 +74,19 @@ tx-agent-kit/
     tooling/    # ESLint configs, scaffold CLI
 ```
 
-Local infrastructure runs in Docker via `docker-compose.yml`:
+Local infrastructure runs in Docker via `docker-compose.yml`, while Temporal runs as a standalone CLI process:
 
-| Service | Role |
-|---------|------|
-| PostgreSQL | Primary database |
-| Temporal | Workflow orchestration (server + UI) |
-| Redis | Caching and session store |
-| OpenTelemetry Collector | Traces and metrics pipeline |
+| Service | Port | Role |
+|---------|------|------|
+| PostgreSQL | 5432 | Primary database |
+| Temporal CLI | 7233 (gRPC), 8233 (UI) | Workflow orchestration |
+| Redis | 6379 | Caching and session store |
+| OTEL Collector | 4317 (gRPC), 4318 (HTTP) | Traces and metrics pipeline |
+| Prometheus | 9090 | Metrics storage and queries |
+| Jaeger | 16686 | Distributed tracing UI |
+| Grafana | 3001 | Dashboards and log exploration |
 
 ## Next steps
 
-1. [Local Setup](/docs/getting-started/local-setup) — Clone, install, configure, and run the full stack.
-2. [First Domain](/docs/getting-started/first-domain) — Create a new domain using the scaffold CLI.
+1. [Local Setup](/docs/getting-started/local-setup) to clone, install, configure, and run the full stack.
+2. [First Domain](/docs/getting-started/first-domain) to create a new domain using the scaffold CLI.
