@@ -1,0 +1,57 @@
+---
+title: Architecture Overview
+description: High-level architecture of the tx-agent-kit monorepo
+---
+
+# Architecture Overview
+
+tx-agent-kit is a pnpm monorepo organized into two top-level directories: `apps/` for deployable applications and `packages/` for shared libraries.
+
+## Applications
+
+Four applications target different runtime environments:
+
+| App | Technology | Port | Purpose |
+|-----|-----------|------|---------|
+| `apps/api` | Effect HttpApi | 4000 | REST API server for auth, workspaces, tasks, invitations |
+| `apps/web` | Next.js | 3000 | Client-only SPA dashboard |
+| `apps/worker` | Temporal | — | Background workflow execution |
+| `apps/mobile` | Expo React Native | — | Cross-platform mobile client |
+
+Each app has a strict responsibility boundary. The API serves HTTP endpoints and orchestrates domain logic; it is the only app that touches the database. The web app is a pure client-side SPA that never queries the database, never runs server-side code, and never imports Effect. The worker runs Temporal workflows for background processing, and all workflows must be deterministic. The mobile app is an Expo project sharing the same API client patterns as the web app.
+
+## Packages
+
+Shared packages provide domain logic, infrastructure, and tooling:
+
+| Package | Purpose |
+|---------|---------|
+| `packages/core` | DDD domain slices (entities, ports, application logic) |
+| `packages/db` | Drizzle schema, migrations, repositories, effect-schemas, factories |
+| `packages/contracts` | Shared API schemas using `effect/Schema` |
+| `packages/auth` | Password hashing and JWT token primitives |
+| `packages/logging` | Structured JSON logger (replaces `console.*`) |
+| `packages/observability` | OpenTelemetry bootstrap and instrumentation |
+| `packages/testkit` | Shared test utilities and harness code |
+| `packages/tooling` | ESLint configs, scaffold CLI, build tooling |
+
+## Key architectural decisions
+
+1. **Effect for the backend, vanilla for the frontend.** The API and worker use Effect for dependency injection, error handling, and service composition. The web app is deliberately Effect-free to keep the frontend simple.
+
+2. **Schema as the contract layer.** `effect/Schema` is the single validation library across the entire stack. No zod, no joi, no yup. Contracts in `packages/contracts` are shared between the API and its consumers.
+
+3. **DDD in packages/core.** Domain logic lives in `packages/core/src/domains/<domain>/` following the domain-driven design pattern. Persistence implementations live in `packages/db/src/repositories/`.
+
+4. **Inward-only dependencies.** Domain code never depends on infrastructure. The dependency arrow always points inward, from concrete to abstract.
+
+5. **Mechanical enforcement.** Every architectural constraint is enforced by ESLint rules, structural invariant checks, or shell scripts. `pnpm lint` verifies all constraints.
+
+## Explore further
+
+| Page | What it covers |
+|------|---------------|
+| [Monorepo Structure](/docs/architecture/monorepo-structure) | Detailed breakdown of every app and package |
+| [DDD Pattern](/docs/architecture/ddd-pattern) | How domain-driven design is implemented |
+| [Dependency Flow](/docs/architecture/dependency-flow) | The rules governing what can import what |
+| [Data Flow](/docs/architecture/data-flow) | End-to-end request lifecycle from client to database and back |

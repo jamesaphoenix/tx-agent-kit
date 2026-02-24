@@ -1,0 +1,94 @@
+---
+title: Your First Domain
+description: Walk through creating a new domain using the scaffold CLI
+---
+
+# Your First Domain
+
+The fastest way to add a new feature to tx-agent-kit is the scaffold CLI. It generates a complete DDD slice — domain types, ports, application logic, adapters, routes, and tests — following every convention and passing all lint checks out of the box.
+
+## Step 1: Dry run
+
+Always start with a dry run to see what will be generated:
+
+```bash
+pnpm scaffold:crud --domain billing --entity invoice --dry-run
+```
+
+This prints the list of files that would be created without actually writing anything. Review the output to confirm the domain and entity names are correct.
+
+Example output:
+
+```
+Would create:
+  packages/core/src/domains/billing/domain/invoice.ts
+  packages/core/src/domains/billing/ports/invoice-repository.port.ts
+  packages/core/src/domains/billing/application/invoice.service.ts
+  packages/contracts/src/billing/invoice.ts
+  packages/db/src/effect-schemas/invoice.ts
+  packages/db/src/factories/invoice.factory.ts
+  packages/db/src/repositories/invoice.repository.ts
+  apps/api/src/routes/billing/invoice.routes.ts
+  apps/api/src/routes/billing/invoice.routes.test.ts
+  ... and more
+```
+
+## Step 2: Generate
+
+Once you are satisfied with the dry run, generate the files:
+
+```bash
+pnpm scaffold:crud --domain billing --entity invoice
+```
+
+This creates the full DDD slice across multiple packages:
+
+### What gets generated
+
+| Layer | Location | Contents |
+|-------|----------|----------|
+| Domain | `packages/core/src/domains/billing/domain/` | Entity types with branded IDs, value objects, pure domain rules (named exports only) |
+| Ports | `packages/core/src/domains/billing/ports/` | Repository port defining the persistence interface, importing record types from `domain/` |
+| Application | `packages/core/src/domains/billing/application/` | Service implementing CRUD use cases, depending only on ports |
+| Contracts | `packages/contracts/src/billing/` | `effect/Schema` definitions for API request/response types, shared between API and consumers |
+| Database | `packages/db/` | Effect schema aligned with Drizzle table, factory for test data, repository implementing the port |
+| API routes | `apps/api/src/routes/billing/` | Effect HttpApi route handlers for CRUD operations, plus integration test file |
+
+## Step 3: Customize
+
+The scaffold generates a working CRUD slice, but your domain likely needs customization:
+
+1. Add domain-specific fields to the entity in `domain/invoice.ts`
+2. Add the database columns to the Drizzle schema in `packages/db/src/schema.ts`
+3. Update the effect schema in `packages/db/src/effect-schemas/invoice.ts` to match
+4. Update the factory in `packages/db/src/factories/invoice.factory.ts`
+5. Add domain rules as pure functions in the domain layer
+6. Extend the API contract in `packages/contracts/src/billing/invoice.ts`
+
+Remember the hard constraints: domain code must be pure (no `Date.now`, `Math.random`, or side effects), port files must not contain `export interface` (import record types from `domain/`), only `effect/Schema` is allowed for validation (no zod), and domain files use named exports only.
+
+## Step 4: Validate
+
+Run the full check suite to verify everything is correct:
+
+```bash
+pnpm lint && pnpm type-check && pnpm test
+```
+
+If you modified the API contract, regenerate the OpenAPI spec and web client:
+
+```bash
+pnpm openapi:generate    # Regenerate apps/api/openapi.json
+pnpm api:client:generate # Regenerate web API hooks from spec
+```
+
+If you added database columns, create and run a migration:
+
+```bash
+pnpm db:generate   # Generate a Drizzle migration
+pnpm db:migrate    # Apply the migration
+```
+
+## The golden path
+
+This workflow — scaffold, customize, validate — is the golden path for adding new domains. It ensures every new domain follows the DDD construction pattern, all architectural invariants are satisfied from the start, boilerplate is handled by the scaffold (letting you focus on domain logic), and the feedback loop stays fast: generate, customize, check, iterate.

@@ -1,0 +1,101 @@
+---
+title: Git Worktrees
+description: Parallel development with deterministic port allocation and isolated database schemas
+---
+
+# Git Worktrees
+
+tx-agent-kit supports parallel development through git worktrees. Each worktree gets deterministic port assignments and an isolated database schema, while sharing the same Docker infrastructure containers.
+
+## How it works
+
+When you create a git worktree, the setup script:
+
+1. Ensures Docker infrastructure is running via `infra:ensure`.
+2. Creates a dedicated PostgreSQL schema for the worktree (e.g., `wt_feature_auth`).
+3. Derives deterministic, collision-free port numbers from the worktree name.
+4. Writes all port assignments and environment overrides to the worktree's `.env` file.
+
+## Deriving ports
+
+```bash
+pnpm worktree:ports <worktree-name>
+```
+
+This outputs deterministic port assignments based on a hash of the worktree name:
+
+```
+WEB_PORT=3142
+API_PORT=4142
+MOBILE_PORT=8223
+WORKER_INSPECT_PORT=9371
+GRAFANA_PORT=3143
+PROMETHEUS_PORT=9232
+WORKTREE_PORT_OFFSET=142
+```
+
+The port offset is derived from the first 4 hex characters of an MD5/SHA hash of the worktree name, mapped to a range of 100–1099. This ensures that different worktree names consistently produce different port offsets while remaining within a predictable range.
+
+Active worktrees are detected via `git worktree list`, and the allocation algorithm resolves collisions by incrementing the offset until a free slot is found.
+
+## Setting up a worktree
+
+```bash
+# Create a git worktree
+git worktree add ../<worktree-name> -b feature/<branch-name>
+
+# Run the setup script
+scripts/worktree/setup.sh ../<worktree-name>
+```
+
+The setup script writes the following keys to the worktree `.env`:
+
+| Key | Example value |
+|-----|---------------|
+| `WORKTREE_PORT_OFFSET` | `142` |
+| `WEB_PORT` | `3142` |
+| `API_PORT` | `4142` |
+| `MOBILE_PORT` | `8223` |
+| `WORKER_INSPECT_PORT` | `9371` |
+| `TEMPORAL_TASK_QUEUE` | `tx-agent-kit-feature-auth` |
+| `API_BASE_URL` | `http://localhost:4142` |
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:4142` |
+| `EXPO_PUBLIC_API_BASE_URL` | `http://localhost:4142` |
+| `DATABASE_URL` | `postgresql://...?options=-c search_path=wt_feature_auth,public` |
+| `DATABASE_SCHEMA` | `wt_feature_auth` |
+
+## Shared infrastructure
+
+All worktrees share the same Docker containers. The `docker-compose.yml` project name is pinned to `tx-agent-kit`, so `pnpm infra:ensure` from any worktree connects to the same running services.
+
+### Isolated per worktree
+
+| Resource | Isolation mechanism |
+|----------|-------------------|
+| Database schema | Each worktree gets its own PostgreSQL schema within `tx_agent_kit` |
+| Temporal task queue | Each worktree uses a unique queue name (`tx-agent-kit-<name>`), preventing workers from competing for the same workflows |
+| Application ports | Each worktree binds to different host ports, allowing simultaneous dev servers |
+
+### Shared across worktrees
+
+| Resource | Details |
+|----------|---------|
+| Docker containers | PostgreSQL, Temporal, Redis, OTEL collector, Jaeger, Prometheus, Grafana |
+| Temporal server | All worktrees connect to the same server but use separate task queues |
+
+## Generated helper scripts
+
+The setup script generates two helper scripts inside the worktree. `run-migrations.sh` runs `pnpm db:migrate` inside the worktree context. `reset-worktree-schema.sh` drops and recreates the worktree's PostgreSQL schema.
+
+## Port allocation internals
+
+The port allocation uses base ports plus a deterministic offset:
+
+| Service | Base port | Formula |
+|---------|-----------|---------|
+| Web | 3000 | `3000 + offset` |
+| API | 4000 | `4000 + offset` |
+| Mobile | 8081 | `8081 + offset` |
+| Worker inspect | 9229 | `9229 + offset` |
+
+The offset range is 100–1099, giving each service 1000 possible port assignments. Collision detection against active worktrees ensures no two concurrent worktrees share the same ports.

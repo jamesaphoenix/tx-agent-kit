@@ -1,0 +1,117 @@
+---
+title: Commands Reference
+description: Complete reference of all pnpm scripts organized by category
+---
+
+# Commands Reference
+
+All commands are run from the monorepo root via `pnpm`. This is the complete reference of available scripts.
+
+## Core Development
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start all app dev servers in parallel (web, api, worker, mobile) |
+| `pnpm dev:web` | Start Next.js web app only |
+| `pnpm dev:api` | Start Effect HTTP API server only |
+| `pnpm dev:worker` | Start Temporal worker only |
+| `pnpm dev:mobile` | Start Expo React Native dev server only |
+| `pnpm dev:docs` | Start Fumadocs documentation site |
+| `pnpm env:configure` | Seed `.env` file with local development defaults (idempotent) |
+| `pnpm infra:ensure` | Start Docker infrastructure services (idempotent, shared across worktrees) |
+| `pnpm infra:down` | Stop Docker infrastructure and remove volumes |
+| `pnpm openapi:generate` | Generate OpenAPI spec from API route definitions |
+| `pnpm api:client:generate` | Regenerate web + mobile API client hooks from OpenAPI spec |
+| `pnpm mobile:generate:api` | Regenerate mobile API client from OpenAPI spec |
+| `pnpm docs:api:generate` | Generate API reference MDX docs from OpenAPI spec |
+| `pnpm scaffold:crud` | Scaffold a new CRUD domain (DDD structure, routes, tests) |
+
+## Quality Gates
+
+| Command | Description |
+|---------|-------------|
+| `pnpm lint` | Run ESLint + structural invariants + shell invariants |
+| `pnpm lint:quiet` | Run lint with reduced output (for agent workflows) |
+| `pnpm lint:invariants` | Run structural domain invariant checks only |
+| `pnpm lint:shell` | Run shell script invariant checks only |
+| `pnpm lint:ci-env` | Validate CI environment variable configuration |
+| `pnpm type-check` | Run TypeScript type checking across all packages |
+| `pnpm type-check:quiet` | Run type-check with reduced output |
+| `pnpm test` | Run all unit tests via Vitest |
+| `pnpm test:quiet` | Run tests with reduced output |
+| `pnpm test:run-silent` | Run tests fully silently |
+| `pnpm test:integration` | Run integration tests (resets test DB, lock-guarded) |
+| `pnpm test:integration:quiet` | Run integration tests with reduced output |
+| `pnpm test:db:pgtap` | Run pgTAP database trigger tests |
+| `pnpm test:infra:observability` | Verify observability infrastructure is working |
+| `pnpm build` | Build all packages and apps |
+| `pnpm build:quiet` | Build with reduced output |
+
+## Database and Worktrees
+
+| Command | Description |
+|---------|-------------|
+| `pnpm db:migrate` | Run Drizzle database migrations |
+| `pnpm db:trigger:new` | Scaffold a new database trigger with pgTAP test |
+| `pnpm db:test:reset` | Drop and recreate test database, rerun migrations |
+| `pnpm db:studio` | Launch Drizzle Studio for visual database inspection |
+| `pnpm worktree:ports` | Derive deterministic port assignments for a git worktree |
+
+## Deployment
+
+| Command | Description |
+|---------|-------------|
+| `pnpm deploy:build-images` | Build container images for api and worker |
+| `pnpm deploy:migrate:staging` | Run DB migrations against staging (secrets from 1Password) |
+| `pnpm deploy:migrate:prod` | Run DB migrations against production (secrets from 1Password) |
+| `pnpm deploy:staging` | Deploy to staging via Docker Compose (renders secrets, pulls images, smoke tests) |
+| `pnpm deploy:prod` | Deploy to production via Docker Compose |
+| `pnpm deploy:smoke` | Run smoke tests against a deployed API (`API_BASE_URL` required) |
+| `pnpm deploy:gcp:toy:bootstrap` | Bootstrap a toy GCP project for E2E testing |
+| `pnpm deploy:gcp:toy:teardown` | Tear down the toy GCP project |
+| `pnpm test:gcp:e2e` | Run GCP end-to-end tests |
+
+## MCP Servers
+
+| Command | Description |
+|---------|-------------|
+| `pnpm mcp:prometheus` | Start Prometheus MCP server (PromQL queries, metric discovery) |
+| `pnpm mcp:jaeger` | Start Jaeger MCP server (trace search, service discovery) |
+| `pnpm mcp:context7` | Start Context7 MCP server (library documentation lookup) |
+| `pnpm mcp:supabase` | Start Supabase MCP server (database access) |
+| `pnpm mcp:playwright` | Start Playwright MCP server (browser automation) |
+
+MCP servers are started via wrapper scripts in `scripts/mcp/` and configured in `.mcp.json`. They provide programmatic access to infrastructure tools for AI agents.
+
+## Temporal
+
+| Command | Description |
+|---------|-------------|
+| `pnpm verify:temporal-types` | Verify Temporal workflow/activity type consistency |
+| `pnpm test:temporal-types` | Run Temporal type verification tests |
+
+## Quiet vs. full commands
+
+Most quality gates have both quiet and full variants:
+
+| Variant | Example | Behavior |
+|---------|---------|----------|
+| Quiet | `pnpm lint:quiet`, `pnpm test:quiet` | Reduced output optimized for agent workflows — use these first to minimize context consumption |
+| Full | `pnpm lint`, `pnpm test` | Complete diagnostic output — switch to these when debugging failures |
+
+The quiet variants run the same checks as the full variants; they only differ in output verbosity.
+
+## Integration test locking
+
+Integration tests are guarded by a file lock at `/tmp/tx-agent-kit-integration.lock`. This prevents overlapping integration test runs from clobbering each other's database state. If a previous run was interrupted, the lock file is automatically cleaned up by the next run.
+
+## CLI tool
+
+The `pnpm tx` command provides a unified CLI for project-specific tasks:
+
+```bash
+pnpm tx scaffold:crud --domain <domain> --entity <entity>
+pnpm tx db:trigger:new <trigger-name>
+```
+
+This is a thin wrapper around `scripts/tx-cli.mjs`.

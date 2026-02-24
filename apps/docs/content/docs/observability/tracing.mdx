@@ -1,0 +1,101 @@
+---
+title: Tracing
+description: Distributed tracing with OpenTelemetry, exported to Jaeger locally and Cloud Trace in production
+---
+
+# Tracing
+
+tx-agent-kit uses OpenTelemetry for distributed tracing. The `@tx-agent-kit/observability` package bootstraps the trace provider, and all spans are exported via OTLP to the collector.
+
+## How tracing works
+
+Each application (API, Worker) initializes the OpenTelemetry Node SDK at startup:
+
+```typescript
+import { startTelemetry } from '@tx-agent-kit/observability'
+
+await startTelemetry('api')
+```
+
+This registers a `NodeSDK` instance with an `OTLPTraceExporter` pointing at `OTEL_EXPORTER_OTLP_ENDPOINT/v1/traces`, a resource with `service.name` and `deployment.environment` attributes, and automatic span context propagation.
+
+## Creating spans
+
+Use the OpenTelemetry API to create custom spans:
+
+```typescript
+import { trace } from '@opentelemetry/api'
+
+const tracer = trace.getTracer('my-service')
+
+const span = tracer.startSpan('database.query')
+span.setAttribute('db.table', 'tasks')
+
+try {
+  const result = await db.query(...)
+  span.setAttribute('db.row_count', result.length)
+} catch (error) {
+  span.recordException(error)
+  span.setStatus({ code: SpanStatusCode.ERROR })
+} finally {
+  span.end()
+}
+```
+
+## Trace context propagation
+
+OpenTelemetry automatically propagates trace context across HTTP boundaries using W3C Trace Context headers (`traceparent`, `tracestate`). An HTTP request from the web app to the API creates a parent span on the client and a child span on the server. The API calling the Temporal worker continues the same trace. All spans from a single user action appear in a single trace in Jaeger or Cloud Trace.
+
+## Configuration
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP HTTP endpoint |
+| `OTEL_LOG_LEVEL` | — | Set to `debug` for OTEL SDK diagnostics |
+
+The trace exporter sends spans to `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces` via HTTP POST with JSON encoding.
+
+## Local backend: Jaeger
+
+In local development, traces flow through the OTEL Collector to Jaeger:
+
+```
+App --> OTEL Collector (port 4320) --> Jaeger (port 16686)
+```
+
+Open the Jaeger UI at `http://localhost:16686` to search traces by service name, operation, or tags, view trace timelines and span details, and analyze latency distributions.
+
+An MCP server is available for programmatic access:
+
+```bash
+pnpm mcp:jaeger
+```
+
+## Production backend: Cloud Trace
+
+In staging and production, the OTEL Collector is configured with `OTEL_COLLECTOR_BACKEND=gcp`, which routes traces to GCP Cloud Trace. The collector uses the `googlecloud` exporter with service account credentials.
+
+## Smoke testing
+
+The observability package provides a smoke test function:
+
+```typescript
+import { emitNodeTelemetrySmoke } from '@tx-agent-kit/observability'
+
+emitNodeTelemetrySmoke('api')
+```
+
+This creates a test span (`observability.smoke.node`) and increments a startup counter, which can be verified in Jaeger and Prometheus.
+
+## Shutdown
+
+Always shut down the telemetry SDK gracefully to flush pending spans:
+
+```typescript
+import { stopTelemetry } from '@tx-agent-kit/observability'
+
+process.on('SIGTERM', async () => {
+  await stopTelemetry()
+  process.exit(0)
+})
+```

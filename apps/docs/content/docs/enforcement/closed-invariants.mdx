@@ -1,0 +1,110 @@
+---
+title: Closed Invariants
+description: Complete list of all enforced invariants organized by category.
+---
+
+# Closed Invariants
+
+This is the complete list of mechanically enforced invariants. Each invariant is checked by at least one of the three enforcement layers (ESLint, structural scripts, shell scripts).
+
+## Web Architecture
+
+| Invariant | Description |
+|-----------|-------------|
+| API-first web | `apps/web` never imports `@tx-agent-kit/db` or `drizzle-orm` |
+| Web runtime simplicity | `apps/web` must not import `effect`/`effect/*` |
+| Client-only runtime | No `apps/web/app/api`, no proxy/middleware, no `next/server`/`next/headers` |
+| Client component contract | All `.tsx` under `app/` and `components/` start with `'use client'` |
+
+## Web Contracts
+
+| Invariant | Description |
+|-----------|-------------|
+| Storage contract | Only `apps/web/lib/auth-token.ts` touches `localStorage` |
+| Transport contract | `apps/web/lib` must not use `/api/*` proxy paths |
+| URL-state contract | `nuqs` usage centralized in `apps/web/lib/url-state.tsx` |
+| Notification contract | `sonner` usage centralized in `apps/web/lib/notify.tsx` |
+| Browser API contract | Direct `window.location` access is forbidden |
+| Transport discipline | Direct `fetch` in `apps/web` is forbidden |
+
+## Logging and Isolation
+
+| Invariant | Description |
+|-----------|-------------|
+| Logging discipline | `console.*` is banned; use `@tx-agent-kit/logging` |
+| Drizzle isolation | Only `packages/db` imports `drizzle-orm` |
+| Schema-first boundaries | Validation uses `effect/Schema` only (Zod banned) |
+
+## Database Parity
+
+| Invariant | Description |
+|-----------|-------------|
+| Table schema parity | Each table has a corresponding Effect schema in `effect-schemas/` |
+| Table factory parity | Each table has a corresponding factory in `factories/` |
+| Contract governance | `openapi.json` is generated and carries DDD metadata |
+| Trigger coverage | Each `CREATE TRIGGER` is referenced in pgTAP suites |
+
+## Domain Architecture
+
+| Invariant | Description |
+|-----------|-------------|
+| Kind governance | Repository ports and API routes declare `crud` or `custom` markers |
+| Core domain folder contract | Domains use `domain/ports/application/adapters`, not `repositories/services` |
+| Persistence boundary | Concrete persistence lives only in `packages/db/src/repositories/` |
+| Domain legibility | Named exports only (no default exports) |
+| Source hygiene | No TODO/FIXME/HACK comments in source |
+| Domain determinism | No `Date.now`, `new Date`, `Math.random` in domain layer |
+| Layer direction | Enforced import restrictions per DDD layer |
+
+## Temporal
+
+| Invariant | Description |
+|-----------|-------------|
+| Workflow determinism | No native timer calls in workflows |
+| No infra imports | Workflows must not import database clients or I/O modules |
+
+## Environment
+
+| Invariant | Description |
+|-----------|-------------|
+| Env governance | Web and worker read env through dedicated modules |
+| Source env governance | `process.env` only in allowed env files |
+| Single env file | Only `.env` and `.env.example` at root |
+
+## Type Safety
+
+| Invariant | Description |
+|-----------|-------------|
+| No `as any` | Forbidden in source modules |
+| No chained assertions | `as unknown as ...` forbidden in source |
+| Suppression governance | No `@ts-ignore`, `@ts-expect-error`, `eslint-disable` in source |
+| No empty catch blocks | Handle, classify, or rethrow errors |
+
+## Testing
+
+| Invariant | Description |
+|-----------|-------------|
+| Test colocation | No `__tests__/`, no `.spec.ts`, no `.integration.ts` without `.test` |
+| API harness | Must use `createDbAuthContext(...)`, no manual spawning |
+| Path resolution | Harness callers use `fileURLToPath(import.meta.url)` |
+| Web lifecycle | Test files must not call setup/reset/teardown directly |
+| No local globalSetup | Integration configs defer to root workspace setup |
+
+## Critical Integration Baselines
+
+| Invariant | Description |
+|-----------|-------------|
+| API coverage | Health, auth, workspace, task, invitation endpoints + idempotency |
+| API health latency | Health endpoint readiness assertion required |
+| Web coverage | Dashboard, Workspaces, Invitations pages + all form components |
+| Web auth flow | Unauthenticated redirect + invalid token handling |
+| Worker coverage | Idempotent `activities.processTask(...)` |
+| Observability coverage | All four services with Jaeger + Prometheus queries |
+
+## Infrastructure
+
+| Invariant | Description |
+|-----------|-------------|
+| Local compose | `docker-compose.yml` is infra-only (no `api` or `worker` services) |
+| Deploy compose | Staging and prod compose files must include `api` and `worker` |
+| No build artifacts in source | `.js`, `.d.ts`, `.js.map` forbidden under `src/` |

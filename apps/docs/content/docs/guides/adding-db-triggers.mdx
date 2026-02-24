@@ -1,0 +1,101 @@
+---
+title: Adding Database Triggers
+description: Workflow for creating database triggers with migration scaffolding and pgTAP test coverage.
+---
+
+# Adding Database Triggers
+
+Database triggers require both a migration file and pgTAP test coverage. The scaffold CLI generates both.
+
+## Step 1: Scaffold the Trigger
+
+Use the trigger scaffold command:
+
+```bash
+pnpm db:trigger:new --name set_updated_at --table tasks
+```
+
+### Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name <name>` | (required) | Trigger name |
+| `--table <table>` | (required) | Target table |
+| `--timing` | `BEFORE` | `BEFORE` or `AFTER` |
+| `--events` | `INSERT,UPDATE` | Comma-separated: `INSERT`, `UPDATE`, `DELETE` |
+| `--level` | `ROW` | `ROW` or `STATEMENT` |
+
+### What Gets Generated
+
+1. **Migration file** in `packages/db/drizzle/migrations/` with a `CREATE TRIGGER` statement and a placeholder trigger function
+2. **pgTAP test file** in `packages/db/pgtap/` with a `fail()` placeholder that you must replace with real assertions
+
+## Step 2: Implement the Trigger Function
+
+Open the generated migration and implement the trigger function:
+
+```sql
+-- packages/db/drizzle/migrations/XXXX_set_updated_at.sql
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON tasks
+  FOR EACH ROW
+  EXECUTE FUNCTION set_updated_at();
+```
+
+## Step 3: Write pgTAP Tests
+
+Replace the scaffold `fail()` placeholder in the generated pgTAP file with real assertions:
+
+```sql
+-- packages/db/pgtap/set_updated_at.sql
+BEGIN;
+SELECT plan(2);
+
+-- Verify the trigger exists
+SELECT has_trigger('tasks', 'set_updated_at', 'Trigger set_updated_at exists on tasks');
+
+-- Verify it fires on UPDATE
+SELECT trigger_is('tasks', 'set_updated_at', 'set_updated_at',
+  'set_updated_at trigger calls set_updated_at function');
+
+SELECT * FROM finish();
+ROLLBACK;
+```
+
+## Step 4: Run Migrations and Tests
+
+```bash
+# Apply the migration
+pnpm db:migrate
+
+# Run pgTAP suites
+pnpm test:db:pgtap
+```
+
+## Invariant Enforcement
+
+The structural invariant checker (`scripts/lint/enforce-domain-invariants.mjs`) scans all `CREATE TRIGGER` statements in migration files and verifies that each trigger name is referenced in at least one pgTAP test file.
+
+If you add a trigger without pgTAP coverage, `pnpm lint` will fail with:
+
+```
+Missing pgTAP coverage marker for trigger `set_updated_at`.
+Reference this trigger in `packages/db/pgtap/*.sql`.
+```
+
+## Full Validation
+
+After adding a trigger:
+
+```bash
+pnpm db:migrate && pnpm test:db:pgtap && pnpm lint
+```

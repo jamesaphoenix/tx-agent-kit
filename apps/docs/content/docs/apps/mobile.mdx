@@ -1,0 +1,65 @@
+---
+title: Mobile App
+description: Expo React Native app consuming the API with component and unit test suites.
+---
+
+# Mobile App (`apps/mobile`)
+
+The mobile application is built with [Expo](https://expo.dev/) and React Native. It provides the same core functionality as the web app — authentication, workspace management, task tracking, and invitations — through a native mobile interface.
+
+## Architecture
+
+The mobile app follows the same client-only pattern as the web app. It consumes `API_BASE_URL` from Expo config and communicates exclusively with the API server.
+
+```
+Mobile App -> Axios Client -> API Server (apps/api)
+```
+
+There is no local database or offline-first logic. The app is a thin client that delegates all business logic to the API.
+
+## Key Modules
+
+| Module | Path | Purpose |
+|--------|------|---------|
+| Environment | `lib/env.ts` | Runtime configuration read from Expo's config system, not from `process.env` directly |
+| Auth Token | `lib/auth-token.ts` | Secure token storage using the platform's native secure storage mechanisms |
+| Axios Client | `lib/axios.ts` | Pre-configured Axios instance pointing to `API_BASE_URL` with auth token injection |
+| Client API | `lib/client-api.ts` | Typed API client methods wrapping Axios calls with proper request/response typing |
+| Client Auth | `lib/client-auth.ts` | Authentication flow logic — sign-up, sign-in, token refresh, and session management |
+| URL State | `lib/url-state.ts` | Navigation state management adapted for React Navigation rather than browser URLs |
+| Session Store | `stores/session-store.ts` | Centralized session state management for the authenticated user context |
+
+## Component Test Suites
+
+The mobile app maintains full component test coverage:
+
+| Component | Test File |
+|-----------|-----------|
+| `AuthForm` | `components/AuthForm.test.tsx` |
+| `CreateWorkspaceForm` | `components/CreateWorkspaceForm.test.tsx` |
+| `CreateTaskForm` | `components/CreateTaskForm.test.tsx` |
+| `CreateInvitationForm` | `components/CreateInvitationForm.test.tsx` |
+| `AcceptInvitationForm` | `components/AcceptInvitationForm.test.tsx` |
+| `SignOutButton` | `components/SignOutButton.test.tsx` |
+| `AuthBootstrapProvider` | `components/AuthBootstrapProvider.test.tsx` |
+
+## Unit Test Suites
+
+Core utility modules have dedicated unit tests:
+
+| Module | Coverage |
+|--------|----------|
+| `env` | Environment config resolution |
+| `auth-token` | Token storage read/write/clear |
+| `axios` | Client configuration and interceptors |
+| `client-api` | API method typing and request construction |
+| `client-auth` | Auth flow state transitions |
+| `url-state` | Navigation state serialization |
+| `session-store` | Session state management |
+
+## Running Tests
+
+```bash
+# Run mobile unit tests
+pnpm --filter @tx-agent-kit/mobile test
+```

@@ -1,0 +1,74 @@
+---
+title: Observability
+description: OpenTelemetry bootstrap helpers for traces, metrics, and logs with configurable backend routing.
+---
+
+# Observability (`packages/observability`)
+
+The observability package provides OpenTelemetry (OTEL) bootstrap helpers that configure trace, metric, and log exporters for the entire stack. All services call `startTelemetry()` on startup to initialize the SDK.
+
+## Usage
+
+```typescript
+import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
+
+// On startup
+await startTelemetry('tx-agent-kit-api')
+
+// On shutdown
+await stopTelemetry()
+```
+
+## What Gets Exported
+
+The SDK configures three signal types:
+
+| Signal | Exporter | Endpoint |
+|--------|----------|----------|
+| Traces | OTLP HTTP | `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces` |
+| Metrics | OTLP HTTP (periodic, 5s interval) | `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/metrics` |
+| Logs | OTLP HTTP (batched) | `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/logs` |
+
+Log exporting can be disabled by setting `OTEL_LOGS_EXPORTER=none`.
+
+## Backend Routing
+
+The OTEL collector routes telemetry to different backends based on `OTEL_COLLECTOR_BACKEND`:
+
+| Backend | Traces | Metrics | Logs |
+|---------|--------|---------|------|
+| `gcp` | Cloud Trace | Cloud Monitoring | Cloud Logging |
+| `oss` (default) | Jaeger | Prometheus | Loki |
+
+## Environment Configuration
+
+Configuration is centralized in `packages/observability/src/env.ts`:
+
+| Variable | Description |
+|----------|-------------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint |
+| `OTEL_COLLECTOR_BACKEND` | `gcp` or `oss` |
+| `OTEL_LOG_LEVEL` | Set to `debug` for diagnostic output |
+| `OTEL_LOGS_EXPORTER` | Set to `none` to disable log export |
+| `NODE_ENV` | Attached as deployment environment attribute |
+
+## Smoke Testing
+
+The package exports a smoke test helper for verifying the telemetry pipeline:
+
+```typescript
+import { emitNodeTelemetrySmoke } from '@tx-agent-kit/observability'
+
+// Emits a test span and increments the startup counter
+emitNodeTelemetrySmoke('tx-agent-kit-api')
+```
+
+## Integration Testing
+
+The stack integration suite at `packages/observability/src/stack.integration.test.ts` validates end-to-end telemetry flow across all four services (`api`, `worker`, `web`, `mobile`). It checks:
+
+| Signal | Validation |
+|--------|------------|
+| Traces | Data appears in Jaeger |
+| Metrics | Data appears in Prometheus |
+| Counters | Service-specific counters and queries resolve correctly |

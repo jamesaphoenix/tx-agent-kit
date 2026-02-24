@@ -1,0 +1,124 @@
+---
+title: Monitoring Stack
+description: Local and production monitoring tools including Jaeger, Prometheus, Grafana, and GCP backends
+---
+
+# Monitoring Stack
+
+tx-agent-kit provides a complete monitoring stack for both local development and production. Locally, open-source tools run in Docker. In staging and production, the OTEL Collector routes signals to GCP managed services.
+
+## Local monitoring tools
+
+### Jaeger (traces)
+
+| Property | Value |
+|----------|-------|
+| URL | `http://localhost:16686` |
+| Signal | Distributed traces |
+| Image | `jaegertracing/jaeger:2.15.1` |
+
+Jaeger provides a trace search UI with filtering by service, operation, tags, and duration. Use it to debug request latency, identify bottlenecks, and trace cross-service calls.
+
+### Prometheus (metrics)
+
+| Property | Value |
+|----------|-------|
+| URL | `http://localhost:9090` |
+| Signal | Application and infrastructure metrics |
+| Image | `prom/prometheus:v3.9.1` |
+
+Prometheus stores time-series metrics and provides PromQL for querying. It receives metrics via both OTLP push (from the collector) and pull-based scraping (from node-exporter and other targets).
+
+Alert rules are defined in `monitoring/local/prometheus/rules/` and evaluated by Prometheus. The lifecycle API is enabled for runtime configuration reloading.
+
+### Grafana (dashboards)
+
+| Property | Value |
+|----------|-------|
+| URL | `http://localhost:3001` |
+| Signal | Visualization of all signals |
+| Image | `grafana/grafana:12.3.3` |
+| Credentials | `admin` / `admin` |
+
+Grafana is pre-provisioned with datasources for Prometheus, Loki, and Jaeger, along with pre-built dashboards stored in `monitoring/local/grafana/dashboards/`. It unifies traces, metrics, and logs in a single UI, letting you correlate a metric spike with traces from the same time window.
+
+### Loki (logs)
+
+| Property | Value |
+|----------|-------|
+| URL | `http://localhost:3100` |
+| Signal | Structured logs |
+| Image | `grafana/loki:3.6.6` |
+
+Loki aggregates logs collected by Promtail from Docker container stdout/stderr. Query logs via Grafana's Explore view using LogQL.
+
+### Supporting services
+
+| Service | Purpose |
+|---------|---------|
+| Promtail | Ships Docker container logs to Loki |
+| Node Exporter | Exposes host system metrics (CPU, memory, disk) on port 9100 |
+| OTEL Collector | Central telemetry routing hub |
+
+## Production monitoring
+
+In staging and production, the OTEL Collector configuration switches backends based on the `OTEL_COLLECTOR_BACKEND` environment variable.
+
+### GCP backend (`OTEL_COLLECTOR_BACKEND=gcp`)
+
+| Signal | GCP Service |
+|--------|------------|
+| Traces | Cloud Trace |
+| Metrics | Cloud Monitoring |
+| Logs | Cloud Logging |
+
+The collector uses the `googlecloud` exporter, which requires `GOOGLE_CLOUD_PROJECT` set to the GCP project ID and service account credentials mounted at `OTEL_COLLECTOR_GCP_CREDENTIALS_DIR`.
+
+### OSS backend (`OTEL_COLLECTOR_BACKEND=oss`)
+
+| Signal | Backend |
+|--------|---------|
+| Traces | Jaeger (`OTEL_JAEGER_ENDPOINT`) |
+| Metrics | Prometheus (`OTEL_PROMETHEUS_OTLP_ENDPOINT`) |
+| Logs | Loki (`OTEL_LOKI_OTLP_ENDPOINT`) |
+
+The OSS backend is useful for self-hosted staging environments or when GCP is not available.
+
+## MCP servers for agent access
+
+Two MCP servers expose monitoring data for programmatic access by AI agents.
+
+### Prometheus MCP
+
+```bash
+pnpm mcp:prometheus
+```
+
+Provides tools for executing PromQL queries, listing metrics, getting metric metadata, and checking Prometheus targets.
+
+### Jaeger MCP
+
+```bash
+pnpm mcp:jaeger
+```
+
+Provides tools for finding traces, getting trace details, listing services, and getting operations for a service.
+
+These servers are configured in `.mcp.json` and run via project wrapper scripts in `scripts/mcp/`.
+
+## Collector configuration
+
+The OTEL Collector uses different configuration files per environment:
+
+| Environment | Config file |
+|-------------|------------|
+| Local | `monitoring/local/otel-collector/otel-collector-config.yaml` |
+| Staging/Prod (GCP) | `monitoring/production/otel-collector.gcp.yaml` |
+| Staging/Prod (OSS) | `monitoring/production/otel-collector.oss.yaml` |
+
+The staging/prod Docker Compose files select the configuration dynamically:
+
+```yaml
+command:
+  - --config=/etc/otel-collector/otel-collector.${OTEL_COLLECTOR_BACKEND:-gcp}.yaml
+```

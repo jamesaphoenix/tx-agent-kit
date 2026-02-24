@@ -1,0 +1,135 @@
+---
+title: Logging
+description: Structured JSON logging via @tx-agent-kit/logging with OTEL log record emission
+---
+
+# Logging
+
+All logging in tx-agent-kit goes through the `@tx-agent-kit/logging` package. Direct `console.*` calls are banned by ESLint across all source modules.
+
+## Why structured logging
+
+Structured logs are machine-parseable JSON objects rather than free-form strings. They can be filtered and queried in log aggregation tools like Loki and Cloud Logging. They correlate with traces via shared attributes. They maintain a consistent format across all services. And they automatically emit OTEL log records alongside stdout output.
+
+## Creating a logger
+
+```typescript
+import { createLogger } from '@tx-agent-kit/logging'
+
+const logger = createLogger('my-service')
+
+logger.info('Server started', { port: 4000 })
+logger.error('Request failed', { path: '/v1/tasks' }, error)
+```
+
+Each log call writes a JSON object to stdout and emits an OTEL log record to the configured collector.
+
+## Log entry format
+
+Every log entry follows this structure:
+
+```json
+{
+  "timestamp": "2026-02-23T12:00:00.000Z",
+  "level": "info",
+  "service": "api",
+  "message": "Server started",
+  "context": {
+    "port": 4000
+  }
+}
+```
+
+Error entries include additional fields:
+
+```json
+{
+  "timestamp": "2026-02-23T12:00:01.000Z",
+  "level": "error",
+  "service": "api",
+  "message": "Error in requestHandler",
+  "context": {
+    "event": "error",
+    "context": "requestHandler",
+    "errorName": "ConnectionError",
+    "errorMessage": "ECONNREFUSED"
+  },
+  "error": {
+    "name": "ConnectionError",
+    "message": "ECONNREFUSED",
+    "stack": "..."
+  }
+}
+```
+
+## Child loggers
+
+Create scoped child loggers that inherit the parent service name:
+
+```typescript
+const dbLogger = logger.child('db', { component: 'repository' })
+
+// Service name becomes "api:db"
+dbLogger.info('Query executed', { table: 'tasks', duration: 42 })
+```
+
+## Utility functions
+
+The logging package provides higher-level utilities for common patterns.
+
+### `logError`
+
+```typescript
+import { logError } from '@tx-agent-kit/logging'
+
+try {
+  await riskyOperation()
+} catch (error) {
+  logError(logger, error, 'riskyOperation', { userId })
+}
+```
+
+### `logPerformance` and `createPerfLogger`
+
+```typescript
+import { createPerfLogger } from '@tx-agent-kit/logging'
+
+const perf = createPerfLogger(logger, 'database.query', { table: 'tasks' })
+const result = await db.query(...)
+perf.end({ rowCount: result.length })
+// Logs: "database.query completed in 42ms"
+```
+
+### `logStateChange`
+
+```typescript
+import { logStateChange } from '@tx-agent-kit/logging'
+
+logStateChange(logger, 'pending', 'processing', { taskId })
+// Logs: "State changed from pending to processing"
+```
+
+### `logProgress`
+
+```typescript
+import { logProgress } from '@tx-agent-kit/logging'
+
+logProgress(logger, 50, 'Processing batch', { batchId })
+// Logs: "Progress: 50% - Processing batch"
+```
+
+## OTEL integration
+
+Every log entry is simultaneously emitted as an OTEL log record via the `@opentelemetry/api-logs` API. The log record includes the `severityNumber` mapped from the log level, `severityText` as the uppercase level name, `body` containing the message string, `attributes` with service name, context fields, and error details, and `timestamp` from the log entry.
+
+When `OTEL_LOGS_EXPORTER=otlp` is set (the default), logs flow through the OTEL Collector to the configured backend. Set `OTEL_LOGS_EXPORTER=none` to disable OTEL log export while keeping stdout output.
+
+## Default logger
+
+A default logger is exported for convenience, using the `SERVICE_NAME` environment variable:
+
+```typescript
+import { defaultLogger } from '@tx-agent-kit/logging'
+
+defaultLogger.info('Application-wide log')
+```

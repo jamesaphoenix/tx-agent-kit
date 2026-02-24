@@ -1,0 +1,41 @@
+---
+title: Welcome to tx-agent-kit
+description: Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle
+---
+
+# Welcome to tx-agent-kit
+
+tx-agent-kit is an **agent-first starter kit** for building production-grade TypeScript applications. It combines Effect HTTP, Temporal workflows, Next.js, Drizzle ORM, and Expo React Native into a single monorepo with mechanical enforcement of architectural decisions.
+
+## What is "agent-first"?
+
+Inspired by OpenAI's Harness Engineering post (February 2026), tx-agent-kit encodes a specific operating model:
+
+**Humans** steer intent, define acceptance criteria, and make architectural decisions. **Agents** implement features, validate correctness, and iterate through mechanical checks. **The repository** is the single source of truth. `CLAUDE.md` and `AGENTS.md` encode taste and constraints so agents can operate autonomously within defined guardrails.
+
+If an agent fails repeatedly, the response is not to micromanage — it is to improve scaffolding: better docs, stricter linters, more tests, smarter scripts.
+
+## What is included
+
+The kit ships with a complete vertical slice across four application targets:
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **API** | Effect HttpApi | Auth, workspaces, tasks, invitations |
+| **Web** | Next.js (client-only SPA) | Dashboard UI |
+| **Worker** | Temporal | Background workflows and activities |
+| **Mobile** | Expo React Native | Cross-platform mobile client |
+
+Supporting packages provide domain logic (`core`), database access (`db`), shared contracts (`contracts`), authentication (`auth`), structured logging (`logging`), OpenTelemetry observability (`observability`), and test utilities (`testkit`).
+
+## Where to start
+
+Start with **[Philosophy](/docs/philosophy)** to understand the agent-first thesis, then move to **[Getting Started](/docs/getting-started)** to set up your environment and scaffold your first domain. **[Architecture](/docs/architecture)** covers the monorepo structure, DDD pattern, and data flow, while **[Core Concepts](/docs/core-concepts)** walks through Effect services, domain modeling, ports and adapters, and schema contracts. From there, **[Enforcement](/docs/enforcement)** shows how every architectural decision is mechanically checked, **[Infrastructure](/docs/infrastructure)** covers Docker services and local development, **[Deployment](/docs/deployment)** handles staging and production workflows, and **[Commands](/docs/commands)** is the full reference of pnpm scripts.
+
+## Design principles
+
+1. **Encode taste in tooling.** If a convention matters, it is enforced by a linter rule, a structural invariant check, or a shell script — not a wiki page.
+2. **Inward-only dependencies.** Domain logic never depends on infrastructure. The dependency arrow always points inward.
+3. **Schema-first contracts.** `effect/Schema` is the single validation library. Contracts are shared, typed, and enforced at compile time.
+4. **Deterministic domains.** No `Date.now`, `Math.random`, or side effects in domain code. Everything is injectable and testable.
+5. **Separation of concerns.** The web app never touches the database. The API never renders HTML. The worker never serves HTTP.

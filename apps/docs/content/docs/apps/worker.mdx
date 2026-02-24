@@ -1,0 +1,82 @@
+---
+title: Worker
+description: Temporal worker for durable workflow execution with strict determinism constraints.
+---
+
+# Worker (`apps/worker`)
+
+The worker application connects to Temporal and executes durable workflows and activities. It runs as a long-lived process that polls the `tx-agent-kit` task queue.
+
+## Architecture
+
+The worker follows Temporal's standard separation of concerns. Workflows define the orchestration logic and must be deterministic. Activities perform side effects such as database queries, API calls, and I/O.
+
+```typescript
+// apps/worker/src/index.ts
+const worker = await Worker.create({
+  connection,
+  namespace: env.TEMPORAL_NAMESPACE,
+  taskQueue: env.TEMPORAL_TASK_QUEUE,
+  workflowsPath: workflowSourcePath,
+  activities
+})
+```
+
+## Determinism Constraints
+
+Temporal replays workflows from event history to rebuild state. Any non-deterministic operation inside a workflow will cause replay failures. The following are **forbidden** inside workflow code:
+
+| Forbidden | Reason |
+|-----------|--------|
+| `Date.now()` / `new Date()` | Use Temporal's `workflow.now()` instead |
+| `Math.random()` | Use deterministic alternatives or activities |
+| `setTimeout` / `setInterval` | Use Temporal's `workflow.sleep()` |
+| `clearTimeout` / `clearInterval` | Not applicable in workflow context |
+| Infrastructure imports | Workflows must not import database clients, HTTP clients, or other I/O modules |
+
+These constraints are enforced at the ESLint level through the domain-invariants configuration.
+
+## Activities
+
+Activities are normal async functions that handle all side effects. They are injected into the worker at startup:
+
+```typescript
+// apps/worker/src/activities.ts
+export const activities = {
+  processTask: async (taskId: string) => {
+    // Database queries, API calls, etc. are allowed here
+  }
+}
+```
+
+The `processTask` activity demonstrates idempotent processing — calling it twice for the same task returns `{ alreadyProcessed: true }` on the second call.
+
+## Configuration
+
+Environment variables are centralized in `apps/worker/src/config/env.ts`:
+
+| Variable | Description |
+|----------|-------------|
+| `TEMPORAL_ADDRESS` | Temporal server address |
+| `TEMPORAL_NAMESPACE` | Temporal namespace |
+| `TEMPORAL_TASK_QUEUE` | Task queue name (default: `tx-agent-kit`) |
+
+Direct `process.env` access is forbidden outside the config module.
+
+## Observability
+
+The worker initializes OpenTelemetry on startup via `@tx-agent-kit/observability`:
+
+```typescript
+await startTelemetry('tx-agent-kit-worker')
+```
+
+This exports traces, metrics, and logs to the configured OTEL collector endpoint.
+
+## Graceful Shutdown
+
+The worker handles `SIGINT` and `SIGTERM` signals for clean shutdown. It stops accepting new workflow tasks, lets in-flight activities complete, then closes the Temporal connection and flushes telemetry.
+
+## Integration Testing
+
+The worker integration suite at `apps/worker/src/activities.integration.test.ts` validates that first-time task processing returns `{ alreadyProcessed: false }`, duplicate processing returns `{ alreadyProcessed: true }`, and test fixtures are seeded per test (no shared table truncation).

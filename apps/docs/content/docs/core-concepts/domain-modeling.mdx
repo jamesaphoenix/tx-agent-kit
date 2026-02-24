@@ -1,0 +1,146 @@
+---
+title: Domain Modeling
+description: Entities, value objects, and pure domain rules in the domain layer
+---
+
+# Domain Modeling
+
+The `domain/` layer is the innermost layer of each DDD slice. It contains entities, value objects, and pure domain rules. Everything in this layer is a plain TypeScript function or type with no dependencies on infrastructure, frameworks, or side effects.
+
+## Entities
+
+Entities are the core data structures of your domain. They are defined as TypeScript interfaces with the `Record` suffix:
+
+```typescript
+// packages/core/src/domains/tasks/domain/task.ts
+
+export interface TaskRecord {
+  readonly id: string
+  readonly workspaceId: string
+  readonly title: string
+  readonly description: string | null
+  readonly status: TaskStatus
+  readonly assigneeId: string | null
+  readonly createdAt: Date
+  readonly updatedAt: Date
+}
+
+export type TaskStatus = "open" | "in_progress" | "completed" | "cancelled"
+```
+
+Key conventions for entities: use `readonly` properties to signal immutability intent, use the `*Record` naming convention (e.g., `TaskRecord`, `InvoiceRecord`), define them in `domain/` so `ports/` can import them (port files cannot define interfaces), and use named exports only — default exports are banned in domain files.
+
+## Value objects
+
+Value objects represent concepts that are defined by their attributes rather than an identity. They are typically string literal unions, branded types, or small structures:
+
+```typescript
+// Value object: currency
+export type Currency = "USD" | "EUR" | "GBP"
+
+// Value object: money (defined by amount + currency, not identity)
+export interface Money {
+  readonly amount: number
+  readonly currency: Currency
+}
+
+// Value object: branded ID
+export type TaskId = string & { readonly _brand: "TaskId" }
+
+export const TaskId = (raw: string): TaskId => raw as TaskId
+```
+
+Value objects are compared by value, not reference. Two `Money` objects with the same amount and currency are considered equal.
+
+## Pure domain rules
+
+Domain rules are pure functions that encode business logic. They take inputs and return outputs with no side effects:
+
+```typescript
+// packages/core/src/domains/tasks/domain/task.ts
+
+export const canTransition = (
+  from: TaskStatus,
+  to: TaskStatus,
+): boolean => {
+  const allowed: Record<TaskStatus, ReadonlyArray<TaskStatus>> = {
+    open: ["in_progress", "cancelled"],
+    in_progress: ["completed", "cancelled", "open"],
+    completed: [],
+    cancelled: [],
+  }
+  return allowed[from].includes(to)
+}
+
+export const isOverdue = (task: TaskRecord, now: Date): boolean => {
+  if (task.status === "completed" || task.status === "cancelled") return false
+  if (!task.dueDate) return false
+  return task.dueDate < now
+}
+```
+
+Notice that `isOverdue` takes `now` as a parameter rather than calling `Date.now()`. This is a hard constraint: **domain code must not use `Date.now`, `new Date()`, or `Math.random` directly.** Time and randomness are injected through function parameters or port interfaces.
+
+This constraint exists for two reasons. First, testability: pure functions with injected time can be tested deterministically. Second, determinism: Temporal workflows replay domain logic, and non-deterministic code breaks replay.
+
+## Composition of domain rules
+
+Complex business logic is built by composing simple pure functions:
+
+```typescript
+export const canAssign = (
+  task: TaskRecord,
+  assigneeId: string,
+  workspaceMembers: ReadonlyArray<string>,
+): boolean => {
+  if (task.status === "completed" || task.status === "cancelled") return false
+  return workspaceMembers.includes(assigneeId)
+}
+
+export const validateTaskCreation = (input: {
+  readonly title: string
+  readonly workspaceId: string
+}): ReadonlyArray<string> => {
+  const errors: Array<string> = []
+  if (input.title.trim().length === 0) errors.push("Title must not be empty")
+  if (input.title.length > 200) errors.push("Title must be 200 characters or fewer")
+  return errors
+}
+```
+
+These functions are trivial to unit test because they have no dependencies:
+
+```typescript
+// domain/task.test.ts
+import { canTransition, validateTaskCreation } from "./task.js"
+
+test("open tasks can transition to in_progress", () => {
+  expect(canTransition("open", "in_progress")).toBe(true)
+})
+
+test("completed tasks cannot transition", () => {
+  expect(canTransition("completed", "open")).toBe(false)
+})
+
+test("empty title is invalid", () => {
+  const errors = validateTaskCreation({ title: "", workspaceId: "ws-1" })
+  expect(errors).toContain("Title must not be empty")
+})
+```
+
+## What does NOT belong in domain/
+
+The domain layer has strict exclusions:
+
+| Excluded | Reason |
+|----------|--------|
+| Database queries | Infrastructure concern — belongs in `packages/db/src/repositories/` |
+| HTTP calls | Infrastructure concern — belongs in `adapters/` |
+| `Date.now()` / `new Date()` | Non-deterministic — inject time as parameter |
+| `Math.random()` | Non-deterministic — inject via ports |
+| `console.log` | Side effect — use `@tx-agent-kit/logging` in outer layers |
+| `process.env` | Configuration — use typed env modules |
+| Effect services | Domain should be plain TypeScript; Effect is for orchestration |
+| Default exports | Convention — named exports only |
+
+By keeping the domain layer pure and minimal, it becomes the most stable and testable part of the codebase.

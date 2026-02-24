@@ -1,0 +1,62 @@
+---
+title: Agent-First Engineering
+description: The thesis behind tx-agent-kit — agents implement, humans steer
+---
+
+# Agent-First Engineering
+
+tx-agent-kit is built on a specific thesis about how software gets built in the age of capable AI agents. This is not a philosophical abstraction — it is a concrete operating model that shapes every decision in the repository.
+
+## The thesis
+
+Software engineering is splitting into two distinct activities:
+
+1. **Steering** — deciding what to build, why it matters, and what "done" looks like.
+2. **Implementing** — writing the code, running the tests, iterating until the checks pass.
+
+Humans are better at steering. Agents are better at implementing. The best results come from clear separation of these roles with well-defined interfaces between them.
+
+## Origins
+
+This approach is inspired by OpenAI's Harness Engineering post (February 2026), which argued that the role of the engineer is shifting from writing code to building the harness — the scaffolding of docs, linters, tests, and scripts that enable agents to operate effectively.
+
+tx-agent-kit takes this idea and makes it concrete. The repository is designed from the ground up to be the harness: every architectural constraint is mechanically enforced, every convention is encoded in a check, and every workflow is documented in the repo itself.
+
+## What this means in practice
+
+When you work with tx-agent-kit, the workflow looks like this:
+
+1. **You define intent.** Write acceptance criteria, describe the domain, specify the behavior.
+2. **The agent implements.** It reads `CLAUDE.md`, follows the DDD construction pattern, runs the scaffold CLI, writes the code.
+3. **Mechanical checks validate.** ESLint rules, structural invariants, type checks, and tests catch violations.
+4. **The agent iterates.** If checks fail, the agent reads the error, fixes the code, and re-runs.
+5. **You review and accept.** The final code has passed all mechanical checks. You review for intent alignment.
+
+The key insight is that step 3 — mechanical enforcement — is what makes this work. Without it, the agent is guessing at conventions. With it, the agent has a concrete feedback loop.
+
+## The improvement cycle
+
+When an agent fails repeatedly at a task, the correct response is not to write the code yourself. It is to ask: **why did the agent fail, and what scaffolding would prevent that failure?**
+
+This creates a self-reinforcing loop where each failure strengthens the harness:
+
+| Agent failure | Harness improvement |
+|---------------|---------------------|
+| Repeats the same coding mistake | Add a linter rule that catches it |
+| Uses the wrong import path | Add a structural invariant check |
+| Skips a setup step | Add it to the scaffold CLI |
+| Misunderstands a convention | Document it in `CLAUDE.md` |
+
+Over time, the repository becomes a better and better harness. Each failure makes future agents more effective.
+
+## Comparison with traditional approaches
+
+| Traditional | Agent-First |
+|-------------|-------------|
+| Conventions in wiki pages | Conventions enforced by lint rules |
+| Architecture in slide decks | Architecture encoded in invariant checks |
+| Onboarding in pair programming | Onboarding in `CLAUDE.md` and scaffold CLIs |
+| Code review catches style issues | Linters catch style issues before review |
+| Tribal knowledge about "how we do things" | Mechanical knowledge in the repo |
+
+The agent-first approach is strictly better even if you never use an AI agent. Mechanical enforcement benefits human developers equally — it just happens to also make agents effective.

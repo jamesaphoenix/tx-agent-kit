@@ -1,0 +1,109 @@
+---
+title: Mechanical Enforcement
+description: Why architectural decisions are enforced in code — ESLint rules, structural checks, and shell invariants
+---
+
+# Mechanical Enforcement
+
+The central principle of tx-agent-kit is: **if it is important, enforce it in code.** Conventions that exist only in documentation are conventions that will be violated.
+
+## Three layers of enforcement
+
+tx-agent-kit uses three complementary enforcement layers, each catching a different class of violations:
+
+### 1. ESLint rules
+
+ESLint catches import violations, banned APIs, and naming conventions at the file level. These rules run in the editor (instant feedback) and in CI (gate on merge).
+
+The domain invariants live in `packages/tooling/eslint-config/domain-invariants.js`:
+
+```js
+// Example: ban drizzle-orm imports outside packages/db
+{
+  "no-restricted-imports": [
+    {
+      name: "drizzle-orm",
+      message: "drizzle-orm may only be imported from packages/db"
+    }
+  ]
+}
+```
+
+The following table summarizes the key rules enforced via ESLint:
+
+| Rule | What it prevents |
+|------|-----------------|
+| No `drizzle-orm` imports outside `packages/db` | Direct DB access from app or domain code |
+| No `effect` imports from `apps/web` | Effect dependencies leaking into the web client |
+| No `console.*` in source modules | Unstructured logging; use `@tx-agent-kit/logging` instead |
+| No `process.env` in domain/services code | Environment coupling in business logic |
+| No `as any` assertions in source modules | Unsafe type coercions bypassing the type system |
+| No `@ts-ignore` or `eslint-disable` directives in source | Suppressed warnings hiding real issues |
+| No default exports in domain layer files | Inconsistent import naming across consumers |
+
+### 2. Structural invariant checks
+
+Some constraints cannot be expressed as ESLint rules because they span multiple files or require AST-level analysis across the project. These are handled by `scripts/lint/enforce-domain-invariants.mjs`:
+
+```bash
+# Run structural checks
+node scripts/lint/enforce-domain-invariants.mjs
+```
+
+The following table summarizes the structural invariants:
+
+| Invariant | Scope |
+|-----------|-------|
+| Every `.tsx` file starts with `'use client'` | `apps/web/app/` and `apps/web/components/` |
+| Port files do not contain `export interface` declarations | `ports/*.ts` across all domains |
+| Domain record types are defined in `domain/` and imported by `ports/` | DDD layer boundaries |
+| No `repositories/` or `services/` directories | Inside `packages/core/src/domains/` |
+| Only `apps/web/lib/auth-token.ts` reads/writes `localStorage` | Entire `apps/web` tree |
+| Env reads go through dedicated env modules only | All source modules |
+| Test files follow colocated naming (`.test.ts`, `.integration.test.ts`) | Entire repo |
+| No `__tests__` directories, `.spec.ts`, or `.integration.ts` files | Entire repo |
+
+### 3. Shell invariant checks
+
+Some invariants are best verified by shell scripts, particularly those involving file system structure, binary availability, or cross-cutting concerns:
+
+```bash
+# Run shell invariant checks
+bash scripts/check-shell-invariants.sh
+```
+
+Shell checks verify that required binaries are available, Docker services are configured correctly, file permissions are set appropriately, and generated files are up to date.
+
+## The unified lint command
+
+All three layers are unified under a single command:
+
+```bash
+pnpm lint
+```
+
+This runs ESLint, structural invariants, and shell invariants in sequence. If any layer fails, the overall command fails. This means a single `pnpm lint` call verifies all architectural constraints.
+
+For less verbose output during iteration:
+
+```bash
+pnpm lint:quiet
+```
+
+## Adding new enforcement
+
+When you discover a convention that is being violated, the process for adding enforcement is:
+
+1. **Identify the class of violation.** Is it an import pattern (ESLint)? A file structure issue (structural)? A system-level concern (shell)?
+2. **Write the check.** Add an ESLint rule, a structural invariant function, or a shell check.
+3. **Verify it catches the violation.** Run the check against the current codebase.
+4. **Fix any existing violations.** The codebase must be green before the check can be enabled.
+5. **Document the constraint in `CLAUDE.md`.** Agents need to know the "why" behind the rule.
+
+This process ensures that every new constraint is immediately actionable. There is no gap between "we decided this" and "this is enforced."
+
+## Why not just code review?
+
+Code review is valuable for intent verification — does this code do what we want? But code review is a poor enforcement mechanism for structural conventions. Different reviewers catch different things, so enforcement is inconsistent. Feedback comes hours or days after the code is written, so the loop is slow. Agents cannot learn from code review comments on other PRs, so it does not scale to AI workflows. And nitpicking structural issues in review is demoralizing for developers, creating unnecessary friction.
+
+Mechanical enforcement handles structural conventions instantly, consistently, and automatically. Code review can then focus on what it does best: verifying intent and catching logical errors.

@@ -1,0 +1,116 @@
+---
+title: Adding Routes
+description: How to add API routes with kind markers, CRUD surfaces, and OpenAPI generation.
+---
+
+# Adding Routes
+
+API routes live in `apps/api/src/routes/` and are built on Effect HttpApi. Each route file must declare an explicit kind marker and register handlers with the API group.
+
+## Kind Markers
+
+Every route file must export a kind marker constant:
+
+```typescript
+// CRUD routes expose list/get/create/update/remove
+export const TasksRouteKind = 'crud' as const
+
+// Custom routes expose domain-specific operations
+export const AuthRouteKind = 'custom' as const
+```
+
+The enforcement layer validates that routes marked `crud` expose the full CRUD surface (list, get, create, update, remove handlers), that routes marked `custom` do not accidentally implement the full CRUD pattern, and that the route kind matches the corresponding repository port kind in the core domain.
+
+## Creating a CRUD Route
+
+A `crud` route follows a predictable pattern. Using tasks as an example:
+
+```typescript
+// apps/api/src/routes/tasks.ts
+import { HttpApiBuilder, HttpServerRequest } from '@effect/platform'
+import { principalFromAuthorization, TaskService } from '@tx-agent-kit/core'
+import { Effect } from 'effect'
+import { TxAgentApi, mapCoreError } from '../api.js'
+
+export const TasksRouteKind = 'crud' as const
+
+export const TasksLive = HttpApiBuilder.group(TxAgentApi, 'tasks', (handlers) =>
+  handlers
+    .handle('listTasks', ({ urlParams }) =>
+      Effect.gen(function* () {
+        const request = yield* HttpServerRequest.HttpServerRequest
+        const principal = yield* principalFromAuthorization(
+          request.headers.authorization
+        ).pipe(Effect.mapError(mapCoreError))
+        const service = yield* TaskService
+        // ... list logic
+      })
+    )
+    .handle('getTask', ({ path }) => /* ... */)
+    .handle('createTask', ({ payload }) => /* ... */)
+    .handle('updateTask', ({ path, payload }) => /* ... */)
+    .handle('removeTask', ({ path }) => /* ... */)
+)
+```
+
+## Creating a Custom Route
+
+Custom routes expose domain-specific operations that don't map to standard CRUD:
+
+```typescript
+// apps/api/src/routes/auth.ts
+export const AuthRouteKind = 'custom' as const
+
+export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) =>
+  handlers
+    .handle('signUp', ({ payload }) => /* ... */)
+    .handle('signIn', ({ payload }) => /* ... */)
+    .handle('me', () => /* ... */)
+    .handle('deleteMe', () => /* ... */)
+)
+```
+
+## Authentication
+
+Most routes extract the authenticated principal from the request:
+
+```typescript
+const request = yield* HttpServerRequest.HttpServerRequest
+const principal = yield* principalFromAuthorization(
+  request.headers.authorization
+).pipe(Effect.mapError(mapCoreError))
+```
+
+## Pagination
+
+List endpoints use the shared `parseListQuery` utility:
+
+```typescript
+import { parseListQuery } from './list-query.js'
+
+const parsed = parseListQuery(urlParams, {
+  defaultSortBy: 'createdAt',
+  allowedSortBy: ['createdAt', 'name'],
+  allowedFilterKeys: ['status']
+})
+```
+
+## After Adding Routes
+
+Regenerate the OpenAPI spec:
+
+```bash
+pnpm openapi:generate
+```
+
+Then regenerate the client hooks:
+
+```bash
+pnpm api:client:generate
+```
+
+Finally, validate:
+
+```bash
+pnpm lint && pnpm type-check && pnpm test
+```

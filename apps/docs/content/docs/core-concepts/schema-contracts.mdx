@@ -1,0 +1,147 @@
+---
+title: Schema Contracts
+description: How effect/Schema provides a single validation layer shared across the entire stack
+---
+
+# Schema Contracts
+
+tx-agent-kit uses `effect/Schema` as the single validation library across the entire stack. No zod, no joi, no yup — one library for all validation, serialization, and API contracts.
+
+## Why a single validation library
+
+Multiple validation libraries create inconsistencies. Imagine Zod in the API, Yup in the frontend, and manual checks in the worker — each with different behavior for edge cases. Schema definitions get duplicated across packages with subtle differences, and there is no guarantee that what the API validates matches what the consumer expects.
+
+`effect/Schema` eliminates this by providing a single schema definition that is shared between the API server and its consumers.
+
+## Contracts in packages/contracts
+
+The `packages/contracts` package contains shared API schemas:
+
+```typescript
+// packages/contracts/src/tasks/task.ts
+
+import { Schema } from "effect"
+
+export class CreateTaskRequest extends Schema.Class<CreateTaskRequest>("CreateTaskRequest")({
+  workspaceId: Schema.String,
+  title: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(200)),
+  description: Schema.NullOr(Schema.String),
+}) {}
+
+export class TaskResponse extends Schema.Class<TaskResponse>("TaskResponse")({
+  id: Schema.String,
+  workspaceId: Schema.String,
+  title: Schema.String,
+  description: Schema.NullOr(Schema.String),
+  status: Schema.Literal("open", "in_progress", "completed", "cancelled"),
+  assigneeId: Schema.NullOr(Schema.String),
+  createdAt: Schema.DateFromString,
+  updatedAt: Schema.DateFromString,
+}) {}
+```
+
+These schemas serve multiple purposes:
+
+1. The Effect HttpApi server uses them to validate incoming API requests.
+2. Responses are serialized through the schema, ensuring type safety.
+3. The schemas produce the OpenAPI spec that documents the API.
+4. The web and mobile clients generate typed hooks from the OpenAPI spec.
+
+## Effect schemas in packages/db
+
+The database layer has its own set of effect schemas in `packages/db/src/effect-schemas/`. These schemas maintain **table-to-schema parity** — every Drizzle table has a corresponding effect schema:
+
+```typescript
+// packages/db/src/effect-schemas/task.ts
+
+import { Schema } from "effect"
+
+export class TaskSchema extends Schema.Class<TaskSchema>("TaskSchema")({
+  id: Schema.String,
+  workspaceId: Schema.String,
+  title: Schema.String,
+  description: Schema.NullOr(Schema.String),
+  status: Schema.Literal("open", "in_progress", "completed", "cancelled"),
+  assigneeId: Schema.NullOr(Schema.String),
+  createdAt: Schema.Date,
+  updatedAt: Schema.Date,
+}) {}
+```
+
+These schemas decode database rows into typed domain records, validate data at the persistence boundary, and ensure the database schema and the TypeScript types stay in sync.
+
+## The two schema layers
+
+It is important to understand why there are two sets of schemas:
+
+| Schema | Location | Purpose |
+|--------|----------|---------|
+| **Contract schemas** | `packages/contracts` | API-facing. Define request/response shapes. Use `DateFromString` for JSON serialization. |
+| **Effect schemas** | `packages/db/src/effect-schemas` | DB-facing. Define table row shapes. Use `Date` directly. |
+
+The contract schemas handle JSON serialization concerns (dates as strings, nested objects). The DB schemas handle database row mapping. They are intentionally separate because the API shape and the database shape are often different.
+
+## Using schemas in routes
+
+The Effect HttpApi automatically validates requests against contract schemas:
+
+```typescript
+// apps/api — route definition
+const TaskRoutes = HttpApiGroup.make("tasks").pipe(
+  HttpApiGroup.add(
+    HttpApiEndpoint.post("createTask", "/v1/tasks")
+      .setPayload(CreateTaskRequest)    // Validates request body
+      .addSuccess(TaskResponse)         // Serializes response
+      .addError(UnauthorizedError, { status: 401 })
+  ),
+)
+```
+
+If a request does not match the `CreateTaskRequest` schema, the API returns a 400 error with validation details automatically. No manual validation code is needed in the route handler.
+
+## Generating clients from schemas
+
+The contract schemas produce an OpenAPI specification:
+
+```bash
+pnpm openapi:generate   # Generates apps/api/openapi.json
+```
+
+From this spec, typed API client hooks are generated for the web app:
+
+```bash
+pnpm api:client:generate  # Generates typed hooks from OpenAPI spec
+```
+
+This creates a chain of type safety:
+
+```
+effect/Schema (source of truth)
+  → OpenAPI spec (generated)
+    → TypeScript API client (generated)
+      → React hooks (generated)
+```
+
+If a schema changes, the generated chain updates automatically. The web app gets compile-time errors if it uses an outdated API shape.
+
+## Factories for test data
+
+Every DB effect schema has a corresponding factory in `packages/db/src/factories/`:
+
+```typescript
+// packages/db/src/factories/task.factory.ts
+
+export const makeTask = (overrides?: Partial<TaskRecord>): TaskRecord => ({
+  id: `task-${randomId()}`,
+  workspaceId: `ws-${randomId()}`,
+  title: "Test Task",
+  description: null,
+  status: "open",
+  assigneeId: null,
+  createdAt: new Date("2024-01-01"),
+  updatedAt: new Date("2024-01-01"),
+  ...overrides,
+})
+```
+
+Factories maintain **table-to-factory parity** — every table has a factory. This is enforced as an architectural invariant.

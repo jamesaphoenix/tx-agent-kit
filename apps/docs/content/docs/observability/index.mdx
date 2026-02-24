@@ -1,0 +1,79 @@
+---
+title: Observability Overview
+description: OpenTelemetry-native observability with traces, metrics, and structured logs
+---
+
+# Observability Overview
+
+tx-agent-kit is built with OpenTelemetry-native observability. All three signal types — traces, metrics, and logs — are exported via OTLP to a centralized collector that routes them to the appropriate backend.
+
+## Architecture
+
+```
+Application (API / Worker)
+    |
+    | OTLP HTTP (port 4318)
+    v
+OTEL Collector
+    |
+    +---> Jaeger (traces)
+    +---> Prometheus (metrics)
+    +---> Loki (logs via Promtail)
+    +---> GCP Cloud Trace / Cloud Monitoring (staging/prod)
+```
+
+Applications never send telemetry directly to backends. The OTEL Collector acts as a single ingestion point and handles routing, batching, and retry logic. This decouples application instrumentation from backend choice.
+
+## Packages
+
+Two internal packages provide the observability foundation.
+
+### `@tx-agent-kit/observability`
+
+Bootstraps the OpenTelemetry Node SDK with trace, metric, and log exporters. Each application calls `startTelemetry(serviceName)` at startup to initialize the SDK.
+
+The package configures trace export via `OTLPTraceExporter`, metric export via `OTLPMetricExporter` with a 5-second periodic export interval, and log export via `OTLPLogExporter` (configurable through `OTEL_LOGS_EXPORTER`). Service resource attributes include `service.name` and `deployment.environment`.
+
+### `@tx-agent-kit/logging`
+
+Structured logging library that writes JSON to stdout and simultaneously emits OTEL log records. `console.*` is banned project-wide via ESLint — all logging must go through this package.
+
+The library produces structured JSON output with `timestamp`, `level`, `service`, `message`, and `context` fields. It automatically emits OTEL log records alongside stdout output and supports child loggers with scoped service names. Utility functions include `logError`, `logProgress`, `logStateChange`, and `logPerformance`.
+
+## Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | Collector endpoint |
+| `OTEL_LOGS_EXPORTER` | `otlp` | Log exporter (`otlp` or `none`) |
+| `OTEL_LOG_LEVEL` | — | Set to `debug` for OTEL diagnostics |
+| `OTEL_COLLECTOR_BACKEND` | `gcp` | Backend selector for staging/prod (`gcp` or `oss`) |
+
+## Local vs. production
+
+| Signal | Local backend | Production backend |
+|--------|--------------|-------------------|
+| Traces | Jaeger (`localhost:16686`) | GCP Cloud Trace |
+| Metrics | Prometheus (`localhost:9090`) | GCP Cloud Monitoring |
+| Logs | Loki via Promtail (`localhost:3100`) | GCP Cloud Logging |
+
+The OTEL Collector configuration switches between backends based on `OTEL_COLLECTOR_BACKEND`. Local development uses the `oss` backends (Jaeger, Prometheus, Loki). Staging and production use `gcp` backends (Cloud Trace, Cloud Monitoring, Cloud Logging).
+
+## Verification
+
+```bash
+# Run observability smoke test
+pnpm test:infra:observability
+
+# Emit test spans and metrics
+pnpm tsx scripts/test/emit-observability-smoke.ts
+```
+
+## Related pages
+
+| Page | Description |
+|------|-------------|
+| [Logging](/docs/observability/logging) | Structured logging with `@tx-agent-kit/logging` |
+| [Tracing](/docs/observability/tracing) | Distributed tracing with OpenTelemetry |
+| [Metrics](/docs/observability/metrics) | Application and infrastructure metrics |
+| [Monitoring Stack](/docs/observability/monitoring-stack) | Local and production monitoring tools |

@@ -1,0 +1,41 @@
+---
+title: Contracts
+description: Shared API schemas and types using effect/Schema for validation and contract boundaries.
+---
+
+# Contracts (`packages/contracts`)
+
+The contracts package defines shared API schemas and types that are consumed by both the API server and client applications. All validation is done with `effect/Schema` — Zod is banned from the project.
+
+## Purpose
+
+Contracts provide a single source of truth for request/response payload shapes, enum types and value sets (such as task statuses, invitation statuses, and member roles), and shared type definitions imported by domain and API layers.
+
+## Usage
+
+Contracts are imported by the API routes for request validation and by the domain layer for type definitions:
+
+```typescript
+// Used in domain layer
+import { type TaskStatus, taskStatuses } from '@tx-agent-kit/contracts'
+
+// Used in API route validation
+import { CreateWorkspaceSchema } from '@tx-agent-kit/contracts'
+```
+
+## Schema-First Boundaries
+
+The project enforces schema-first validation at all system boundaries. Rather than using raw types, data crossing trust boundaries (API input, database results) must be decoded through `effect/Schema`:
+
+```typescript
+import { Schema } from 'effect'
+
+export const TaskStatusSchema = Schema.Literal('open', 'in_progress', 'done', 'cancelled')
+export type TaskStatus = Schema.Schema.Type<typeof TaskStatusSchema>
+
+export const taskStatuses = ['open', 'in_progress', 'done', 'cancelled'] as const
+```
+
+## Governance
+
+`effect/Schema` is the only validation library allowed; Zod imports will fail lint checks. Contract types are consumed by `packages/core` domain layers through re-exports. The API server's `openapi.json` is generated from these contract definitions, ensuring the spec always matches the runtime validation.

@@ -1,0 +1,81 @@
+---
+title: Deployment Overview
+description: Container-based deployment model for staging and production environments
+---
+
+# Deployment Overview
+
+tx-agent-kit deploys staging and production environments using immutable container images managed through Docker Compose. The deployment pipeline is fully scriptable and secrets-free in the repository.
+
+## Deployment model
+
+The deployment workflow has four stages:
+
+1. Build images — build and optionally push container images for `api` and `worker`.
+2. Run migrations — apply database schema changes to the target environment.
+3. Deploy with Compose — render secrets, pull images, start services, run smoke checks.
+4. Smoke tests — verify critical API flows are working in the deployed environment.
+
+## What gets deployed
+
+| Component | Deployment method |
+|-----------|------------------|
+| **API** | Container image via Docker Compose |
+| **Worker** | Container image via Docker Compose |
+| **OTEL Collector** | Container via Docker Compose |
+| **Web** | Deployed separately (e.g., Vercel, static hosting) |
+| **Mobile** | Deployed separately (e.g., EAS, App Store) |
+
+The API and Worker are the only components deployed as containers from this repository. The web and mobile apps are deployed through their respective platforms and configured to point at the deployed API via `API_BASE_URL`.
+
+## Secrets handling
+
+All deployment secrets are stored in 1Password vaults and referenced via `op://` URIs in the environment templates `deploy/env/staging.env.template` and `deploy/env/prod.env.template`.
+
+During deployment, `op inject` resolves these references into a rendered `.env` file that is passed to Docker Compose. The rendered file is never committed to git.
+
+## Environment configuration
+
+Both staging and production environments share the same configuration structure:
+
+| Variable | Source |
+|----------|--------|
+| `DATABASE_URL` | 1Password (`op://octospark-services/<env>/DATABASE_URL`) |
+| `AUTH_SECRET` | 1Password |
+| `TEMPORAL_ADDRESS` | 1Password |
+| `API_CORS_ORIGIN` | 1Password |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Literal (`http://otel-collector:4318`) |
+| `OTEL_COLLECTOR_BACKEND` | Literal (`gcp` or `oss`) |
+| `GOOGLE_CLOUD_PROJECT` | 1Password (for GCP telemetry) |
+
+## Quick reference
+
+```bash
+# Build container images
+pnpm deploy:build-images
+
+# Push images and pin digests
+PUSH_IMAGES=1 pnpm deploy:build-images
+
+# Run migrations
+pnpm deploy:migrate:staging
+pnpm deploy:migrate:prod
+
+# Deploy to staging
+pnpm deploy:staging
+
+# Deploy to production
+pnpm deploy:prod
+
+# Run smoke tests against a deployed environment
+API_BASE_URL=https://api.example.com pnpm deploy:smoke
+```
+
+## Related pages
+
+| Page | Description |
+|------|-------------|
+| [Build Images](/docs/deployment/build-images) | Image build and push pipeline |
+| [Migrations](/docs/deployment/migrations) | Database migration workflow |
+| [Deploy with Compose](/docs/deployment/deploy-compose) | Full deployment process |
+| [Smoke Tests](/docs/deployment/smoke-tests) | Post-deployment verification |

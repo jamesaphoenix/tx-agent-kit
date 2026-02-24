@@ -1,0 +1,92 @@
+---
+title: Build Images
+description: Building and pushing immutable container images for API and Worker services
+---
+
+# Build Images
+
+The `deploy:build-images` script builds Docker container images for the API and Worker services. These images are tagged with the current git SHA and optionally pushed to a container registry with pinned digests.
+
+## Usage
+
+```bash
+# Build images locally (no push)
+pnpm deploy:build-images
+
+# Build and push images, pinning digests
+PUSH_IMAGES=1 pnpm deploy:build-images
+```
+
+## What it builds
+
+The script builds two container images:
+
+| Image | Source | Base |
+|-------|--------|------|
+| `tx-agent-kit-api` | `apps/api` | Node.js 22 Alpine |
+| `tx-agent-kit-worker` | `apps/worker` | Node.js 22 Alpine |
+
+Both images are built from the monorepo root using multi-stage Dockerfiles. The build context includes the full monorepo to resolve internal package dependencies via pnpm workspaces.
+
+## Image tagging
+
+Images are tagged with the current git commit SHA:
+
+```
+tx-agent-kit-api:a1b2c3d
+tx-agent-kit-worker:a1b2c3d
+```
+
+## Pushing and pinning digests
+
+When `PUSH_IMAGES=1` is set, the script:
+
+1. Pushes both images to the configured container registry.
+2. Retrieves the immutable digest for each pushed image.
+3. Writes an artifact file at `deploy/artifacts/images-<sha>.env` containing pinned image references.
+
+The artifact file looks like:
+
+```bash
+API_IMAGE=registry.example.com/tx-agent-kit-api@sha256:abc123...
+WORKER_IMAGE=registry.example.com/tx-agent-kit-worker@sha256:def456...
+```
+
+## Using artifacts in deployment
+
+The artifact `.env` file is passed to the deploy script to ensure the exact images that were built and tested are deployed:
+
+```bash
+# Build and push
+PUSH_IMAGES=1 pnpm deploy:build-images
+
+# Deploy staging with the artifact
+pnpm deploy:staging deploy/artifacts/images-a1b2c3d.env
+```
+
+This guarantees reproducible deployments — the deployed images are identified by content digest, not mutable tags.
+
+## Build cache
+
+Docker layer caching applies automatically. Subsequent builds that do not change application code or dependencies reuse cached layers. The multi-stage build separates dependency installation from application code, so `pnpm install` layers are cached until `package.json` or `pnpm-lock.yaml` change.
+
+## CI integration
+
+In CI pipelines, the typical workflow is:
+
+```bash
+# Install dependencies
+pnpm install --frozen-lockfile
+
+# Run quality checks
+pnpm lint && pnpm type-check && pnpm test
+
+# Build and push images
+PUSH_IMAGES=1 pnpm deploy:build-images
+
+# Deploy to staging
+pnpm deploy:staging deploy/artifacts/images-$(git rev-parse --short HEAD).env
+
+# Smoke test staging
+API_BASE_URL=https://staging-api.example.com pnpm deploy:smoke
+```

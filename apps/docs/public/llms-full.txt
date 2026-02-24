@@ -1,0 +1,214 @@
+# tx-agent-kit
+
+> You tell the agent what to build. The agent builds it. The repo makes sure the agent builds it right.
+
+This is a production TypeScript monorepo built for the way software is actually made now: you describe what you want, an AI agent writes the code, and 50+ mechanical checks make damn sure the result is clean. Effect HTTP for the API. Temporal for durable workflows. Next.js for the web client. Drizzle for the database. Expo for mobile. Every architectural rule is enforced by code, not documentation.
+
+This file is the map. Each section below tells you what you'll find and exactly where to find it.
+
+
+## Start here
+
+/docs
+Your orientation point. What tx-agent-kit is, what's included, and where to go next depending on what you're trying to do.
+
+/docs/getting-started/local-setup
+Get the whole thing running locally. Clone, pnpm install, configure env, spin up Docker infra, run migrations, start all services. You'll have a web app on port 3000 and an API on port 4000 inside of 5 minutes.
+
+/docs/getting-started/first-domain
+Build your first real feature. One command (`pnpm scaffold:crud`) generates your domain layer, ports, application logic, adapters, routes, and tests. You fill in the business rules. The rest is wired for you.
+
+
+## The philosophy: why this exists
+
+/docs/philosophy
+The thesis. Software engineering has always been two jobs: deciding what to build and building it. Agents are getting scary good at the second job. This repo is designed to let them rip while keeping the architecture clean.
+
+/docs/philosophy/why-different
+Most boilerplates give you a README full of conventions and hope you follow them. This one gives you lint rules that fail your build if you don't. The difference between "please don't import drizzle-orm outside packages/db" and "you literally cannot import drizzle-orm outside packages/db."
+
+/docs/philosophy/operating-model
+You write the acceptance criteria. You define what the feature should do. The agent reads CLAUDE.md, runs the scaffold, writes the code, and iterates against the linter until everything passes. When the agent hits a wall, you improve the scaffolding so it doesn't hit that wall again.
+
+/docs/philosophy/mechanical-enforcement
+The core belief: if a rule is important enough to write down, it's important enough to enforce automatically. Three layers do the enforcing: ESLint rules catch bad imports and patterns, a structural invariant script catches cross-file inconsistencies, and shell scripts validate env governance and integration baselines.
+
+
+## Architecture: how it all fits together
+
+/docs/architecture
+The 30,000-foot view. Four apps (API, web, worker, mobile), eight shared packages (core, db, contracts, auth, logging, observability, testkit, tooling), strict boundaries between all of them.
+
+/docs/architecture/monorepo-structure
+The detailed breakdown. What each app does, what each package owns, and why the boundaries are where they are. apps/api serves the Effect HttpApi. apps/web is a client-only Next.js SPA that never touches the database. apps/worker runs Temporal workflows. apps/mobile is Expo React Native. The packages provide the shared guts.
+
+/docs/architecture/ddd-pattern
+Every domain follows the same structure: domain/ holds your entities and pure business rules, ports/ defines the interfaces, application/ orchestrates use cases, adapters/ implement the ports. No repositories/ or services/ folders in core domains; concrete persistence lives in packages/db/src/repositories/. This isn't optional. It's enforced.
+
+/docs/architecture/dependency-flow
+Dependencies always point inward. Domain code knows nothing about infrastructure. Ports know about domain, nothing else. Application knows about domain and ports. Adapters know about domain and ports. ESLint boundary rules make illegal imports a build error, not a code review comment.
+
+/docs/architecture/data-flow
+Follow a request from the user's browser all the way through: Web (client SPA) hits the API (Effect HTTP), which calls into Core (domain logic), which reads/writes through DB (Drizzle/Postgres). Async work flows through Temporal. The web app never talks to the database. Ever.
+
+
+## Core concepts: the technical foundation
+
+/docs/core-concepts
+A quick tour of the four big ideas that power everything: Effect services for dependency injection, domain modeling for business rules, ports and adapters for decoupling, and effect/Schema for contracts.
+
+/docs/core-concepts/effect-services
+Effect is the runtime backbone. Services declare their dependencies with Effect.Tag. Layers wire implementations together. Typed errors propagate through the stack. Effect.run* only appears at explicit runtime boundaries (app entrypoints). If you're working on the API, worker, or core packages, you'll use Effect constantly. The web app never touches it.
+
+/docs/core-concepts/domain-modeling
+Your business rules live in domain/ directories as pure functions. No side effects. No Date.now(). No Math.random(). When you need the current time, you inject it through a port. This makes domain code trivially testable and keeps agents from introducing non-determinism.
+
+/docs/core-concepts/ports-and-adapters
+Ports are the contracts your domain depends on. They say "I need something that can save a user" without caring whether it's Postgres, an in-memory store, or a mock. Adapters are the implementations. Port files import Record types from domain/. The actual database code lives in packages/db/src/repositories/.
+
+/docs/core-concepts/schema-contracts
+effect/Schema is the only validation library in this repo. Zod is banned by ESLint. Contracts defined in packages/contracts are shared by API routes, web clients, and mobile clients. Table-aligned effect schemas in packages/db/src/effect-schemas/ maintain parity with every Drizzle table.
+
+
+## The apps: what each one does and how it's constrained
+
+/docs/apps/api
+The Effect HttpApi server. Handles auth (sign-up, sign-in, token verification), workspaces, tasks, and invitations with idempotency. Every route declares itself as crud or custom. Generates its OpenAPI spec with `pnpm openapi:generate`. Integration tests use the standardized createDbAuthContext harness.
+
+/docs/apps/web
+A client-only Next.js SPA. The constraints are aggressive: no app/api routes, no proxy.ts, no middleware.ts, no next/server or next/headers imports. Every .tsx file starts with 'use client'. No Effect, no Drizzle. localStorage access goes through auth-token.ts. URL state through url-state.tsx. Notifications through notify.tsx. Fetch is banned; use the typed API client generated from OpenAPI.
+
+/docs/apps/worker
+The Temporal worker. Workflows must be deterministic: no Date.now, no new Date, no Math.random, no setTimeout, no setInterval, no infrastructure imports. Activities are where side effects happen. Each git worktree gets its own Temporal task queue to avoid collisions.
+
+/docs/apps/mobile
+Expo React Native. Consumes the same API as the web app, same contracts. Has component test suites covering AuthForm, CreateWorkspaceForm, CreateTaskForm, CreateInvitationForm, AcceptInvitationForm, SignOutButton, and AuthBootstrapProvider, plus unit tests for env, auth-token, axios, client-api, client-auth, url-state, and session-store.
+
+
+## The packages: shared building blocks
+
+/docs/packages/core
+The DDD domain slices live here under packages/core/src/domains/<domain>/. Strict layer direction: domain → ports → application → adapters. Named exports only. No default exports. No Date.now or Math.random. Determinism is lint-enforced.
+
+/docs/packages/db
+The only package allowed to import drizzle-orm. Schema at src/schema.ts. One Effect schema per table in src/effect-schemas/. One factory per table in src/factories/. Concrete repository implementations in src/repositories/. Migrations managed by Drizzle. pgTAP suites in pgtap/ validate trigger contracts.
+
+/docs/packages/contracts
+Shared API schemas using effect/Schema. The request/response shapes used by API routes, web hooks, and mobile clients all come from here. One source of truth for what data looks like across the entire stack.
+
+/docs/packages/auth
+Password hashing and JWT tokens. Deliberately thin. No domain logic. Just the cryptographic primitives the API auth endpoints need.
+
+/docs/packages/logging
+Structured JSON logger. Writes to stdout. Emits OTEL log records. console.* is ESLint-banned everywhere. createLogger gives you child loggers, logError, logPerformance, logStateChange, logProgress.
+
+/docs/packages/observability
+OpenTelemetry Node SDK bootstrap. Call startTelemetry(serviceName) and you get trace, metric, and log exporters pointing at OTEL_EXPORTER_OTLP_ENDPOINT. The collector routes signals to Jaeger/Prometheus/Loki locally, or Cloud Trace/Monitoring/Logging in prod.
+
+/docs/packages/testkit
+Shared test utilities. Integration harnesses with createDbAuthContext. Lock-guarded runners that prevent overlapping integration tests from clobbering each other. DB reset helpers for clean-slate testing.
+
+/docs/packages/tooling
+ESLint configurations: base rules, boundary enforcement, domain invariants, promise handling, testing overrides. Also houses the scaffold CLI that powers `pnpm scaffold:crud`.
+
+
+## Guides: do the thing
+
+/docs/guides/adding-a-domain
+The golden path, step by step. Dry-run the scaffold first. Generate the code. Add your contracts in packages/contracts. Wire the domain logic. Update the DB schema if needed. Add effect-schemas and factories to maintain parity. Expose the API routes. Regenerate OpenAPI. Regenerate web/mobile clients. Run `pnpm lint && pnpm type-check && pnpm test`. Ship it.
+
+/docs/guides/adding-routes
+Routes go in apps/api. Each one declares itself as crud (full CRUD surface: list, getById, create, update, remove) or custom (specific operations only). Kind markers are enforced by the structural invariant checker. After adding routes, run `pnpm openapi:generate` to update the spec.
+
+/docs/guides/adding-workflows
+Temporal workflows are written as pure, deterministic functions. No Date.now, no native timers, no infrastructure imports inside a workflow. Activities do the I/O and side effects. The worker integration suite verifies idempotent processing behavior.
+
+/docs/guides/adding-db-triggers
+One command does most of the work: `pnpm db:trigger:new --name <trigger-name> --table <table>`. It scaffolds the migration SQL and a pgTAP test skeleton. You implement the trigger logic, write real assertions in the pgTAP file, then run `pnpm db:migrate && pnpm test:db:pgtap`.
+
+/docs/guides/testing-strategy
+Four levels. Unit tests with Vitest (`pnpm test`), colocated as file.test.ts. Integration tests against Docker infra (`pnpm test:integration`), lock-guarded and idempotent. pgTAP tests for database trigger contracts. Smoke tests against deployed environments. Quiet runners (`pnpm test:quiet`, `pnpm test:integration:quiet`) keep agent output lean.
+
+/docs/guides/generating-api-client
+`pnpm openapi:generate` pulls the spec from Effect HttpApi route definitions into apps/api/openapi.json. `pnpm api:client:generate` runs that plus Orval to generate typed React Query hooks for both web and mobile. Three commands, fully typed clients.
+
+
+## Enforcement: the rules and how they're enforced
+
+/docs/enforcement
+The enforcement philosophy in one sentence: `pnpm lint` runs three layers of checks and if any one of them fails, your code doesn't merge. ESLint catches import violations and banned patterns. A structural invariant script catches cross-file inconsistencies ESLint can't see. Shell scripts validate env governance and integration baselines.
+
+/docs/enforcement/eslint-rules
+What ESLint catches: no drizzle-orm imports outside packages/db. No effect/effect/* in apps/web. No console.* anywhere (use the logging package). No `as any`. No chained type assertions. No `@ts-ignore` or `eslint-disable` in source. No default exports in domain layer files. No direct process.env in domain/service code. Package boundaries enforced via eslint-plugin-boundaries.
+
+/docs/enforcement/structural-checks
+What scripts/lint/enforce-domain-invariants.mjs catches: every pgTable must have a matching Effect schema file and a matching factory file. Route and repository kind markers (crud/custom) must be consistent with actual surface area. Core domain folders must follow the prescribed structure. No TODO/FIXME/HACK in source. Test files must be colocated (no __tests__/ dirs, no .spec.ts).
+
+/docs/enforcement/shell-invariants
+What scripts/check-shell-invariants.sh catches: source modules in apps/ and packages/ must read env through dedicated env modules, not scattered process.env. Integration test baselines must cover required endpoint sets. CI environment variables must be properly configured.
+
+/docs/enforcement/closed-invariants
+Every single enforced rule in one place, organized by category. API-first web, client-only runtime, component contracts, storage/transport/URL-state/notification centralization, logging discipline, drizzle isolation, schema-first boundaries, table parity, contract governance, kind governance, layer direction, legibility, source hygiene, determinism, temporal determinism, env governance, suppression governance, type safety, error handling, test colocation, integration baselines, trigger coverage.
+
+
+## Infrastructure: the local and remote stack
+
+/docs/infrastructure
+Two worlds. Docker runs the shared services (Postgres, Temporal, Redis, OTEL collector, observability UIs). Your apps run as regular Node processes for fast hot-reload. This split is intentional: infra changes rarely, apps change constantly.
+
+/docs/infrastructure/docker-stack
+The full Docker Compose stack: PostgreSQL on 5432, Temporal on 7233 (UI on 8233), Redis on 6379, OTEL Collector on 4318/4317, Jaeger on 16686, Prometheus on 9090, Grafana on 3001, Loki on 3100. `pnpm infra:ensure` starts everything idempotently. `pnpm infra:down` stops it.
+
+/docs/infrastructure/local-development
+The four-step workflow: `pnpm env:configure` seeds your .env with safe defaults, `pnpm infra:ensure` spins up Docker, `pnpm db:migrate` applies Drizzle migrations, `pnpm dev` starts web, API, and worker. Use `dev:web`, `dev:api`, `dev:worker`, or `dev:mobile` individually.
+
+/docs/infrastructure/worktrees
+Working on multiple branches simultaneously? `pnpm worktree:ports <name>` generates deterministic, collision-free ports from the worktree name. scripts/worktree/setup.sh writes a .env with isolated WORKTREE_PORT_OFFSET, WEB_PORT, API_PORT, MOBILE_PORT, WORKER_INSPECT_PORT, TEMPORAL_TASK_QUEUE, and API_BASE_URL. All worktrees share the same Docker infra containers.
+
+/docs/infrastructure/secrets-management
+Secrets never live in plaintext .env files in git. 1Password CLI (op) handles everything. .env.dev and .env.prod are committed with op:// references. `op inject` renders real values at deploy time. .env files are gitignored. `pnpm env:configure` generates safe local defaults without touching 1Password.
+
+
+## Observability: see what your code is doing
+
+/docs/observability
+Everything goes through OpenTelemetry. Traces, metrics, and logs all export via OTLP to a collector. The collector routes signals to the right backend: Jaeger/Prometheus/Loki locally, Cloud Trace/Cloud Monitoring/Cloud Logging in production.
+
+/docs/observability/logging
+@tx-agent-kit/logging gives you structured JSON on stdout plus OTEL log record emission. console.* is banned. createLogger(service) returns a logger with child loggers, logError, logPerformance, logStateChange, and logProgress helpers.
+
+/docs/observability/tracing
+Distributed tracing via OpenTelemetry. packages/observability bootstraps the OTLPTraceExporter. W3C Trace Context propagates across HTTP boundaries. Locally, traces go to Jaeger on port 16686. In production, Cloud Trace.
+
+/docs/observability/metrics
+Application metrics via the OTEL SDK with a 5-second periodic export interval. Counters, histograms, UpDownCounters. Locally, Prometheus scrapes on port 9090 via OTLP receiver. In production, GCP Cloud Monitoring.
+
+/docs/observability/monitoring-stack
+The full picture. Local stack: Jaeger for traces (16686), Prometheus for metrics (9090), Grafana for dashboards (3001), Loki for logs (3100). Production: set OTEL_COLLECTOR_BACKEND to gcp or oss. MCP servers (`pnpm mcp:prometheus`, `pnpm mcp:jaeger`) let agents query telemetry directly.
+
+
+## Deployment: get it to production
+
+/docs/deployment
+The deployment model: API and worker ship as immutable Docker containers. Web and mobile are deployed separately on their own platforms. The pipeline is: build images, run migrations, deploy via Compose, run smoke tests. Secrets come from 1Password CLI.
+
+/docs/deployment/build-images
+`pnpm deploy:build-images` builds API and worker container images. Set PUSH_IMAGES=1 to push and get digest-pinned references. The output is deploy/artifacts/images-<sha>.env containing API_IMAGE and WORKER_IMAGE. These artifacts make deployments reproducible.
+
+/docs/deployment/migrations
+`pnpm deploy:migrate:staging` and `pnpm deploy:migrate:prod` run Drizzle migrations against the target database. The DB URL is resolved from 1Password via `op read`. Always migrate staging first.
+
+/docs/deployment/deploy-compose
+`pnpm deploy:staging` or `pnpm deploy:prod`, optionally with an artifact env file. Under the hood: `op inject` renders the env template with real secrets, image references from the artifact are injected, `docker compose pull` and `up -d`, then smoke checks run automatically (RUN_SMOKE=1 by default). OTEL collector backend is configurable.
+
+/docs/deployment/smoke-tests
+`API_BASE_URL=https://<host> pnpm deploy:smoke` hits every critical path: /health, auth sign-up + /v1/auth/me, workspace create/list, task create/list, invitation create/list/accept with idempotency verification. Random test data prevents collisions across runs.
+
+
+## Reference
+
+/docs/api-reference
+Auto-generated from apps/api/openapi.json. Run `pnpm docs:api:generate` to regenerate. Four endpoint groups: Auth (/v1/auth/*), Workspaces (/v1/workspaces/*), Tasks (/v1/tasks/*), Invitations (/v1/invitations/*). Bearer JWT auth. Cursor-based pagination.
+
+/docs/commands
+Every pnpm script in the repo, organized by what you're trying to do: development (dev, env:configure, infra:ensure, scaffold:crud), quality gates (lint, type-check, test, all with quiet variants), database (db:migrate, db:trigger:new, db:studio), deployment (build-images, migrate, deploy, smoke), and MCP servers (prometheus, jaeger, context7, supabase, playwright).

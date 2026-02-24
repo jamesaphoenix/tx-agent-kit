@@ -1,0 +1,4 @@
+{
+  "title": "Core Concepts",
+  "pages": ["index", "effect-services", "domain-modeling", "ports-and-adapters", "schema-contracts"]
+}

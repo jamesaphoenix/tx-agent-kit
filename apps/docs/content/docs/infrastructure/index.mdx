@@ -1,0 +1,70 @@
+---
+title: Infrastructure Overview
+description: Docker services for shared infrastructure, local process runners for applications
+---
+
+# Infrastructure Overview
+
+tx-agent-kit splits infrastructure into two layers: **shared services** managed by Docker Compose, and **application processes** run as local Node.js processes during development.
+
+## Shared infrastructure (Docker)
+
+All backing services run inside Docker containers through a single `docker-compose.yml` with the `infra` profile. These services are shared across all git worktrees.
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| PostgreSQL | 5432 | Application database |
+| Temporal Server | 7233 | Workflow orchestration |
+| Temporal UI | 8233 | Temporal dashboard |
+| Redis | 6379 | Caching and session state |
+| OTEL Collector | 4318 (HTTP), 4317 (gRPC) | Telemetry signal routing |
+| Jaeger | 16686 | Distributed trace viewer |
+| Prometheus | 9090 | Metrics storage and querying |
+| Grafana | 3001 | Dashboards and visualization |
+| Loki | 3100 | Log aggregation |
+
+The `pnpm infra:ensure` command starts all services idempotently — if they are already running, it exits immediately. Services are health-checked before the command returns.
+
+## Application processes (local Node.js)
+
+During development, applications run as local Node.js processes managed by Turborepo.
+
+| Application | Package | Description | Port |
+|-------------|---------|-------------|------|
+| API | `apps/api` | Effect HTTP server | 4000 |
+| Web | `apps/web` | Next.js dev server | 3000 |
+| Worker | `apps/worker` | Temporal worker process | — |
+| Mobile | `apps/mobile` | Expo development server | 8081 |
+
+This split is intentional. Infrastructure services are long-lived and shared; application code changes frequently and benefits from fast local reload.
+
+## Why not Docker for everything?
+
+Running applications inside containers during development adds friction: slower rebuilds, volume mount overhead, and debugging complexity. By keeping infra in Docker and apps as local processes, you get the reliability of containerized services with the speed of native Node.js hot-reload.
+
+In staging and production, applications are deployed as container images. The `deploy:build-images` script builds immutable images for `api` and `worker`. See [Deployment](/docs/deployment) for details.
+
+## Quick start
+
+```bash
+# Configure local environment variables
+pnpm env:configure
+
+# Start Docker infrastructure
+pnpm infra:ensure
+
+# Run database migrations
+pnpm db:migrate
+
+# Start all applications
+pnpm dev
+```
+
+## Related pages
+
+| Page | Description |
+|------|-------------|
+| [Docker Stack](/docs/infrastructure/docker-stack) | Service configuration details |
+| [Local Development](/docs/infrastructure/local-development) | Full development workflow |
+| [Worktrees](/docs/infrastructure/worktrees) | Parallel development with git worktrees |
+| [Secrets Management](/docs/infrastructure/secrets-management) | 1Password CLI integration |

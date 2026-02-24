@@ -1,0 +1,170 @@
+---
+title: Ports and Adapters
+description: How abstract interfaces decouple domain logic from infrastructure implementations
+---
+
+# Ports and Adapters
+
+The ports and adapters pattern (also known as hexagonal architecture) is central to tx-agent-kit's design. Ports define abstract capability contracts. Adapters implement those contracts with concrete infrastructure.
+
+## Ports: defining contracts
+
+A port is a type alias that describes what a capability does, without specifying how it does it:
+
+```typescript
+// packages/core/src/domains/tasks/ports/task-repository.port.ts
+
+import type { TaskRecord, TaskStatus } from "../domain/task.js"
+
+export type TaskRepositoryPort = {
+  readonly findById: (id: string) => Effect.Effect<TaskRecord | null>
+  readonly create: (input: CreateTaskInput) => Effect.Effect<TaskRecord>
+  readonly updateStatus: (id: string, status: TaskStatus) => Effect.Effect<TaskRecord>
+  readonly listByWorkspace: (workspaceId: string) => Effect.Effect<ReadonlyArray<TaskRecord>>
+  readonly delete: (id: string) => Effect.Effect<void>
+}
+
+export type CreateTaskInput = {
+  readonly workspaceId: string
+  readonly title: string
+  readonly description: string | null
+}
+```
+
+### Port rules
+
+Ports in tx-agent-kit follow strict conventions enforced by structural invariant checks.
+
+Port files must use `export type` instead of `export interface`. This is a mechanical enforcement — the structural invariant script checks for `export interface` in any file under `ports/` and fails the build if found.
+
+```typescript
+// WRONG — will fail structural invariant check
+export interface TaskRepositoryPort {
+  findById(id: string): Effect.Effect<TaskRecord | null>
+}
+
+// CORRECT — use export type
+export type TaskRepositoryPort = {
+  readonly findById: (id: string) => Effect.Effect<TaskRecord | null>
+}
+```
+
+Record types come from `domain/`. Port files import `TaskRecord`, `TaskStatus`, and other domain types from the `domain/` directory. They never define their own entity types.
+
+Ports import only `domain/` and `ports/`. A port file cannot import from `application/`, `adapters/`, `packages/db`, or any infrastructure package.
+
+## Adapters: concrete implementations
+
+Adapters implement port contracts using specific technologies. In tx-agent-kit, the primary adapters are Drizzle-based repository implementations in `packages/db/src/repositories/`:
+
+```typescript
+// packages/db/src/repositories/task.repository.ts
+
+import { eq } from "drizzle-orm"
+import { tasks } from "../schema.js"
+import type { TaskRepositoryPort } from "@tx-agent-kit/core/domains/tasks/ports/task-repository.port.js"
+
+export const makeTaskRepository = (db: DrizzleClient): TaskRepositoryPort => ({
+  findById: (id) =>
+    Effect.tryPromise(() =>
+      db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, id))
+        .then((rows) => rows[0] ?? null),
+    ),
+
+  create: (input) =>
+    Effect.tryPromise(() =>
+      db
+        .insert(tasks)
+        .values({
+          id: generateId(),
+          workspaceId: input.workspaceId,
+          title: input.title,
+          description: input.description,
+          status: "open",
+        })
+        .returning()
+        .then((rows) => rows[0]!),
+    ),
+
+  // ... other methods
+})
+```
+
+### Why adapters live in packages/db
+
+In many hexagonal architecture implementations, adapters live next to the domain. tx-agent-kit takes a different approach: **persistence adapters live in `packages/db/src/repositories/`**.
+
+This decision is deliberate. First, `packages/core` stays free of `drizzle-orm` — if repositories lived in core, core would need a dependency on the database library. Second, all database code is colocated: schema, migrations, repositories, effect-schemas, and factories all live together in `packages/db`. Third, the structural invariant enforces it — the check script verifies that `packages/core/src/domains/*/repositories/` does not exist.
+
+## Wiring ports to adapters
+
+The connection between abstract ports and concrete adapters happens through Effect's layer system in the application bootstrap:
+
+```typescript
+// apps/api — layer wiring
+import { TaskRepository } from "@tx-agent-kit/core/domains/tasks/ports/task-repository.port.js"
+import { makeTaskRepository } from "@tx-agent-kit/db/repositories/task.repository.js"
+
+const TaskRepositoryLive = Layer.succeed(
+  TaskRepository,
+  makeTaskRepository(dbClient),
+)
+```
+
+Route handlers and application services depend on the abstract `TaskRepository` tag. The layer system provides the concrete Drizzle implementation at runtime.
+
+## Testing with ports
+
+Ports make testing straightforward. You can create in-memory implementations for unit tests:
+
+```typescript
+// Test with an in-memory adapter
+const makeInMemoryTaskRepo = (): TaskRepositoryPort => {
+  const store = new Map<string, TaskRecord>()
+
+  return {
+    findById: (id) => Effect.succeed(store.get(id) ?? null),
+    create: (input) => {
+      const task: TaskRecord = {
+        id: `task-${store.size + 1}`,
+        ...input,
+        status: "open",
+        assigneeId: null,
+        createdAt: new Date("2024-01-01"),
+        updatedAt: new Date("2024-01-01"),
+      }
+      store.set(task.id, task)
+      return Effect.succeed(task)
+    },
+    // ... other methods
+  }
+}
+```
+
+This in-memory implementation can be used in unit tests without any database setup, making tests fast and deterministic.
+
+## Non-repository ports
+
+Not all ports are repositories. Ports can define any external capability:
+
+```typescript
+// Email notification port
+export type EmailPort = {
+  readonly send: (to: string, subject: string, body: string) => Effect.Effect<void>
+}
+
+// Clock port (for deterministic time)
+export type ClockPort = {
+  readonly now: () => Effect.Effect<Date>
+}
+
+// ID generation port
+export type IdGeneratorPort = {
+  readonly generate: () => Effect.Effect<string>
+}
+```
+
+Each of these can have a production adapter (SMTP client, `Date.now` wrapper, UUID generator) and a test adapter (recording mock, fixed time, sequential IDs).

@@ -1,0 +1,4 @@
+{
+  "title": "Guides",
+  "pages": ["adding-a-domain", "adding-routes", "adding-workflows", "adding-db-triggers", "testing-strategy", "generating-api-client"]
+}

@@ -1,0 +1,134 @@
+---
+title: Local Setup
+description: Step-by-step guide to setting up tx-agent-kit for local development
+---
+
+# Local Setup
+
+This guide walks through every step to get tx-agent-kit running on your local machine.
+
+## 1. Clone the repository
+
+```bash
+git clone <your-repo-url> tx-agent-kit
+cd tx-agent-kit
+```
+
+## 2. Install dependencies
+
+```bash
+pnpm install
+```
+
+This installs all workspace dependencies across apps and packages. pnpm's workspace protocol ensures packages reference each other correctly.
+
+## 3. Configure environment
+
+```bash
+pnpm env:configure
+```
+
+This command seeds your `.env` files idempotently. It uses 1Password CLI (`op`) to resolve secrets from `op://` references in `.env.dev` templates.
+
+The convention for secrets management:
+
+| File | Handling |
+|------|----------|
+| `.env.dev` / `.env.prod` | Committed to git, contain `op://` references only |
+| `.env` | Gitignored, generated locally via `op inject` |
+
+If you do not use 1Password, you can manually create `.env` files from `.env.example` as a fallback.
+
+## 4. Start infrastructure
+
+```bash
+pnpm infra:ensure
+```
+
+This starts the shared local infrastructure via Docker Compose:
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| PostgreSQL | 5432 | Primary database |
+| Temporal Server | 7233 | Workflow orchestration |
+| Temporal UI | 8233 | Workflow visibility dashboard |
+| Redis | 6379 | Caching and sessions |
+| OTEL Collector | 4317 (gRPC), 4318 (HTTP) | Telemetry pipeline |
+
+The command is idempotent — running it multiple times will not create duplicate containers. It also works correctly across git worktrees, deriving ports from the worktree to avoid collisions.
+
+## 5. Run database migrations
+
+```bash
+pnpm db:migrate
+```
+
+This runs Drizzle migrations against your local PostgreSQL instance, creating all tables, triggers, and indexes.
+
+To verify the migration was successful:
+
+```bash
+pnpm db:studio
+```
+
+This opens Drizzle Studio in your browser, letting you inspect the database schema.
+
+## 6. Start development servers
+
+```bash
+pnpm dev
+```
+
+This starts all application servers in development mode:
+
+| App | URL | Description |
+|-----|-----|-------------|
+| **Web** | `http://localhost:3000` | Next.js client-only SPA |
+| **API** | `http://localhost:4000` | Effect HttpApi server |
+| **Worker** | (background) | Temporal worker process |
+
+The web app communicates with the API server via `API_BASE_URL`. In local development, this defaults to `http://localhost:4000`.
+
+## Verifying the setup
+
+Once all services are running, verify the stack is healthy:
+
+```bash
+# API health check
+curl http://localhost:4000/health
+
+# Run unit tests
+pnpm test
+
+# Run linter and type checks
+pnpm lint && pnpm type-check
+```
+
+For integration tests (which require running infrastructure):
+
+```bash
+pnpm test:integration
+```
+
+Integration tests are lock-guarded (`/tmp/tx-agent-kit-integration.lock`) to prevent overlapping runs from clobbering each other.
+
+## Quiet runners
+
+During development iteration, prefer quiet runners to reduce terminal output:
+
+```bash
+pnpm lint:quiet          # ESLint + structural + shell checks (minimal output)
+pnpm type-check:quiet    # TypeScript compilation check (errors only)
+pnpm test:quiet          # Unit tests (summary only)
+pnpm test:integration:quiet  # Integration tests (summary only)
+```
+
+Switch to the full commands when you need detailed diagnostics.
+
+## Troubleshooting
+
+**Docker services will not start:** Ensure Docker Desktop is running and you have sufficient disk space. Run `docker compose ps` to check container status.
+
+**Database connection refused:** Verify PostgreSQL is running (`docker compose ps`) and the `DATABASE_URL` in `.env` points to `localhost:5432`.
+
+**1Password CLI errors:** Ensure you are signed in (`op signin`) and have access to the required vaults.

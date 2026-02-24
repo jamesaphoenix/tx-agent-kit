@@ -1,0 +1,48 @@
+---
+title: Core Concepts
+description: Overview of the core technical concepts used in tx-agent-kit
+---
+
+# Core Concepts
+
+tx-agent-kit is built on a small set of technical concepts that work together to produce a maintainable, testable, and agent-friendly codebase. This section explains each concept in depth.
+
+## The technology stack
+
+The kit combines several technologies, each chosen for a specific role:
+
+| Technology | Role | Where used |
+|-----------|------|------------|
+| **Effect** | Dependency injection, typed errors, service composition | `packages/core`, `packages/db`, `apps/api`, `apps/worker` |
+| **effect/Schema** | Validation, serialization, API contracts | `packages/contracts`, `packages/db/src/effect-schemas` |
+| **Drizzle ORM** | Database schema, migrations, queries | `packages/db` only |
+| **Next.js** | Client-side SPA framework | `apps/web` only |
+| **Temporal** | Durable workflow orchestration | `apps/worker` only |
+| **Expo** | Cross-platform mobile | `apps/mobile` only |
+
+A deliberate boundary: **Effect is not used in the web or mobile apps.** These frontends are vanilla TypeScript consumers of a typed HTTP API. This keeps the frontend simple and avoids coupling it to the backend's effect system.
+
+## Concept map
+
+The core concepts build on each other:
+
+1. **[Effect Services](/docs/core-concepts/effect-services)** — How Effect provides dependency injection and typed error handling across the backend.
+
+2. **[Domain Modeling](/docs/core-concepts/domain-modeling)** — How entities, value objects, and pure domain rules are structured in the `domain/` layer.
+
+3. **[Ports and Adapters](/docs/core-concepts/ports-and-adapters)** — How abstract interfaces decouple domain logic from infrastructure.
+
+4. **[Schema Contracts](/docs/core-concepts/schema-contracts)** — How `effect/Schema` provides a single validation layer shared across the entire stack.
+
+## How they connect
+
+The typical flow through these concepts:
+
+1. A **Schema contract** defines the shape of an API request.
+2. The API validates the request and calls a domain **service** (Effect service).
+3. The service executes **domain logic** (pure functions from `domain/`).
+4. The service calls a **port** (abstract repository interface).
+5. The port is implemented by an **adapter** (Drizzle repository in `packages/db`).
+6. Effect's **layer system** wires the concrete adapter to the abstract port at runtime.
+
+Each concept handles one concern. Together, they provide a complete architecture with clear boundaries and testable components.

@@ -1,0 +1,125 @@
+---
+title: Structural Checks
+description: Cross-file invariant validation via scripts/lint/enforce-domain-invariants.mjs.
+---
+
+# Structural Checks
+
+The structural invariant checker at `scripts/lint/enforce-domain-invariants.mjs` validates cross-file relationships that ESLint cannot check. It reads multiple files, compares structures, and reports violations.
+
+## Table Parity Checks
+
+### Effect Schema Parity
+
+For every `pgTable(...)` declaration in `packages/db/src/`, there must be a corresponding file in `packages/db/src/effect-schemas/`:
+
+```
+users table    -> packages/db/src/effect-schemas/users.ts
+tasks table    -> packages/db/src/effect-schemas/tasks.ts
+workspaces     -> packages/db/src/effect-schemas/workspaces.ts
+```
+
+Each schema file must satisfy the following requirements:
+
+| Requirement | Detail |
+|-------------|--------|
+| Import source | Must import from `effect/Schema` |
+| Row schema export | Must export a `*RowSchema` constant |
+| Row shape export | Must export a `*RowShape` type |
+| Barrel re-export | Must be re-exported from `effect-schemas/index.ts` |
+
+### Factory Parity
+
+For every table, there must be a factory in `packages/db/src/factories/`:
+
+```
+users table    -> packages/db/src/factories/users.factory.ts
+tasks table    -> packages/db/src/factories/tasks.factory.ts
+```
+
+Each factory must export a `create*Factory` function and be re-exported from `factories/index.ts`.
+
+## Domain Structure Validation
+
+### Required Folders
+
+Every domain under `packages/core/src/domains/` must contain the following:
+
+| Required Folder | Constraint |
+|-----------------|------------|
+| `domain/` | At least one `.ts` file |
+| `ports/` | At least one `.ts` file declaring `Effect.Effect` return types |
+| `application/` | At least one non-index `.ts` file |
+| `adapters/` | At least one `.ts` file importing from ports |
+
+### Forbidden Folders
+
+Domains must **not** contain `repositories/` or `services/` directories. Use `ports/` for contracts and `adapters/` for implementations.
+
+### Layer Direction
+
+The checker validates every import path within domain files:
+
+| Source Layer | Allowed Imports |
+|-------------|-----------------|
+| `domain` | `domain` |
+| `ports` | `domain`, `ports` |
+| `application` | `domain`, `ports`, `application` |
+| `adapters` | `domain`, `ports`, `adapters` |
+| `runtime` | All layers |
+| `ui` | All layers |
+
+Cross-domain imports are forbidden. Each domain is self-contained.
+
+## Kind Marker Validation
+
+### Repository Port Kinds
+
+Every port file in `packages/core/src/domains/*/ports/` must declare:
+
+```typescript
+export const TaskRepositoryKind = 'crud' as const
+```
+
+If marked `crud`, the port must expose the full CRUD surface (list, getById, create, update, remove). If marked `custom`, it must not expose the full CRUD surface.
+
+### Route Kinds
+
+Every route file in `apps/api/src/routes/` must declare a kind marker. The checker validates that route kinds match their corresponding repository port kinds.
+
+## Source Hygiene
+
+### No TODO/FIXME/HACK
+
+Placeholder comments are forbidden in source modules. Track work items in the issue tracker, not in code comments.
+
+### No Build Artifacts
+
+Generated `.js`, `.js.map`, `.d.ts`, and `.d.ts.map` files are forbidden under `src/` directories.
+
+### No Direct `process.env`
+
+Source modules must read environment through dedicated env modules. Allowed env files are explicitly listed in the checker.
+
+## Integration Coverage Baselines
+
+The checker verifies that critical integration suites exist and contain required markers:
+
+| Suite | Requirement |
+|-------|-------------|
+| API | Must exercise all critical endpoints |
+| Web | Must cover all required components and pages |
+| Worker | Must validate idempotent processing |
+| Observability | Must cover all four services |
+
+## Test Colocation
+
+All tests must be colocated with their source modules. The following patterns are forbidden:
+
+| Forbidden Pattern | Reason |
+|-------------------|--------|
+| `__tests__/` directories | Tests must sit next to their source file |
+| `.spec.ts` files | Use `.test.ts` instead |
+| `.integration.ts` (without `.test`) | Use `.integration.test.ts` instead |
+
+Every test file must have a colocated source module.

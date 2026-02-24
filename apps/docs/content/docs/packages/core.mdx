@@ -1,0 +1,108 @@
+---
+title: Core
+description: DDD domain slices with strict layer direction, named exports, and determinism governance.
+---
+
+# Core (`packages/core`)
+
+The core package contains the domain logic for the entire system. It is organized as DDD domain slices under `src/domains/`, with each domain following a strict folder structure and layer dependency direction.
+
+## Domain Structure
+
+Each domain slice must contain these folders:
+
+```
+packages/core/src/domains/<domain>/
+  domain/       # Entities, value objects, pure business rules
+  ports/        # Capability contracts (Effect Context.Tag services)
+  application/  # Use-case orchestration (Effect services)
+  adapters/     # External system adapter implementations
+```
+
+The `runtime/` folder (layer wiring and composition) and `ui/` folder (presentation-facing helpers) are optional.
+
+The `repositories/` and `services/` folders are forbidden. Concrete persistence lives in `packages/db`, and use-case orchestration belongs in `application/`.
+
+## Current Domains
+
+| Domain | Purpose |
+|--------|---------|
+| `auth` | User authentication, principal extraction, session management |
+| `workspace` | Workspace CRUD, membership, invitations |
+| `task` | Task CRUD within workspaces |
+
+## Layer Dependency Direction
+
+Dependencies must flow inward. The enforcement script validates every import path:
+
+```
+domain     -> domain only
+ports      -> domain, ports
+application -> domain, ports, application
+adapters   -> domain, ports, adapters
+runtime    -> all layers
+ui         -> all layers
+```
+
+Cross-domain imports are forbidden. Each domain is a self-contained unit.
+
+## Domain Layer
+
+The domain layer defines entities, value objects, and pure business rules. It must not import anything outside its own domain layer.
+
+```typescript
+// packages/core/src/domains/task/domain/task-domain.ts
+export interface TaskRecord {
+  id: string
+  workspaceId: string
+  title: string
+  description: string | null
+  status: TaskStatus
+  createdByUserId: string
+  createdAt: Date
+}
+
+export const isValidTaskTitle = (title: string): boolean => {
+  const trimmed = title.trim()
+  return trimmed.length >= 1 && trimmed.length <= 200
+}
+```
+
+**Determinism constraint**: `Date.now()`, `new Date()`, and `Math.random()` are forbidden in domain-layer code. Inject time and randomness through ports.
+
+## Ports Layer
+
+Ports define abstract capability contracts using Effect's `Context.Tag`:
+
+```typescript
+// packages/core/src/domains/task/ports/task-ports.ts
+export class TaskStorePort extends Context.Tag('TaskStorePort')<
+  TaskStorePort,
+  {
+    list: (workspaceId: string, params: ListParams) => Effect.Effect<PaginatedResult<TaskRecord>, unknown>
+    getById: (id: string) => Effect.Effect<TaskRecord | null, unknown>
+    create: (input: CreateTaskInput) => Effect.Effect<TaskRecord | null, unknown>
+    update: (input: UpdateTaskInput) => Effect.Effect<TaskRecord | null, unknown>
+    remove: (id: string) => Effect.Effect<{ deleted: true }, unknown>
+  }
+>() {}
+```
+
+Ports must return `Effect.Effect` (never `Promise`), declare an explicit kind marker (`crud` or `custom`), avoid implementing layers with `Layer.succeed`/`Layer.effect`, and import port types from the domain layer via `*Record` interfaces.
+
+## Application Layer
+
+Application modules orchestrate use cases by combining ports:
+
+```typescript
+// packages/core/src/domains/task/application/task-service.ts
+export class TaskService extends Context.Tag('TaskService')<TaskService, {
+  getById: (principal: Principal, taskId: string) => Effect.Effect<Task, CoreError>
+  create: (principal: Principal, input: CreateTaskCommand) => Effect.Effect<Task, CoreError>
+  // ...
+}>() {}
+```
+
+## Governance Rules
+
+All domain layer files must use named exports; `export default` is forbidden. Environment reads must go through dedicated config modules rather than accessing `process.env` directly. Type assertions to `any` are not permitted — model unknowns explicitly and decode with schema at boundaries. Suppression directives such as `@ts-ignore` are likewise forbidden; fix the underlying type issue instead of suppressing the error.

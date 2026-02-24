@@ -1,0 +1,88 @@
+---
+title: Tooling
+description: ESLint configurations, domain invariant rules, and the scaffold CLI for generating CRUD domain slices.
+---
+
+# Tooling (`packages/tooling`)
+
+The tooling package contains shared ESLint configurations and the scaffold CLI. It provides the mechanical enforcement layer that keeps the codebase consistent.
+
+## ESLint Configs
+
+The package exports several ESLint configurations under `packages/tooling/eslint-config/`:
+
+### Base Config
+
+Standard TypeScript + import rules shared across all packages and apps.
+
+### Domain Invariants (`domain-invariants.js`)
+
+Project-specific rules that enforce architectural constraints:
+
+| Rule | Rationale |
+|------|-----------|
+| No `console.*` | Use `@tx-agent-kit/logging` instead |
+| No `drizzle-orm` outside `packages/db` | Database access is isolated to one package |
+| No `effect` in `apps/web` | The web app stays a thin client |
+| No default exports in domain layers | Named exports keep imports explicit |
+| No `as any` assertions | Model unknowns explicitly and decode at boundaries |
+| No chained assertions (`as unknown as ...`) | Decode at boundaries instead of double-casting |
+| No suppression directives | Fix root types rather than suppressing errors |
+
+### Boundaries Config
+
+Package boundary enforcement via `eslint-plugin-boundaries`. Prevents unauthorized cross-package imports.
+
+### Promise Config
+
+Rules for proper async/await and Promise handling.
+
+### Testing Config
+
+Test-specific rules and relaxed constraints for test files.
+
+## Scaffold CLI
+
+The scaffold CLI generates CRUD domain slices following the golden path:
+
+```bash
+# Preview what will be created
+pnpm scaffold:crud --domain billing --entity invoice --dry-run
+
+# Generate the domain slice
+pnpm scaffold:crud --domain billing --entity invoice
+
+# Generate with database schema additions
+pnpm scaffold:crud --domain billing --entity invoice --with-db
+```
+
+### What It Generates
+
+For a domain `billing` with entity `invoice`:
+
+```
+packages/core/src/domains/billing/
+  domain/billing-domain.ts        # Entity types and pure rules
+  ports/billing-ports.ts          # Repository port contracts
+  application/billing-service.ts  # Use-case orchestration
+  adapters/billing-adapters.ts    # Adapter implementations
+```
+
+With `--with-db`:
+```
+packages/db/src/effect-schemas/invoices.ts
+packages/db/src/factories/invoices.factory.ts
+```
+
+### CLI Options
+
+| Flag | Description |
+|------|-------------|
+| `--domain <name>` | Domain name (e.g., `billing`) |
+| `--entity <name>` | Entity name (e.g., `invoice`) |
+| `--plural <name>` | Plural form (auto-inferred if omitted) |
+| `--dry-run` | Preview changes without writing files |
+| `--force` | Overwrite existing files |
+| `--with-db` | Also generate DB schema/factory stubs |
+
+The CLI locates the repository root by walking up from `cwd` and finding the root `package.json` with name `tx-agent-kit`.

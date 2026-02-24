@@ -1,0 +1,122 @@
+---
+title: ESLint Rules
+description: ESLint enforcement layer covering import restrictions, code patterns, and package boundaries.
+---
+
+# ESLint Rules
+
+The ESLint configuration lives in `packages/tooling/eslint-config/` and provides per-file enforcement of architectural constraints. The primary file is `domain-invariants.js`.
+
+## Import Restrictions
+
+### No `console.*`
+
+All logging must go through `@tx-agent-kit/logging`:
+
+```typescript
+// Forbidden
+console.log('Server started')
+
+// Required
+import { createLogger } from '@tx-agent-kit/logging'
+const logger = createLogger('my-service')
+logger.info('Server started')
+```
+
+### No `drizzle-orm` Outside `packages/db`
+
+Database access is fully isolated. Only `packages/db` may import from `drizzle-orm`:
+
+```typescript
+// Only allowed in packages/db/src/**
+import { pgTable, uuid, varchar } from 'drizzle-orm/pg-core'
+```
+
+Any other package importing `drizzle-orm` will fail lint.
+
+### No `effect` in `apps/web`
+
+The web app must remain a simple client. Effect runtime logic belongs in API, core, or worker layers:
+
+```typescript
+// Forbidden in apps/web/**
+import { Effect } from 'effect'
+import { Schema } from 'effect/Schema'
+```
+
+### No `next/server` or `next/headers` in `apps/web`
+
+The web app is client-only. Server-side Next.js imports are forbidden:
+
+```typescript
+// Forbidden in apps/web/**
+import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+```
+
+## Code Pattern Rules
+
+### No `as any` Assertions
+
+Type assertions to `any` bypass the type system. Model unknowns explicitly and decode at boundaries:
+
+```typescript
+// Forbidden
+const data = response as any
+
+// Required: decode with schema
+const data = Schema.decodeUnknown(MySchema)(response)
+```
+
+### No Chained Assertions
+
+Double assertions (`as unknown as T`) are forbidden. Use proper schema decoding:
+
+```typescript
+// Forbidden
+const value = input as unknown as MyType
+
+// Required: decode at boundary
+const value = Schema.decodeUnknown(MySchema)(input)
+```
+
+### No Suppression Directives
+
+`@ts-ignore`, `@ts-expect-error`, and `eslint-disable` are forbidden in source modules. Fix the root cause:
+
+```typescript
+// Forbidden
+// @ts-ignore
+// @ts-expect-error
+// eslint-disable-next-line
+
+// Required: fix the actual type or rule issue
+```
+
+These are allowed in test files and generated code.
+
+### No Default Exports in Domain Layers
+
+Domain, port, application, adapter, and route files must use named exports:
+
+```typescript
+// Forbidden
+export default class TaskService { }
+
+// Required
+export class TaskService { }
+```
+
+## Package Boundaries
+
+The `eslint-plugin-boundaries` configuration enforces dependency direction between packages. For example, `apps/web` cannot import from `packages/db` or `packages/core`, and `packages/core` cannot import from `packages/db`. On the other hand, `apps/api` can import from both `packages/core` and `packages/db`.
+
+## Running ESLint
+
+```bash
+# Full output
+pnpm lint
+
+# Or just ESLint without structural/shell checks
+npx eslint .
+```

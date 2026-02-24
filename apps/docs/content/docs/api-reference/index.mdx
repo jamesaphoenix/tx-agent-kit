@@ -1,0 +1,115 @@
+---
+title: API Reference
+description: Auto-generated API reference from the OpenAPI specification
+---
+
+# API Reference
+
+The API reference documentation is auto-generated from the OpenAPI specification at `apps/api/openapi.json`. This specification is the single source of truth for all API endpoints, request/response schemas, and authentication requirements.
+
+## Regenerating the docs
+
+When API routes change, regenerate the OpenAPI spec and API reference docs:
+
+```bash
+# Regenerate OpenAPI spec from API routes
+pnpm openapi:generate
+
+# Regenerate API reference MDX files from the spec
+pnpm docs:api:generate
+```
+
+The `openapi:generate` command introspects the Effect HttpApi route definitions in `apps/api` and produces an updated `apps/api/openapi.json`. The `docs:api:generate` command then reads this spec and generates MDX documentation files.
+
+## Endpoint groups
+
+The API is organized into four endpoint groups:
+
+### Auth (`/v1/auth/*`)
+
+Auth routes use the `custom` kind marker — domain-specific operations rather than standard CRUD.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/v1/auth/sign-up` | Register a new user and return a session |
+| `POST` | `/v1/auth/sign-in` | Authenticate and return a JWT |
+| `GET` | `/v1/auth/me` | Get the current authenticated user |
+| `DELETE` | `/v1/auth/me` | Delete the authenticated user |
+
+### Workspaces (`/v1/workspaces/*`)
+
+Workspace routes use the `crud` kind marker and expose the full CRUD surface.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/workspaces` | List workspaces for the current user (paginated) |
+| `GET` | `/v1/workspaces/:id` | Get a single workspace by ID |
+| `POST` | `/v1/workspaces/many` | Get multiple workspaces by IDs |
+| `POST` | `/v1/workspaces` | Create a workspace |
+| `PATCH` | `/v1/workspaces/:id` | Update a workspace |
+| `DELETE` | `/v1/workspaces/:id` | Remove a workspace |
+
+### Tasks (`/v1/tasks/*`)
+
+Task routes also use the `crud` kind marker.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/tasks` | List tasks for a workspace (paginated) |
+| `GET` | `/v1/tasks/:id` | Get a single task |
+| `POST` | `/v1/tasks/many` | Get multiple tasks by IDs |
+| `POST` | `/v1/tasks` | Create a task |
+| `PATCH` | `/v1/tasks/:id` | Update a task |
+| `DELETE` | `/v1/tasks/:id` | Remove a task |
+
+### Invitations (`/v1/invitations/*`)
+
+Invitation routes include idempotent acceptance.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/invitations` | List invitations for the current user |
+| `GET` | `/v1/invitations/:id` | Get a single invitation |
+| `POST` | `/v1/invitations` | Create an invitation |
+| `PATCH` | `/v1/invitations/:id` | Update an invitation |
+| `DELETE` | `/v1/invitations/:id` | Remove an invitation |
+| `POST` | `/v1/invitations/accept/:token` | Accept an invitation (idempotent) |
+
+## Authentication
+
+All endpoints except `/v1/auth/sign-up`, `/v1/auth/sign-in`, and `/health` require a Bearer JWT token in the `Authorization` header:
+
+```
+Authorization: Bearer <jwt-token>
+```
+
+Tokens are returned by the sign-up and sign-in endpoints.
+
+## Health check
+
+```
+GET /health
+```
+
+Returns `{ "status": "healthy" }` with a 200 status code. This endpoint is used by Docker health checks and deployment smoke tests.
+
+## Paginated responses
+
+List endpoints support cursor-based pagination with `limit` and `cursor` query parameters. Responses include a `nextCursor` field when more results are available:
+
+```json
+{
+  "data": [...],
+  "nextCursor": "abc123"
+}
+```
+
+## OpenAPI spec location
+
+The canonical OpenAPI spec lives at:
+
+```
+apps/api/openapi.json
+```
+
+This file is generated, not hand-written. Do not edit it directly --- changes will be overwritten by `pnpm openapi:generate`.

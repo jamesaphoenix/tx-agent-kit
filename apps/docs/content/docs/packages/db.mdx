@@ -1,0 +1,106 @@
+---
+title: Database
+description: Drizzle schema, Effect repositories, migrations, pgTAP trigger suites, and parity-enforced factories.
+---
+
+# Database (`packages/db`)
+
+The database package is the only package that may import `drizzle-orm`. It manages the PostgreSQL schema, migrations, repositories, Effect schemas, and test factories.
+
+## Structure
+
+```
+packages/db/
+  src/
+    schema.ts              # Drizzle table definitions
+    effect-schemas/        # One Effect schema per table
+    factories/             # One test factory per table
+    repositories/          # Concrete persistence implementations
+    env.ts                 # Database connection config
+  drizzle/
+    migrations/            # SQL migration files
+  pgtap/                   # pgTAP SQL test suites
+```
+
+## Schema
+
+All tables are defined using Drizzle's `pgTable` in source files under `src/`. Each table must be declared as an exported constant:
+
+```typescript
+export const tasks = pgTable('tasks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id),
+  title: varchar('title', { length: 200 }).notNull(),
+  description: text('description'),
+  status: varchar('status', { length: 50 }).notNull().default('open'),
+  createdByUserId: uuid('created_by_user_id').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow()
+})
+```
+
+Aliasing `pgTable` or wrapping it in local variables is forbidden for invariant safety.
+
+## Effect Schemas (Parity-Enforced)
+
+Each database table must have a corresponding file in `src/effect-schemas/`:
+
+```
+src/effect-schemas/
+  tasks.ts         # TasksRowSchema + TasksRowShape
+  users.ts         # UsersRowSchema + UsersRowShape
+  workspaces.ts    # WorkspacesRowSchema + WorkspacesRowShape
+  index.ts         # Re-exports all schemas
+```
+
+Each schema file must import from `effect/Schema`, export a `*RowSchema` constant, and export a `*RowShape` type.
+
+The structural invariant checker validates 1:1 parity between tables and effect schema files.
+
+## Factories (Parity-Enforced)
+
+Each table must have a corresponding factory in `src/factories/`:
+
+```
+src/factories/
+  tasks.factory.ts
+  users.factory.ts
+  workspaces.factory.ts
+  index.ts
+```
+
+Each factory must export a `create*Factory` function. The invariant checker validates parity between tables and factory files.
+
+## Repositories
+
+Concrete persistence implementations live in `src/repositories/`. These are the only files in the system that execute database queries:
+
+```typescript
+// Repositories must:
+// 1. Import matching Effect schema decoders
+// 2. Decode DB row results via Effect schema
+// 3. Execute queries through the Effect DB provider (provideDB)
+// 4. Not use Promise chaining (.then())
+```
+
+Repository implementations satisfy the abstract port contracts defined in `packages/core/src/domains/*/ports/`.
+
+## Migrations
+
+Database migrations are managed by Drizzle and stored in `drizzle/migrations/`. Run migrations with:
+
+```bash
+pnpm db:migrate
+```
+
+## pgTAP Trigger Suites
+
+Database triggers defined in migrations must have corresponding pgTAP test coverage in `pgtap/*.sql`. The invariant checker scans all `CREATE TRIGGER` statements in migrations and verifies each trigger name appears in the pgTAP suites.
+
+```bash
+# Run pgTAP suites
+pnpm test:db:pgtap
+```
+
+## Drizzle Isolation
+
+The `drizzle-orm` import is restricted to this package only. All other packages and apps must interact with the database through the repository layer. This is enforced by ESLint's `no-restricted-imports` rule.

@@ -1,0 +1,137 @@
+---
+title: Effect Services
+description: How Effect is used for dependency injection, layers, and typed errors in the backend
+---
+
+# Effect Services
+
+tx-agent-kit uses [Effect](https://effect.website) as the backbone of the backend architecture. Effect provides dependency injection through services and layers, typed error handling, and composable program construction.
+
+## Where Effect is used
+
+Effect is used in five packages:
+
+| Package | How Effect is used |
+|---------|-------------------|
+| `packages/core` | Service definitions, domain error types, port interfaces |
+| `packages/db` | Repository implementations as Effect services |
+| `packages/auth` | Auth primitives wrapped as Effect operations |
+| `apps/api` | HttpApi server, route handlers, layer composition |
+| `apps/worker` | Activity implementations, workflow helpers |
+
+Effect is deliberately excluded from `apps/web` and `apps/mobile`. The frontend apps are pure TypeScript consumers of an HTTP API. They do not need Effect's dependency injection or error handling — they use standard try/catch and API client libraries.
+
+## Services and dependency injection
+
+Effect services are the primary mechanism for dependency injection. A service defines a capability contract:
+
+```typescript
+import { Context, Effect } from "effect"
+
+// Define a service tag
+export class TaskRepository extends Context.Tag("TaskRepository")<
+  TaskRepository,
+  {
+    readonly findById: (id: string) => Effect.Effect<TaskRecord | null>
+    readonly create: (input: CreateTaskInput) => Effect.Effect<TaskRecord>
+    readonly listByWorkspace: (workspaceId: string) => Effect.Effect<ReadonlyArray<TaskRecord>>
+  }
+>() {}
+```
+
+Code that needs task persistence depends on `TaskRepository` without knowing the implementation:
+
+```typescript
+const createTask = (input: CreateTaskInput) =>
+  Effect.gen(function* () {
+    const repo = yield* TaskRepository
+    const task = yield* repo.create(input)
+    return task
+  })
+```
+
+The concrete implementation is provided later through layers.
+
+## Layers for composition
+
+Layers wire concrete implementations to service tags. This is where the dependency injection happens:
+
+```typescript
+import { Layer } from "effect"
+
+// Concrete implementation using Drizzle
+export const TaskRepositoryLive = Layer.succeed(
+  TaskRepository,
+  makeTaskRepository(db),
+)
+```
+
+Layers compose to build the full application:
+
+```typescript
+const AppLayer = Layer.mergeAll(
+  TaskRepositoryLive,
+  WorkspaceRepositoryLive,
+  AuthServiceLive,
+)
+
+// Run the program with all dependencies provided
+Effect.runPromise(
+  program.pipe(Effect.provide(AppLayer))
+)
+```
+
+This composition happens at the application boundary — in `apps/api` route wiring or `apps/worker` bootstrap. Domain code never sees concrete implementations.
+
+## Typed errors
+
+Effect tracks errors in the type system. Every operation declares what errors it can produce:
+
+```typescript
+export class TaskNotFound extends Data.TaggedError("TaskNotFound")<{
+  readonly id: string
+}> {}
+
+export class InvalidStatusTransition extends Data.TaggedError("InvalidStatusTransition")<{
+  readonly from: string
+  readonly to: string
+}> {}
+
+// The return type includes the error channel
+const updateStatus = (
+  id: string,
+  status: string,
+): Effect.Effect<TaskRecord, TaskNotFound | InvalidStatusTransition> =>
+  Effect.gen(function* () {
+    const repo = yield* TaskRepository
+    const task = yield* repo.findById(id)
+    if (!task) return yield* Effect.fail(new TaskNotFound({ id }))
+    // ...
+  })
+```
+
+Route handlers in the API map these domain errors to HTTP status codes, keeping domain logic free from HTTP concerns.
+
+## HttpApi
+
+The API server uses Effect's HttpApi module to define typed HTTP endpoints:
+
+```typescript
+const TaskApi = HttpApiGroup.make("tasks").pipe(
+  HttpApiGroup.add(
+    HttpApiEndpoint.post("createTask", "/v1/tasks")
+      .setPayload(CreateTaskRequest)
+      .addSuccess(TaskResponse)
+      .addError(UnauthorizedError, { status: 401 })
+      .addError(WorkspaceNotFound, { status: 404 }),
+  ),
+)
+```
+
+This provides automatic request validation from `effect/Schema`, typed error responses with correct HTTP status codes, OpenAPI spec generation from the route definitions, and type-safe handler implementations.
+
+## What Effect is NOT used for
+
+To keep the architecture simple, Effect is not used for frontend state management (the web app uses standard React hooks and `nuqs` for URL state), simple utilities (pure functions in `domain/` are plain TypeScript), or configuration parsing (env modules use typed accessors, not Effect layers).
+
+The rule of thumb: use Effect when you need dependency injection, typed errors, or composable async operations. Use plain TypeScript when you do not.

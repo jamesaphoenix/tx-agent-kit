@@ -1,0 +1,114 @@
+---
+title: Monorepo Structure
+description: Detailed breakdown of every app and package in the tx-agent-kit monorepo
+---
+
+# Monorepo Structure
+
+This page describes every app and package in the monorepo, their responsibilities, and their key files.
+
+## Applications
+
+### `apps/api` — Effect HttpApi Server
+
+The API server is built with Effect HttpApi, providing typed REST endpoints for all domain operations. It handles authentication (sign-up, sign-in, JWT token management), CRUD operations for workspaces, tasks, and invitations, OpenAPI spec generation, and request validation using `effect/Schema` contracts.
+
+| File / Directory | Role |
+|-----------------|------|
+| `src/server-lib.ts` | Server bootstrap and route mounting |
+| `src/routes/` | Route handlers organized by domain |
+| `openapi.json` | Generated OpenAPI specification |
+
+The API is the only application that directly uses `packages/db` for persistence. Routes must consume contracts from `packages/contracts` for request and response types. Whenever routes change, the OpenAPI spec must be regenerated with `pnpm openapi:generate`.
+
+### `apps/web` — Client-Only Next.js SPA
+
+The web application is a strictly client-side Next.js SPA. It communicates with the API server via HTTP and never performs server-side operations. It provides the dashboard UI for workspaces, tasks, and invitations, manages authentication flows (sign-up, sign-in, sign-out), and uses URL-based state management.
+
+| File / Directory | Role |
+|-----------------|------|
+| `app/` | Next.js app router pages (all `'use client'`) |
+| `components/` | Reusable UI components (all `'use client'`) |
+| `lib/env.ts` | Centralized runtime environment reads |
+| `lib/auth-token.ts` | Only file that reads/writes `localStorage` |
+| `lib/url-state.tsx` | Only entry point for URL query state (wraps `nuqs`) |
+| `lib/notify.tsx` | Only entry point for notifications (wraps `sonner`) |
+
+The web app operates under strict constraints to preserve its client-only nature:
+
+| Prohibition | Reason |
+|------------|--------|
+| No `app/api` routes, `proxy.ts`, or `middleware.ts` | Keeps the app purely client-side |
+| No imports from `next/server` or `next/headers` | Prevents server-side code from creeping in |
+| No imports from `effect` or `effect/*` | Keeps the frontend Effect-free |
+| No imports from `drizzle-orm` | Database access belongs to the API |
+| No direct `fetch` calls | Must use typed API client layers |
+| No direct `window.location` reads | Must use `lib/url-state.tsx` |
+| Every `.tsx` file starts with `'use client'` | Enforced by lint rules |
+
+### `apps/worker` — Temporal Worker
+
+The worker runs Temporal workflows and activities for background processing. It owns workflow definitions for long-running business processes, activity implementations that interact with domain services, and the worker bootstrap and registration lifecycle.
+
+| File / Directory | Role |
+|-----------------|------|
+| `src/index.ts` | Worker bootstrap |
+| `src/workflows/` | Temporal workflow definitions |
+| `src/activities/` | Activity implementations |
+
+Temporal imposes determinism requirements on workflows: they must not call `Date.now`, `new Date`, or `Math.random`, and must not use native timers like `setTimeout` or `setInterval`. Workflows also must not import infrastructure packages directly. All environment variable reads are centralized in `src/config/env.ts`.
+
+### `apps/mobile` — Expo React Native
+
+The mobile app is a cross-platform Expo React Native client that mirrors the web app's feature set through a native interface. It consumes the same API contract as the web app, using identical request/response schemas from `packages/contracts`, but swaps out the browser-specific transport and storage layers for React Native equivalents.
+
+| Capability | Implementation |
+|-----------|---------------|
+| Authentication | Secure token storage via `expo-secure-store` instead of `localStorage` |
+| API communication | Shared typed API client patterns matching the web app |
+| Navigation | Expo Router for file-system-based native navigation |
+| State management | Same URL-state and session-store patterns adapted for mobile |
+
+The mobile app has full integration test coverage including component test suites for `AuthForm`, `CreateWorkspaceForm`, `CreateTaskForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `AuthBootstrapProvider`, plus unit test suites for `env`, `auth-token`, `axios`, `client-api`, `client-auth`, `url-state`, and `session-store`.
+
+## Packages
+
+### `packages/core` — DDD Domain Slices
+
+All domain logic lives here, organized by bounded context. Each domain follows the DDD construction pattern with `domain/`, `ports/`, and `application/` directories. No persistence implementations live in this package — those belong in `packages/db/src/repositories/`. See the [DDD Pattern](/docs/architecture/ddd-pattern) page for the full layer breakdown.
+
+### `packages/db` — Database Layer
+
+Everything related to PostgreSQL lives in this package: Drizzle schema definitions, migrations, repository implementations, effect-schemas for runtime validation, and factories for test data generation.
+
+| Directory | Contents |
+|----------|----------|
+| `src/schema.ts` | Drizzle table definitions |
+| `src/repositories/` | Concrete repository implementations |
+| `src/effect-schemas/` | Table-aligned `effect/Schema` definitions |
+| `src/factories/` | Test data factories |
+| `drizzle/` | Migration files |
+
+### `packages/contracts` — Shared API Schemas
+
+This package holds `effect/Schema` definitions shared between the API server and its consumers. These schemas define the shape of API requests, responses, and domain identifiers, forming the single source of truth for the API contract.
+
+### `packages/auth` — Authentication Primitives
+
+Password hashing (bcrypt/argon2) and JWT token creation/verification. The API server uses this package for all auth flows.
+
+### `packages/logging` — Structured Logger
+
+A structured JSON logger that replaces `console.*` across the codebase. All source modules must use this package for logging — direct `console.*` calls are lint-banned.
+
+### `packages/observability` — OpenTelemetry Bootstrap
+
+Configures OpenTelemetry tracing and metrics. Provides bootstrap functions for instrumenting the API server and worker at startup.
+
+### `packages/testkit` — Test Utilities
+
+Shared test harnesses, database reset utilities, and integration test helpers used across all apps and packages. This includes the standardized `createDbAuthContext(...)` harness for API integration tests.
+
+### `packages/tooling` — Developer Tooling
+
+Contains the shared ESLint configuration (including domain invariant rules in `domain-invariants.js`), the scaffold CLI for generating new domains (`pnpm scaffold:crud`), and build tooling configuration.

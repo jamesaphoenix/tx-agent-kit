@@ -1,0 +1,145 @@
+---
+title: Data Flow
+description: End-to-end data flow from client applications through the API to the database and worker
+---
+
+# Data Flow
+
+This page traces the end-to-end data flow through tx-agent-kit, from a user action in the browser to the database and back.
+
+## Overview
+
+```
+┌───────────┐     HTTP      ┌───────────┐    Effect    ┌───────────┐
+│  Web/Mobile│ ──────────▶  │    API     │ ──────────▶ │   Core    │
+│  (Client)  │              │ (Effect    │              │ (Domain   │
+│            │ ◀────────── │  HttpApi)  │ ◀────────── │  Logic)   │
+└───────────┘   JSON        └─────┬─────┘   Result     └───────────┘
+                                  │
+                          ┌───────▼───────┐
+                          │      DB       │
+                          │  (Drizzle/    │
+                          │  PostgreSQL)  │
+                          └───────┬───────┘
+                                  │
+                          ┌───────▼───────┐
+                          │    Worker     │
+                          │  (Temporal    │
+                          │  Workflows)   │
+                          └───────────────┘
+```
+
+## Request lifecycle
+
+### 1. Client sends request
+
+The web app (or mobile app) sends an HTTP request to the API server. The web app uses a typed API client layer generated from the OpenAPI spec — it never uses raw `fetch`.
+
+```typescript
+// apps/web — using generated API hooks
+const { data: tasks } = useListTasks({ workspaceId })
+```
+
+The request goes directly to `API_BASE_URL` (e.g., `http://localhost:4000`). There is no proxy layer or BFF — the web app is a pure client that communicates with the API over HTTP.
+
+### 2. API receives and validates
+
+The Effect HttpApi server receives the request, matches it to a route, and validates the input using `effect/Schema` contracts from `packages/contracts`:
+
+```typescript
+// apps/api — route handler
+const CreateTaskRoute = HttpApiEndpoint.post("createTask", "/v1/tasks")
+  .setPayload(CreateTaskRequest)   // effect/Schema from packages/contracts
+  .addSuccess(TaskResponse)
+  .addError(UnauthorizedError)
+```
+
+If validation fails, the API returns a typed error response immediately. No domain code is executed for invalid requests.
+
+### 3. Domain logic executes
+
+For valid requests, the route handler calls the application service in `packages/core`:
+
+```typescript
+// Application service orchestrates domain logic
+const task = yield* taskService.create({
+  workspaceId: payload.workspaceId,
+  title: payload.title,
+  description: payload.description,
+})
+```
+
+The application service calls domain functions for business rule validation, invokes repository ports for data access, coordinates with other services when cross-domain logic is involved, and returns typed success or failure results back to the route handler.
+
+### 4. Repository persists data
+
+The repository implementation in `packages/db` translates domain operations into Drizzle queries:
+
+```typescript
+// packages/db — repository implementation
+create: (input) => Effect.tryPromise(() =>
+  db.insert(tasks).values({
+    id: generateId(),
+    workspaceId: input.workspaceId,
+    title: input.title,
+    description: input.description,
+  }).returning().then(rows => rows[0]!)
+)
+```
+
+The repository returns domain record types, not Drizzle row types. The mapping between database rows and domain records happens here.
+
+### 5. Response returns to client
+
+The result flows back through every layer in reverse. The repository returns a domain record to the application service, which passes the result to the route handler. The route handler serializes the response using the `effect/Schema` contract, and the API sends the JSON response to the client. Finally, the client receives typed data through the generated API hooks.
+
+### 6. Background work (optional)
+
+Some operations trigger background workflows via Temporal:
+
+```typescript
+// API route starts a workflow
+yield* temporalClient.workflow.start(processInvoiceWorkflow, {
+  workflowId: `invoice-${invoiceId}`,
+  args: [{ invoiceId }],
+})
+```
+
+The Temporal worker picks up the workflow and executes activities:
+
+```typescript
+// Worker activity calls domain services
+export const sendInvoiceEmail = async (invoiceId: string) => {
+  const invoice = await invoiceService.findById(invoiceId)
+  await emailAdapter.send(invoice)
+  await invoiceService.markAsSent(invoiceId)
+}
+```
+
+Workflows are deterministic and durable — they survive worker restarts and can be replayed.
+
+## Strict boundaries
+
+The data flow enforces strict boundaries between layers:
+
+| Boundary | Rule |
+|----------|------|
+| Client to API | HTTP only. No shared process, no direct DB access. |
+| API to Core | Effect services. Domain logic has no knowledge of HTTP. |
+| Core to DB | Port interfaces. Domain defines the contract, DB implements it. |
+| API to Worker | Temporal client. Async, durable, decoupled. |
+
+These boundaries mean you can replace the web frontend without touching the API, switch databases without changing domain logic, scale the worker independently of the API, and test each layer in isolation.
+
+## What the web app never does
+
+To reinforce the architecture, the web app is explicitly prohibited from a set of operations, all enforced by ESLint rules and structural invariant checks:
+
+| Prohibition | Enforcement |
+|------------|-------------|
+| Querying the database directly | ESLint `no-restricted-imports` on `drizzle-orm` |
+| Running server-side code (no API routes, no middleware) | Structural invariant check |
+| Importing Effect or Drizzle | ESLint `no-restricted-imports` |
+| Reading `localStorage` outside `lib/auth-token.ts` | ESLint restriction |
+| Using raw `fetch` instead of the typed API client | ESLint restriction |
+| Reading `window.location` directly instead of `lib/url-state.tsx` | ESLint restriction |

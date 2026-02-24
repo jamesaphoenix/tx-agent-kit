@@ -1,0 +1,68 @@
+---
+title: Why tx-agent-kit is Different
+description: How this kit differs from typical boilerplates by encoding taste in mechanical checks
+---
+
+# Why tx-agent-kit is Different
+
+Most starter kits and boilerplates give you a file structure and some example code. tx-agent-kit gives you an **architecture enforcement system** that happens to also include a file structure and example code.
+
+## The problem with boilerplates
+
+A typical boilerplate gives you a starting point:
+
+```
+my-app/
+  src/
+    components/
+    pages/
+    utils/
+    services/
+```
+
+It says "put components here, put services there." But nothing prevents you from importing a database client directly into a React component. Nothing stops you from scattering validation logic across 14 files. Nothing enforces the architecture the boilerplate intended.
+
+Within a few weeks of active development, the original structure is eroded. Shortcuts accumulate. Conventions drift. The architecture diagram on the README no longer matches reality.
+
+## The tx-agent-kit approach
+
+tx-agent-kit takes every architectural decision and asks: **can we enforce this mechanically?**
+
+| Decision | Enforcement |
+|----------|-------------|
+| Web app never queries DB directly | ESLint `no-restricted-imports` for `drizzle-orm` in `apps/web` |
+| Domain code has no side effects | Lint ban on `Date.now`, `new Date`, `Math.random` in domain paths |
+| All web files are client components | Structural check: every `.tsx` in `apps/web/app` starts with `'use client'` |
+| Port files do not export interfaces | AST-level structural invariant check |
+| Only one file reads localStorage | ESLint restriction + structural check |
+| No `console.*` in source | Lint ban; use `@tx-agent-kit/logging` instead |
+| No `process.env` in domain/services | Structural invariant: env reads only in dedicated env modules |
+| No `as any` in source | Lint rule across all source modules |
+
+These are not suggestions. They are compile-time and lint-time errors. You cannot merge code that violates them.
+
+## Encoding taste
+
+Every codebase has "taste" — the implicit conventions that experienced engineers enforce through code review. Statements like "we use named exports, not default exports, in domain files" or "we never import from the database package in the web app" or "we always validate at the boundary, not deep in business logic" represent this taste.
+
+In a traditional project, this taste lives in people's heads. New team members learn it through osmosis and correction. AI agents never learn it because they cannot observe code reviews.
+
+tx-agent-kit **encodes taste in code**. The ESLint config at `packages/tooling/eslint-config/domain-invariants.js` contains dozens of rules that express architectural decisions. The script at `scripts/lint/enforce-domain-invariants.mjs` performs structural checks that ESLint cannot express. Together, they form a machine-readable specification of "how we do things here."
+
+## Benefits beyond agents
+
+This approach pays dividends even without AI agents. New developers get immediate feedback on violations instead of waiting for code review, so onboarding is faster. The architecture cannot drift because the checks run on every commit, keeping the codebase consistent. Code reviewers can focus on logic and intent because structural concerns are already handled, reducing review burden. And the lint rules and invariant scripts themselves serve as living documentation of architectural decisions — the constraints are self-documenting.
+
+## The scaffold CLI
+
+Beyond enforcement, tx-agent-kit provides a scaffold CLI that generates correct-by-construction code:
+
+```bash
+pnpm scaffold:crud --domain billing --entity invoice --dry-run
+```
+
+This generates the full DDD slice — domain, ports, application logic, adapters, routes, and tests — following every convention automatically. The generated code passes all lint checks and type checks out of the box.
+
+The scaffold CLI is the positive complement to enforcement. Enforcement says "you must not do X." The scaffold says "here is the correct way to do Y."
+
+Together, they form the harness: a system that makes it easy to do the right thing and hard to do the wrong thing.

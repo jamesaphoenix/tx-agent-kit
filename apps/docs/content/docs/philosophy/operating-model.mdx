@@ -1,0 +1,72 @@
+---
+title: Operating Model
+description: How humans and agents collaborate — humans define what and why, agents handle how
+---
+
+# Operating Model
+
+tx-agent-kit defines a clear operating model for how humans and agents collaborate. This model is not aspirational — it is the actual workflow the repository is designed to support.
+
+## Roles
+
+### Humans steer
+
+Humans own the questions that require judgment and context: what should this feature do, what problem does it solve, how do we know it is done, and what edge cases matter. They make architectural decisions — whether to introduce a new domain or extend an existing one — and they perform the final review to verify that the implementation matches their intent. Humans do not need to write implementation code, but they must be able to read it and confirm it aligns with what they asked for.
+
+### Agents implement
+
+Agents pick up where intent ends and execution begins. They read the harness — `CLAUDE.md`, the DDD construction pattern, the scaffold CLI — and use it to generate code that follows the golden path for CRUD domains or to write custom logic where the scaffold does not apply. They run `pnpm lint && pnpm type-check && pnpm test`, read the errors when checks fail, fix the code, and re-run until the suite is green. Agents do not make architectural decisions, but they should flag when the current architecture does not support a requested feature.
+
+## The system of record
+
+In this model, the repository is the single source of truth. Not a wiki, not a Notion page, not a Slack channel — the repo.
+
+The key files that encode the system of record:
+
+| File | Purpose |
+|------|---------|
+| `CLAUDE.md` | Agent instructions, hard constraints, workflow requirements |
+| `AGENTS.md` | Map-like index for agent navigation |
+| `packages/tooling/eslint-config/domain-invariants.js` | Lint rules encoding architectural taste |
+| `scripts/lint/enforce-domain-invariants.mjs` | Structural invariant checks |
+| `scripts/check-shell-invariants.sh` | Shell-level invariant checks |
+| `docs/` | Durable decisions and runbooks |
+
+When a decision changes, it changes in the repo. When a convention is added, it is added as a lint rule or structural check. The repo is always up to date because the repo is the enforcement mechanism.
+
+## Why repo-local documentation
+
+External documentation (wikis, Confluence, Google Docs) has a fundamental problem: it drifts from reality. The code changes but the documentation does not get updated. Within weeks, the documentation is misleading. Within months, it is actively harmful.
+
+Repo-local documentation avoids this for four reasons. It lives next to the code, so when you change the code the documentation is right there. It can be mechanically checked — a script can verify that documented commands still work. It is versioned, so you can see when documentation changed and why. And agents can read it, since an agent working in the repo has access to all documentation without needing external API access.
+
+## Workflow example
+
+Here is a concrete example of the operating model in action:
+
+**Human:** "Add a `billing` domain with an `invoice` entity. Invoices have an amount, currency, status (draft/sent/paid), and belong to a workspace."
+
+**Agent reads `CLAUDE.md`**, finds the golden path for CRUD domain setup:
+
+```bash
+# 1. Dry run to see what will be generated
+pnpm scaffold:crud --domain billing --entity invoice --dry-run
+
+# 2. Generate the domain slice
+pnpm scaffold:crud --domain billing --entity invoice
+
+# 3. Customize the generated domain types, add status enum, wire up relations
+
+# 4. Run all checks
+pnpm lint && pnpm type-check && pnpm test
+```
+
+**Agent iterates** on any lint or type errors, reads the error messages, fixes the code, and re-runs checks until everything passes.
+
+**Human reviews** the generated and customized code, verifies it matches intent, and accepts or requests changes.
+
+## Scaling the model
+
+This model scales because the harness improves over time. Each new domain adds patterns that the scaffold CLI can learn from. Each agent failure leads to a new lint rule or invariant check. Each convention documented in `CLAUDE.md` makes future agents more effective.
+
+The repository gets smarter with every interaction. The cost of adding new features decreases over time because the harness handles more and more of the mechanical work.

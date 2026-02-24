@@ -1,0 +1,64 @@
+---
+title: Testkit
+description: Shared test utilities, integration harnesses, lock-guarded runners, and DB reset helpers.
+---
+
+# Testkit (`packages/testkit`)
+
+The testkit package provides shared test infrastructure used across all integration suites. It ensures consistent test setup, idempotent database reset, and lock-guarded execution.
+
+## Core Harness: `createDbAuthContext`
+
+The primary test harness used by API, web, and worker integration suites:
+
+```typescript
+import { createDbAuthContext } from '@tx-agent-kit/testkit'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ctx = createDbAuthContext({
+  apiCwd: resolve(dirname(fileURLToPath(import.meta.url)), '..')
+})
+```
+
+This harness starts a real API server process, provides authenticated HTTP helpers for making requests, handles database reset between test cases, and manages the full process lifecycle from startup through health check to teardown.
+
+**Path resolution rule**: The `apiCwd` parameter must be resolved from `fileURLToPath(import.meta.url)`, never from `process.cwd()`. This ensures correct behavior when running from the root workspace integration runner.
+
+## Lock-Guarded Execution
+
+Integration test runners use file locks to prevent concurrent execution from clobbering shared resources:
+
+| Lock File | Purpose |
+|-----------|---------|
+| `/tmp/tx-agent-kit-db-reset.lock` | Guards database reset operations |
+| `/tmp/tx-agent-kit-integration.lock` | Guards full integration suite execution |
+
+This prevents two parallel agent sessions or CI jobs from running integration tests against the same database simultaneously.
+
+## Database Reset
+
+The testkit provides idempotent database reset that truncates test data tables while preserving the schema and migrations, all within the lock guard.
+
+## Environment
+
+Testkit configuration is centralized in `packages/testkit/src/env.ts`. This is one of the allowed env modules for `process.env` access.
+
+## Integration Test Organization
+
+All integration suites run through a single root Vitest workspace:
+
+```
+vitest.integration.workspace.ts      # Root workspace config
+  -> scripts/test/vitest-global-setup.ts  # Global infra setup
+  -> apps/api/vitest.integration.config.ts
+  -> apps/web/vitest.integration.config.ts
+  -> apps/worker/vitest.integration.config.ts
+  -> packages/testkit/vitest.integration.config.ts
+```
+
+Individual project configs must not define `globalSetup`, `maxWorkers: 1`, or `fileParallelism: false`. These are managed at the workspace level.
+
+## Utilities
+
+Beyond the core harness, the testkit ships several specialized modules. **CLI workflow helpers** (`cli-workflows.ts`) wrap shell commands so integration tests can exercise `pnpm scaffold:crud` and other CLI entry points end-to-end. **Command entrypoint verification** (`command-entrypoints.ts`) asserts that every registered pnpm script resolves to a real executable — catching dead scripts before they reach CI. **Deploy smoke runners** (`deploy-smoke.ts`) provide the same health/auth/CRUD smoke sequence used by `pnpm deploy:smoke`, but callable from Vitest so you can run smoke tests as part of the integration suite. **Dev service startup helpers** (`start-dev-services.ts`) manage the lifecycle of API/worker/web processes inside tests, including health-check polling and graceful teardown. **Worktree setup helpers** (`worktree-setup.ts`) verify that `scripts/worktree/setup.sh` correctly derives isolated ports and env files for a given worktree name.

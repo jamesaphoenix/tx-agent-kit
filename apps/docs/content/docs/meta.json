@@ -1,0 +1,19 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "---",
+    "philosophy",
+    "getting-started",
+    "architecture",
+    "core-concepts",
+    "apps",
+    "packages",
+    "guides",
+    "enforcement",
+    "infrastructure",
+    "observability",
+    "deployment",
+    "api-reference",
+    "commands"
+  ]
+}

@@ -1,0 +1,137 @@
+---
+title: DDD Construction Pattern
+description: How domain-driven design is implemented in tx-agent-kit
+---
+
+# DDD Construction Pattern
+
+tx-agent-kit implements domain-driven design (DDD) with a specific construction pattern that separates concerns into well-defined layers. This pattern is enforced mechanically — not just documented.
+
+## Directory structure
+
+Each domain in `packages/core/src/domains/` follows this structure:
+
+```
+packages/core/src/domains/<domain>/
+  domain/         # Entities, value objects, pure domain rules
+  ports/          # Interfaces and capability contracts
+  application/    # Use-case orchestration
+  adapters/       # External system adapters (optional)
+  runtime/        # Layer wiring (optional)
+  ui/             # Presentation-facing helpers (optional)
+```
+
+Persistence implementations live separately in `packages/db/src/repositories/`, not inside the domain slice.
+
+## Layer responsibilities
+
+### `domain/`
+
+The innermost layer containing pure domain logic with zero dependencies on infrastructure:
+
+```typescript
+// packages/core/src/domains/billing/domain/invoice.ts
+
+export interface InvoiceRecord {
+  readonly id: string
+  readonly workspaceId: string
+  readonly amount: number
+  readonly currency: string
+  readonly status: InvoiceStatus
+  readonly createdAt: Date
+}
+
+export type InvoiceStatus = "draft" | "sent" | "paid" | "cancelled"
+
+export const canTransition = (
+  from: InvoiceStatus,
+  to: InvoiceStatus,
+): boolean => {
+  const transitions: Record<InvoiceStatus, ReadonlyArray<InvoiceStatus>> = {
+    draft: ["sent", "cancelled"],
+    sent: ["paid", "cancelled"],
+    paid: [],
+    cancelled: [],
+  }
+  return transitions[from].includes(to)
+}
+```
+
+All functions in `domain/` must be pure — no `Date.now`, `new Date`, `Math.random`, or any side effects. Only named exports are allowed (no default exports). The layer cannot import from `packages/db`, `effect`, or any adapter. All `*Record` interfaces that ports reference must originate here.
+
+### `ports/`
+
+Abstract interfaces defining what capabilities the domain needs without specifying how they are implemented:
+
+```typescript
+// packages/core/src/domains/billing/ports/invoice-repository.port.ts
+
+import type { InvoiceRecord } from "../domain/invoice.js"
+
+export type InvoiceRepositoryPort = {
+  readonly findById: (id: string) => Effect.Effect<InvoiceRecord | null>
+  readonly findByWorkspace: (workspaceId: string) => Effect.Effect<ReadonlyArray<InvoiceRecord>>
+  readonly create: (input: CreateInvoiceInput) => Effect.Effect<InvoiceRecord>
+  readonly updateStatus: (id: string, status: InvoiceStatus) => Effect.Effect<InvoiceRecord>
+}
+```
+
+Port files must use `export type` and import record types from `domain/` — `export interface` declarations are banned. Ports can only import from `domain/` and other `ports/` files; they cannot reference concrete implementations.
+
+### `application/`
+
+Use-case orchestration that composes domain logic with port-defined capabilities:
+
+```typescript
+// packages/core/src/domains/billing/application/invoice.service.ts
+
+import { canTransition } from "../domain/invoice.js"
+import type { InvoiceRepositoryPort } from "../ports/invoice-repository.port.js"
+
+export const makeInvoiceService = (repo: InvoiceRepositoryPort) => ({
+  transitionStatus: (id: string, newStatus: InvoiceStatus) =>
+    Effect.gen(function* () {
+      const invoice = yield* repo.findById(id)
+      if (!invoice) return yield* Effect.fail(new InvoiceNotFound({ id }))
+      if (!canTransition(invoice.status, newStatus)) {
+        return yield* Effect.fail(
+          new InvalidStatusTransition({ from: invoice.status, to: newStatus })
+        )
+      }
+      return yield* repo.updateStatus(id, newStatus)
+    }),
+})
+```
+
+The application layer can import from `domain/`, `ports/`, and other `application/` files, but never from concrete infrastructure. It orchestrates calls to port methods and domain functions without containing SQL or HTTP calls itself.
+
+### Persistence in `packages/db/src/repositories/`
+
+Concrete repository implementations live in the database package, not inside the core domain:
+
+```typescript
+// packages/db/src/repositories/invoice.repository.ts
+
+import type { InvoiceRepositoryPort } from "@tx-agent-kit/core/domains/billing/ports/invoice-repository.port.js"
+
+export const makeInvoiceRepository = (db: DrizzleClient): InvoiceRepositoryPort => ({
+  findById: (id) => Effect.tryPromise(() =>
+    db.select().from(invoices).where(eq(invoices.id, id)).then(rows => rows[0] ?? null)
+  ),
+  // ... other methods
+})
+```
+
+This separation ensures that `packages/core` has zero dependency on `drizzle-orm` or any database library.
+
+## What is NOT allowed in core domains
+
+The structural invariant checks enforce these prohibitions:
+
+| Prohibition | Rationale |
+|------------|-----------|
+| No `repositories/` directory inside `packages/core/src/domains/` | Persistence belongs in `packages/db` |
+| No `services/` directory inside `packages/core/src/domains/` | Use `application/` instead for consistency |
+| No imports from `drizzle-orm`, `pg`, or database-specific packages | Core must remain infrastructure-free |
+| No `process.env` reads | Use typed config modules |
+| No `console.*` calls | Use `@tx-agent-kit/logging` |

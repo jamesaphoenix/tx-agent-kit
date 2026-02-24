@@ -1,0 +1,116 @@
+---
+title: Smoke Tests
+description: Post-deployment verification covering auth, workspaces, tasks, and invitations
+---
+
+# Smoke Tests
+
+Smoke tests verify that a deployed environment is functional by exercising the critical API flows end-to-end. They run automatically after deployment (when `RUN_SMOKE=1`) and can be triggered manually against any API endpoint.
+
+## Usage
+
+```bash
+# Run against a specific environment
+API_BASE_URL=https://api.staging.example.com pnpm deploy:smoke
+
+# Run against local development
+API_BASE_URL=http://localhost:4000 pnpm deploy:smoke
+```
+
+## What it tests
+
+The smoke test script (`scripts/deploy/smoke-api.sh`) runs a sequence of API calls that covers every critical flow:
+
+### 1. Health check
+
+```
+GET /health
+```
+
+Verifies the API is responding and reports `status: "healthy"`.
+
+### 2. Authentication
+
+```
+POST /v1/auth/sign-up    (creates a test user with random credentials)
+GET  /v1/auth/me          (verifies the returned JWT token works)
+```
+
+Signs up a new user with a random email and password, then uses the returned JWT to verify the `/v1/auth/me` endpoint returns the authenticated user.
+
+### 3. Workspace CRUD
+
+```
+POST /v1/workspaces       (creates a workspace)
+GET  /v1/workspaces       (lists workspaces, confirms creation)
+```
+
+Creates a workspace under the authenticated user and verifies it appears in the list.
+
+### 4. Task CRUD
+
+```
+POST /v1/tasks            (creates a task in the workspace)
+GET  /v1/tasks            (lists tasks, confirms creation)
+```
+
+Creates a task linked to the workspace and verifies it appears in the filtered task list.
+
+### 5. Invitation flow
+
+```
+POST /v1/auth/sign-up              (creates a second user as invitee)
+POST /v1/invitations               (invites the second user to the workspace)
+GET  /v1/invitations               (lists invitations)
+POST /v1/invitations/:token/accept (accepts the invitation)
+POST /v1/invitations/:token/accept (re-accepts, expects 404 - idempotency)
+```
+
+This exercises the full invitation lifecycle. It creates a second user account, sends a workspace invitation from the first user to the second, accepts the invitation using the invitation token, and then verifies that accepting the same invitation again returns a 404 (the invitation is consumed).
+
+## Test data
+
+All test data is created with random suffixes:
+
+| Field | Pattern |
+|-------|---------|
+| Email | `deploy-smoke-<timestamp>-<random>@example.com` |
+| Password | `Sm0ke-<random>-Pass!` |
+| Workspace name | `Smoke Workspace <random>` |
+| Task title | `Smoke Task <random>` |
+
+This prevents collisions when running smoke tests multiple times against the same environment.
+
+## Status code assertions
+
+The script asserts exact HTTP status codes for each operation:
+
+| Operation | Expected status |
+|-----------|----------------|
+| Health check | 200 |
+| Sign up | 201 |
+| Auth me | 200 |
+| Create workspace | 201 |
+| List workspaces | 200 |
+| Create task | 201 |
+| List tasks | 200 |
+| Create invitation | 201 |
+| List invitations | 200 |
+| Accept invitation | 200 |
+| Re-accept invitation | 404 |
+
+Any unexpected status code causes the script to exit with an error, clearly identifying which step failed.
+
+## Integration with deployment
+
+The deploy scripts run smoke tests by default after bringing up services:
+
+```bash
+# Deploy with smoke tests (default)
+pnpm deploy:staging
+
+# Deploy without smoke tests
+RUN_SMOKE=0 pnpm deploy:staging
+```
+
+If smoke tests fail, the deployment is flagged as unhealthy. The deployed services remain running for debugging, but the deploy script exits with a non-zero status.

@@ -1,0 +1,74 @@
+---
+title: Shell Invariants
+description: Shell script validation, environment governance, and integration baseline checks.
+---
+
+# Shell Invariants
+
+The shell invariant checker at `scripts/check-shell-invariants.sh` validates infrastructure and environment concerns that are best expressed as shell checks.
+
+## What It Checks
+
+### Shell Script Validation
+
+All `.sh` files in the repository are validated for proper shebang lines, absence of syntax errors (via `bash -n`), and consistent quoting practices.
+
+### Environment File Governance
+
+The checker enforces the single-env-file policy:
+
+| Rule | Detail |
+|------|--------|
+| Root-level allowlist | Only `.env` and `.env.example` are permitted at the repository root |
+| No nested env files | No `.env` files inside `apps/`, `packages/`, `scripts/`, or `docs/` |
+| Centralized config | All environment configuration lives at the root |
+
+This prevents the proliferation of scattered `.env.dev`, `.env.staging`, etc. files across the monorepo.
+
+### Integration Baseline Checks
+
+The checker validates that integration test infrastructure is properly configured:
+
+| Check | What it verifies |
+|-------|------------------|
+| Root workspace config | Config file exists at the expected path |
+| Global setup file | Setup script is present and referenceable |
+| Runner script references | Scripts point to the correct workspace config |
+
+## Running Shell Invariants
+
+Shell invariants run as part of the full lint command:
+
+```bash
+# Run all enforcement (ESLint + structural + shell)
+pnpm lint
+
+# Run shell invariants only
+bash scripts/check-shell-invariants.sh
+```
+
+## Environment Governance in Detail
+
+The project uses a strict env governance model:
+
+```
+Repository Root:
+  .env              # Gitignored, generated locally
+  .env.example      # Committed, documents required variables
+
+apps/web/lib/env.ts           # Web runtime env reads
+apps/worker/src/config/env.ts # Worker runtime env reads
+apps/api/src/config/env.ts    # API runtime env reads
+packages/*/src/env.ts         # Package-level env reads
+```
+
+Source modules must **never** read `process.env` directly. They must import from their package's dedicated env module. The structural checker validates this, and the shell checker validates the file layout.
+
+## Adding Shell Checks
+
+When adding new shell-level invariants:
+
+1. Add the check to `scripts/check-shell-invariants.sh`
+2. Use clear error messages that tell the developer what to fix
+3. Exit with non-zero status on failure
+4. The check automatically runs as part of `pnpm lint`

@@ -1,0 +1,79 @@
+---
+title: Enforcement Overview
+description: Why mechanical enforcement matters and the three layers that implement it.
+---
+
+# Enforcement Overview
+
+If a rule is important enough to document, it is important enough to enforce mechanically. Human-reviewed style guides drift over time. Mechanical checks do not.
+
+## Philosophy
+
+The project encodes architectural decisions as executable checks rather than prose conventions. When an agent or human makes a change, the checks catch violations before they merge. This creates a tight feedback loop:
+
+1. Developer or agent makes a change
+2. `pnpm lint` runs all three enforcement layers
+3. Violations are reported as specific, actionable error messages
+4. The change is fixed before it enters the codebase
+
+## Three Layers
+
+### 1. ESLint Rules
+
+File: `packages/tooling/eslint-config/domain-invariants.js`
+
+ESLint catches per-file violations during editing and in CI. These rules cover the following areas:
+
+| Category | Examples |
+|----------|----------|
+| Import restrictions | No `drizzle-orm` outside `packages/db`, no `effect` in `apps/web` |
+| Code patterns | `console.*` banned, `as any` banned, no suppression directives |
+| Package boundaries | Cross-package import control via `eslint-plugin-boundaries` |
+
+### 2. Structural Scripts
+
+File: `scripts/lint/enforce-domain-invariants.mjs`
+
+A Node.js script that validates cross-file structural invariants. These checks require reading multiple files and comparing relationships:
+
+| Check | Purpose |
+|-------|---------|
+| Table-to-schema parity | Every table has a matching Effect schema file |
+| Table-to-factory parity | Every table has a matching factory file |
+| Domain folder structure | Required and forbidden folders per domain |
+| Kind marker consistency | Route and repository kind markers match |
+| Layer dependency direction | Imports flow inward only |
+| Critical integration coverage | Baseline integration suites exist |
+
+### 3. Shell Invariants
+
+File: `scripts/check-shell-invariants.sh`
+
+Bash checks for infrastructure and environment concerns:
+
+| Check | Purpose |
+|-------|---------|
+| Shell script validation | Shebangs, syntax, quoting |
+| Environment file governance | Only `.env` and `.env.example` at root |
+| Integration baseline checks | Config files and setup scripts present |
+
+## Running Enforcement
+
+```bash
+# Run all three layers
+pnpm lint
+
+# Quiet mode for agent workflows
+pnpm lint:quiet
+```
+
+The `lint` command runs ESLint, then the structural script, then the shell invariants. All three must pass.
+
+## Adding New Rules
+
+When you discover a new architectural constraint that should be enforced:
+
+1. Determine which layer is appropriate (file-level -> ESLint, cross-file -> structural, infra -> shell)
+2. Add the check to the appropriate file
+3. Add a descriptive error message that tells the developer how to fix the violation
+4. Document the rule in the closed invariants list

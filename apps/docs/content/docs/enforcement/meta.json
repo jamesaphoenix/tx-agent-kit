@@ -1,0 +1,4 @@
+{
+  "title": "Enforcement",
+  "pages": ["index", "eslint-rules", "structural-checks", "shell-invariants", "closed-invariants"]
+}

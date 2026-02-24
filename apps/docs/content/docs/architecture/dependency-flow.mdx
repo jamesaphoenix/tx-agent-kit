@@ -1,0 +1,115 @@
+---
+title: Dependency Flow
+description: Inward-only dependency direction and how it is enforced
+---
+
+# Dependency Flow
+
+tx-agent-kit enforces a strict inward-only dependency direction. Inner layers never depend on outer layers. This is not a guideline — it is mechanically enforced by ESLint boundary rules and structural invariant checks.
+
+## The dependency rule
+
+Each layer can only import from layers at the same level or further inward:
+
+```
+                    ┌─────────────┐
+                    │   domain    │  (innermost — no deps)
+                    └──────┬──────┘
+                           │
+                    ┌──────▼──────┐
+                    │    ports    │  (imports domain)
+                    └──────┬──────┘
+                           │
+              ┌────────────▼────────────┐
+              │      application        │  (imports domain, ports)
+              └────────────┬────────────┘
+                           │
+         ┌─────────────────▼─────────────────┐
+         │   adapters / repositories          │  (imports domain, ports)
+         └─────────────────┬─────────────────┘
+                           │
+              ┌────────────▼────────────┐
+              │     runtime / ui        │  (orchestration — imports all)
+              └─────────────────────────┘
+```
+
+## Import rules by layer
+
+| Layer | Can import from |
+|-------|----------------|
+| `domain/` | Only `domain/` within the same domain |
+| `ports/` | `domain/` and `ports/` |
+| `application/` | `domain/`, `ports/`, and `application/` |
+| `adapters/` | `domain/`, `ports/`, and `adapters/` |
+| `runtime/` | All layers (orchestration) |
+| `ui/` | All layers (presentation) |
+
+### Cross-domain imports
+
+Domains can reference each other's `domain/` layer (for shared value objects or record types), but should not directly import another domain's `application/` layer. Cross-domain orchestration happens at the `runtime/` or route level.
+
+## Enforcement mechanisms
+
+### ESLint boundaries
+
+The ESLint configuration in `packages/tooling/eslint-config/domain-invariants.js` uses `no-restricted-imports` rules to enforce boundaries:
+
+```js
+// Simplified example of boundary enforcement
+{
+  // domain/ files cannot import from ports/, application/, adapters/
+  overrides: [{
+    files: ["**/domains/*/domain/**/*.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          "**/ports/**",
+          "**/application/**",
+          "**/adapters/**",
+          "**/repositories/**",
+        ]
+      }]
+    }
+  }]
+}
+```
+
+### Structural invariants
+
+The script `scripts/lint/enforce-domain-invariants.mjs` performs additional checks beyond what ESLint covers. It verifies that `packages/core` does not contain `repositories/` directories, that port files do not use `export interface`, and that domain record types are defined in `domain/` rather than `ports/`.
+
+### Package-level boundaries
+
+Beyond the DDD layers, there are package-level import restrictions:
+
+| Rule | Enforced by |
+|------|-------------|
+| `apps/web` cannot import `drizzle-orm` | ESLint `no-restricted-imports` |
+| `apps/web` cannot import `effect` | ESLint `no-restricted-imports` |
+| `apps/web` cannot import `next/server` | ESLint `no-restricted-imports` |
+| Only `packages/db` may import `drizzle-orm` | ESLint + structural check |
+| Source modules cannot use `console.*` | ESLint (use `@tx-agent-kit/logging`) |
+| Source modules cannot use `as any` | ESLint |
+
+## Why inward-only
+
+The inward dependency direction provides concrete benefits.
+
+**Testability.** Domain logic can be tested with no infrastructure. Port interfaces can be mocked trivially. Application services can be tested with in-memory implementations.
+
+**Replaceability.** Switching from PostgreSQL to another database means replacing repository implementations in `packages/db`. The domain layer, ports, and application logic do not change.
+
+**Clarity.** When reading domain code, you know it contains no hidden side effects. When reading a port, you know it defines a contract, not an implementation. The layer tells you the role.
+
+**Agent effectiveness.** An agent working on domain logic does not need to understand the database schema. An agent implementing a repository does not need to understand the business rules. The layers provide natural task boundaries.
+
+## Practical example
+
+Consider adding a validation rule that invoices cannot exceed a workspace's credit limit:
+
+1. **Domain layer** — Add a pure function `isWithinCreditLimit(invoice, workspace)` to `domain/`
+2. **Port layer** — No changes needed (workspace data comes through existing ports)
+3. **Application layer** — Call `isWithinCreditLimit` before creating an invoice in the service
+4. **Repository layer** — No changes needed
+
+The change is isolated to the inner layers. No database migrations, no API changes, no infrastructure modifications. The dependency direction keeps the blast radius small.

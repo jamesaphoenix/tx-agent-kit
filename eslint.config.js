@@ -17,7 +17,8 @@ export default [
       '**/.expo/**',
       'apps/mobile/*.config.{js,mjs,ts}',
       'apps/mobile/babel.config.js',
-      'apps/mobile/vitest.component-setup.ts'
+      'apps/mobile/vitest.component-setup.ts',
+      'apps/docs/**'
     ]
   },
   ...baseConfig,

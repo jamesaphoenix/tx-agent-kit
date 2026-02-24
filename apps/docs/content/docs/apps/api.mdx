@@ -1,0 +1,114 @@
+---
+title: API Server
+description: Effect HttpApi server powering auth, workspaces, tasks, and invitations with OpenAPI spec generation.
+---
+
+# API Server (`apps/api`)
+
+The API server is the backbone of tx-agent-kit. It is built on [Effect HttpApi](https://effect.website/docs/platform/http-api) and exposes a fully typed, schema-validated REST API. The server runs on port **4000** by default.
+
+## Architecture
+
+The API server follows a layered architecture where routes delegate to domain services, which in turn interact with repositories through Effect's dependency injection system.
+
+```
+Request -> Route Handler -> Domain Service -> Repository Port -> DB Repository
+```
+
+Each route handler extracts the authenticated principal from the `Authorization` header, invokes the appropriate domain service, and maps the result to an API response shape.
+
+## Route Groups
+
+The API exposes the following route groups:
+
+### Auth (`/v1/auth`)
+
+Auth routes use the `custom` kind marker since they expose domain-specific operations rather than standard CRUD.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/auth/sign-up` | POST | Register a new user and return a session |
+| `/v1/auth/sign-in` | POST | Authenticate and return a session |
+| `/v1/auth/me` | GET | Return the authenticated principal |
+| `/v1/auth/me` | DELETE | Delete the authenticated user |
+
+### Workspaces (`/v1/workspaces`)
+
+Workspace routes use the `crud` kind marker and expose the full CRUD surface.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/workspaces` | GET | List workspaces for the current user (paginated) |
+| `/v1/workspaces/:id` | GET | Get a single workspace by ID |
+| `/v1/workspaces/many` | POST | Get multiple workspaces by IDs |
+| `/v1/workspaces` | POST | Create a workspace |
+| `/v1/workspaces/:id` | PATCH | Update a workspace |
+| `/v1/workspaces/:id` | DELETE | Remove a workspace |
+
+### Tasks (`/v1/tasks`)
+
+Task routes also use the `crud` kind marker.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/tasks` | GET | List tasks for a workspace (paginated) |
+| `/v1/tasks/:id` | GET | Get a single task |
+| `/v1/tasks/many` | POST | Get multiple tasks by IDs |
+| `/v1/tasks` | POST | Create a task |
+| `/v1/tasks/:id` | PATCH | Update a task |
+| `/v1/tasks/:id` | DELETE | Remove a task |
+
+### Invitations (`/v1/invitations`)
+
+Invitation endpoints are nested under the workspaces group and include idempotent acceptance.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/invitations` | GET | List invitations for the current user |
+| `/v1/invitations/:id` | GET | Get a single invitation |
+| `/v1/invitations` | POST | Create an invitation |
+| `/v1/invitations/:id` | PATCH | Update an invitation |
+| `/v1/invitations/:id` | DELETE | Remove an invitation |
+| `/v1/invitations/accept/:token` | POST | Accept an invitation (idempotent) |
+
+## Kind Markers
+
+Every route file declares an explicit kind marker that must match the corresponding repository port kind:
+
+```typescript
+// apps/api/src/routes/workspaces.ts
+export const WorkspacesRouteKind = 'crud' as const
+
+// apps/api/src/routes/auth.ts
+export const AuthRouteKind = 'custom' as const
+```
+
+The enforcement layer validates that `crud` routes expose the full list/get/create/update/remove surface, and that `custom` routes do not accidentally implement the full CRUD pattern.
+
+## OpenAPI Generation
+
+The API spec is generated from the Effect HttpApi definitions:
+
+```bash
+pnpm openapi:generate
+```
+
+This produces `apps/api/openapi.json`, which is then consumed by Orval to generate typed client hooks for the web and mobile apps.
+
+## Config and Environment
+
+Runtime environment variables are read exclusively through `apps/api/src/config/env.ts`. Direct `process.env` access is forbidden in route and service modules.
+
+## Integration Testing
+
+The API integration suite lives at `apps/api/src/api.integration.test.ts` and uses the standardized harness:
+
+```typescript
+import { createDbAuthContext } from '@tx-agent-kit/testkit'
+
+const ctx = createDbAuthContext({
+  apiCwd: resolve(dirname(fileURLToPath(import.meta.url)), '..')
+})
+```
+
+The harness provides authenticated HTTP helpers and handles DB reset between test cases. Manual process spawning and direct `createSqlTestContext` wiring are forbidden in the API integration suite.

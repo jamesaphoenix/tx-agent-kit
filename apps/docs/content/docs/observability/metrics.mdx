@@ -1,0 +1,110 @@
+---
+title: Metrics
+description: Application metrics via OpenTelemetry SDK with Prometheus and Cloud Monitoring backends
+---
+
+# Metrics
+
+tx-agent-kit collects application metrics using the OpenTelemetry SDK. Metrics are exported via OTLP to the collector, which routes them to Prometheus locally or GCP Cloud Monitoring in production.
+
+## How metrics work
+
+The `@tx-agent-kit/observability` package initializes a `PeriodicExportingMetricReader` that pushes metrics every 5 seconds:
+
+```typescript
+metricReader: new PeriodicExportingMetricReader({
+  exporter: new OTLPMetricExporter({
+    url: `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/metrics`
+  }),
+  exportIntervalMillis: 5000
+})
+```
+
+Metrics flow from the application to the OTEL Collector via OTLP, then to the configured backend.
+
+## Creating metrics
+
+Use the OpenTelemetry Metrics API to define custom instruments:
+
+```typescript
+import { metrics } from '@opentelemetry/api'
+
+const meter = metrics.getMeter('api')
+
+// Counter - monotonically increasing value
+const requestCounter = meter.createCounter('http.requests.total', {
+  description: 'Total HTTP requests',
+  unit: 'requests'
+})
+requestCounter.add(1, { 'http.method': 'GET', 'http.route': '/v1/tasks' })
+
+// Histogram - distribution of values
+const latencyHistogram = meter.createHistogram('http.request.duration', {
+  description: 'HTTP request latency',
+  unit: 'ms'
+})
+latencyHistogram.record(42, { 'http.method': 'GET', 'http.route': '/v1/tasks' })
+
+// UpDownCounter - value that can increase or decrease
+const activeConnections = meter.createUpDownCounter('db.connections.active', {
+  description: 'Active database connections'
+})
+activeConnections.add(1)  // connection opened
+activeConnections.add(-1) // connection closed
+```
+
+## Built-in metrics
+
+The observability package provides a metrics registry with baseline instruments:
+
+```typescript
+import { getOrCreateNodeServiceMetrics } from '@tx-agent-kit/observability'
+
+const meter = metrics.getMeter('api')
+const { startupCounter } = getOrCreateNodeServiceMetrics(meter)
+
+startupCounter.add(1, { 'smoke.service': 'api' })
+```
+
+## Configuration
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP HTTP endpoint |
+| `PROMETHEUS_URL` | `http://localhost:9090` | Prometheus query endpoint (for MCP server) |
+
+## Local backend: Prometheus
+
+In local development, the OTEL Collector forwards metrics to Prometheus via the OTLP receiver:
+
+```
+App --> OTEL Collector (port 4320) --> Prometheus (port 9090)
+```
+
+Prometheus is configured with `--web.enable-otlp-receiver` to accept OTLP push-based metrics alongside traditional pull-based scraping.
+
+Query metrics at `http://localhost:9090`:
+
+```text
+# Total HTTP requests by route
+sum(http_requests_total) by (http_route)
+
+# P95 request latency
+histogram_quantile(0.95, rate(http_request_duration_bucket[5m]))
+```
+
+An MCP server is available for programmatic access:
+
+```bash
+pnpm mcp:prometheus
+```
+
+## Production backend: Cloud Monitoring
+
+In staging and production, the OTEL Collector exports metrics to GCP Cloud Monitoring using the `googlecloud` exporter. Metrics appear as custom metrics under `custom.googleapis.com/opentelemetry/`.
+
+## Grafana dashboards
+
+Pre-provisioned Grafana dashboards at `http://localhost:3001` visualize metrics from Prometheus. Dashboards are stored in `monitoring/local/grafana/dashboards/` and are automatically loaded when Grafana starts.
+
+Default credentials: `admin` / `admin`.

@@ -1,0 +1,80 @@
+---
+title: Logging
+description: Structured JSON logger with OpenTelemetry log emission, mandatory over console.*.
+---
+
+# Logging (`packages/logging`)
+
+The logging package provides structured JSON logging with automatic OpenTelemetry log record emission. It is the only approved logging mechanism — `console.*` calls are banned by ESLint across the entire codebase.
+
+## Usage
+
+```typescript
+import { createLogger } from '@tx-agent-kit/logging'
+
+const logger = createLogger('my-service')
+
+logger.info('Server started', { port: 4000 })
+logger.error('Request failed', { requestId: 'abc' }, error)
+```
+
+## Log Format
+
+Every log entry is emitted as a JSON line to stdout and simultaneously as an OpenTelemetry log record:
+
+```json
+{
+  "timestamp": "2026-02-23T10:30:00.000Z",
+  "level": "info",
+  "service": "tx-agent-kit-api",
+  "message": "Server started",
+  "context": {
+    "port": 4000
+  }
+}
+```
+
+## API
+
+### `createLogger(service, baseContext?)`
+
+Creates a structured logger instance for the given service name.
+
+### Logger Methods
+
+| Method | Severity | Parameters |
+|--------|----------|------------|
+| `debug` | DEBUG | `(message, context?)` |
+| `info` | INFO | `(message, context?)` |
+| `warn` | WARN | `(message, context?)` |
+| `error` | ERROR | `(message, context?, error?)` |
+| `child` | — | `(scope, context?)` returns a new logger |
+
+### Helper Functions
+
+| Function | Purpose |
+|----------|---------|
+| `toErrorDetails(error)` | Extract structured error context from an unknown error |
+| `logError(logger, error, context, metadata?)` | Log an error with full context |
+| `logProgress(logger, progress, step, metadata?)` | Log a progress event (0-100%) |
+| `logStateChange(logger, from, to, metadata?)` | Log a state transition |
+| `logPerformance(logger, operation, durationMs, metadata?)` | Log operation timing |
+| `createPerfLogger(logger, operation, metadata?)` | Create a timer that logs duration on `.end()` |
+
+### Child Loggers
+
+Create scoped loggers that inherit the parent's base context:
+
+```typescript
+const logger = createLogger('api')
+const authLogger = logger.child('auth', { module: 'auth' })
+// Service name becomes "api:auth"
+```
+
+## OpenTelemetry Integration
+
+Every log entry is emitted as an OTEL log record through the `@opentelemetry/api-logs` SDK. This means logs flow through the same OTEL collector pipeline as traces and metrics, enabling correlated observability.
+
+## Environment
+
+The default logger reads its service name from the `SERVICE_NAME` environment variable via `packages/logging/src/env.ts`.

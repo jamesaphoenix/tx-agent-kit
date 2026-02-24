@@ -1,0 +1,129 @@
+---
+title: Testing Strategy
+description: Testing pyramid with unit tests, integration suites, pgTAP, smoke tests, and quiet runners.
+---
+
+# Testing Strategy
+
+The project uses a layered testing strategy with mechanical enforcement of test colocation, naming conventions, and coverage baselines.
+
+## Testing Pyramid
+
+### Unit Tests
+
+Fast, isolated tests that run without external dependencies.
+
+```bash
+pnpm test          # Full output
+pnpm test:quiet    # Minimal output (preferred for agents)
+```
+
+| Property | Value |
+|----------|-------|
+| Framework | Vitest |
+| Convention | `<file>.test.ts` or `<file>.test.tsx`, colocated next to source |
+| Parallelism | Host CPU count by default (`TEST_MAX_WORKERS` to override) |
+
+### Integration Tests
+
+Tests that run against real infrastructure (PostgreSQL, API server, Temporal).
+
+```bash
+pnpm test:integration          # Full output
+pnpm test:integration:quiet    # Minimal output (preferred for agents)
+```
+
+| Property | Value |
+|----------|-------|
+| Framework | Vitest with workspace runner |
+| Convention | `<file>.integration.test.ts` or `<file>.integration.test.tsx` |
+| Orchestration | Single workspace run via `vitest.integration.workspace.ts` |
+| Global setup | `scripts/test/vitest-global-setup.ts` |
+| Lock guard | `/tmp/tx-agent-kit-integration.lock` prevents concurrent runs |
+| Parallelism | Host CPU count by default (`INTEGRATION_MAX_WORKERS` to override) |
+
+### pgTAP Tests
+
+SQL-level tests for database trigger contracts.
+
+```bash
+pnpm test:db:pgtap
+```
+
+| Property | Value |
+|----------|-------|
+| Framework | pgTAP |
+| Location | `packages/db/pgtap/*.sql` |
+| Coverage | Every `CREATE TRIGGER` in migrations must be referenced |
+
+### Smoke Tests
+
+Post-deployment health checks.
+
+```bash
+pnpm deploy:smoke
+```
+
+Validates health, auth, workspace, task, and invitation endpoints against a running deployment.
+
+## Test Naming Conventions
+
+The project enforces strict naming:
+
+| Pattern | Status |
+|---------|--------|
+| `file.test.ts` | Allowed (unit test) |
+| `file.integration.test.ts` | Allowed (integration test) |
+| `file.spec.ts` | Forbidden |
+| `file.integration.ts` | Forbidden (missing `.test`) |
+| `__tests__/file.ts` | Forbidden (not colocated) |
+
+## Test Colocation
+
+Every test file must have a colocated source module:
+
+```
+src/
+  auth-service.ts                      # Source
+  auth-service.test.ts                 # Unit test (colocated)
+  auth-service.integration.test.ts     # Integration test (colocated)
+```
+
+A test file without a matching source file will fail the structural invariant check.
+
+## Integration Suite Organization
+
+All integration suites run through a single root workspace:
+
+```
+vitest.integration.workspace.ts
+  -> apps/api/vitest.integration.config.ts
+  -> apps/web/vitest.integration.config.ts
+  -> apps/worker/vitest.integration.config.ts
+  -> packages/testkit/vitest.integration.config.ts
+```
+
+Individual project configs must not define `globalSetup` (use the root global setup), `maxWorkers: 1` (use the env-driven policy), or `fileParallelism: false` (use the env-driven policy).
+
+## Critical Coverage Baselines
+
+The invariant checker enforces minimum coverage for critical flows:
+
+| App | Required coverage |
+|-----|-------------------|
+| API | `/health`, `/v1/auth/sign-up`, `/v1/auth/sign-in`, `/v1/auth/me`, `/v1/workspaces`, `/v1/tasks`, `/v1/invitations`, plus invitation idempotency and health readiness latency |
+| Web | Integration suites for `DashboardPage`, `WorkspacesPage`, `InvitationsPage`, `AuthForm`, `CreateWorkspaceForm`, `CreateTaskForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `client-auth` |
+| Worker | Idempotent `activities.processTask(...)` behavior |
+
+## Quiet Runners
+
+For agent workflows where minimal output reduces context bloat:
+
+```bash
+pnpm lint:quiet
+pnpm type-check:quiet
+pnpm test:quiet
+pnpm test:integration:quiet
+```
+
+Switch to full commands when diagnostics are needed.

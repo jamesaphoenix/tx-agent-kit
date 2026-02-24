@@ -1,0 +1,109 @@
+---
+title: Deploy with Compose
+description: Staging and production deployment via Docker Compose with secrets injection
+---
+
+# Deploy with Compose
+
+Staging and production environments are deployed using Docker Compose. The deploy scripts handle secrets injection, image resolution, service startup, and optional smoke testing in a single command.
+
+## Commands
+
+```bash
+# Deploy to staging
+pnpm deploy:staging [artifact.env]
+
+# Deploy to production
+pnpm deploy:prod [artifact.env]
+```
+
+The optional `artifact.env` argument points to an image artifact file produced by `pnpm deploy:build-images`. If omitted, the script uses the latest available artifact.
+
+## Deployment steps
+
+The deploy script (`scripts/deploy/deploy-compose.sh`) performs these steps in order:
+
+### 1. Render secrets
+
+```bash
+op inject -i deploy/env/<env>.env.template -o /tmp/<env>.env
+```
+
+The 1Password CLI resolves all `op://` references in the environment template, producing a rendered `.env` file with actual secret values.
+
+### 2. Inject image references
+
+If an artifact file is provided, the script reads `API_IMAGE` and `WORKER_IMAGE` from it and exports them as environment variables for Docker Compose.
+
+### 3. Pull and start services
+
+```bash
+docker compose -f docker-compose.<env>.yml pull
+docker compose -f docker-compose.<env>.yml up -d
+```
+
+The environment-specific Compose file (`docker-compose.staging.yml` or `docker-compose.prod.yml`) defines the services:
+
+| Service | Configuration |
+|---------|--------------|
+| **API** | Image from artifact, port 4000, health check via `/health` |
+| **Worker** | Image from artifact, connects to Temporal |
+| **OTEL Collector** | Routes telemetry to GCP or OSS backends |
+
+### 4. Run smoke checks
+
+By default (`RUN_SMOKE=1`), the deploy script runs smoke tests against the deployed API after services are healthy. Set `RUN_SMOKE=0` to skip.
+
+## Compose files
+
+### Staging (`docker-compose.staging.yml`)
+
+```yaml
+services:
+  api:
+    image: ${API_IMAGE}
+    env_file: ${DEPLOY_ENV_FILE}
+    ports: ['4000:4000']
+  worker:
+    image: ${WORKER_IMAGE}
+    env_file: ${DEPLOY_ENV_FILE}
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.146.1
+    command: --config=/etc/otel-collector/otel-collector.${OTEL_COLLECTOR_BACKEND}.yaml
+```
+
+### Production (`docker-compose.prod.yml`)
+
+Same structure as staging but references production secrets and may have different scaling or resource configurations.
+
+## OTEL collector backend
+
+The collector backend is configured via `OTEL_COLLECTOR_BACKEND` in the environment template:
+
+| Value | Backend | Config file |
+|-------|---------|------------|
+| `gcp` | GCP Cloud Trace, Monitoring, Logging | `monitoring/production/otel-collector.gcp.yaml` |
+| `oss` | Jaeger, Prometheus, Loki | `monitoring/production/otel-collector.oss.yaml` |
+
+GCP backend requires `GOOGLE_CLOUD_PROJECT` and service account credentials mounted via `OTEL_COLLECTOR_GCP_CREDENTIALS_DIR`.
+
+## Health checks
+
+The API container includes a health check that polls `/health` every 15 seconds with 8 retries and a 20-second start period. The deploy script waits for the health check to pass before running smoke tests.
+
+## Full deployment example
+
+```bash
+# 1. Build and push images
+PUSH_IMAGES=1 pnpm deploy:build-images
+
+# 2. Run staging migrations
+pnpm deploy:migrate:staging
+
+# 3. Deploy to staging (auto-runs smoke tests)
+pnpm deploy:staging deploy/artifacts/images-$(git rev-parse --short HEAD).env
+
+# 4. After verification, deploy to production
+pnpm deploy:migrate:prod
+pnpm deploy:prod deploy/artifacts/images-$(git rev-parse --short HEAD).env
+```
