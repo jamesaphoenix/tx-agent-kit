@@ -1,94 +1,118 @@
 # tx-agent-kit
 
-> You tell the agent what to build. The agent builds it. The repo makes sure the agent builds it right.
+> Agent pointer map for repo-aware LLMs. Prefer these file pointers before broad search.
 
-tx-agent-kit is a production TypeScript monorepo where AI agents do the implementing and mechanical checks keep them honest. Effect HTTP, Temporal, Next.js, Drizzle, Expo. Every architectural rule is a lint check, not a prayer.
+## Canonical entry points
 
-## Start here
+- `AGENTS.md`: primary operating rules and hard constraints for agents.
+- `README.md`: project overview, prerequisites, and local bootstrap.
+- `docs/ARCHITECTURE.md`: system boundaries and dependency flow.
+- `docs/QUALITY.md`: enforced invariants and rationale.
+- `docs/COMMANDS.md`: command catalog (full + quiet lanes).
+- `docs/RUNBOOKS.md`: operational workflows and troubleshooting.
+- `docs/DEPLOYMENT.md`: build, migrate, deploy, smoke test.
+- `docs/ROLLBACK.md`: rollback procedures.
 
-[Welcome](/docs): What this project is and how to orient yourself
-[Local Setup](/docs/getting-started/local-setup): Clone, install, and run everything in under 5 minutes
-[Your First Domain](/docs/getting-started/first-domain): Scaffold a real feature end-to-end with one command
+## Enforcement (mechanical gates)
 
-## Understand the philosophy
+- `packages/tooling/eslint-config/domain-invariants.js`: import bans and coding constraints.
+- `scripts/lint/enforce-domain-invariants.mjs`: cross-file structural invariants.
+- `scripts/check-shell-invariants.sh`: shell-level repo policy checks.
 
-[Why tx-agent-kit exists](/docs/philosophy): The agent-first engineering thesis
-[Why this is different](/docs/philosophy/why-different): Tribal knowledge dies. Lint rules don't.
-[The operating model](/docs/philosophy/operating-model): You steer intent. Agents implement. The repo enforces.
-[Mechanical enforcement](/docs/philosophy/mechanical-enforcement): If it matters, it's a check. 50+ invariants and counting.
+## App map
 
-## Learn the architecture
+- `apps/api/src/server.ts`: API runtime entrypoint.
+- `apps/api/src/server-lib.ts`: API runtime wiring and layers.
+- `apps/api/openapi.json`: generated API contract.
+- `apps/web/app`: web app routes/pages (use client constrained).
+- `apps/web/components`: web UI components + integration suites.
+- `apps/web/lib`: web transport/state/auth helpers.
+- `apps/mobile`: Expo app code and integration/unit suites.
+- `apps/mobile/lib`: mobile API/auth/env client layers.
+- `apps/worker/src/index.ts`: worker runtime entrypoint.
+- `apps/worker/src/workflows.ts`: Temporal workflows (determinism constraints).
+- `apps/worker/src/activities.ts`: side-effectful Temporal activities.
+- `apps/docs/content/docs`: docs source of truth for docs site content.
 
-[Architecture overview](/docs/architecture): The big picture: 4 apps, 8 packages, strict boundaries
-[Monorepo structure](/docs/architecture/monorepo-structure): What lives where and why
-[DDD pattern](/docs/architecture/ddd-pattern): domain/ → ports/ → application/ → adapters/
-[Dependency flow](/docs/architecture/dependency-flow): Dependencies point inward. ESLint enforces it.
-[Data flow](/docs/architecture/data-flow): Web → API → Core → DB → Worker, traced end to end
+## Package map
 
-## Master the core concepts
+- `packages/core/src/domains`: domain logic (domain/ports/application/adapters).
+- `packages/contracts/src`: shared effect/Schema contracts.
+- `packages/db/src/schema.ts`: Drizzle schema source of truth.
+- `packages/db/src/effect-schemas`: table-aligned effect schemas.
+- `packages/db/src/factories`: table-aligned test factories.
+- `packages/db/drizzle/migrations`: SQL migrations.
+- `packages/db/pgtap`: pgTAP trigger/invariant suites.
+- `packages/testkit/src`: integration harnesses and shared test runtime helpers.
+- `packages/observability/src`: OTEL setup and signal pipelines.
+- `packages/logging/src`: structured logging primitives.
 
-[Effect services](/docs/core-concepts/effect-services): DI, layers, typed errors. The backbone of the API.
-[Domain modeling](/docs/core-concepts/domain-modeling): Pure functions. No Date.now. No Math.random. Testable in isolation.
-[Ports and adapters](/docs/core-concepts/ports-and-adapters): Interfaces in ports/. Implementations in packages/db.
-[Schema contracts](/docs/core-concepts/schema-contracts): effect/Schema everywhere. Zod is banned.
+## Critical test harness pointers
 
-## Know the apps
+- `vitest.integration.workspace.ts`: integration workspace composition.
+- `vitest.boilerplate.workspace.ts`: boilerplate meta-test workspace.
+- `scripts/test/vitest-global-setup.ts`: shared integration preflight + locking.
+- `scripts/test/run-integration.sh`: integration lane runner.
+- `scripts/test-integration-quiet.sh`: quiet integration runner.
+- `scripts/test/run-boilerplate.sh`: boilerplate meta-test runner.
+- `scripts/test-boilerplate-quiet.sh`: quiet boilerplate runner.
+- `packages/testkit/src/db-auth-context.ts`: API+DB auth test harness.
+- `packages/testkit/src/sql-context.ts`: schema-isolated SQL test context.
+- `packages/testkit/src/boilerplate.parallel-worktrees.boilerplate.test.ts`: 2-worktree, 2-schema, 2x stack non-interference meta-test.
 
-[API server](/docs/apps/api): Effect HttpApi. Auth, workspaces, tasks, invitations. Generates its own OpenAPI spec.
-[Web](/docs/apps/web): Client-only Next.js. No server code. No Effect. No Drizzle. Just typed API calls.
-[Worker](/docs/apps/worker): Temporal. Deterministic workflows. Activities handle the messy parts.
-[Mobile](/docs/apps/mobile): Expo React Native. Same API, same contracts.
+## Critical flow coverage pointers
 
-## Know the packages
+- `apps/api/src/api.integration.test.ts`: critical API endpoint + idempotency coverage.
+- `apps/web/components/AuthForm.integration.test.tsx`
+- `apps/web/components/CreateWorkspaceForm.integration.test.tsx`
+- `apps/web/components/CreateTaskForm.integration.test.tsx`
+- `apps/web/components/CreateInvitationForm.integration.test.tsx`
+- `apps/web/components/AcceptInvitationForm.integration.test.tsx`
+- `apps/web/components/SignOutButton.integration.test.tsx`
+- `apps/mobile/components/AuthForm.integration.test.tsx`
+- `apps/mobile/components/CreateWorkspaceForm.integration.test.tsx`
+- `apps/mobile/components/CreateTaskForm.integration.test.tsx`
+- `apps/mobile/components/CreateInvitationForm.integration.test.tsx`
+- `apps/mobile/components/AcceptInvitationForm.integration.test.tsx`
+- `apps/mobile/components/SignOutButton.integration.test.tsx`
+- `apps/mobile/components/providers/AuthBootstrapProvider.integration.test.tsx`
+- `apps/mobile/lib/client-api.integration.test.ts`
 
-[Core](/docs/packages/core): DDD domain slices. The business logic lives here.
-[DB](/docs/packages/db): Drizzle schema, repositories, migrations, pgTAP tests. Only package that touches the ORM.
-[Contracts](/docs/packages/contracts): Shared API shapes. Single source of truth for validation.
-[Auth](/docs/packages/auth): Password hashing and JWT. Thin and boring on purpose.
-[Logging](/docs/packages/logging): Structured JSON. console.log is dead to us.
-[Observability](/docs/packages/observability): OTEL bootstrap. Traces, metrics, logs.
-[Testkit](/docs/packages/testkit): Harnesses, lock guards, DB reset helpers.
-[Tooling](/docs/packages/tooling): ESLint configs and the scaffold CLI.
+## Worktrees and parallel agent development
 
-## Build something
+- `scripts/worktree/setup.sh`: per-worktree schema/env/port/task-queue setup.
+- `scripts/worktree/derive-ports.sh`: deterministic worktree port derivation.
+- `scripts/worktree/lib/ports.sh`: collision-aware port allocation.
+- `scripts/worktree/manage.sh`: create/list/remove worktree workflows.
+- `scripts/worktree/ensure-shared-infra.sh`: shared infra bootstrap across worktrees.
 
-[Add a domain](/docs/guides/adding-a-domain): The golden path. Scaffold, wire, validate, ship.
-[Add routes](/docs/guides/adding-routes): crud or custom. Kind markers keep you honest.
-[Add workflows](/docs/guides/adding-workflows): Temporal. No timers in workflows. Activities do the I/O.
-[Add DB triggers](/docs/guides/adding-db-triggers): One command scaffolds migration + pgTAP test.
-[Test it](/docs/guides/testing-strategy): Unit → integration → pgTAP → smoke. Quiet runners for agents.
-[Generate the API client](/docs/guides/generating-api-client): OpenAPI in, typed hooks out.
+## Infra and observability operations
 
-## Understand enforcement
+- `scripts/start-dev-services.sh`: shared Docker infra ensure.
+- `scripts/test/check-observability.sh`: OTEL smoke validation gate.
+- `scripts/test/emit-observability-smoke.ts`: signal emission helper.
+- `scripts/temporal/start-dev.sh`: local Temporal CLI bootstrap.
+- `scripts/temporal/status.sh`: local Temporal runtime status.
+- `scripts/temporal/stop-dev.sh`: local Temporal runtime shutdown.
+- `docker-compose.yml`: local infra topology.
 
-[How enforcement works](/docs/enforcement): Three layers. ESLint, structural scripts, shell checks.
-[ESLint rules](/docs/enforcement/eslint-rules): What's banned and why
-[Structural checks](/docs/enforcement/structural-checks): Cross-file invariants that ESLint can't catch
-[Shell invariants](/docs/enforcement/shell-invariants): Env governance and integration baselines
-[The full list](/docs/enforcement/closed-invariants): Every enforced rule in one place
+## Code generation and scaffolding
 
-## Run the infrastructure
+- `packages/tooling/scaffold/src/cli.ts`: CRUD scaffold CLI implementation.
+- `apps/docs/scripts/generate-api-docs.ts`: OpenAPI -> docs reference generator.
+- `apps/web/lib/api/generated`: generated web API client.
+- `apps/web/lib/api/orval-mutator.ts`: web client mutation behavior.
+- `apps/mobile/lib/api/orval-mutator.ts`: mobile client mutation behavior.
 
-[Docker stack](/docs/infrastructure/docker-stack): Postgres, Redis, OTEL, Jaeger, Prometheus, Grafana
-[Local dev workflow](/docs/infrastructure/local-development): env:configure → infra:ensure → db:migrate → dev
-[Worktrees](/docs/infrastructure/worktrees): Parallel branches with collision-free ports
-[Secrets](/docs/infrastructure/secrets-management): 1Password CLI. op:// refs in committed templates.
+## Deployment and smoke validation
 
-## See everything
+- `scripts/deploy/build-images.sh`: API/worker image build pipeline.
+- `scripts/deploy/migrate.sh`: migration runner for deploy environments.
+- `scripts/deploy/deploy-compose.sh`: compose deployment workflow.
+- `scripts/deploy/smoke-api.sh`: post-deploy critical-flow smoke checks.
+- `scripts/deploy/gcp`: optional GCP bootstrap/validate/teardown scripts.
 
-[Logging](/docs/observability/logging): Structured JSON over OTLP
-[Tracing](/docs/observability/tracing): Distributed traces. Jaeger locally, Cloud Trace in prod.
-[Metrics](/docs/observability/metrics): Counters, histograms. Prometheus locally, Cloud Monitoring in prod.
-[Monitoring stack](/docs/observability/monitoring-stack): The full local + production observability picture
+## Public docs links (secondary)
 
-## Ship it
-
-[Build images](/docs/deployment/build-images): Immutable, digest-pinned containers
-[Run migrations](/docs/deployment/migrations): Drizzle migrations against staging/prod via 1Password
-[Deploy](/docs/deployment/deploy-compose): op inject → docker compose up → smoke test
-[Smoke tests](/docs/deployment/smoke-tests): Health, auth, workspaces, tasks, invitations. Automated.
-
-## Reference
-
-[API Reference](/docs/api-reference): Auto-generated from the OpenAPI spec
-[Commands](/docs/commands): Every pnpm script, organized by what you're trying to do
+- https://agentkit.txdocs.dev/docs: human-oriented docs site.
+- https://agentkit.txdocs.dev/llms-full.txt: expanded narrative map.
