@@ -1,8 +1,9 @@
+import './globals.css';
+import { Banner } from 'fumadocs-ui/components/banner';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import Script from 'next/script';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
-import './globals.css';
 
 const GA_ID = 'G-JPDS4Q62K4';
 
@@ -33,6 +34,24 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </Script>
       </head>
       <body className="flex min-h-screen flex-col">
+        <Banner id="tx-docs-promo" variant="rainbow">
+          <span className="font-medium">
+            Built by the team behind tx
+            <span className="mx-2 opacity-50">|</span>
+            Primitives for memory, tasks &amp; orchestration
+            <a
+              href="https://txdocs.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 inline-flex items-center gap-1 rounded-md bg-white/20 px-2 py-0.5 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/30"
+            >
+              Visit tx docs
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </a>
+          </span>
+        </Banner>
         <RootProvider>{children}</RootProvider>
       </body>
     </html>
