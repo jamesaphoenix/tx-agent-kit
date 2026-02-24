@@ -32,6 +32,8 @@
     "test:quiet": "./scripts/test-quiet.sh",
     "test:integration": "./scripts/test/run-integration.sh",
     "test:integration:quiet": "./scripts/test-integration-quiet.sh",
+    "test:boilerplate": "./scripts/test/run-boilerplate.sh",
+    "test:boilerplate:quiet": "./scripts/test-boilerplate-quiet.sh",
     "test:db:pgtap": "./scripts/test/run-pgtap.sh",
     "test:infra:observability": "./scripts/test/check-observability.sh",
     "test:run-silent": "./scripts/test-run-silent.sh",

@@ -34,6 +34,11 @@ SCHEMA_NAME="$(generate_schema_name "$WORKTREE_NAME")"
 log_info "Ensuring infrastructure is running"
 "$ROOT_DIR/scripts/start-dev-services.sh"
 
+if [[ "${TEMPORAL_RUNTIME_MODE:-cli}" == "cli" ]]; then
+  log_info "Ensuring local Temporal CLI runtime"
+  "$ROOT_DIR/scripts/temporal/start-dev.sh"
+fi
+
 log_info "Creating schema '$SCHEMA_NAME' (idempotent)"
 psql "$DB_URL" -v schema_name="$SCHEMA_NAME" <<'SQL'
 \set quoted_schema :schema_name
@@ -50,6 +55,15 @@ WEB_PORT=""
 API_PORT=""
 MOBILE_PORT=""
 WORKER_INSPECT_PORT=""
+WORKTREE_PORT_OFFSET=""
+ACTIVE_WORKTREE_NAMES=()
+while IFS= read -r worktree_path; do
+  worktree_base_name="$(basename "$worktree_path")"
+  if [[ -n "$worktree_base_name" ]]; then
+    ACTIVE_WORKTREE_NAMES+=("$worktree_base_name")
+  fi
+done < <(git -C "$ROOT_DIR" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')
+
 while IFS='=' read -r key value; do
   case "$key" in
     WEB_PORT)
@@ -64,12 +78,15 @@ while IFS='=' read -r key value; do
     WORKER_INSPECT_PORT)
       WORKER_INSPECT_PORT="$value"
       ;;
+    WORKTREE_PORT_OFFSET)
+      WORKTREE_PORT_OFFSET="$value"
+      ;;
   esac
 done <<EOF
-$(allocate_worktree_ports "$WORKTREE_NAME")
+$(allocate_worktree_ports "$WORKTREE_NAME" "${ACTIVE_WORKTREE_NAMES[@]}")
 EOF
 
-if [[ -z "$WEB_PORT" || -z "$API_PORT" || -z "$MOBILE_PORT" || -z "$WORKER_INSPECT_PORT" ]]; then
+if [[ -z "$WEB_PORT" || -z "$API_PORT" || -z "$MOBILE_PORT" || -z "$WORKER_INSPECT_PORT" || -z "$WORKTREE_PORT_OFFSET" ]]; then
   log_error "Failed to derive deterministic worktree ports"
   exit 1
 fi
@@ -98,18 +115,22 @@ upsert_env_value() {
 
 WORKTREE_ENV="$WORKTREE_PATH/.env"
 SCHEMA_QUERY="postgresql://postgres:postgres@localhost:5432/tx_agent_kit?options=-c%20search_path%3D${SCHEMA_NAME},public"
+WORKTREE_TASK_QUEUE="tx-agent-kit-${WORKTREE_NAME}"
 
 upsert_env_value "$WORKTREE_ENV" "DATABASE_URL" "$SCHEMA_QUERY"
 upsert_env_value "$WORKTREE_ENV" "DATABASE_SCHEMA" "$SCHEMA_NAME"
+upsert_env_value "$WORKTREE_ENV" "WORKTREE_PORT_OFFSET" "$WORKTREE_PORT_OFFSET"
 upsert_env_value "$WORKTREE_ENV" "API_PORT" "$API_PORT"
 upsert_env_value "$WORKTREE_ENV" "PORT" "$WEB_PORT"
 upsert_env_value "$WORKTREE_ENV" "WEB_PORT" "$WEB_PORT"
 upsert_env_value "$WORKTREE_ENV" "MOBILE_PORT" "$MOBILE_PORT"
 upsert_env_value "$WORKTREE_ENV" "WORKER_INSPECT_PORT" "$WORKER_INSPECT_PORT"
+upsert_env_value "$WORKTREE_ENV" "TEMPORAL_TASK_QUEUE" "$WORKTREE_TASK_QUEUE"
 upsert_env_value "$WORKTREE_ENV" "API_BASE_URL" "http://localhost:${API_PORT}"
 upsert_env_value "$WORKTREE_ENV" "NEXT_PUBLIC_API_BASE_URL" "http://localhost:${API_PORT}"
 upsert_env_value "$WORKTREE_ENV" "EXPO_PUBLIC_API_BASE_URL" "http://localhost:${API_PORT}"
 upsert_env_value "$WORKTREE_ENV" "OTEL_EXPORTER_OTLP_ENDPOINT" "http://localhost:4320"
+upsert_env_value "$WORKTREE_ENV" "OTEL_LOGS_EXPORTER" "otlp"
 upsert_env_value "$WORKTREE_ENV" "NEXT_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT" "http://localhost:4320"
 upsert_env_value "$WORKTREE_ENV" "EXPO_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT" "http://localhost:4320"
 upsert_env_value "$WORKTREE_ENV" "NEXT_PUBLIC_NODE_ENV" "development"
@@ -135,8 +156,10 @@ chmod +x "$WORKTREE_PATH/reset-worktree-schema.sh"
 log_success "Worktree setup complete"
 printf '  Worktree: %s\n' "$WORKTREE_NAME"
 printf '  Schema:   %s\n' "$SCHEMA_NAME"
+printf '  Port offset: %s\n' "$WORKTREE_PORT_OFFSET"
 printf '  Web port: %s\n' "$WEB_PORT"
 printf '  API port: %s\n' "$API_PORT"
 printf '  Mobile port: %s\n' "$MOBILE_PORT"
 printf '  Worker inspect port: %s\n' "$WORKER_INSPECT_PORT"
+printf '  Temporal task queue: %s\n' "$WORKTREE_TASK_QUEUE"
 printf '  Env file: %s\n' "$WORKTREE_ENV"

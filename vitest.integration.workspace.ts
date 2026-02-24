@@ -6,6 +6,7 @@ const integrationConfigName = 'vitest.integration.config.ts'
 // Static marker list retained for lint invariant checks that verify expected integration project coverage.
 const requiredIntegrationConfigMarkers = [
   'apps/api/vitest.integration.config.ts',
+  'apps/mobile/vitest.integration.config.ts',
   'apps/web/vitest.integration.config.ts',
   'packages/observability/vitest.integration.config.ts',
   'packages/testkit/vitest.integration.config.ts',

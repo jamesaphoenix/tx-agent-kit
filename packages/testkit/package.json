@@ -10,7 +10,8 @@
     "type-check": "tsc -b --pretty false",
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run -c vitest.config.ts",
-    "test:integration": "vitest run -c vitest.integration.config.ts"
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "test:boilerplate": "vitest run -c vitest.boilerplate.config.ts"
   },
   "dependencies": {
     "@tx-agent-kit/contracts": "workspace:*",

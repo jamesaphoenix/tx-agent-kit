@@ -2,6 +2,8 @@ import { vi } from 'vitest'
 
 ;(globalThis as Record<string, unknown>).__DEV__ = true
 
+const secureStoreValues: Record<string, string> = {}
+
 vi.mock('react-native-toast-message', () => {
   const MockToast = () => 'Toast'
   return {
@@ -33,16 +35,29 @@ vi.mock('expo-router', () => ({
 }))
 
 vi.mock('expo-secure-store', () => ({
-  getItemAsync: vi.fn(),
-  setItemAsync: vi.fn(),
-  deleteItemAsync: vi.fn()
+  getItemAsync: vi.fn((key: string) => Promise.resolve(secureStoreValues[key] ?? null)),
+  setItemAsync: vi.fn((key: string, value: string) => {
+    secureStoreValues[key] = value
+    return Promise.resolve()
+  }),
+  deleteItemAsync: vi.fn((key: string) => {
+    delete secureStoreValues[key]
+    return Promise.resolve()
+  })
 }))
 
 vi.mock('expo-constants', () => ({
   default: {
-    expoConfig: {
-      extra: {
-        API_BASE_URL: 'http://localhost:4000'
+    get expoConfig() {
+      return {
+        extra: {
+          API_BASE_URL:
+            process.env.MOBILE_INTEGRATION_API_BASE_URL ??
+            process.env.EXPO_PUBLIC_API_BASE_URL ??
+            'http://localhost:4000',
+          OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4320',
+          NODE_ENV: 'test'
+        }
       }
     }
   }
