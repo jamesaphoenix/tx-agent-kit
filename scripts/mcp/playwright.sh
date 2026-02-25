@@ -29,6 +29,14 @@ if [[ -n "${PLAYWRIGHT_MCP_OUTPUT_DIR:-}" ]]; then
   PLAYWRIGHT_ARGS+=(--output-dir "$PLAYWRIGHT_MCP_OUTPUT_DIR")
 fi
 
+if [[ -n "${PLAYWRIGHT_MCP_STORAGE_STATE:-}" ]]; then
+  if [[ -f "$PLAYWRIGHT_MCP_STORAGE_STATE" ]]; then
+    PLAYWRIGHT_ARGS+=(--storage-state "$PLAYWRIGHT_MCP_STORAGE_STATE")
+  else
+    echo "Warning: PLAYWRIGHT_MCP_STORAGE_STATE is set but file was not found: $PLAYWRIGHT_MCP_STORAGE_STATE" >&2
+  fi
+fi
+
 case "${PLAYWRIGHT_MCP_HEADLESS:-true}" in
   true|TRUE|1|yes|YES)
     PLAYWRIGHT_ARGS+=(--headless)

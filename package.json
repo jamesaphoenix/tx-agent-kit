@@ -47,6 +47,8 @@
     "mcp:context7": "./scripts/mcp/context7.sh",
     "mcp:supabase": "./scripts/mcp/supabase.sh",
     "mcp:playwright": "./scripts/mcp/playwright.sh",
+    "playwright:auth:bootstrap": "node ./scripts/playwright/bootstrap-auth-storage-state.mjs",
+    "mcp:playwright:auth": "./scripts/mcp/playwright-auth.sh",
     "mcp:codex-config": "./scripts/mcp/codex-config.sh",
     "tx": "node ./scripts/tx-cli.mjs",
     "infra:ensure": "./scripts/start-dev-services.sh",

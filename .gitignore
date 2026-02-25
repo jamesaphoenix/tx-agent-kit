@@ -7,6 +7,7 @@ coverage
 .env
 .env.*
 !.env.example
+!.env.playwright.dev
 .next
 .DS_Store
 *.log

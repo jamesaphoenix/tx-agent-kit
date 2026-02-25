@@ -28,6 +28,17 @@
    - On Linux, wrapper adds `--add-host=host.docker.internal:host-gateway`; override `PROMETHEUS_URL` if your target differs.
    - `pnpm mcp:jaeger` reads `JAEGER_URL`, `JAEGER_PROTOCOL`, and optional `JAEGER_PORT`.
 
+## Agent Swarm Browser Auth (Playwright MCP)
+1. Keep `.env.playwright.dev` as `op://...` references only (never plaintext credentials).
+2. Bootstrap authenticated storage state from real auth APIs:
+   - `op run --env-file=.env.playwright.dev -- pnpm playwright:auth:bootstrap`
+3. Start Playwright MCP pre-authenticated for swarm browser tasks:
+   - `op run --env-file=.env.playwright.dev -- pnpm mcp:playwright:auth`
+4. Notes:
+   - Uses `/v1/auth/sign-up`, `/v1/auth/sign-in`, and `/v1/auth/me` only (no auth bypass endpoints).
+   - Writes storage state to `.artifacts/playwright-mcp/storage-state.json` unless `PLAYWRIGHT_MCP_STORAGE_STATE` is set.
+   - Production bootstrap is blocked unless `PLAYWRIGHT_AUTH_ALLOW_PROD=true`.
+
 ## Run services
 `pnpm dev`
 - Runs `web + api + worker` as local processes.
