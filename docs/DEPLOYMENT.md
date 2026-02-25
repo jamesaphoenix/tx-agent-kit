@@ -19,6 +19,9 @@
 - Deployment compose files:
   - `docker-compose.staging.yml`
   - `docker-compose.prod.yml`
+- Optional worker error reporting:
+  - `WORKER_SENTRY_DSN` can be provided via env template to enable errors-only Sentry.
+  - Leave blank/unset to disable.
 - Staging/prod OTEL collector backend selection:
   - `OTEL_COLLECTOR_BACKEND=gcp` (default)
   - `OTEL_COLLECTOR_BACKEND=oss`

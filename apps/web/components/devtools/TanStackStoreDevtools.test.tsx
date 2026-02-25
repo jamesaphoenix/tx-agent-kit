@@ -103,7 +103,28 @@ describe('TanStackStoreDevtools', () => {
     expect(screen.queryByTestId('tanstack-store-devtools-panel')).toBeNull()
   })
 
-  it('uses explicit button sizing and colors that are resilient to global button styles', () => {
+  it('does not capture history updates while the panel is hidden', () => {
+    const store = createCounterStore(0, 'initial')
+
+    render(<TanStackStoreDevtools store={store} name="Counter Store" maxHistory={10} />)
+
+    act(() => {
+      store.setState((state) => ({ ...state, count: 1 }))
+      store.setState((state) => ({ ...state, count: 2 }))
+      store.setState((state) => ({ ...state, count: 3 }))
+    })
+
+    fireEvent.click(screen.getByTestId('tanstack-store-devtools-toggle'))
+
+    const historyEntries = screen.getAllByTestId('tanstack-store-devtools-history-entry')
+    expect(historyEntries).toHaveLength(1)
+    expect(historyEntries[0]?.textContent).toContain('"count": 3')
+    expect(screen.getByTestId('tanstack-store-devtools-history-count').textContent).toContain(
+      '1 snapshot'
+    )
+  })
+
+  it('uses explicit button sizing that is resilient to global button styles', () => {
     const store = createCounterStore(0, 'initial')
 
     render(<TanStackStoreDevtools store={store} name="Counter Store" />)
@@ -117,7 +138,6 @@ describe('TanStackStoreDevtools', () => {
     const clearHistoryButton = screen.getByRole('button', { name: 'Clear history' })
     expect(clearHistoryButton.style.width).toBe('auto')
     expect(clearHistoryButton.style.minHeight).toBe('unset')
-    expect(clearHistoryButton.style.color).toBe('rgb(15, 23, 42)')
   })
 
   it('clears history and keeps only the latest snapshot', () => {

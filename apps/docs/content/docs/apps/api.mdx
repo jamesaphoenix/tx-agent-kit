@@ -82,6 +82,13 @@ pnpm openapi:generate
 
 This produces `apps/api/openapi.json`, which is then consumed by Orval to generate typed client hooks for the web and mobile apps.
 
+When the API server is running (default `http://localhost:4000`), runtime docs are available at:
+
+- `/docs` for Swagger UI
+- `/openapi.json` for the raw OpenAPI document
+
+Both runtime endpoints come from the same Effect HttpApi definitions. The generated `apps/api/openapi.json` remains the repo artifact used by downstream generation workflows (including `pnpm docs:api:generate`).
+
 ## Config and Environment
 
 Runtime environment variables are read exclusively through `apps/api/src/config/env.ts`. Direct `process.env` access is forbidden in route and service modules.

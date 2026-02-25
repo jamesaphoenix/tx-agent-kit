@@ -112,7 +112,7 @@ const main = async () => {
   if (!email || !password) {
     throw new Error(
       'PLAYWRIGHT_AUTH_EMAIL and PLAYWRIGHT_AUTH_PASSWORD are required. ' +
-        'Tip: op run --env-file=.env.playwright.dev -- pnpm mcp:playwright:auth'
+        'Tip: op run --env-file=.env -- pnpm mcp:playwright:auth'
     )
   }
 

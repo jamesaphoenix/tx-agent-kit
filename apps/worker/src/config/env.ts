@@ -2,12 +2,14 @@ const defaultTemporalRuntimeMode = 'cli'
 const defaultTemporalAddress = 'localhost:7233'
 const defaultTemporalNamespace = 'default'
 const defaultTemporalTaskQueue = 'tx-agent-kit'
+const defaultNodeEnv = 'development'
 
 const runtimeModes = ['cli', 'cloud'] as const
 
 export type TemporalRuntimeMode = (typeof runtimeModes)[number]
 
 export interface WorkerEnv {
+  NODE_ENV: string
   TEMPORAL_RUNTIME_MODE: TemporalRuntimeMode
   TEMPORAL_ADDRESS: string
   TEMPORAL_NAMESPACE: string
@@ -15,6 +17,7 @@ export interface WorkerEnv {
   TEMPORAL_API_KEY: string | undefined
   TEMPORAL_TLS_ENABLED: boolean
   TEMPORAL_TLS_SERVER_NAME: string | undefined
+  WORKER_SENTRY_DSN: string | undefined
 }
 
 export interface WorkerTemporalConnectionOptions {
@@ -52,6 +55,15 @@ const parseBooleanEnv = (value: string | undefined, fallback: boolean): boolean 
   throw new Error(`Invalid boolean value '${value}'`)
 }
 
+const parseOptionalStringEnv = (value: string | undefined): string | undefined => {
+  if (typeof value === 'undefined') {
+    return undefined
+  }
+
+  const normalized = value.trim()
+  return normalized.length > 0 ? normalized : undefined
+}
+
 const resolveRuntimeModeDefaults = (
   runtimeMode: TemporalRuntimeMode
 ): { tlsEnabledDefault: boolean } => ({
@@ -81,23 +93,18 @@ export const getWorkerEnv = (): WorkerEnv => {
   const defaults = resolveRuntimeModeDefaults(runtimeMode)
 
   const env: WorkerEnv = {
+    NODE_ENV: process.env.NODE_ENV ?? defaultNodeEnv,
     TEMPORAL_RUNTIME_MODE: runtimeMode,
     TEMPORAL_ADDRESS: process.env.TEMPORAL_ADDRESS ?? defaultTemporalAddress,
     TEMPORAL_NAMESPACE: process.env.TEMPORAL_NAMESPACE ?? defaultTemporalNamespace,
     TEMPORAL_TASK_QUEUE: process.env.TEMPORAL_TASK_QUEUE ?? defaultTemporalTaskQueue,
-    TEMPORAL_API_KEY:
-      process.env.TEMPORAL_API_KEY && process.env.TEMPORAL_API_KEY.trim().length > 0
-        ? process.env.TEMPORAL_API_KEY
-        : undefined,
+    TEMPORAL_API_KEY: parseOptionalStringEnv(process.env.TEMPORAL_API_KEY),
     TEMPORAL_TLS_ENABLED: parseBooleanEnv(
       process.env.TEMPORAL_TLS_ENABLED,
       defaults.tlsEnabledDefault
     ),
-    TEMPORAL_TLS_SERVER_NAME:
-      process.env.TEMPORAL_TLS_SERVER_NAME &&
-      process.env.TEMPORAL_TLS_SERVER_NAME.trim().length > 0
-        ? process.env.TEMPORAL_TLS_SERVER_NAME
-        : undefined
+    TEMPORAL_TLS_SERVER_NAME: parseOptionalStringEnv(process.env.TEMPORAL_TLS_SERVER_NAME),
+    WORKER_SENTRY_DSN: parseOptionalStringEnv(process.env.WORKER_SENTRY_DSN)
   }
 
   validateWorkerEnv(env)

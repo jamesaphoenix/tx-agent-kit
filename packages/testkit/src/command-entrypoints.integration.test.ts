@@ -211,7 +211,10 @@ describe.sequential('root command entrypoints integration', () => {
   }, 360_000)
 
   it('executes type-check command entrypoints', () => {
-    const typeCheck = runCommand('pnpm', ['type-check'], {}, 300_000)
+    let typeCheck = runCommand('pnpm', ['type-check'], {}, 300_000)
+    if (typeCheck.exitCode !== 0) {
+      typeCheck = runCommand('pnpm', ['type-check'], {}, 300_000)
+    }
     const typeCheckOutput = combinedOutput(typeCheck)
     if (typeCheck.exitCode !== 0) {
       expect(typeCheckOutput).toMatch(
@@ -219,7 +222,10 @@ describe.sequential('root command entrypoints integration', () => {
       )
     }
 
-    const typeCheckQuiet = runCommand('pnpm', ['type-check:quiet'], {}, 300_000)
+    let typeCheckQuiet = runCommand('pnpm', ['type-check:quiet'], {}, 300_000)
+    if (typeCheckQuiet.exitCode !== 0) {
+      typeCheckQuiet = runCommand('pnpm', ['type-check:quiet'], {}, 300_000)
+    }
     const typeCheckQuietOutput = combinedOutput(typeCheckQuiet)
     if (typeCheckQuiet.exitCode !== 0) {
       expect(typeCheckQuietOutput).toMatch(

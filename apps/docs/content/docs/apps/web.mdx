@@ -114,6 +114,16 @@ Wraps the `sonner` toast library. Direct `sonner` imports are forbidden outside 
 
 All runtime environment reads are centralized here. Direct `process.env` access is forbidden in web source modules.
 
+### Optional Sentry Errors
+
+The web app supports optional Sentry error reporting using `NEXT_PUBLIC_SENTRY_DSN`.
+
+- If `NEXT_PUBLIC_SENTRY_DSN` is blank/unset, Sentry is skipped.
+- Sentry is configured for errors only (`tracesSampleRate: 0`).
+- Initialization runs from `AppProviders` through `apps/web/lib/sentry.ts`.
+
+See [Sentry (Optional)](/docs/apps/sentry) for complete setup.
+
 ## API Client Generation
 
 The web app uses [Orval](https://orval.dev/) to generate typed API hooks from the OpenAPI spec:

@@ -5,12 +5,20 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { activities } from './activities.js'
-import { getWorkerEnv, resolveWorkerTemporalConnectionOptions } from './config/env.js'
+import {
+  getWorkerEnv,
+  resolveWorkerTemporalConnectionOptions,
+  type WorkerEnv
+} from './config/env.js'
+import {
+  captureWorkerException,
+  flushWorkerSentry,
+  initializeWorkerSentry
+} from './observability/sentry.js'
 
 const logger = createLogger('tx-agent-kit-worker')
 
-async function run(): Promise<void> {
-  const env = getWorkerEnv()
+async function run(env: WorkerEnv): Promise<void> {
   const sourceDir = path.dirname(fileURLToPath(import.meta.url))
   const workflowJsPath = path.join(sourceDir, 'workflows.js')
   const workflowSourcePath = existsSync(workflowJsPath)
@@ -68,4 +76,30 @@ async function run(): Promise<void> {
   }
 }
 
-void run()
+const runWorker = async (): Promise<void> => {
+  const env = getWorkerEnv()
+  await initializeWorkerSentry(env)
+
+  try {
+    await run(env)
+  } catch (error) {
+    captureWorkerException(error)
+    logger.error('Temporal worker stopped due to an unhandled error.', {
+      error:
+        error instanceof Error
+          ? {
+              name: error.name,
+              message: error.message,
+              stack: error.stack
+            }
+          : {
+              message: String(error)
+            }
+    })
+    process.exitCode = 1
+  } finally {
+    await flushWorkerSentry()
+  }
+}
+
+void runWorker()

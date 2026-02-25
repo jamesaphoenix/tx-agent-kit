@@ -8,7 +8,8 @@ const defaultNodeEnv = 'development'
 let mockExtra: Record<string, unknown> | undefined = {
   API_BASE_URL: 'https://test-api.example.com',
   OTEL_EXPORTER_OTLP_ENDPOINT: 'https://test-otel.example.com',
-  NODE_ENV: 'staging'
+  NODE_ENV: 'staging',
+  SENTRY_DSN: 'https://mobile@sentry.example.com/123'
 }
 
 vi.mock('expo-constants', () => ({
@@ -24,7 +25,8 @@ describe('getMobileEnv', () => {
     mockExtra = {
       API_BASE_URL: 'https://test-api.example.com',
       OTEL_EXPORTER_OTLP_ENDPOINT: 'https://test-otel.example.com',
-      NODE_ENV: 'staging'
+      NODE_ENV: 'staging',
+      SENTRY_DSN: 'https://mobile@sentry.example.com/123'
     }
     _resetEnvCacheForTest()
   })
@@ -44,6 +46,11 @@ describe('getMobileEnv', () => {
     expect(env.NODE_ENV).toBe('staging')
   })
 
+  it('reads SENTRY_DSN from expo config extra', () => {
+    const env = getMobileEnv()
+    expect(env.SENTRY_DSN).toBe('https://mobile@sentry.example.com/123')
+  })
+
   it('returns cached env on subsequent calls', () => {
     const first = getMobileEnv()
     const second = getMobileEnv()
@@ -56,6 +63,7 @@ describe('getMobileEnv', () => {
     expect(env.API_BASE_URL).toBe(defaultApiBaseUrl)
     expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(defaultOtelEndpoint)
     expect(env.NODE_ENV).toBe(defaultNodeEnv)
+    expect(env.SENTRY_DSN).toBeUndefined()
   })
 
   it('falls back to default when API_BASE_URL is not a string', () => {
@@ -84,5 +92,18 @@ describe('getMobileEnv', () => {
     }
     const env = getMobileEnv()
     expect(env.NODE_ENV).toBe(defaultNodeEnv)
+    expect(env.SENTRY_DSN).toBeUndefined()
+  })
+
+  it('treats empty SENTRY_DSN values as undefined', () => {
+    mockExtra = {
+      API_BASE_URL: 'https://test-api.example.com',
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'https://test-otel.example.com',
+      NODE_ENV: 'staging',
+      SENTRY_DSN: '   '
+    }
+
+    const env = getMobileEnv()
+    expect(env.SENTRY_DSN).toBeUndefined()
   })
 })

@@ -1,4 +1,4 @@
-import { HttpApiBuilder } from '@effect/platform'
+import { HttpApiBuilder, HttpApiSwagger } from '@effect/platform'
 import { NodeHttpServer, NodeRuntime } from '@effect/platform-node'
 import {
   AuthServiceLive,
@@ -40,31 +40,48 @@ const ApiLive = HttpApiBuilder.api(TxAgentApi).pipe(
   Layer.provide(TeamsLive)
 )
 
+const MiddlewareLive = Layer.mergeAll(
+  HttpApiBuilder.middleware(authRateLimitMiddleware),
+  HttpApiBuilder.middleware(bodyLimitMiddleware),
+  HttpApiBuilder.middlewareCors(getCorsConfig()),
+  HttpApiBuilder.middlewareOpenApi({ path: '/openapi.json' }),
+  HttpApiSwagger.layer({ path: '/docs' })
+)
+
+const PortDependenciesLive = Layer.mergeAll(
+  AuthUsersPortLive,
+  AuthOrganizationOwnershipPortLive,
+  PasswordResetTokenPortLive,
+  InvitationEmailPortLive,
+  PasswordResetEmailPortLive,
+  PasswordHasherPortLive,
+  SessionTokenPortLive,
+  OrganizationStorePortLive,
+  OrganizationInvitationStorePortLive,
+  OrganizationUsersPortLive,
+  TeamStorePortLive,
+  TeamOrganizationMembershipPortLive
+)
+
+const ServiceDependenciesLive = Layer.mergeAll(
+  AuthServiceLive,
+  OrganizationServiceLive,
+  TeamServiceLive
+).pipe(Layer.provide(PortDependenciesLive))
+
+const ApiWithDependenciesLive = ApiLive.pipe(
+  Layer.provide(ServiceDependenciesLive),
+  Layer.provide(PortDependenciesLive)
+)
+
 export const makeServerLive = (options?: { port?: number; host?: string }) => {
   const env = getApiEnv()
   const port = options?.port ?? Number.parseInt(env.API_PORT, 10)
   const host = options?.host ?? env.API_HOST
 
   return HttpApiBuilder.serve().pipe(
-    Layer.provide(HttpApiBuilder.middleware(authRateLimitMiddleware)),
-    Layer.provide(HttpApiBuilder.middleware(bodyLimitMiddleware)),
-    Layer.provide(HttpApiBuilder.middlewareCors(getCorsConfig())),
-    Layer.provide(ApiLive),
-    Layer.provide(AuthUsersPortLive),
-    Layer.provide(AuthOrganizationOwnershipPortLive),
-    Layer.provide(PasswordResetTokenPortLive),
-    Layer.provide(InvitationEmailPortLive),
-    Layer.provide(PasswordResetEmailPortLive),
-    Layer.provide(PasswordHasherPortLive),
-    Layer.provide(SessionTokenPortLive),
-    Layer.provide(OrganizationStorePortLive),
-    Layer.provide(OrganizationInvitationStorePortLive),
-    Layer.provide(OrganizationUsersPortLive),
-    Layer.provide(TeamStorePortLive),
-    Layer.provide(TeamOrganizationMembershipPortLive),
-    Layer.provide(AuthServiceLive),
-    Layer.provide(OrganizationServiceLive),
-    Layer.provide(TeamServiceLive),
+    Layer.provide(MiddlewareLive),
+    Layer.provide(ApiWithDependenciesLive),
     Layer.provide(NodeHttpServer.layer(() => createServer(), { port, host }))
   )
 }

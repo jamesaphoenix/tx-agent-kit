@@ -20,13 +20,16 @@ module.exports = () => {
     process.env.NODE_ENV ??
     defaultNodeEnv
 
+  const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN ?? ''
+
   return {
     ...appJson.expo,
     extra: {
       ...(appJson.expo.extra ?? {}),
       API_BASE_URL: apiBaseUrl,
       OTEL_EXPORTER_OTLP_ENDPOINT: otelEndpoint,
-      NODE_ENV: nodeEnv
+      NODE_ENV: nodeEnv,
+      SENTRY_DSN: sentryDsn
     }
   }
 }

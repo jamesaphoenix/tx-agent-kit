@@ -11,7 +11,63 @@ BEGIN;
 -- trg_workspace_owner_membership (dropped: workspaces table removed)
 -- trg_normalize_invitation_identity (dropped: replaced by normalize_invitation_identity)
 
-SELECT plan(5);
+SELECT plan(9);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_trigger AS t
+    JOIN pg_class AS r ON r.oid = t.tgrelid
+    JOIN pg_namespace AS n ON n.oid = r.relnamespace
+    WHERE t.tgname = 'update_organizations_updated_at'
+      AND r.relname = 'organizations'
+      AND n.nspname = current_schema()
+      AND t.tgisinternal = false
+  ),
+  'organizations updated_at trigger exists'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_trigger AS t
+    JOIN pg_class AS r ON r.oid = t.tgrelid
+    JOIN pg_namespace AS n ON n.oid = r.relnamespace
+    WHERE t.tgname = 'update_org_members_updated_at'
+      AND r.relname = 'org_members'
+      AND n.nspname = current_schema()
+      AND t.tgisinternal = false
+  ),
+  'org_members updated_at trigger exists'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_trigger AS t
+    JOIN pg_class AS r ON r.oid = t.tgrelid
+    JOIN pg_namespace AS n ON n.oid = r.relnamespace
+    WHERE t.tgname = 'update_teams_updated_at'
+      AND r.relname = 'teams'
+      AND n.nspname = current_schema()
+      AND t.tgisinternal = false
+  ),
+  'teams updated_at trigger exists'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_trigger AS t
+    JOIN pg_class AS r ON r.oid = t.tgrelid
+    JOIN pg_namespace AS n ON n.oid = r.relnamespace
+    WHERE t.tgname = 'update_team_members_updated_at'
+      AND r.relname = 'team_members'
+      AND n.nspname = current_schema()
+      AND t.tgisinternal = false
+  ),
+  'team_members updated_at trigger exists'
+);
 
 INSERT INTO users (email, password_hash, name)
 VALUES ('  PGTAP-NORMALIZE@EXAMPLE.COM  ', 'hash', 'PGTAP Normalize')

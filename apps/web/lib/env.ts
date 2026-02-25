@@ -7,9 +7,19 @@ export interface WebEnv {
   OTEL_EXPORTER_OTLP_ENDPOINT: string
   NODE_ENV: string
   SITE_URL: string
+  SENTRY_DSN: string | undefined
 }
 
 let cachedEnv: WebEnv | null = null
+
+const parseOptionalString = (value: string | undefined): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalizedValue = value.trim()
+  return normalizedValue.length > 0 ? normalizedValue : undefined
+}
 
 export const getWebEnv = (): WebEnv => {
   if (cachedEnv) {
@@ -31,7 +41,8 @@ export const getWebEnv = (): WebEnv => {
       defaultNodeEnv,
     SITE_URL:
       process.env.NEXT_PUBLIC_SITE_URL ??
-      'http://localhost:3000'
+      'http://localhost:3000',
+    SENTRY_DSN: parseOptionalString(process.env.NEXT_PUBLIC_SENTRY_DSN)
   }
 
   return cachedEnv

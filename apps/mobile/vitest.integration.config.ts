@@ -1,6 +1,9 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
+const resolveFromConfig = (relativePath: string): string =>
+  fileURLToPath(new URL(relativePath, import.meta.url).toString())
+
 export default defineConfig({
   esbuild: {
     jsx: 'automatic',
@@ -24,13 +27,11 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./', import.meta.url)),
-      '@tx-agent-kit/observability/client': fileURLToPath(
-        new URL('../../packages/infra/observability/src/client.ts', import.meta.url)
+      '@': resolveFromConfig('./'),
+      '@tx-agent-kit/observability/client': resolveFromConfig(
+        '../../packages/infra/observability/src/client.ts'
       ),
-      'react-native': fileURLToPath(
-        new URL('./__mocks__/react-native.ts', import.meta.url)
-      )
+      'react-native': resolveFromConfig('./__mocks__/react-native.ts')
     }
   }
 })

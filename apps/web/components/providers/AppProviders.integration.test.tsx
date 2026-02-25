@@ -6,6 +6,8 @@ import { IntegrationRouterProvider } from '../../integration/support/next-router
 import { render, screen, userEvent, waitFor } from '../../integration/test-utils'
 import { sessionStoreActions } from '../../stores/session-store'
 
+const mutableProcessEnv = process.env as Record<string, string | undefined>
+
 const renderAppProviders = (devtoolsMode: 'auto' | 'enabled' | 'disabled' = 'auto') => {
   return render(
     <IntegrationRouterProvider>
@@ -19,6 +21,9 @@ const renderAppProviders = (devtoolsMode: 'auto' | 'enabled' | 'disabled' = 'aut
 describe('AppProviders integration', () => {
   beforeEach(() => {
     sessionStoreActions.clear()
+    mutableProcessEnv.NEXT_PUBLIC_SENTRY_DSN =
+      'https://public@example.ingest.sentry.io/123456'
+    mutableProcessEnv.NEXT_PUBLIC_NODE_ENV = 'test'
   })
 
   it('renders TanStack devtools in auto mode for integration environment', () => {

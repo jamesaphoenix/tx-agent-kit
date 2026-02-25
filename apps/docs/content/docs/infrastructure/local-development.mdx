@@ -84,7 +84,7 @@ This runs all application dev servers in parallel via Turborepo:
 | Web | `http://localhost:3000` | 3000 |
 | API | `http://localhost:4000` | 4000 |
 | Worker | (background process) | n/a |
-| Mobile | Expo DevTools | 8081 |
+| Mobile | `http://localhost:8081/status` (Metro status, default) | 8081 |
 
 You can also start individual applications:
 
@@ -93,7 +93,20 @@ pnpm dev:web      # Next.js only
 pnpm dev:api      # Effect HTTP API only
 pnpm dev:worker   # Temporal worker only
 pnpm dev:mobile   # Expo React Native only
+pnpm dev:mobile:web # Expo web preview (intentional browser target)
 ```
+
+`pnpm dev:mobile` runs Expo/Metro on `MOBILE_PORT` (default `8081`). Open the actual app using iOS Simulator, Android Emulator, or Expo Go. `http://localhost:8081` is the Metro/web endpoint and is usually not the best native mobile UX.
+
+If you specifically want browser preview, run `pnpm dev:mobile:web` so Expo serves the app intentionally for web.
+
+### 7. Open local dev views (optional)
+
+```bash
+pnpm dev:open
+```
+
+Run this after `pnpm dev` is up. It opens local app/dev dashboards (web, mobile Metro status, API Swagger, Temporal UI, Grafana, Prometheus, Jaeger) in Brave Browser with a Google Chrome fallback.
 
 ## Verifying the setup
 
@@ -103,8 +116,17 @@ After starting all services, verify everything works:
 # Check API health
 curl http://localhost:4000/health
 
+# Verify API Swagger endpoint
+curl -f http://localhost:4000/docs > /dev/null
+
+# Verify OpenAPI JSON endpoint
+curl -f http://localhost:4000/openapi.json > /dev/null
+
 # Open web app
 open http://localhost:3000
+
+# Open API Swagger UI
+open http://localhost:4000/docs
 
 # Check Temporal CLI runtime
 pnpm temporal:dev:status

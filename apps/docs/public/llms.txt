@@ -1,126 +1,103 @@
 # tx-agent-kit
 
-> Agent pointer map for repo-aware LLMs. Prefer these file pointers before broad search.
+> Canonical URL map for docs-aware LLMs. Use these real pages first.
 
-## Canonical entry points
+## Primary pointers
 
-- `AGENTS.md`: primary operating rules and hard constraints for agents.
-- `README.md`: project overview, prerequisites, and local bootstrap.
-- `docs/ARCHITECTURE.md`: system boundaries and dependency flow.
-- `docs/QUALITY.md`: enforced invariants and rationale.
-- `docs/COMMANDS.md`: command catalog (full + quiet lanes).
-- `docs/RUNBOOKS.md`: operational workflows and troubleshooting.
-- `docs/DEPLOYMENT.md`: build, migrate, deploy, smoke test.
-- `docs/ROLLBACK.md`: rollback procedures.
+- https://agentkit.txdocs.dev/docs
+- https://agentkit.txdocs.dev/llms-full.txt
+- https://agentkit.txdocs.dev/docs/api-reference
+- https://agentkit.txdocs.dev/docs/commands
 
-## Enforcement (mechanical gates)
+## Getting started
 
-- `packages/tooling/eslint-config/domain-invariants.js`: import bans and coding constraints.
-- `scripts/lint/enforce-domain-invariants.mjs`: cross-file structural invariants.
-- `scripts/check-shell-invariants.sh`: shell-level repo policy checks.
+- https://agentkit.txdocs.dev/docs/getting-started
+- https://agentkit.txdocs.dev/docs/getting-started/local-setup
+- https://agentkit.txdocs.dev/docs/getting-started/first-domain
 
-## App map
+## Philosophy
 
-- `apps/api/src/server.ts`: API runtime entrypoint.
-- `apps/api/src/server-lib.ts`: API runtime wiring and layers.
-- `apps/api/openapi.json`: generated API contract.
-- `apps/web/app/(website)`: public marketing pages (landing, blog, pricing, terms, privacy).
-- `apps/web/app/(application)`: authenticated app shell (org/team dashboard, workspaces).
-- `apps/web/app/sign-in`, `sign-up`: auth pages (split-panel layout).
-- `apps/web/config/index.ts`: site-wide config (company, homepage, blog, dashboard nav).
-- `apps/web/lib/seo.ts`: SEO utilities + structured data builders.
-- `apps/web/lib/blog.ts`: backend-agnostic blog data layer (BlogDataSource interface).
-- `apps/web/lib/blog-seo.ts`: blog-specific JSON-LD structured data.
-- `apps/web/components/Breadcrumbs.tsx`: breadcrumb navigation.
-- `apps/web/components/StructuredData.tsx`: JSON-LD script renderer.
-- `apps/web/components/WebsiteHeader.tsx`: sticky header (config-driven, auth-aware).
-- `apps/web/components/WebsiteFooter.tsx`: footer (config-driven, links).
-- `apps/web/components`: web UI components + integration suites.
-- `apps/web/lib`: web transport/state/auth helpers.
-- `apps/mobile`: Expo app code and integration/unit suites.
-- `apps/mobile/lib`: mobile API/auth/env client layers.
-- `apps/worker/src/index.ts`: worker runtime entrypoint.
-- `apps/worker/src/workflows.ts`: Temporal workflows (determinism constraints).
-- `apps/worker/src/activities.ts`: side-effectful Temporal activities.
-- `apps/docs/content/docs`: docs source of truth for docs site content.
+- https://agentkit.txdocs.dev/docs/philosophy
+- https://agentkit.txdocs.dev/docs/philosophy/why-different
+- https://agentkit.txdocs.dev/docs/philosophy/operating-model
+- https://agentkit.txdocs.dev/docs/philosophy/mechanical-enforcement
 
-## Package map
+## Architecture
 
-- `packages/core/src/domains`: domain logic (domain/ports/application/adapters).
-- `packages/contracts/src`: shared effect/Schema contracts.
-- `packages/infra/db/src/schema.ts`: Drizzle schema source of truth.
-- `packages/infra/db/src/effect-schemas`: table-aligned effect schemas.
-- `packages/infra/db/src/factories`: table-aligned test factories.
-- `packages/infra/db/drizzle/migrations`: SQL migrations.
-- `packages/infra/db/pgtap`: pgTAP trigger/invariant suites.
-- `packages/testkit/src`: integration harnesses and shared test runtime helpers.
-- `packages/infra/observability/src`: OTEL setup and signal pipelines.
-- `packages/infra/logging/src`: structured logging primitives.
+- https://agentkit.txdocs.dev/docs/architecture
+- https://agentkit.txdocs.dev/docs/architecture/monorepo-structure
+- https://agentkit.txdocs.dev/docs/architecture/ddd-pattern
+- https://agentkit.txdocs.dev/docs/architecture/dependency-flow
+- https://agentkit.txdocs.dev/docs/architecture/data-flow
 
-## Critical test harness pointers
+## Core concepts
 
-- `vitest.integration.workspace.ts`: integration workspace composition.
-- `vitest.boilerplate.workspace.ts`: boilerplate meta-test workspace.
-- `scripts/test/vitest-global-setup.ts`: shared integration preflight + locking.
-- `scripts/test/run-integration.sh`: integration lane runner.
-- `scripts/test-integration-quiet.sh`: quiet integration runner.
-- `scripts/test/run-boilerplate.sh`: boilerplate meta-test runner.
-- `scripts/test-boilerplate-quiet.sh`: quiet boilerplate runner.
-- `packages/testkit/src/db-auth-context.ts`: API+DB auth test harness.
-- `packages/testkit/src/sql-context.ts`: schema-isolated SQL test context.
-- `packages/testkit/src/boilerplate.parallel-worktrees.boilerplate.test.ts`: 2-worktree, 2-schema, 2x stack non-interference meta-test.
+- https://agentkit.txdocs.dev/docs/core-concepts
+- https://agentkit.txdocs.dev/docs/core-concepts/effect-services
+- https://agentkit.txdocs.dev/docs/core-concepts/domain-modeling
+- https://agentkit.txdocs.dev/docs/core-concepts/ports-and-adapters
+- https://agentkit.txdocs.dev/docs/core-concepts/schema-contracts
 
-## Critical flow coverage pointers
+## Apps
 
-- `apps/api/src/api.integration.test.ts`: critical API endpoint + idempotency coverage.
-- `apps/web/components/AuthForm.integration.test.tsx`
-- `apps/web/components/CreateOrganizationForm.integration.test.tsx`
-- `apps/web/components/CreateInvitationForm.integration.test.tsx`
-- `apps/web/components/AcceptInvitationForm.integration.test.tsx`
-- `apps/web/components/SignOutButton.integration.test.tsx`
-- `apps/mobile/components/AuthForm.integration.test.tsx`
-- `apps/mobile/components/CreateOrganizationForm.integration.test.tsx`
-- `apps/mobile/components/CreateInvitationForm.integration.test.tsx`
-- `apps/mobile/components/AcceptInvitationForm.integration.test.tsx`
-- `apps/mobile/components/SignOutButton.integration.test.tsx`
-- `apps/mobile/components/providers/AuthBootstrapProvider.integration.test.tsx`
-- `apps/mobile/lib/client-api.integration.test.ts`
+- https://agentkit.txdocs.dev/docs/apps/api
+- https://agentkit.txdocs.dev/docs/apps/web
+- https://agentkit.txdocs.dev/docs/apps/worker
+- https://agentkit.txdocs.dev/docs/apps/mobile
 
-## Worktrees and parallel agent development
+## Packages
 
-- `scripts/worktree/setup.sh`: per-worktree schema/env/port/task-queue setup.
-- `scripts/worktree/derive-ports.sh`: deterministic worktree port derivation.
-- `scripts/worktree/lib/ports.sh`: collision-aware port allocation.
-- `scripts/worktree/manage.sh`: create/list/remove worktree workflows.
-- `scripts/worktree/ensure-shared-infra.sh`: shared infra bootstrap across worktrees.
+- https://agentkit.txdocs.dev/docs/packages/core
+- https://agentkit.txdocs.dev/docs/packages/db
+- https://agentkit.txdocs.dev/docs/packages/contracts
+- https://agentkit.txdocs.dev/docs/packages/auth
+- https://agentkit.txdocs.dev/docs/packages/logging
+- https://agentkit.txdocs.dev/docs/packages/observability
+- https://agentkit.txdocs.dev/docs/packages/testkit
+- https://agentkit.txdocs.dev/docs/packages/tooling
 
-## Infra and observability operations
+## Guides
 
-- `scripts/start-dev-services.sh`: shared Docker infra ensure.
-- `scripts/test/check-observability.sh`: OTEL smoke validation gate.
-- `scripts/test/emit-observability-smoke.ts`: signal emission helper.
-- `scripts/temporal/start-dev.sh`: local Temporal CLI bootstrap.
-- `scripts/temporal/status.sh`: local Temporal runtime status.
-- `scripts/temporal/stop-dev.sh`: local Temporal runtime shutdown.
-- `docker-compose.yml`: local infra topology.
+- https://agentkit.txdocs.dev/docs/guides/adding-a-domain
+- https://agentkit.txdocs.dev/docs/guides/adding-routes
+- https://agentkit.txdocs.dev/docs/guides/adding-workflows
+- https://agentkit.txdocs.dev/docs/guides/adding-db-triggers
+- https://agentkit.txdocs.dev/docs/guides/testing-strategy
+- https://agentkit.txdocs.dev/docs/guides/generating-api-client
 
-## Code generation and scaffolding
+## Enforcement
 
-- `packages/tooling/scaffold/src/cli.ts`: CRUD scaffold CLI implementation.
-- `apps/docs/scripts/generate-api-docs.ts`: OpenAPI -> docs reference generator.
-- `apps/web/lib/api/generated`: generated web API client.
-- `apps/web/lib/api/orval-mutator.ts`: web client mutation behavior.
-- `apps/mobile/lib/api/orval-mutator.ts`: mobile client mutation behavior.
+- https://agentkit.txdocs.dev/docs/enforcement
+- https://agentkit.txdocs.dev/docs/enforcement/eslint-rules
+- https://agentkit.txdocs.dev/docs/enforcement/structural-checks
+- https://agentkit.txdocs.dev/docs/enforcement/shell-invariants
+- https://agentkit.txdocs.dev/docs/enforcement/closed-invariants
 
-## Deployment and smoke validation
+## Infrastructure
 
-- `scripts/deploy/build-images.sh`: API/worker image build pipeline.
-- `scripts/deploy/migrate.sh`: migration runner for deploy environments.
-- `scripts/deploy/deploy-compose.sh`: compose deployment workflow.
-- `scripts/deploy/smoke-api.sh`: post-deploy critical-flow smoke checks.
-- `scripts/deploy/gcp`: optional GCP bootstrap/validate/teardown scripts.
+- https://agentkit.txdocs.dev/docs/infrastructure
+- https://agentkit.txdocs.dev/docs/infrastructure/docker-stack
+- https://agentkit.txdocs.dev/docs/infrastructure/local-development
+- https://agentkit.txdocs.dev/docs/infrastructure/worktrees
+- https://agentkit.txdocs.dev/docs/infrastructure/secrets-management
 
-## Public docs links (secondary)
+## Observability
 
-- https://agentkit.txdocs.dev/docs: human-oriented docs site.
-- https://agentkit.txdocs.dev/llms-full.txt: expanded narrative map.
+- https://agentkit.txdocs.dev/docs/observability
+- https://agentkit.txdocs.dev/docs/observability/logging
+- https://agentkit.txdocs.dev/docs/observability/tracing
+- https://agentkit.txdocs.dev/docs/observability/metrics
+- https://agentkit.txdocs.dev/docs/observability/monitoring-stack
+
+## Deployment
+
+- https://agentkit.txdocs.dev/docs/deployment
+- https://agentkit.txdocs.dev/docs/deployment/build-images
+- https://agentkit.txdocs.dev/docs/deployment/migrations
+- https://agentkit.txdocs.dev/docs/deployment/deploy-compose
+- https://agentkit.txdocs.dev/docs/deployment/smoke-tests
+
+## Reference
+
+- https://agentkit.txdocs.dev/docs/api-reference
+- https://agentkit.txdocs.dev/docs/commands

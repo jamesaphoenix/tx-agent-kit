@@ -62,6 +62,8 @@ The setup script writes the following keys to the worktree `.env`:
 | `DATABASE_URL` | `postgresql://...?options=-c search_path=wt_feature_auth,public` |
 | `DATABASE_SCHEMA` | `wt_feature_auth` |
 
+`MOBILE_PORT` is the Expo/Metro endpoint port used by `pnpm dev:mobile`. Because it is derived from `WORKTREE_PORT_OFFSET`, mobile endpoint URLs (for example, `http://localhost:<MOBILE_PORT>`) are also worktree-specific.
+
 ## Shared infrastructure
 
 All worktrees share the same Docker containers. The `docker-compose.yml` project name is pinned to `tx-agent-kit`, so `pnpm infra:ensure` from any worktree connects to the same running services.

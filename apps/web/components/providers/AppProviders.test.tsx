@@ -26,6 +26,12 @@ vi.mock('../../lib/notify', () => ({
   NotifyToaster: () => <div data-testid="notify-toaster" />
 }))
 
+const initializeWebSentryMock = vi.fn()
+
+vi.mock('../../lib/sentry', () => ({
+  initializeWebSentry: initializeWebSentryMock
+}))
+
 vi.mock('@tanstack/react-query-devtools', () => ({
   ReactQueryDevtools: () => <div data-testid="react-query-devtools" />
 }))
@@ -71,6 +77,7 @@ describe('AppProviders', () => {
     expect(screen.queryByTestId('notify-toaster')).not.toBeNull()
     expect(screen.queryByTestId('react-query-devtools')).not.toBeNull()
     expect(screen.queryByTestId('tanstack-store-devtools')).not.toBeNull()
+    expect(initializeWebSentryMock).toHaveBeenCalledTimes(1)
   })
 
   it('hides TanStack devtools in production', async () => {

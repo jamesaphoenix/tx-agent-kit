@@ -29,6 +29,16 @@ There is no local database or offline-first logic. The app is a thin client that
 | URL State | `lib/url-state.ts` | Navigation state management adapted for React Navigation rather than browser URLs |
 | Session Store | `stores/session-store.ts` | Centralized session state management for the authenticated user context |
 
+## Optional Sentry Errors
+
+The mobile app supports optional Sentry error reporting via `EXPO_PUBLIC_SENTRY_DSN`.
+
+- `EXPO_PUBLIC_SENTRY_DSN` is read in `app.config.js` and forwarded to runtime env (`lib/env.ts`).
+- If the value is blank/unset, Sentry is skipped.
+- Sentry is configured for errors only (`tracesSampleRate: 0`).
+
+See [Sentry (Optional)](/docs/apps/sentry) for complete setup.
+
 ## Component Test Suites
 
 The mobile app maintains full component test coverage:

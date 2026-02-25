@@ -29,11 +29,11 @@
    - `pnpm mcp:jaeger` reads `JAEGER_URL`, `JAEGER_PROTOCOL`, and optional `JAEGER_PORT`.
 
 ## Agent Swarm Browser Auth (Playwright MCP)
-1. Keep `.env.playwright.dev` as `op://...` references only (never plaintext credentials).
+1. Keep root `.env` credentials sourced via 1Password (`op://...`), never plaintext secrets in source-controlled files.
 2. Bootstrap authenticated storage state from real auth APIs:
-   - `op run --env-file=.env.playwright.dev -- pnpm playwright:auth:bootstrap`
+   - `op run --env-file=.env -- pnpm playwright:auth:bootstrap`
 3. Start Playwright MCP pre-authenticated for swarm browser tasks:
-   - `op run --env-file=.env.playwright.dev -- pnpm mcp:playwright:auth`
+   - `op run --env-file=.env -- pnpm mcp:playwright:auth`
 4. Notes:
    - Uses `/v1/auth/sign-up`, `/v1/auth/sign-in`, and `/v1/auth/me` only (no auth bypass endpoints).
    - Writes storage state to `.artifacts/playwright-mcp/storage-state.json` unless `PLAYWRIGHT_MCP_STORAGE_STATE` is set.
@@ -43,6 +43,12 @@
 `pnpm dev`
 - Runs `web + api + worker` as local processes.
 - Docker infra is shared (`pnpm infra:ensure`) and local Temporal CLI is auto-started when `TEMPORAL_RUNTIME_MODE=cli`.
+- For intentional browser preview of the mobile app, run `pnpm dev:mobile:web` (instead of opening Metro root directly).
+
+## Open local app + dashboard tabs
+`pnpm dev:open`
+- Opens local tabs for `web`, `mobile`, API Swagger (`/docs`), Temporal UI, Grafana, Prometheus, and Jaeger.
+- Uses `Brave Browser` first and falls back to `Google Chrome` if Brave is unavailable.
 
 ## Apply migrations
 `pnpm db:migrate`

@@ -111,6 +111,19 @@ pnpm scaffold:crud --domain billing --entity invoice --dry-run
 pnpm scaffold:crud --domain billing --entity invoice --with-db
 ```
 
+## Utilities
+```bash
+# Repo lines of code snapshot (tracked source-like files)
+git ls-files -z \
+  ':!**/*.md' ':!**/*.mdx' ':!**/*.txt' ':!**/*.csv' ':!**/*.tsv' \
+  ':!**/*.json' ':!**/*.jsonc' ':!**/*.json5' ':!**/*.yml' ':!**/*.yaml' ':!**/*.toml' \
+  ':!**/*.png' ':!**/*.jpg' ':!**/*.jpeg' ':!**/*.gif' ':!**/*.svg' ':!**/*.ico' ':!**/*.webp' \
+  ':!**/*.woff' ':!**/*.woff2' ':!**/*.ttf' ':!**/*.otf' \
+  ':!**/*.map' ':!**/*.lock' ':!pnpm-lock.yaml' \
+  ':!**/node_modules/**' ':!**/dist/**' ':!**/build/**' ':!**/.next/**' ':!**/coverage/**' ':!**/.turbo/**' ':!**/.vercel/**' \
+  | xargs -0 wc -l 2>/dev/null | tail -n 1
+```
+
 ## Docker (Local Infra Only)
 ```bash
 docker compose -p tx-agent-kit --profile infra up -d

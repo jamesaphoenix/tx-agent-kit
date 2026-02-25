@@ -1,0 +1,51 @@
+---
+title: Sentry (Optional)
+description: Optional, errors-only Sentry setup for web, worker, and mobile runtimes.
+---
+
+# Sentry (Optional)
+
+Sentry support is optional in `tx-agent-kit` and is intended for error reporting only.
+
+- If a DSN is not configured, Sentry does not initialize.
+- Tracing is disabled in all runtime initializers (`tracesSampleRate: 0`).
+- Env reads remain centralized in each runtime env module.
+
+## Runtime Env Variables
+
+| Runtime | Variable | Where it is read |
+|---------|----------|------------------|
+| Web (`apps/web`) | `NEXT_PUBLIC_SENTRY_DSN` | `apps/web/lib/env.ts` |
+| Worker (`apps/worker`) | `WORKER_SENTRY_DSN` | `apps/worker/src/config/env.ts` |
+| Mobile (`apps/mobile`) | `EXPO_PUBLIC_SENTRY_DSN` | `apps/mobile/app.config.js` -> `apps/mobile/lib/env.ts` |
+
+## Local Development
+
+Add optional keys to your local `.env`:
+
+```bash
+NEXT_PUBLIC_SENTRY_DSN=
+WORKER_SENTRY_DSN=
+EXPO_PUBLIC_SENTRY_DSN=
+```
+
+You can keep these empty for local development. The runtime initializers are no-ops when the value is blank.
+
+## 1Password Templates
+
+For staged environments, store DSNs in 1Password and reference them from env templates when needed:
+
+```dotenv
+# deploy/env/staging.env.template
+# WORKER_SENTRY_DSN=op://octospark-services/staging/WORKER_SENTRY_DSN
+```
+
+Web and mobile deployments are managed outside the compose stack; configure their DSNs in each platform/runtime environment with the same variable names listed above.
+
+## Runtime Wiring
+
+- Web initializes Sentry in `AppProviders` using `apps/web/lib/sentry.ts`.
+- Worker initializes and flushes Sentry in `apps/worker/src/index.ts` using `apps/worker/src/observability/sentry.ts`.
+- Mobile initializes Sentry in `apps/mobile/app/_layout.tsx` using `apps/mobile/lib/sentry.ts`.
+
+All three initializers are idempotent and safe to call multiple times.

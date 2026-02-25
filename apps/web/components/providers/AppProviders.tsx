@@ -3,9 +3,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getWebEnv } from '../../lib/env'
 import { NotifyToaster } from '../../lib/notify'
+import { initializeWebSentry } from '../../lib/sentry'
 import { UrlStateProvider } from '../../lib/url-state'
 import { sessionStore } from '../../stores/session-store'
 import { TanStackStoreDevtools } from '../devtools/TanStackStoreDevtools'
@@ -52,6 +53,10 @@ export function AppProviders({ children, devtoolsMode = 'auto' }: AppProvidersPr
   const [queryClient] = useState(createQueryClient)
   const webEnv = getWebEnv()
   const shouldRenderDevtools = resolveShouldRenderDevtools(webEnv.NODE_ENV, devtoolsMode)
+
+  useEffect(() => {
+    void initializeWebSentry()
+  }, [])
 
   return (
     <UrlStateProvider>

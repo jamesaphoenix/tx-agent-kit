@@ -77,6 +77,16 @@ await startTelemetry('tx-agent-kit-worker')
 
 This exports traces, metrics, and logs to the configured OTEL collector endpoint.
 
+### Optional Sentry Errors
+
+The worker also supports optional Sentry error reporting via `WORKER_SENTRY_DSN`.
+
+- If `WORKER_SENTRY_DSN` is blank/unset, Sentry is skipped.
+- Sentry is configured for errors only (`tracesSampleRate: 0`).
+- Unhandled worker bootstrap/runtime errors are captured before shutdown flush.
+
+See [Sentry (Optional)](/docs/apps/sentry) for complete setup.
+
 ## Graceful Shutdown
 
 The worker handles `SIGINT` and `SIGTERM` signals for clean shutdown. It stops accepting new workflow tasks, lets in-flight activities complete, then closes the Temporal connection and flushes telemetry.

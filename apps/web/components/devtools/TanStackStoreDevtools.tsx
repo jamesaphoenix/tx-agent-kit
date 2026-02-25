@@ -149,6 +149,7 @@ export function TanStackStoreDevtools<TState>({
   const currentState = useStore(store, (snapshot) => snapshot)
   const [isOpen, setIsOpen] = useState(initiallyOpen)
   const nextHistoryIdRef = useRef(1)
+  const wasOpenRef = useRef(initiallyOpen)
   const [history, setHistory] = useState<Array<StoreHistoryEntry<TState>>>(() => [
     createHistoryEntry(0, store.state)
   ])
@@ -159,6 +160,17 @@ export function TanStackStoreDevtools<TState>({
   }, [store])
 
   useEffect(() => {
+    if (!isOpen) {
+      wasOpenRef.current = false
+      return
+    }
+
+    if (!wasOpenRef.current) {
+      nextHistoryIdRef.current = 1
+      setHistory([createHistoryEntry(0, store.state)])
+    }
+    wasOpenRef.current = true
+
     const subscription = store.subscribe((snapshot) => {
       setHistory((previousHistory) => {
         const nextEntry = createHistoryEntry(nextHistoryIdRef.current, snapshot)
@@ -170,7 +182,7 @@ export function TanStackStoreDevtools<TState>({
     return () => {
       subscription.unsubscribe()
     }
-  }, [historySize, store])
+  }, [historySize, isOpen, store])
 
   useEffect(() => {
     setHistory((previousHistory) => previousHistory.slice(0, historySize))

@@ -19,6 +19,15 @@ pnpm docs:api:generate
 
 The `openapi:generate` command introspects the Effect HttpApi route definitions in `apps/api` and produces an updated `apps/api/openapi.json`. The `docs:api:generate` command then reads this spec and generates MDX documentation files.
 
+## Runtime docs endpoints
+
+When the API server is running (default `http://localhost:4000`), it also exposes:
+
+- Swagger UI at `/docs`
+- Raw OpenAPI JSON at `/openapi.json`
+
+The runtime `/openapi.json` powers `/docs` and reflects the running server. The generated `apps/api/openapi.json` is the checked-in artifact used by `pnpm docs:api:generate` and other repo tooling.
+
 ## Endpoint groups
 
 The API is organized into four endpoint groups:
@@ -91,10 +100,10 @@ List endpoints support cursor-based pagination with `limit` and `cursor` query p
 
 ## OpenAPI spec location
 
-The canonical OpenAPI spec lives at:
+The generated OpenAPI spec in the repository lives at:
 
 ```
 apps/api/openapi.json
 ```
 
-This file is generated, not hand-written. Do not edit it directly --- changes will be overwritten by `pnpm openapi:generate`.
+This file is generated, not hand-written. Do not edit it directly --- changes will be overwritten by `pnpm openapi:generate`. For runtime inspection, use `/openapi.json` on the API server.

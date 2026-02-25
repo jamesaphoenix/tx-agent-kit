@@ -1,4 +1,4 @@
 {
   "title": "Apps",
-  "pages": ["api", "web", "worker", "mobile"]
+  "pages": ["api", "web", "worker", "mobile", "sentry"]
 }

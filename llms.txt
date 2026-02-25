@@ -1,178 +1,103 @@
 # tx-agent-kit
 
-> Agent-first TypeScript monorepo. You tell the agent what to build. The agent builds it. The repo makes sure it's built right.
+> Canonical URL map for docs-aware LLMs. Use these real pages first.
 
-Production starter with Effect HTTP, Temporal, Next.js, Drizzle, and Expo. 50+ mechanical invariants enforced by lint rules, structural scripts, and shell checks. Every architectural decision is a build error, not a code review comment.
+## Primary pointers
 
-## Docs site
+- https://agentkit.txdocs.dev/docs
+- https://agentkit.txdocs.dev/llms-full.txt
+- https://agentkit.txdocs.dev/docs/api-reference
+- https://agentkit.txdocs.dev/docs/commands
 
-Full documentation: https://agentkit.txdocs.dev
-Agent-consumable docs: https://agentkit.txdocs.dev/llms.txt
-Extended docs: https://agentkit.txdocs.dev/llms-full.txt
+## Getting started
 
+- https://agentkit.txdocs.dev/docs/getting-started
+- https://agentkit.txdocs.dev/docs/getting-started/local-setup
+- https://agentkit.txdocs.dev/docs/getting-started/first-domain
 
-## Repo orientation
+## Philosophy
 
-CLAUDE.md:Agent operating guide (constraints, DDD pattern, workflow, enforcement)
-AGENTS.md:Symlink to CLAUDE.md (both agent runtimes read the same file)
-docs/ARCHITECTURE.md:System architecture and boundaries
-docs/QUALITY.md:All enforced invariants with rationale
-docs/COMMANDS.md:Every pnpm script, organized by purpose
-docs/RUNBOOKS.md:Operational procedures
-docs/DEPLOYMENT.md:Build, migrate, deploy, smoke test
-apps/api/openapi.json:Generated OpenAPI spec (source of truth for API contract)
+- https://agentkit.txdocs.dev/docs/philosophy
+- https://agentkit.txdocs.dev/docs/philosophy/why-different
+- https://agentkit.txdocs.dev/docs/philosophy/operating-model
+- https://agentkit.txdocs.dev/docs/philosophy/mechanical-enforcement
 
+## Architecture
 
-## Stack
+- https://agentkit.txdocs.dev/docs/architecture
+- https://agentkit.txdocs.dev/docs/architecture/monorepo-structure
+- https://agentkit.txdocs.dev/docs/architecture/ddd-pattern
+- https://agentkit.txdocs.dev/docs/architecture/dependency-flow
+- https://agentkit.txdocs.dev/docs/architecture/data-flow
 
-apps/api:Effect HttpApi server. Auth, organizations, invitations. Generates its own OpenAPI spec.
-apps/web:Client-only Next.js SPA. Two route groups: (website) for public marketing (landing, blog, pricing, terms, privacy) and (application) for authenticated org/team dashboard. No server code, no Effect, no Drizzle. Config-driven content, backend-agnostic blog, JSON-LD structured data, breadcrumbs.
-apps/worker:Temporal worker. Deterministic workflows, activities handle side effects.
-apps/mobile:Expo React Native. Same API, same contracts as web.
-apps/docs:Fumadocs documentation site (port 3002).
-packages/core:DDD domain slices under packages/core/src/domains/<domain>/. Business logic lives here.
-packages/infra/db:Drizzle schema, repositories, migrations, pgTAP tests. Only package that imports drizzle-orm.
-packages/contracts:Shared API schemas using effect/Schema. Single source of truth for validation.
-packages/infra/auth:Password hashing and JWT. Thin on purpose.
-packages/infra/logging:Structured JSON logger. console.* is lint-banned everywhere.
-packages/infra/observability:OpenTelemetry bootstrap. Traces, metrics, logs via OTLP.
-packages/testkit:Integration harnesses, lock-guarded runners, DB reset helpers.
-packages/tooling:ESLint configs, domain invariant rules, scaffold CLI.
+## Core concepts
 
+- https://agentkit.txdocs.dev/docs/core-concepts
+- https://agentkit.txdocs.dev/docs/core-concepts/effect-services
+- https://agentkit.txdocs.dev/docs/core-concepts/domain-modeling
+- https://agentkit.txdocs.dev/docs/core-concepts/ports-and-adapters
+- https://agentkit.txdocs.dev/docs/core-concepts/schema-contracts
 
-## Prerequisites
+## Apps
 
-Node.js 22+, pnpm 10+, Docker Desktop 24+, Temporal CLI. 1Password CLI optional (deploy only).
+- https://agentkit.txdocs.dev/docs/apps/api
+- https://agentkit.txdocs.dev/docs/apps/web
+- https://agentkit.txdocs.dev/docs/apps/worker
+- https://agentkit.txdocs.dev/docs/apps/mobile
 
+## Packages
 
-## Quickstart
+- https://agentkit.txdocs.dev/docs/packages/core
+- https://agentkit.txdocs.dev/docs/packages/db
+- https://agentkit.txdocs.dev/docs/packages/contracts
+- https://agentkit.txdocs.dev/docs/packages/auth
+- https://agentkit.txdocs.dev/docs/packages/logging
+- https://agentkit.txdocs.dev/docs/packages/observability
+- https://agentkit.txdocs.dev/docs/packages/testkit
+- https://agentkit.txdocs.dev/docs/packages/tooling
 
-pnpm install
-pnpm env:configure
-pnpm infra:ensure
-pnpm temporal:dev:up
-pnpm db:migrate
-pnpm dev
+## Guides
 
+- https://agentkit.txdocs.dev/docs/guides/adding-a-domain
+- https://agentkit.txdocs.dev/docs/guides/adding-routes
+- https://agentkit.txdocs.dev/docs/guides/adding-workflows
+- https://agentkit.txdocs.dev/docs/guides/adding-db-triggers
+- https://agentkit.txdocs.dev/docs/guides/testing-strategy
+- https://agentkit.txdocs.dev/docs/guides/generating-api-client
 
-## Local endpoints
+## Enforcement
 
-Web: http://localhost:3000
-API: http://localhost:4000
-Docs: http://localhost:3002
-Temporal UI: http://localhost:8233
-Prometheus: http://localhost:9090
-Jaeger: http://localhost:16686
-Grafana: http://localhost:3001
-
-
-## Key constraints
-
-Validation: effect/Schema only. Zod is banned.
-Logging: console.* is banned. Use @tx-agent-kit/logging.
-Persistence: only packages/infra/db imports drizzle-orm.
-Web boundary: apps/web never imports DB, Effect, or server modules. Every .tsx starts with 'use client'.
-Domain determinism: no Date.now, new Date, or Math.random in domain code. Inject via ports.
-Temporal determinism: no native timers, no infra imports inside workflows.
-Kind markers: routes and repositories declare crud or custom. Enforced by structural checks.
-Type safety: as any, chained assertions, and suppression directives are banned in source.
-Test colocation: use file.test.ts and file.integration.test.ts. No __tests__/ dirs or .spec.ts files.
-Env governance: source modules read env through dedicated env modules, never process.env directly.
-
-
-## DDD pattern
-
-packages/core/src/domains/<domain>/
-  domain/      :Entities, value objects, pure rules
-  ports/       :Interfaces and capability contracts
-  application/ :Use-case orchestration
-  adapters/    :Port implementations
-  runtime/     :Layer wiring (optional)
-
-Dependencies point inward: domain <- ports <- application <- adapters <- runtime.
-
-
-## Golden path (new feature)
-
-pnpm scaffold:crud --domain <name> --entity <name> --dry-run
-pnpm scaffold:crud --domain <name> --entity <name>
-Add contracts in packages/contracts with effect/Schema.
-Add domain logic in packages/core/src/domains/<name>/.
-Update packages/infra/db/src/schema.ts + matching effect-schemas/ and factories/.
-Expose routes in apps/api, run pnpm openapi:generate.
-Regenerate clients: pnpm api:client:generate.
-Validate: pnpm lint && pnpm type-check && pnpm test.
-
-
-## Enforcement layers
-
-ESLint: packages/tooling/eslint-config/domain-invariants.js:Import bans, pattern bans, boundary rules.
-Structural: scripts/lint/enforce-domain-invariants.mjs:Table parity, kind consistency, folder structure.
-Shell: scripts/check-shell-invariants.sh:Env governance, integration baselines.
-Gate: pnpm lint runs all three layers. Failure blocks merge.
-
-
-## Quality gates
-
-pnpm lint              # ESLint + structural + shell invariants
-pnpm type-check        # TypeScript compilation
-pnpm test              # Unit tests (Vitest)
-pnpm test:integration  # Integration tests (lock-guarded, idempotent DB reset)
-pnpm test:db:pgtap     # Database trigger contract tests
-
-Quiet variants (pnpm lint:quiet, test:quiet, etc.) reduce output for agent workflows.
-
+- https://agentkit.txdocs.dev/docs/enforcement
+- https://agentkit.txdocs.dev/docs/enforcement/eslint-rules
+- https://agentkit.txdocs.dev/docs/enforcement/structural-checks
+- https://agentkit.txdocs.dev/docs/enforcement/shell-invariants
+- https://agentkit.txdocs.dev/docs/enforcement/closed-invariants
 
 ## Infrastructure
 
-Docker Compose runs: PostgreSQL (5432), Redis (6379), OTEL Collector (4318), Prometheus (9090), Jaeger (16686), Grafana (3001), Loki (3100).
-Temporal CLI runs as a standalone process on port 7233.
-pnpm infra:ensure is idempotent. pnpm temporal:dev:up is idempotent.
-Worktrees get collision-free ports via pnpm worktree:ports <name>.
+- https://agentkit.txdocs.dev/docs/infrastructure
+- https://agentkit.txdocs.dev/docs/infrastructure/docker-stack
+- https://agentkit.txdocs.dev/docs/infrastructure/local-development
+- https://agentkit.txdocs.dev/docs/infrastructure/worktrees
+- https://agentkit.txdocs.dev/docs/infrastructure/secrets-management
 
+## Observability
+
+- https://agentkit.txdocs.dev/docs/observability
+- https://agentkit.txdocs.dev/docs/observability/logging
+- https://agentkit.txdocs.dev/docs/observability/tracing
+- https://agentkit.txdocs.dev/docs/observability/metrics
+- https://agentkit.txdocs.dev/docs/observability/monitoring-stack
 
 ## Deployment
 
-pnpm deploy:build-images:Immutable containers, digest-pinned.
-pnpm deploy:migrate:staging:Drizzle migrations via 1Password.
-pnpm deploy:staging:op inject, docker compose up, smoke test.
-pnpm deploy:smoke:Health, auth, CRUD, idempotency verification.
+- https://agentkit.txdocs.dev/docs/deployment
+- https://agentkit.txdocs.dev/docs/deployment/build-images
+- https://agentkit.txdocs.dev/docs/deployment/migrations
+- https://agentkit.txdocs.dev/docs/deployment/deploy-compose
+- https://agentkit.txdocs.dev/docs/deployment/smoke-tests
 
+## Reference
 
-## API reference
-
-Three endpoint groups: Auth (/v1/auth/*), Organizations (/v1/organizations/*), Invitations (/v1/invitations/*).
-Team CRUD: /v1/teams/* for team management within organizations.
-Bearer JWT auth on all routes except sign-up, sign-in, and /health.
-Cursor-based pagination on list endpoints.
-Full spec: apps/api/openapi.json.
-
-
-## Web architecture
-
-Route groups:
-(website):Public marketing site (landing, blog, pricing, terms, privacy). Layout wraps WebsiteHeader + WebsiteFooter.
-(application):Authenticated app shell. Auth-guard layout checks token, redirects to /sign-in if missing.
-Auth pages:sign-in, sign-up, forgot-password, reset-password at app root with split-panel layout.
-
-Org/team routing:
-/org:Smart redirect (resolves first org + first team → /org/{orgId}/{teamId}).
-/org/{orgId}/workspaces:Team listing and creation within an org.
-/org/{orgId}/{teamId}:Team dashboard.
-
-Config-driven content:
-apps/web/config/index.ts:Company info, homepage (hero, features, FAQs, CTA), blog, dashboard nav. No Stripe price IDs.
-
-SEO infrastructure:
-apps/web/lib/seo.ts:buildTitle, buildDescription, Organization/WebPage/BreadcrumbList/FAQPage structured data.
-apps/web/lib/blog.ts:Backend-agnostic BlogDataSource interface. Pluggable blog backend.
-apps/web/lib/blog-seo.ts:BlogPosting and Blog JSON-LD builders.
-apps/web/components/Breadcrumbs.tsx:Breadcrumb navigation component.
-apps/web/components/StructuredData.tsx:JSON-LD script renderer.
-apps/web/app/sitemap.ts:All marketing page URLs.
-apps/web/app/robots.ts:Disallows authenticated routes.
-
-Permissions:
-Migration 0008 seeds admin/member roles with 17 permission actions.
-packages/contracts/src/literals.ts:permissionActions array + PermissionAction type.
-Admin gets all; member gets safe subset (excludes manage_organization, manage_billing, etc.).
+- https://agentkit.txdocs.dev/docs/api-reference
+- https://agentkit.txdocs.dev/docs/commands

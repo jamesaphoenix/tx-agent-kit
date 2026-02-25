@@ -8,6 +8,8 @@
 - `pnpm temporal:dev:down`: stop local Temporal CLI server managed by repo scripts.
 - `pnpm temporal:dev:status`: inspect Temporal runtime mode + local CLI health.
 - `pnpm dev`: run web + api + worker locally with hot reload (auto-runs infra ensure + local Temporal CLI in `cli` mode).
+- `pnpm dev:mobile:web`: run Expo web preview intentionally on the mobile dev port.
+- `pnpm dev:open`: open local app/dev dashboards in Brave Browser (fallback: Google Chrome).
 - `pnpm openapi:generate`: regenerate `apps/api/openapi.json` from API definitions.
 - `pnpm api:client:generate`: regenerate `apps/api/openapi.json` and web Orval hooks in `apps/web/lib/api/generated`.
 - `pnpm tx <command> [args]`: invoke the repo command dispatcher (tx-style entrypoint for tooling commands).
@@ -69,8 +71,8 @@
 - `pnpm mcp:playwright`: start Playwright MCP.
 - `pnpm playwright:auth:bootstrap`: create/sign-in bootstrap user via real auth API and write Playwright storage state.
 - `pnpm mcp:playwright:auth`: run auth bootstrap and then start Playwright MCP with `--storage-state`.
-- `op run --env-file=.env.playwright.dev -- pnpm mcp:playwright:auth`: recommended 1Password-backed Playwright MCP login flow.
-- `MCP_ENV_FILE=.env.playwright.dev pnpm mcp:playwright:auth`: point wrapper at a specific env file path when not using default `.env`.
+- `op run --env-file=.env -- pnpm mcp:playwright:auth`: recommended 1Password-backed Playwright MCP login flow.
+- `MCP_ENV_FILE=.env pnpm mcp:playwright:auth`: point wrapper at a specific env file path when not using default `.env`.
 - `pnpm mcp:codex-config`: print Codex MCP TOML blocks wired to local wrappers.
 - `PROMETHEUS_URL=http://host.docker.internal:9090 pnpm mcp:prometheus`: point containerized Prometheus MCP at host Prometheus (default).
 - `JAEGER_URL=http://localhost JAEGER_PORT=16686 pnpm mcp:jaeger`: host-mode Jaeger MCP defaults (use either host+port or URL with embedded port).
