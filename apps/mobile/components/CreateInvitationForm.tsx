@@ -3,16 +3,16 @@ import { Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { clientApi } from '../lib/client-api'
 import { notify } from '../lib/notify'
 
-interface WorkspaceOption {
+interface OrganizationOption {
   id: string
   name: string
 }
 
 export function CreateInvitationForm({
-  workspaces,
+  organizations,
   onCreated
 }: {
-  workspaces: ReadonlyArray<WorkspaceOption>
+  organizations: ReadonlyArray<OrganizationOption>
   onCreated?: () => void | Promise<void>
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -23,14 +23,14 @@ export function CreateInvitationForm({
 
   useEffect(() => {
     setSelectedIndex(0)
-  }, [workspaces])
+  }, [organizations])
 
-  const workspaceId = workspaces[selectedIndex]?.id ?? ''
+  const organizationId = organizations[selectedIndex]?.id ?? ''
 
   const onSubmit = async () => {
     if (pending) return
-    if (!workspaceId) {
-      const message = 'Create a workspace first'
+    if (!organizationId) {
+      const message = 'Create an organization first'
       setError(message)
       notify.error(message)
       return
@@ -40,7 +40,7 @@ export function CreateInvitationForm({
     setError(null)
 
     try {
-      await clientApi.createInvitation({ workspaceId, email, role })
+      await clientApi.createInvitation({ organizationId, email, role })
       setEmail('')
       notify.success('Invitation sent')
       await onCreated?.()
@@ -57,18 +57,18 @@ export function CreateInvitationForm({
     <View style={{ gap: 12 }}>
       <Text style={headingStyle}>Invite teammate</Text>
 
-      <Text style={labelStyle}>Workspace</Text>
+      <Text style={labelStyle}>Organization</Text>
       <View style={{ gap: 6 }}>
-        {workspaces.map((workspace, index) => (
+        {organizations.map((organization, index) => (
           <TouchableOpacity
-            key={workspace.id}
+            key={organization.id}
             onPress={() => setSelectedIndex(index)}
             style={[
               chipStyle,
               index === selectedIndex && { backgroundColor: '#dbeafe', borderColor: '#2563eb' }
             ]}
           >
-            <Text>{workspace.name}</Text>
+            <Text>{organization.name}</Text>
           </TouchableOpacity>
         ))}
       </View>

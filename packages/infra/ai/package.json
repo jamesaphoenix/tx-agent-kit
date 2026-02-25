@@ -1,0 +1,22 @@
+{
+  "name": "@tx-agent-kit/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "type-check": "tsc -b --pretty false",
+    "lint": "eslint src --max-warnings=0",
+    "test": "vitest run -c vitest.config.ts"
+  },
+  "dependencies": {
+    "@openrouter/sdk": "^0.9.11",
+    "effect": "^3.19.16",
+    "zod": "^4.1.7"
+  },
+  "devDependencies": {
+    "@tx-agent-kit/vitest-config": "workspace:*"
+  }
+}

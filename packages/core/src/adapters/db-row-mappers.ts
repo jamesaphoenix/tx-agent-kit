@@ -1,16 +1,17 @@
 import type {
   InvitationRowShape,
-  TaskRowShape,
-  UserRowShape,
-  WorkspaceRowShape
+  OrganizationRowShape,
+  TeamMemberRowShape,
+  TeamRowShape,
+  UserRowShape
 } from '@tx-agent-kit/db'
 import type { AuthUserRecord } from '../domains/auth/domain/auth-domain.js'
-import type { TaskRecord } from '../domains/task/domain/task-domain.js'
 import type {
   InvitationRecord,
-  WorkspaceRecord,
-  WorkspaceUserRecord
-} from '../domains/workspace/domain/workspace-domain.js'
+  OrganizationRecord,
+  OrganizationUserRecord
+} from '../domains/organization/domain/organization-domain.js'
+import type { TeamMemberRecord, TeamRecord } from '../domains/team/domain/team-domain.js'
 import type { PaginatedResult } from '../pagination.js'
 
 const toRecord = <
@@ -39,37 +40,47 @@ export const mapNullable = <Input, Output>(
   mapItem: (item: Input) => Output
 ): Output | null => (value === null ? null : mapItem(value))
 
-const toTaskRecordBase = toRecord<TaskRowShape, readonly [
-  'id',
-  'workspaceId',
-  'title',
-  'description',
-  'status',
-  'createdByUserId',
-  'createdAt'
-]>(['id', 'workspaceId', 'title', 'description', 'status', 'createdByUserId', 'createdAt'] as const)
-
-export const toTaskRecord = (row: TaskRowShape): TaskRecord => toTaskRecordBase(row)
-
-export const toTaskRecordPage = (page: PaginatedResult<TaskRowShape>): PaginatedResult<TaskRecord> =>
-  mapPaginatedResult(page, toTaskRecord)
-
-const toWorkspaceRecordBase = toRecord<WorkspaceRowShape, readonly [
+const toOrganizationRecordBase = toRecord<OrganizationRowShape, readonly [
   'id',
   'name',
-  'ownerUserId',
-  'createdAt'
-]>(['id', 'name', 'ownerUserId', 'createdAt'] as const)
+  'billingEmail',
+  'onboardingData',
+  'stripeCustomerId',
+  'stripeSubscriptionId',
+  'stripePaymentMethodId',
+  'creditsBalance',
+  'reservedCredits',
+  'autoRechargeEnabled',
+  'autoRechargeThreshold',
+  'autoRechargeAmount',
+  'isSubscribed',
+  'subscriptionStatus',
+  'subscriptionPlan',
+  'subscriptionStartedAt',
+  'subscriptionEndsAt',
+  'subscriptionCurrentPeriodEnd',
+  'createdAt',
+  'updatedAt'
+]>([
+  'id', 'name',
+  'billingEmail', 'onboardingData',
+  'stripeCustomerId', 'stripeSubscriptionId', 'stripePaymentMethodId',
+  'creditsBalance', 'reservedCredits',
+  'autoRechargeEnabled', 'autoRechargeThreshold', 'autoRechargeAmount',
+  'isSubscribed', 'subscriptionStatus', 'subscriptionPlan',
+  'subscriptionStartedAt', 'subscriptionEndsAt', 'subscriptionCurrentPeriodEnd',
+  'createdAt', 'updatedAt'
+] as const)
 
-export const toWorkspaceRecord = (row: WorkspaceRowShape): WorkspaceRecord => toWorkspaceRecordBase(row)
+export const toOrganizationRecord = (row: OrganizationRowShape): OrganizationRecord => toOrganizationRecordBase(row)
 
-export const toWorkspaceRecordPage = (
-  page: PaginatedResult<WorkspaceRowShape>
-): PaginatedResult<WorkspaceRecord> => mapPaginatedResult(page, toWorkspaceRecord)
+export const toOrganizationRecordPage = (
+  page: PaginatedResult<OrganizationRowShape>
+): PaginatedResult<OrganizationRecord> => mapPaginatedResult(page, toOrganizationRecord)
 
 const toInvitationRecordBase = toRecord<InvitationRowShape, readonly [
   'id',
-  'workspaceId',
+  'organizationId',
   'inviteeUserId',
   'email',
   'role',
@@ -80,7 +91,7 @@ const toInvitationRecordBase = toRecord<InvitationRowShape, readonly [
   'createdAt'
 ]>([
   'id',
-  'workspaceId',
+  'organizationId',
   'inviteeUserId',
   'email',
   'role',
@@ -101,11 +112,38 @@ const mapUserRecordFields = toRecord<UserRowShape, readonly [
   'id',
   'email',
   'passwordHash',
+  'passwordChangedAt',
   'name',
   'createdAt'
-]>(['id', 'email', 'passwordHash', 'name', 'createdAt'] as const)
+]>(['id', 'email', 'passwordHash', 'passwordChangedAt', 'name', 'createdAt'] as const)
 
 export const toAuthUserRecord = (row: UserRowShape): AuthUserRecord => mapUserRecordFields(row)
 
-export const toWorkspaceUserRecord = (row: UserRowShape): WorkspaceUserRecord =>
+export const toOrganizationUserRecord = (row: UserRowShape): OrganizationUserRecord =>
   mapUserRecordFields(row)
+
+const toTeamRecordBase = toRecord<TeamRowShape, readonly [
+  'id',
+  'organizationId',
+  'name',
+  'website',
+  'brandSettings',
+  'createdAt',
+  'updatedAt'
+]>(['id', 'organizationId', 'name', 'website', 'brandSettings', 'createdAt', 'updatedAt'] as const)
+
+export const toTeamRecord = (row: TeamRowShape): TeamRecord => toTeamRecordBase(row)
+
+export const toTeamRecordPage = (page: PaginatedResult<TeamRowShape>): PaginatedResult<TeamRecord> =>
+  mapPaginatedResult(page, toTeamRecord)
+
+const toTeamMemberRecordBase = toRecord<TeamMemberRowShape, readonly [
+  'id',
+  'teamId',
+  'userId',
+  'roleId',
+  'createdAt',
+  'updatedAt'
+]>(['id', 'teamId', 'userId', 'roleId', 'createdAt', 'updatedAt'] as const)
+
+export const toTeamMemberRecord = (row: TeamMemberRowShape): TeamMemberRecord => toTeamMemberRecordBase(row)

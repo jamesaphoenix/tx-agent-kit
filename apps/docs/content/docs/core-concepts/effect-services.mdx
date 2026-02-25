@@ -12,8 +12,8 @@ Effect is used in five packages:
 | Package | How Effect is used |
 |---------|-------------------|
 | `packages/core` | Service definitions, domain error types, port interfaces |
-| `packages/db` | Repository implementations as Effect services |
-| `packages/auth` | Auth primitives wrapped as Effect operations |
+| `packages/infra/db` | Repository implementations as Effect services |
+| `packages/infra/auth` | Auth primitives wrapped as Effect operations |
 | `apps/api` | HttpApi server, route handlers, layer composition |
 | `apps/worker` | Activity implementations, workflow helpers |
 
@@ -27,24 +27,24 @@ Effect services are the primary mechanism for dependency injection. A service de
 import { Context, Effect } from "effect"
 
 // Define a service tag
-export class TaskRepository extends Context.Tag("TaskRepository")<
-  TaskRepository,
+export class OrganizationRepository extends Context.Tag("OrganizationRepository")<
+  OrganizationRepository,
   {
-    readonly findById: (id: string) => Effect.Effect<TaskRecord | null>
-    readonly create: (input: CreateTaskInput) => Effect.Effect<TaskRecord>
-    readonly listByWorkspace: (workspaceId: string) => Effect.Effect<ReadonlyArray<TaskRecord>>
+    readonly findById: (id: string) => Effect.Effect<OrganizationRecord | null>
+    readonly create: (input: CreateOrganizationInput) => Effect.Effect<OrganizationRecord>
+    readonly listByUser: (userId: string) => Effect.Effect<ReadonlyArray<OrganizationRecord>>
   }
 >() {}
 ```
 
-Code that needs task persistence depends on `TaskRepository` without knowing the implementation:
+Code that needs organization persistence depends on `OrganizationRepository` without knowing the implementation:
 
 ```typescript
-const createTask = (input: CreateTaskInput) =>
+const createOrganization = (input: CreateOrganizationInput) =>
   Effect.gen(function* () {
-    const repo = yield* TaskRepository
-    const task = yield* repo.create(input)
-    return task
+    const repo = yield* OrganizationRepository
+    const org = yield* repo.create(input)
+    return org
   })
 ```
 
@@ -58,9 +58,9 @@ Layers wire concrete implementations to service tags. This is where the dependen
 import { Layer } from "effect"
 
 // Concrete implementation using Drizzle
-export const TaskRepositoryLive = Layer.succeed(
-  TaskRepository,
-  makeTaskRepository(db),
+export const OrganizationRepositoryLive = Layer.succeed(
+  OrganizationRepository,
+  makeOrganizationRepository(db),
 )
 ```
 
@@ -68,8 +68,8 @@ Layers compose to build the full application:
 
 ```typescript
 const AppLayer = Layer.mergeAll(
-  TaskRepositoryLive,
-  WorkspaceRepositoryLive,
+  OrganizationRepositoryLive,
+  InvitationRepositoryLive,
   AuthServiceLive,
 )
 
@@ -86,24 +86,24 @@ This composition happens at the application boundary, in `apps/api` route wiring
 Effect tracks errors in the type system. Every operation declares what errors it can produce:
 
 ```typescript
-export class TaskNotFound extends Data.TaggedError("TaskNotFound")<{
+export class OrganizationNotFound extends Data.TaggedError("OrganizationNotFound")<{
   readonly id: string
 }> {}
 
-export class InvalidStatusTransition extends Data.TaggedError("InvalidStatusTransition")<{
+export class InvalidSubscriptionTransition extends Data.TaggedError("InvalidSubscriptionTransition")<{
   readonly from: string
   readonly to: string
 }> {}
 
 // The return type includes the error channel
-const updateStatus = (
+const updateOrganization = (
   id: string,
-  status: string,
-): Effect.Effect<TaskRecord, TaskNotFound | InvalidStatusTransition> =>
+  input: UpdateOrganizationInput,
+): Effect.Effect<OrganizationRecord, OrganizationNotFound> =>
   Effect.gen(function* () {
-    const repo = yield* TaskRepository
-    const task = yield* repo.findById(id)
-    if (!task) return yield* Effect.fail(new TaskNotFound({ id }))
+    const repo = yield* OrganizationRepository
+    const org = yield* repo.findById(id)
+    if (!org) return yield* Effect.fail(new OrganizationNotFound({ id }))
     // ...
   })
 ```
@@ -115,13 +115,12 @@ Route handlers in the API map these domain errors to HTTP status codes, keeping 
 The API server uses Effect's HttpApi module to define typed HTTP endpoints:
 
 ```typescript
-const TaskApi = HttpApiGroup.make("tasks").pipe(
+const OrganizationApi = HttpApiGroup.make("organizations").pipe(
   HttpApiGroup.add(
-    HttpApiEndpoint.post("createTask", "/v1/tasks")
-      .setPayload(CreateTaskRequest)
-      .addSuccess(TaskResponse)
-      .addError(UnauthorizedError, { status: 401 })
-      .addError(WorkspaceNotFound, { status: 404 }),
+    HttpApiEndpoint.post("createOrganization", "/v1/organizations")
+      .setPayload(createOrganizationRequestSchema)
+      .addSuccess(organizationSchema)
+      .addError(UnauthorizedError, { status: 401 }),
   ),
 )
 ```

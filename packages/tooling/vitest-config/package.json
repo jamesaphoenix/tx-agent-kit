@@ -4,8 +4,17 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./unit": "./unit.ts",
-    "./integration": "./integration.ts",
-    "./workers": "./workers.ts"
+    "./unit": {
+      "types": "./unit.ts",
+      "default": "./unit.cjs"
+    },
+    "./integration": {
+      "types": "./integration.ts",
+      "default": "./integration.cjs"
+    },
+    "./workers": {
+      "types": "./workers.ts",
+      "default": "./workers.cjs"
+    }
   }
 }

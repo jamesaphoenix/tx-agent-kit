@@ -3,7 +3,7 @@ import * as Schema from 'effect/Schema'
 export const TaskProcessWorkflowInputSchema = Schema.Struct({
   operationId: Schema.String,
   taskId: Schema.String,
-  workspaceId: Schema.String
+  organizationId: Schema.String
 })
 
 export type TaskProcessWorkflowInput = Schema.Schema.Type<typeof TaskProcessWorkflowInputSchema>

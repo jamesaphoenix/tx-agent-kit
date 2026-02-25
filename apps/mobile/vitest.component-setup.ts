@@ -49,12 +49,15 @@ vi.mock('expo-secure-store', () => ({
 vi.mock('expo-constants', () => ({
   default: {
     get expoConfig() {
+      const integrationRuntime = globalThis as Record<string, unknown>
+      const integrationApiBaseUrl =
+        typeof integrationRuntime.__MOBILE_INTEGRATION_API_BASE_URL === 'string'
+          ? integrationRuntime.__MOBILE_INTEGRATION_API_BASE_URL
+          : 'http://localhost:4000'
+
       return {
         extra: {
-          API_BASE_URL:
-            process.env.MOBILE_INTEGRATION_API_BASE_URL ??
-            process.env.EXPO_PUBLIC_API_BASE_URL ??
-            'http://localhost:4000',
+          API_BASE_URL: integrationApiBaseUrl,
           OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4320',
           NODE_ENV: 'test'
         }

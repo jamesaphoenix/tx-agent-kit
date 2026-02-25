@@ -8,19 +8,19 @@ Agent-first TypeScript monorepo for building scalable apps with Effect, Temporal
 - `apps/api`: Effect HTTP API for auth/workspaces/invitations/tasks.
 - `apps/worker`: Temporal worker and workflows.
 - `packages/core`: Effect services and domain logic.
-- `packages/db`: Drizzle schema, repositories, migrations, and table-aligned Effect schemas.
-- `packages/logging`: Structured JSON logger package for all services.
+- `packages/infra/db`: Drizzle schema, repositories, migrations, and table-aligned Effect schemas.
+- `packages/infra/logging`: Structured JSON logger package for all services.
 - `packages/contracts`: Shared contracts and `effect/Schema` definitions.
-- `packages/auth`: Password/JWT primitives.
-- `packages/observability`: OpenTelemetry bootstrap utilities.
+- `packages/infra/auth`: Password/JWT primitives.
+- `packages/infra/observability`: OpenTelemetry bootstrap utilities.
 - `monitoring/local`: Prometheus, Jaeger, Grafana, and OTel collector for local infra.
 
 ## Invariants
 - Web is API-first and never queries Postgres directly.
 - Domain boundaries are schema-first with `effect/Schema` (zod is banned).
-- Only `packages/db` imports `drizzle-orm`.
-- Every DB table has a matching Effect schema in `packages/db/src/effect-schemas`.
-- Every DB table has a matching factory in `packages/db/src/factories`.
+- Only `packages/infra/db` imports `drizzle-orm`.
+- Every DB table has a matching Effect schema in `packages/infra/db/src/effect-schemas`.
+- Every DB table has a matching factory in `packages/infra/db/src/factories`.
 - `console.*` is banned; use `@tx-agent-kit/logging`.
 - DDD import direction is enforced with ports as the seam: `domain <- ports <- application <- runtime/ui` and `domain <- ports <- adapters <- runtime/ui`.
 - `apps/api/openapi.json` is generated from `apps/api` and is the external contract reference.

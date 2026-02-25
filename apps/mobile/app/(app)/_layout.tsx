@@ -35,10 +35,10 @@ export default function AppTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="workspaces"
+        name="organizations"
         options={{
-          title: 'Workspaces',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }} accessibilityLabel="Workspaces">W</Text>
+          title: 'Organizations',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }} accessibilityLabel="Organizations">O</Text>
         }}
       />
       <Tabs.Screen

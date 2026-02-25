@@ -2,8 +2,11 @@ import {
   createDbAuthContext,
   type ApiFactoryContext
 } from '../../../../packages/testkit/src/index.ts'
+import { getTestkitEnv } from '../../../../packages/testkit/src/env.ts'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+const mobileIntegrationPortStride = 10
 
 const parsePositiveInt = (value: string | undefined, fallback: number): number => {
   if (!value) {
@@ -20,7 +23,14 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
 
 const supportDir = dirname(fileURLToPath(import.meta.url))
 const apiCwd = resolve(supportDir, '../../../api')
-const integrationPort = parsePositiveInt(process.env.MOBILE_INTEGRATION_API_PORT, 4106)
+const testkitEnv = getTestkitEnv()
+const workerSlot = parsePositiveInt(
+  testkitEnv.VITEST_WORKER_ID ?? testkitEnv.VITEST_POOL_ID,
+  1
+)
+const integrationBasePort = parsePositiveInt(testkitEnv.MOBILE_INTEGRATION_API_PORT, 4106)
+const integrationPort = integrationBasePort + (workerSlot - 1) * mobileIntegrationPortStride
+const integrationSchemaPrefix = `mobile_integration_slot_${workerSlot}`
 
 const dbAuthContext = createDbAuthContext({
   apiCwd,
@@ -29,7 +39,7 @@ const dbAuthContext = createDbAuthContext({
   authSecret: 'mobile-integration-auth-secret-12345',
   corsOrigin: '*',
   sql: {
-    schemaPrefix: 'mobile_integration'
+    schemaPrefix: integrationSchemaPrefix
   }
 })
 

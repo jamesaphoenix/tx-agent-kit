@@ -37,7 +37,7 @@ export const InvitationList = () => (
   <List sort={{ field: 'createdAt', order: 'DESC' }} filters={invitationFilters}>
     <Datagrid rowClick={false}>
       <TextField source="id" />
-      <TextField source="workspaceId" />
+      <TextField source="organizationId" />
       <TextField source="email" />
       <TextField source="role" />
       <TextField source="status" />

@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "bash -lc 'set -a; [[ -f ../../.env ]] && source ../../.env; set +a; exec tsx watch src/server.ts'",
     "build": "tsc -b",
     "openapi:generate": "tsx src/openapi.ts",
     "type-check": "tsc -b --pretty false",

@@ -22,7 +22,7 @@ Project-specific rules that enforce architectural constraints:
 | Rule | Rationale |
 |------|-----------|
 | No `console.*` | Use `@tx-agent-kit/logging` instead |
-| No `drizzle-orm` outside `packages/db` | Database access is isolated to one package |
+| No `drizzle-orm` outside `packages/infra/db` | Database access is isolated to one package |
 | No `effect` in `apps/web` | The web app stays a thin client |
 | No default exports in domain layers | Named exports keep imports explicit |
 | No `as any` assertions | Model unknowns explicitly and decode at boundaries |
@@ -70,8 +70,8 @@ packages/core/src/domains/billing/
 
 With `--with-db`:
 ```
-packages/db/src/effect-schemas/invoices.ts
-packages/db/src/factories/invoices.factory.ts
+packages/infra/db/src/effect-schemas/invoices.ts
+packages/infra/db/src/factories/invoices.factory.ts
 ```
 
 ### CLI Options

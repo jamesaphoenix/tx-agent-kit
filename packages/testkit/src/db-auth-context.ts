@@ -4,9 +4,9 @@ import {
   deleteUser as deleteUserFactory,
   loginUser as loginUserFactory,
   type ApiFactoryContext,
-  type CreateTeamOptions,
+  type CreateOrganizationOptions,
   type CreateUserOptions,
-  type CreatedTeam,
+  type CreatedOrganization,
   type CreatedUserSession,
   type FactoryAuthResponse,
   type LoginUserOptions
@@ -42,7 +42,7 @@ export interface DbAuthContext {
   createUser: (options?: CreateUserOptions) => Promise<CreatedUserSession>
   loginUser: (options: LoginUserOptions) => Promise<FactoryAuthResponse>
   deleteUser: (token: string) => Promise<{ deleted: boolean }>
-  createTeam: (options: CreateTeamOptions) => Promise<CreatedTeam>
+  createTeam: (options: CreateOrganizationOptions) => Promise<CreatedOrganization>
 }
 
 export const createDbAuthContext = (options: CreateDbAuthContextOptions): DbAuthContext => {
@@ -86,7 +86,7 @@ export const createDbAuthContext = (options: CreateDbAuthContextOptions): DbAuth
     loginUser: async (loginUserOptions: LoginUserOptions) =>
       loginUserFactory(getFactoryContext(), loginUserOptions),
     deleteUser: async (token: string) => deleteUserFactory(getFactoryContext(), token),
-    createTeam: async (createTeamOptions: CreateTeamOptions) =>
-      createTeamFactory(getFactoryContext(), createTeamOptions)
+    createTeam: async (createOrganizationOptions: CreateOrganizationOptions) =>
+      createTeamFactory(getFactoryContext(), createOrganizationOptions)
   }
 }

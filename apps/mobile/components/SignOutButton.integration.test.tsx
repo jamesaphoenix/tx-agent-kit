@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router'
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { createUser } from '../../../packages/testkit/src/index.ts'
 import { createMobileFactoryContext } from '../integration/support/mobile-integration-context'
-import { readAuthToken, writeAuthToken } from '../lib/auth-token'
+import { clearAuthToken, readAuthToken, writeAuthToken } from '../lib/auth-token'
 import { SignOutButton } from './SignOutButton'
 import { sessionStore, sessionStoreActions, sessionStoreSelectors } from '../stores/session-store'
 
@@ -59,5 +59,25 @@ describe('SignOutButton integration', () => {
     expect(tokenAfterSignOut).toBeNull()
     expect(sessionStoreSelectors.getPrincipal(sessionStore.state)).toBeNull()
     expect(routerReplace).toHaveBeenCalledWith('/sign-in')
+  })
+
+  it('is idempotent when clicked while already signed out', async () => {
+    await clearAuthToken()
+    sessionStoreActions.clear()
+
+    const tree = create(<SignOutButton />)
+
+    await act(async () => {
+      findByType(tree.root, 'TouchableOpacity')[0]?.props.onPress()
+    })
+
+    await flush()
+    await flush()
+
+    const tokenAfterSignOut = await readAuthToken()
+    expect(tokenAfterSignOut).toBeNull()
+    expect(sessionStoreSelectors.getPrincipal(sessionStore.state)).toBeNull()
+    expect(routerReplace).toHaveBeenCalledWith('/sign-in')
+    expect(findByType(tree.root, 'TouchableOpacity')[0]?.props.disabled).toBe(false)
   })
 })

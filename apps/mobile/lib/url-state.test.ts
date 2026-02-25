@@ -34,7 +34,7 @@ describe('useSafeNextPath', () => {
 
   it('returns custom fallback when specified', () => {
     mockParams.mockReturnValue({})
-    expect(useSafeNextPath('/workspaces')).toBe('/workspaces')
+    expect(useSafeNextPath('/organizations')).toBe('/organizations')
   })
 
   it('returns fallback for array values', () => {
@@ -58,7 +58,7 @@ describe('useSafeNextPath', () => {
   })
 
   it('preserves query parameters in valid paths', () => {
-    mockParams.mockReturnValue({ next: '/workspaces?tab=active' })
-    expect(useSafeNextPath()).toBe('/workspaces?tab=active')
+    mockParams.mockReturnValue({ next: '/organizations?tab=active' })
+    expect(useSafeNextPath()).toBe('/organizations?tab=active')
   })
 })

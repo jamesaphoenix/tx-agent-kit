@@ -2,6 +2,7 @@ export interface AuthUserRecord {
   id: string
   email: string
   passwordHash: string
+  passwordChangedAt: Date
   name: string
   createdAt: Date
 }
@@ -24,6 +25,15 @@ export interface SignInCommand {
   password: string
 }
 
+export interface ForgotPasswordCommand {
+  email: string
+}
+
+export interface ResetPasswordCommand {
+  token: string
+  password: string
+}
+
 export interface AuthSession {
   token: string
   user: AuthUser
@@ -32,13 +42,15 @@ export interface AuthSession {
 export interface AuthPrincipal {
   userId: string
   email: string
-  workspaceId?: string
+  organizationId?: string
   roles: ReadonlyArray<string>
 }
 
 export interface AuthSessionTokenPayload {
   sub: string
   email: string
+  pwd: number
+  iat?: number
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -59,7 +71,7 @@ export const toAuthUser = (row: AuthUserRecord): AuthUser => ({
   createdAt: row.createdAt
 })
 
-export const toAuthPrincipal = (payload: AuthSessionTokenPayload): AuthPrincipal => ({
+export const toAuthPrincipal = (payload: Pick<AuthSessionTokenPayload, 'sub' | 'email'>): AuthPrincipal => ({
   userId: payload.sub,
   email: payload.email,
   roles: ['member']

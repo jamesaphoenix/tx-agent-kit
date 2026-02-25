@@ -1,7 +1,8 @@
-export const workspaceOwnerMembershipTriggerName = 'trg_workspace_owner_membership' as const
-export const invitationIdentityTriggerName = 'trg_normalize_invitation_identity' as const
+export const organizationUpdatedAtTriggerName = 'update_organizations_updated_at' as const
+export const orgMembersUpdatedAtTriggerName = 'update_org_members_updated_at' as const
+export const invitationIdentityTriggerName = 'normalize_invitation_identity' as const
 
 export const triggerFunctionNames = {
-  ensureWorkspaceOwnerMembership: 'ensure_workspace_owner_membership',
-  normalizeInvitationIdentity: 'normalize_invitation_identity'
+  updateUpdatedAtColumn: 'update_updated_at_column',
+  normalizeInvitationIdentity: 'normalize_invitation_identity_fn'
 } as const

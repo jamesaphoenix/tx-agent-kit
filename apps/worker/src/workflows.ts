@@ -1,8 +1,7 @@
 import { proxyActivities } from '@temporalio/workflow'
-import type { TaskProcessWorkflowInput, TaskProcessWorkflowOutput } from '@tx-agent-kit/temporal-client'
 import type { activities } from './activities.js'
 
-const { processTask } = proxyActivities<typeof activities>({
+const { ping } = proxyActivities<typeof activities>({
   startToCloseTimeout: '30 seconds',
   retry: {
     maximumAttempts: 3,
@@ -10,12 +9,6 @@ const { processTask } = proxyActivities<typeof activities>({
   }
 })
 
-export async function taskProcessWorkflow(input: TaskProcessWorkflowInput): Promise<TaskProcessWorkflowOutput> {
-  const result = await processTask(input)
-
-  return {
-    success: !result.alreadyProcessed,
-    operationId: input.operationId,
-    alreadyProcessed: result.alreadyProcessed
-  }
+export async function pingWorkflow(): Promise<{ ok: boolean }> {
+  return ping()
 }

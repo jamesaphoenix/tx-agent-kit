@@ -1,11 +1,87 @@
 ---
 title: Web App
-description: Client-only Next.js SPA with strict constraints against server-side code, typed API clients, and centralized browser utilities.
+description: Client-only Next.js SPA with route groups for public marketing and authenticated app shell, strict constraints against server-side code, typed API clients, and centralized browser utilities.
 ---
 
 # Web App (`apps/web`)
 
 The web application is a client-only Next.js SPA. It acts as a thin presentation layer that consumes the API server directly. No server-side rendering, no API proxying, no middleware.
+
+## Route Groups
+
+The app uses Next.js route groups to separate public marketing pages from the authenticated application:
+
+### `(website)` — Public Marketing
+
+Pages under `app/(website)/` are publicly accessible and wrapped in the `WebsiteHeader` + `WebsiteFooter` layout:
+
+| Page | Path | Description |
+|------|------|-------------|
+| Landing | `/` | Config-driven hero, features grid, FAQ, CTA section with JSON-LD structured data |
+| Blog listing | `/blog` | Blog articles with category filtering, skeleton loading, empty state |
+| Blog post | `/blog/[slug]` | Individual article with author info, tags, hero image |
+| Pricing | `/pricing` | 3-tier pricing (Free/Pro/Enterprise) with FAQ section |
+| Terms | `/terms` | Terms of Service (config-driven company references) |
+| Privacy | `/privacy` | Privacy Policy (config-driven contact emails) |
+
+### `(application)` — Authenticated App
+
+Pages under `app/(application)/` are behind an auth-guard layout that checks for a valid token and redirects to `/sign-in` if missing:
+
+| Page | Path | Description |
+|------|------|-------------|
+| Org redirect | `/org` | Smart redirect: resolves first org → first team → dashboard |
+| Workspaces | `/org/[orgId]/workspaces` | Team listing and creation within an organization |
+| Team dashboard | `/org/[orgId]/[teamId]` | Dashboard for a specific team |
+
+### Auth Pages
+
+Auth pages (`sign-in`, `sign-up`, `forgot-password`, `reset-password`) live at the app root, outside both route groups. They use a split-panel layout with the form on the left and a branded panel on the right.
+
+## Config-Driven Content
+
+Site-wide configuration lives in `apps/web/config/index.ts`:
+
+```typescript
+export const config: SiteConfig = {
+  name: 'tx-agent-kit',
+  domain: 'tx-agent-kit.dev',
+  description: '...',
+  company: { name, supportEmail, legalEmail, privacyEmail, address, phone },
+  homepage: { heroTitle, heroSubtitle, features, faqs, ctaTitle, ctaDescription },
+  blog: { title, description },
+  dashboard: { sidebarNavItems }
+}
+```
+
+No Stripe price IDs are stored in the config. The header, footer, landing page, and legal pages all reference this config.
+
+## SEO Infrastructure
+
+| File | Purpose |
+|------|---------|
+| `lib/seo.ts` | `buildTitle`, `buildDescription`, Organization/WebPage/BreadcrumbList/FAQPage structured data builders |
+| `lib/blog.ts` | Backend-agnostic `BlogDataSource` interface, `estimateReadingTime`, `escapeXml` |
+| `lib/blog-seo.ts` | BlogPosting and Blog JSON-LD structured data builders |
+| `components/Breadcrumbs.tsx` | Breadcrumb navigation with chevron separators and `aria-label` |
+| `components/StructuredData.tsx` | JSON-LD `<script type="application/ld+json">` renderer |
+| `app/sitemap.ts` | Sitemap with all marketing page URLs |
+| `app/robots.ts` | Robots.txt disallowing authenticated routes |
+
+### Blog Data Layer
+
+The blog system is backend-agnostic. Consumers provide a `BlogDataSource` implementation:
+
+```typescript
+export interface BlogDataSource {
+  getArticles: (limit?: number, categoryId?: string) => Promise<BlogArticle[]>
+  getArticleBySlug: (slug: string) => Promise<BlogArticle | null>
+  getCategories: () => Promise<BlogCategory[]>
+  getCategoryBySlug: (slug: string) => Promise<BlogCategory | null>
+}
+```
+
+Connect any backend (PocketBase, Supabase, filesystem MDX, headless CMS) by calling `setBlogDataSource(source)` at app initialization.
 
 ## Hard Constraints
 
@@ -29,17 +105,6 @@ Only this module may read or write `localStorage`. All other modules access auth
 ### URL State (`lib/url-state.tsx`)
 
 Wraps the `nuqs` library. Direct `nuqs` imports are forbidden elsewhere. Direct `window.location` reads are also forbidden. Use the URL state wrappers instead.
-
-```typescript
-// Correct: use the centralized wrapper
-import { useQueryState } from '@/lib/url-state'
-
-// Forbidden: direct nuqs import
-import { useQueryState } from 'nuqs'
-
-// Forbidden: direct browser API
-const path = window.location.pathname
-```
 
 ### Notifications (`lib/notify.tsx`)
 
@@ -69,10 +134,14 @@ Web integration tests are colocated alongside the components and pages they test
 | Test file |
 |-----------|
 | `apps/web/components/AuthForm.integration.test.tsx` |
-| `apps/web/components/CreateWorkspaceForm.integration.test.tsx` |
-| `apps/web/components/CreateTaskForm.integration.test.tsx` |
+| `apps/web/components/CreateOrganizationForm.integration.test.tsx` |
+| `apps/web/components/CreateInvitationForm.integration.test.tsx` |
+| `apps/web/components/AcceptInvitationForm.integration.test.tsx` |
+| `apps/web/components/SignOutButton.integration.test.tsx` |
+| `apps/web/components/ForgotPasswordForm.integration.test.tsx` |
+| `apps/web/components/ResetPasswordForm.integration.test.tsx` |
 | `apps/web/app/dashboard/page.integration.test.tsx` |
-| `apps/web/app/workspaces/page.integration.test.tsx` |
+| `apps/web/app/organizations/page.integration.test.tsx` |
 | `apps/web/app/invitations/page.integration.test.tsx` |
 
 Suite lifecycle is centralized in `apps/web/vitest.integration.setup.ts`. Individual test files must not call `setupWebIntegrationSuite`, `resetWebIntegrationCase`, or `teardownWebIntegrationSuite` directly.

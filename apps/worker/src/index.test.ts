@@ -40,9 +40,18 @@ vi.mock('./activities.js', () => ({
 
 vi.mock('./config/env.js', () => ({
   getWorkerEnv: () => ({
+    TEMPORAL_RUNTIME_MODE: 'cli',
     TEMPORAL_ADDRESS: 'temporal.internal:7233',
     TEMPORAL_NAMESPACE: 'staging',
-    TEMPORAL_TASK_QUEUE: 'tx-agent-kit-worker'
+    TEMPORAL_TASK_QUEUE: 'tx-agent-kit-worker',
+    TEMPORAL_API_KEY: undefined,
+    TEMPORAL_TLS_ENABLED: false,
+    TEMPORAL_TLS_SERVER_NAME: undefined
+  }),
+  resolveWorkerTemporalConnectionOptions: (env: {
+    TEMPORAL_ADDRESS: string
+  }) => ({
+    address: env.TEMPORAL_ADDRESS
   })
 }))
 

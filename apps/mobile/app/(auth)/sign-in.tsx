@@ -13,7 +13,7 @@ export default function SignInScreen() {
         <View style={{ gap: 16 }}>
           <Text style={{ fontSize: 28, fontWeight: '700' }}>Sign in</Text>
           <Text style={{ fontSize: 16, color: '#6b7280' }}>
-            Access your workspaces, invitations, and execution dashboard.
+            Access your organizations, invitations, and execution dashboard.
           </Text>
           <AuthForm mode="sign-in" nextPath={nextPath} />
           <Text style={{ color: '#6b7280', textAlign: 'center' }}>

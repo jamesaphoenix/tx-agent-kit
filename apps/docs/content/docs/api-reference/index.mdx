@@ -34,31 +34,18 @@ Auth routes use the `custom` kind marker, meaning domain-specific operations rat
 | `GET` | `/v1/auth/me` | Get the current authenticated user |
 | `DELETE` | `/v1/auth/me` | Delete the authenticated user |
 
-### Workspaces (`/v1/workspaces/*`)
+### Organizations (`/v1/organizations/*`)
 
-Workspace routes use the `crud` kind marker and expose the full CRUD surface.
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/v1/workspaces` | List workspaces for the current user (paginated) |
-| `GET` | `/v1/workspaces/:id` | Get a single workspace by ID |
-| `POST` | `/v1/workspaces/many` | Get multiple workspaces by IDs |
-| `POST` | `/v1/workspaces` | Create a workspace |
-| `PATCH` | `/v1/workspaces/:id` | Update a workspace |
-| `DELETE` | `/v1/workspaces/:id` | Remove a workspace |
-
-### Tasks (`/v1/tasks/*`)
-
-Task routes also use the `crud` kind marker.
+Organization routes use the `crud` kind marker and expose the full CRUD surface.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/v1/tasks` | List tasks for a workspace (paginated) |
-| `GET` | `/v1/tasks/:id` | Get a single task |
-| `POST` | `/v1/tasks/many` | Get multiple tasks by IDs |
-| `POST` | `/v1/tasks` | Create a task |
-| `PATCH` | `/v1/tasks/:id` | Update a task |
-| `DELETE` | `/v1/tasks/:id` | Remove a task |
+| `GET` | `/v1/organizations` | List organizations for the current user (paginated) |
+| `GET` | `/v1/organizations/:id` | Get a single organization by ID |
+| `POST` | `/v1/organizations/many` | Get multiple organizations by IDs |
+| `POST` | `/v1/organizations` | Create an organization |
+| `PATCH` | `/v1/organizations/:id` | Update an organization |
+| `DELETE` | `/v1/organizations/:id` | Remove an organization |
 
 ### Invitations (`/v1/invitations/*`)
 

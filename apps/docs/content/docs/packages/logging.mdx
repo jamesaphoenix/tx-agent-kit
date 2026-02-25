@@ -3,7 +3,7 @@ title: Logging
 description: Structured JSON logger with OpenTelemetry log emission, mandatory over console.*.
 ---
 
-# Logging (`packages/logging`)
+# Logging (`packages/infra/logging`)
 
 The logging package provides structured JSON logging with automatic OpenTelemetry log record emission. It is the only approved logging mechanism. `console.*` calls are banned by ESLint across the entire codebase.
 
@@ -77,4 +77,4 @@ Every log entry is emitted as an OTEL log record through the `@opentelemetry/api
 
 ## Environment
 
-The default logger reads its service name from the `SERVICE_NAME` environment variable via `packages/logging/src/env.ts`.
+The default logger reads its service name from the `SERVICE_NAME` environment variable via `packages/infra/logging/src/env.ts`.

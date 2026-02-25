@@ -1,23 +1,20 @@
 'use client'
 
-import type { AuthPrincipal, Task, Workspace } from '@tx-agent-kit/contracts'
+import type { AuthPrincipal, Organization } from '@tx-agent-kit/contracts'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AppNav } from '../../components/AppNav'
-import { CreateTaskForm } from '../../components/CreateTaskForm'
+import { DashboardShell } from '../../components/DashboardShell'
 import { ensureSessionOrRedirect, handleUnauthorizedApiError } from '../../lib/client-auth'
 import { clientApi } from '../../lib/client-api'
 
 interface DashboardState {
   principal: AuthPrincipal | null
-  workspaces: Workspace[]
-  tasks: Task[]
+  organizations: Organization[]
 }
 
 const emptyState: DashboardState = {
   principal: null,
-  workspaces: [],
-  tasks: []
+  organizations: []
 }
 
 export default function DashboardPage() {
@@ -36,16 +33,11 @@ export default function DashboardPage() {
 
     try {
       const principal = await clientApi.me()
-      const workspacePayload = await clientApi.listWorkspaces()
-      const firstWorkspace = workspacePayload.data[0]
-      const tasksPayload = firstWorkspace
-        ? await clientApi.listTasks(firstWorkspace.id)
-        : { data: [] }
+      const organizationPayload = await clientApi.listOrganizations()
 
       setState({
         principal,
-        workspaces: workspacePayload.data,
-        tasks: tasksPayload.data
+        organizations: organizationPayload.data
       })
     } catch (err) {
       if (handleUnauthorizedApiError(err, router, '/dashboard')) {
@@ -62,58 +54,59 @@ export default function DashboardPage() {
     void load()
   }, [load])
 
-  const firstWorkspace = state.workspaces[0]
+  const firstOrganization = state.organizations[0]
+
+  const metrics = [
+    {
+      label: 'Organizations',
+      value: String(state.organizations.length)
+    },
+    {
+      label: 'Session',
+      value: state.principal ? 'Authenticated' : 'Checking',
+      tone: state.principal ? 'success' as const : 'warning' as const
+    },
+    {
+      label: 'Sync',
+      value: loading ? 'Live refresh' : 'Up to date',
+      tone: loading ? 'warning' as const : 'success' as const
+    }
+  ]
 
   return (
-    <section className="stack">
-      <AppNav />
-      <header className="card stack">
-        <h1>Dashboard</h1>
-        <p className="muted">
-          {state.principal ? `Signed in as ${state.principal.email}` : 'Loading profile...'}
-        </p>
-      </header>
-
+    <DashboardShell
+      title="Operations Dashboard"
+      subtitle={state.principal ? `Signed in as ${state.principal.email}` : 'Loading profile...'}
+      principalEmail={state.principal?.email}
+      metrics={metrics}
+    >
       {error && <p className="error">{error}</p>}
 
-      <div className="grid grid-2">
+      <div className="dashboard-shell-grid">
         <section className="card stack">
-          <h2>Current workspace</h2>
-          {firstWorkspace ? (
+          <h2>Current organization</h2>
+          {firstOrganization ? (
             <>
-              <p>{firstWorkspace.name}</p>
-              <p className="muted">{state.tasks.length} task(s)</p>
+              <p><strong>{firstOrganization.name}</strong></p>
+              <p className="muted">Status: {firstOrganization.subscriptionStatus}</p>
             </>
           ) : loading ? (
-            <p className="muted">Loading workspaces...</p>
+            <p className="muted">Loading organizations...</p>
           ) : (
-            <p className="muted">Create a workspace to start tracking tasks.</p>
+            <p className="muted">Create an organization to get started.</p>
           )}
         </section>
 
-        {firstWorkspace && (
-          <section className="card">
-            <CreateTaskForm workspaceId={firstWorkspace.id} onCreated={load} />
-          </section>
-        )}
+        <section className="card stack">
+          <h2>Execution posture</h2>
+          <p className="muted">System checks for auth, org context, and API health are active.</p>
+          <ul className="dashboard-shell-checklist">
+            <li>{state.principal ? 'Authenticated principal detected' : 'Authenticating principal...'}</li>
+            <li>{loading ? 'Refreshing organization state' : 'Organization state synchronized'}</li>
+            <li>Structured notifications enabled</li>
+          </ul>
+        </section>
       </div>
-
-      <section className="card stack">
-        <h2>Tasks</h2>
-        {state.tasks.length === 0 ? (
-          <p className="muted">No tasks yet.</p>
-        ) : (
-          state.tasks.map((task) => (
-            <article key={task.id} className="card" style={{ background: 'var(--surface-2)' }}>
-              <div className="stack">
-                <strong>{task.title}</strong>
-                {task.description && <p className="muted">{task.description}</p>}
-                <small className="muted">Status: {task.status}</small>
-              </div>
-            </article>
-          ))
-        )}
-      </section>
-    </section>
+    </DashboardShell>
   )
 }

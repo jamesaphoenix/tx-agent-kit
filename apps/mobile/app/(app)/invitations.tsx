@@ -1,4 +1,4 @@
-import type { Invitation, Workspace } from '@tx-agent-kit/contracts'
+import type { Invitation, Organization } from '@tx-agent-kit/contracts'
 import { useCallback, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
@@ -9,12 +9,12 @@ import { clientApi } from '../../lib/client-api'
 
 interface InvitationState {
   invitations: Invitation[]
-  workspaces: Workspace[]
+  organizations: Organization[]
 }
 
 const emptyState: InvitationState = {
   invitations: [],
-  workspaces: []
+  organizations: []
 }
 
 export default function InvitationsScreen() {
@@ -28,16 +28,16 @@ export default function InvitationsScreen() {
 
   const fetchData = useCallback(async (): Promise<void> => {
     try {
-      const [invitationsPayload, workspacesPayload] = await Promise.all([
+      const [invitationsPayload, organizationsPayload] = await Promise.all([
         clientApi.listInvitations(),
-        clientApi.listWorkspaces()
+        clientApi.listOrganizations()
       ])
 
       if (!mountedRef.current) return
 
       setState({
         invitations: invitationsPayload.invitations,
-        workspaces: workspacesPayload.workspaces
+        organizations: organizationsPayload.organizations
       })
     } catch (err) {
       const handled = await handleUnauthorizedApiError(err, routerRef.current, '/invitations')
@@ -81,7 +81,7 @@ export default function InvitationsScreen() {
       <View style={cardStyle}>
         <Text style={{ fontSize: 22, fontWeight: '700' }}>Team Invitations</Text>
         <Text style={{ color: '#6b7280' }}>
-          Invite collaborators and accept invites across workspaces.
+          Invite collaborators and accept invites across organizations.
         </Text>
       </View>
 
@@ -95,7 +95,7 @@ export default function InvitationsScreen() {
       )}
 
       <View style={cardStyle}>
-        <CreateInvitationForm workspaces={state.workspaces} onCreated={refresh} />
+        <CreateInvitationForm organizations={state.organizations} onCreated={refresh} />
       </View>
 
       <View style={cardStyle}>

@@ -24,14 +24,8 @@ vi.mock('../../lib/client-auth', () => ({
 vi.mock('../../lib/client-api', () => ({
   clientApi: {
     me: vi.fn(),
-    listWorkspaces: vi.fn(),
-    listTasks: vi.fn()
+    listOrganizations: vi.fn()
   }
-}))
-
-vi.mock('../../components/CreateTaskForm', () => ({
-  CreateTaskForm: (props: Record<string, unknown>) =>
-    require('react').createElement('CreateTaskForm', props)
 }))
 
 vi.mock('../../components/SignOutButton', () => ({
@@ -49,8 +43,7 @@ beforeEach(() => {
 })
 
 const principal = { userId: 'u-1', email: 'test@co.com', roles: ['member'] as readonly string[] }
-const workspace = { id: 'w-1', name: 'Alpha', ownerUserId: 'u-1' }
-const task = { id: 't-1', title: 'Task one', description: null, status: 'open', workspaceId: 'w-1' }
+const organization = { id: 'o-1', name: 'Alpha', ownerUserId: 'u-1' }
 
 describe('DashboardScreen', () => {
   it('stops loading without API calls when no session exists', async () => {
@@ -64,11 +57,10 @@ describe('DashboardScreen', () => {
     expect(json).not.toContain('test@co.com')
   })
 
-  it('loads and renders principal, workspaces, and tasks on success', async () => {
+  it('loads and renders principal and organizations on success', async () => {
     ;(ensureSessionOrRedirect as Mock).mockReturnValue(true)
     ;(clientApi.me as Mock).mockResolvedValue(principal)
-    ;(clientApi.listWorkspaces as Mock).mockResolvedValue({ workspaces: [workspace] })
-    ;(clientApi.listTasks as Mock).mockResolvedValue({ tasks: [task] })
+    ;(clientApi.listOrganizations as Mock).mockResolvedValue({ organizations: [organization] })
 
     const tree = create(<DashboardScreen />)
     await flush()
@@ -76,18 +68,18 @@ describe('DashboardScreen', () => {
     const json = JSON.stringify(tree.toJSON())
     expect(json).toContain('test@co.com')
     expect(json).toContain('Alpha')
-    expect(json).toContain('Task one')
   })
 
-  it('does not call listTasks when there are no workspaces', async () => {
+  it('shows empty state when there are no organizations', async () => {
     ;(ensureSessionOrRedirect as Mock).mockReturnValue(true)
     ;(clientApi.me as Mock).mockResolvedValue(principal)
-    ;(clientApi.listWorkspaces as Mock).mockResolvedValue({ workspaces: [] })
+    ;(clientApi.listOrganizations as Mock).mockResolvedValue({ organizations: [] })
 
-    create(<DashboardScreen />)
+    const tree = create(<DashboardScreen />)
     await flush()
 
-    expect(clientApi.listTasks).not.toHaveBeenCalled()
+    const json = JSON.stringify(tree.toJSON())
+    expect(json).toContain('No organizations yet.')
   })
 
   it('delegates 401 errors to handleUnauthorizedApiError', async () => {

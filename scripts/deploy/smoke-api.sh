@@ -43,6 +43,8 @@ const assertStatus = (response, expected, label) => {
 const randomSuffix = Math.random().toString(16).slice(2)
 const email = `deploy-smoke-${Date.now()}-${randomSuffix}@example.com`
 const password = `Sm0ke-${randomSuffix}-Pass!`
+const inviteeEmail = `deploy-smoke-invitee-${Date.now()}-${randomSuffix}@example.com`
+const inviteePassword = `Sm0keInvitee-${randomSuffix}-Pass!`
 
 const health = await requestJson('/health', { method: 'GET' })
 assertStatus(health.response, 200, 'health')
@@ -71,57 +73,75 @@ const me = await requestJson('/v1/auth/me', {
 })
 assertStatus(me.response, 200, 'auth/me')
 
-const workspace = await requestJson('/v1/workspaces', {
+const organization = await requestJson('/v1/organizations', {
   method: 'POST',
   headers: { authorization: `Bearer ${token}` },
-  body: JSON.stringify({ name: `Smoke Workspace ${randomSuffix}` })
+  body: JSON.stringify({ name: `Smoke Organization ${randomSuffix}` })
 })
-assertStatus(workspace.response, 201, 'create workspace')
+assertStatus(organization.response, 201, 'create organization')
 
-const workspaceId = workspace.body?.id
-if (typeof workspaceId !== 'string' || workspaceId.length === 0) {
-  throw new Error('create workspace: missing id')
+const organizationId = organization.body?.id
+if (typeof organizationId !== 'string' || organizationId.length === 0) {
+  throw new Error('create organization: missing id')
 }
 
-const listWorkspaces = await requestJson('/v1/workspaces?limit=5', {
+const listOrganizations = await requestJson('/v1/organizations?limit=5', {
   method: 'GET',
   headers: { authorization: `Bearer ${token}` }
 })
-assertStatus(listWorkspaces.response, 200, 'list workspaces')
+assertStatus(listOrganizations.response, 200, 'list organizations')
 
-const task = await requestJson('/v1/tasks', {
+const inviteeSignUp = await requestJson('/v1/auth/sign-up', {
   method: 'POST',
-  headers: { authorization: `Bearer ${token}` },
   body: JSON.stringify({
-    workspaceId,
-    title: `Smoke Task ${randomSuffix}`,
-    description: 'deployment smoke test'
+    email: inviteeEmail,
+    password: inviteePassword,
+    name: 'Deploy Smoke Invitee'
   })
 })
-assertStatus(task.response, 201, 'create task')
+assertStatus(inviteeSignUp.response, 201, 'invitee sign-up')
 
-const listTasks = await requestJson(`/v1/tasks?workspaceId=${encodeURIComponent(workspaceId)}&limit=5`, {
-  method: 'GET',
-  headers: { authorization: `Bearer ${token}` }
-})
-assertStatus(listTasks.response, 200, 'list tasks')
+const inviteeToken = inviteeSignUp.body?.token
+if (typeof inviteeToken !== 'string' || inviteeToken.length === 0) {
+  throw new Error('invitee sign-up: missing token')
+}
 
 const invitation = await requestJson('/v1/invitations', {
   method: 'POST',
   headers: { authorization: `Bearer ${token}` },
   body: JSON.stringify({
-    workspaceId,
-    email: `invitee-${randomSuffix}@example.com`,
+    organizationId,
+    email: inviteeEmail,
     role: 'member'
   })
 })
 assertStatus(invitation.response, 201, 'create invitation')
+
+const invitationToken = invitation.body?.token
+if (typeof invitationToken !== 'string' || invitationToken.length === 0) {
+  throw new Error('create invitation: missing token')
+}
 
 const listInvitations = await requestJson('/v1/invitations?limit=5', {
   method: 'GET',
   headers: { authorization: `Bearer ${token}` }
 })
 assertStatus(listInvitations.response, 200, 'list invitations')
+
+const acceptInvitation = await requestJson(`/v1/invitations/${encodeURIComponent(invitationToken)}/accept`, {
+  method: 'POST',
+  headers: { authorization: `Bearer ${inviteeToken}` }
+})
+assertStatus(acceptInvitation.response, 200, 'accept invitation')
+if (acceptInvitation.body?.accepted !== true) {
+  throw new Error('accept invitation: expected accepted=true')
+}
+
+const acceptInvitationSecond = await requestJson(`/v1/invitations/${encodeURIComponent(invitationToken)}/accept`, {
+  method: 'POST',
+  headers: { authorization: `Bearer ${inviteeToken}` }
+})
+assertStatus(acceptInvitationSecond.response, 404, 'accept invitation second')
 
 console.log('Deploy smoke checks passed')
 NODE

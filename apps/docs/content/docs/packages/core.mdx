@@ -21,15 +21,15 @@ packages/core/src/domains/<domain>/
 
 The `runtime/` folder (layer wiring and composition) and `ui/` folder (presentation-facing helpers) are optional.
 
-The `repositories/` and `services/` folders are forbidden. Concrete persistence lives in `packages/db`, and use-case orchestration belongs in `application/`.
+The `repositories/` and `services/` folders are forbidden. Concrete persistence lives in `packages/infra/db`, and use-case orchestration belongs in `application/`.
 
 ## Current Domains
 
 | Domain | Purpose |
 |--------|---------|
 | `auth` | User authentication, principal extraction, session management |
-| `workspace` | Workspace CRUD, membership, invitations |
-| `task` | Task CRUD within workspaces |
+| `organization` | Organization CRUD, membership, billing, subscriptions |
+| `invitation` | Invitation management and acceptance |
 
 ## Layer Dependency Direction
 
@@ -51,20 +51,20 @@ Cross-domain imports are forbidden. Each domain is a self-contained unit.
 The domain layer defines entities, value objects, and pure business rules. It must not import anything outside its own domain layer.
 
 ```typescript
-// packages/core/src/domains/task/domain/task-domain.ts
-export interface TaskRecord {
+// packages/core/src/domains/organization/domain/organization.ts
+export interface OrganizationRecord {
   id: string
-  workspaceId: string
-  title: string
-  description: string | null
-  status: TaskStatus
-  createdByUserId: string
+  name: string
+  billingEmail: string | null
+  isSubscribed: boolean
+  subscriptionStatus: SubscriptionStatus
   createdAt: Date
+  updatedAt: Date
 }
 
-export const isValidTaskTitle = (title: string): boolean => {
-  const trimmed = title.trim()
-  return trimmed.length >= 1 && trimmed.length <= 200
+export const isValidOrganizationName = (name: string): boolean => {
+  const trimmed = name.trim()
+  return trimmed.length >= 2 && trimmed.length <= 64
 }
 ```
 
@@ -75,14 +75,14 @@ export const isValidTaskTitle = (title: string): boolean => {
 Ports define abstract capability contracts using Effect's `Context.Tag`:
 
 ```typescript
-// packages/core/src/domains/task/ports/task-ports.ts
-export class TaskStorePort extends Context.Tag('TaskStorePort')<
-  TaskStorePort,
+// packages/core/src/domains/organization/ports/organization-ports.ts
+export class OrganizationStorePort extends Context.Tag('OrganizationStorePort')<
+  OrganizationStorePort,
   {
-    list: (workspaceId: string, params: ListParams) => Effect.Effect<PaginatedResult<TaskRecord>, unknown>
-    getById: (id: string) => Effect.Effect<TaskRecord | null, unknown>
-    create: (input: CreateTaskInput) => Effect.Effect<TaskRecord | null, unknown>
-    update: (input: UpdateTaskInput) => Effect.Effect<TaskRecord | null, unknown>
+    list: (userId: string, params: ListParams) => Effect.Effect<PaginatedResult<OrganizationRecord>, unknown>
+    getById: (id: string) => Effect.Effect<OrganizationRecord | null, unknown>
+    create: (input: CreateOrganizationInput) => Effect.Effect<OrganizationRecord | null, unknown>
+    update: (input: UpdateOrganizationInput) => Effect.Effect<OrganizationRecord | null, unknown>
     remove: (id: string) => Effect.Effect<{ deleted: true }, unknown>
   }
 >() {}
@@ -95,10 +95,10 @@ Ports must return `Effect.Effect` (never `Promise`), declare an explicit kind ma
 Application modules orchestrate use cases by combining ports:
 
 ```typescript
-// packages/core/src/domains/task/application/task-service.ts
-export class TaskService extends Context.Tag('TaskService')<TaskService, {
-  getById: (principal: Principal, taskId: string) => Effect.Effect<Task, CoreError>
-  create: (principal: Principal, input: CreateTaskCommand) => Effect.Effect<Task, CoreError>
+// packages/core/src/domains/organization/application/organization-service.ts
+export class OrganizationService extends Context.Tag('OrganizationService')<OrganizationService, {
+  getById: (principal: Principal, organizationId: string) => Effect.Effect<Organization, CoreError>
+  create: (principal: Principal, input: CreateOrganizationCommand) => Effect.Effect<Organization, CoreError>
   // ...
 }>() {}
 ```

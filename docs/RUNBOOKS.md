@@ -41,8 +41,8 @@
 
 ## Add a custom DB trigger
 1. Run `pnpm db:trigger:new --name <trigger-name> --table <table> [--timing BEFORE|AFTER] [--events INSERT,UPDATE] [--level ROW|STATEMENT]` (or `pnpm tx db trigger new ...`).
-2. Implement trigger function logic in the generated migration under `packages/db/drizzle/migrations/`.
-3. Replace scaffold `fail(...)` assertion in the generated `packages/db/pgtap/*.pgtap.sql` suite with concrete trigger assertions.
+2. Implement trigger function logic in the generated migration under `packages/infra/db/drizzle/migrations/`.
+3. Replace scaffold `fail(...)` assertion in the generated `packages/infra/db/pgtap/*.pgtap.sql` suite with concrete trigger assertions.
 4. Run `pnpm db:migrate` and `pnpm test:db:pgtap`.
 
 ## Compute deterministic worktree ports

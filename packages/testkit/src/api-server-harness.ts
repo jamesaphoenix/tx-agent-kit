@@ -153,6 +153,15 @@ export const createApiServerHarness = (
       return
     }
 
+    if (!reuseHealthyServer && (await isHealthy())) {
+      throw new Error(
+        [
+          `Refusing to start API harness on ${baseUrl} because a healthy server is already running.`,
+          'Stop the existing process or enable `reuseHealthyServer` intentionally.'
+        ].join(' ')
+      )
+    }
+
     if (!existsSync(apiServerEntryPath)) {
       throw new Error(
         [
@@ -191,6 +200,16 @@ export const createApiServerHarness = (
     }
 
     await waitForHealthy()
+
+    if (spawned.exitCode !== null) {
+      const logs = output.join('')
+      throw new Error(
+        [
+          `API process exited before becoming stable on ${baseUrl}.`,
+          logs.length > 0 ? `Process output:\n${logs}` : 'Process output was empty.'
+        ].join('\n\n')
+      )
+    }
   }
 
   const stop = async (): Promise<void> => {

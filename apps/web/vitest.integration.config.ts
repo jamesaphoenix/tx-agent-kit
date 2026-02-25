@@ -3,8 +3,8 @@ import integrationConfig from '@tx-agent-kit/vitest-config/integration'
 import { resolveIntegrationMaxWorkers } from '@tx-agent-kit/vitest-config/workers'
 import { defineConfig, mergeConfig } from 'vitest/config'
 
-const webIntegrationMaxWorkers = resolveIntegrationMaxWorkers()
-process.env.WEB_INTEGRATION_MAX_WORKERS = String(webIntegrationMaxWorkers)
+const integrationMaxWorkers = resolveIntegrationMaxWorkers()
+process.env.WEB_INTEGRATION_MAX_WORKERS = String(integrationMaxWorkers)
 
 export default mergeConfig(
   integrationConfig,
@@ -25,8 +25,6 @@ export default mergeConfig(
       include: ['**/*.integration.test.ts', '**/*.integration.test.tsx'],
       exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/coverage/**'],
       pool: 'forks',
-      maxWorkers: webIntegrationMaxWorkers,
-      fileParallelism: webIntegrationMaxWorkers > 1,
       isolate: true,
       passWithNoTests: true
     },

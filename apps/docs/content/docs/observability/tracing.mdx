@@ -27,7 +27,7 @@ import { trace } from '@opentelemetry/api'
 const tracer = trace.getTracer('my-service')
 
 const span = tracer.startSpan('database.query')
-span.setAttribute('db.table', 'tasks')
+span.setAttribute('db.table', 'organizations')
 
 try {
   const result = await db.query(...)

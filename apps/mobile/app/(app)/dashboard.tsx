@@ -1,22 +1,19 @@
-import type { AuthPrincipal, Task, Workspace } from '@tx-agent-kit/contracts'
+import type { AuthPrincipal, Organization } from '@tx-agent-kit/contracts'
 import { useCallback, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
-import { CreateTaskForm } from '../../components/CreateTaskForm'
 import { SignOutButton } from '../../components/SignOutButton'
 import { ensureSessionOrRedirect, handleUnauthorizedApiError } from '../../lib/client-auth'
 import { clientApi } from '../../lib/client-api'
 
 interface DashboardState {
   principal: AuthPrincipal | null
-  workspaces: Workspace[]
-  tasks: Task[]
+  organizations: Organization[]
 }
 
 const emptyState: DashboardState = {
   principal: null,
-  workspaces: [],
-  tasks: []
+  organizations: []
 }
 
 export default function DashboardScreen() {
@@ -31,18 +28,13 @@ export default function DashboardScreen() {
   const fetchData = useCallback(async (): Promise<void> => {
     try {
       const principal = await clientApi.me()
-      const workspacePayload = await clientApi.listWorkspaces()
-      const firstWorkspace = workspacePayload.workspaces[0]
-      const tasksPayload = firstWorkspace
-        ? await clientApi.listTasks(firstWorkspace.id)
-        : { tasks: [] }
+      const organizationPayload = await clientApi.listOrganizations()
 
       if (!mountedRef.current) return
 
       setState({
         principal,
-        workspaces: workspacePayload.workspaces,
-        tasks: tasksPayload.tasks
+        organizations: organizationPayload.organizations
       })
     } catch (err) {
       const handled = await handleUnauthorizedApiError(err, routerRef.current, '/dashboard')
@@ -82,7 +74,7 @@ export default function DashboardScreen() {
     }, [load])
   )
 
-  const firstWorkspace = state.workspaces[0]
+  const firstOrganization = state.organizations[0]
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 16 }}>
@@ -108,40 +100,28 @@ export default function DashboardScreen() {
       )}
 
       <View style={cardStyle}>
-        <Text style={{ fontSize: 18, fontWeight: '600' }}>Current workspace</Text>
-        {firstWorkspace ? (
-          <>
-            <Text style={{ marginTop: 4 }}>{firstWorkspace.name}</Text>
-            <Text style={{ color: '#6b7280' }}>{state.tasks.length} task(s)</Text>
-          </>
+        <Text style={{ fontSize: 18, fontWeight: '600' }}>Current organization</Text>
+        {firstOrganization ? (
+          <Text style={{ marginTop: 4 }}>{firstOrganization.name}</Text>
         ) : loading ? (
-          <Text style={{ color: '#6b7280' }}>Loading workspaces...</Text>
+          <Text style={{ color: '#6b7280' }}>Loading organizations...</Text>
         ) : (
-          <Text style={{ color: '#6b7280' }}>Create a workspace to start tracking tasks.</Text>
+          <Text style={{ color: '#6b7280' }}>Create an organization to get started.</Text>
         )}
       </View>
 
-      {firstWorkspace && (
-        <View style={cardStyle}>
-          <CreateTaskForm workspaceId={firstWorkspace.id} onCreated={refresh} />
-        </View>
-      )}
-
       <View style={cardStyle}>
-        <Text style={{ fontSize: 18, fontWeight: '600' }}>Tasks</Text>
-        {state.tasks.length === 0 ? (
+        <Text style={{ fontSize: 18, fontWeight: '600' }}>Organizations</Text>
+        {state.organizations.length === 0 ? (
           <Text style={{ color: '#6b7280', marginTop: 4 }}>
-            {loading ? 'Loading tasks...' : 'No tasks yet.'}
+            {loading ? 'Loading organizations...' : 'No organizations yet.'}
           </Text>
         ) : (
-          state.tasks.map((task) => (
-            <View key={task.id} style={taskCardStyle}>
-              <Text style={{ fontWeight: '600' }}>{task.title}</Text>
-              {task.description && (
-                <Text style={{ color: '#6b7280', marginTop: 2 }}>{task.description}</Text>
-              )}
-              <Text style={{ color: '#6b7280', fontSize: 12, marginTop: 2 }}>
-                Status: {task.status}
+          state.organizations.map((org) => (
+            <View key={org.id} style={organizationCardStyle}>
+              <Text style={{ fontWeight: '600' }}>{org.name}</Text>
+              <Text style={{ color: '#6b7280', fontSize: 12 }}>
+                Status: {org.subscriptionStatus}
               </Text>
             </View>
           ))
@@ -158,7 +138,7 @@ const cardStyle = {
   gap: 4
 }
 
-const taskCardStyle = {
+const organizationCardStyle = {
   backgroundColor: '#f3f4f6',
   borderRadius: 8,
   padding: 12,

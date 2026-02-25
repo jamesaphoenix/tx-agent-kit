@@ -17,6 +17,7 @@ import {
   runWorktreeSetup,
   type WorktreeSetupResult
 } from './worktree-setup.js'
+import { boilerplateWorktreeNames } from './boilerplate.parallel-worktrees.boilerplate.js'
 
 interface WorktreeFixture {
   readonly name: string
@@ -47,7 +48,6 @@ const probeTimeoutMs = parsePositiveInt(
 const dualStackTimeoutMs = Math.max(180_000, probeTimeoutMs * 6)
 
 const tempRootPath = mkdtempSync(resolve(tmpdir(), 'tx-agent-kit-boilerplate-'))
-const worktreeNames = ['wt_boilerplate_alpha', 'wt_boilerplate_bravo'] as const
 const fixtures: WorktreeFixture[] = []
 const testkitEnv = getTestkitEnv()
 const baseDatabaseUrl =
@@ -229,7 +229,7 @@ const assertProbe = (
 }
 
 beforeAll(() => {
-  for (const worktreeName of worktreeNames) {
+  for (const worktreeName of boilerplateWorktreeNames) {
     fixtures.push({
       name: worktreeName,
       setup: runWorktreeSetup(worktreeName, tempRootPath, baseDatabaseUrl)

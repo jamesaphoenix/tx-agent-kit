@@ -9,17 +9,21 @@ export interface NotifyPromiseMessages {
   error: string
 }
 
+export interface NotifyOptions {
+  id?: number | string
+}
+
 export const notify = {
-  success: (message: string): void => {
-    toast.success(message)
+  success: (message: string, options?: NotifyOptions): void => {
+    toast.success(message, options)
   },
 
-  error: (message: string): void => {
-    toast.error(message)
+  error: (message: string, options?: NotifyOptions): void => {
+    toast.error(message, options)
   },
 
-  info: (message: string): void => {
-    toast.info(message)
+  info: (message: string, options?: NotifyOptions): void => {
+    toast.info(message, options)
   },
 
   promise: <T,>(promise: Promise<T>, messages: NotifyPromiseMessages): Promise<T> => {
@@ -33,7 +37,7 @@ export const NotifyToaster = (): ReactElement => {
     <SonnerToaster
       position="top-right"
       richColors
-      closeButton
+      closeButton={false}
       toastOptions={{
         duration: 4500
       }}

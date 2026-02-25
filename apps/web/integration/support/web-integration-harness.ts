@@ -1,4 +1,5 @@
 import { createSqlTestContext } from '@tx-agent-kit/testkit'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { availableParallelism, cpus } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -140,29 +141,59 @@ const waitForProcessExit = async (pid: number, timeoutMs: number): Promise<boole
   return !isProcessAlive(pid)
 }
 
-const stopProcess = async (pid: number): Promise<void> => {
+const stopProcess = async (pid: number): Promise<boolean> => {
   if (!isProcessAlive(pid)) {
-    return
+    return true
   }
 
   try {
     process.kill(pid, 'SIGTERM')
   } catch {
-    return
+    return !isProcessAlive(pid)
   }
 
   const exitedAfterTerm = await waitForProcessExit(pid, 5_000)
   if (exitedAfterTerm) {
-    return
+    return true
   }
 
   try {
     process.kill(pid, 'SIGKILL')
   } catch {
-    return
+    return !isProcessAlive(pid)
   }
 
-  await waitForProcessExit(pid, 2_000)
+  return waitForProcessExit(pid, 2_000)
+}
+
+const readProcessCommandLine = (pid: number): string | undefined => {
+  try {
+    const command = execFileSync('ps', ['-p', String(pid), '-o', 'command='], {
+      cwd: repoRoot,
+      env: process.env,
+      encoding: 'utf8'
+    }).trim()
+
+    return command.length > 0 ? command : undefined
+  } catch {
+    return undefined
+  }
+}
+
+type ProcessClassification = 'expected' | 'unexpected' | 'unknown'
+
+const classifyWebIntegrationApiProcess = (pid: number): ProcessClassification => {
+  const commandLine = readProcessCommandLine(pid)
+  if (!commandLine) {
+    return 'unknown'
+  }
+
+  const normalized = commandLine.toLowerCase()
+  if (normalized.includes('apps/api/src/server.ts') && normalized.includes('node')) {
+    return 'expected'
+  }
+
+  return 'unexpected'
 }
 
 const cleanupSchemaForSlot = async (workerSlot: number): Promise<void> => {
@@ -180,13 +211,44 @@ export const cleanupPersistentWebIntegrationHarnesses = async (
 
   for (const workerSlot of knownSlots) {
     const pidFilePath = resolveWebIntegrationPidFilePath(workerSlot)
+    let shouldCleanupSchema = true
 
     if (existsSync(pidFilePath)) {
       const parsedPid = Number.parseInt(readFileSync(pidFilePath, 'utf8').trim(), 10)
-      if (!Number.isNaN(parsedPid) && parsedPid > 0) {
-        await stopProcess(parsedPid)
+      if (!Number.isNaN(parsedPid) && parsedPid > 0 && isProcessAlive(parsedPid)) {
+        const processClassification = classifyWebIntegrationApiProcess(parsedPid)
+        if (processClassification === 'unexpected') {
+          process.stderr.write(
+            `Skipping stop for unexpected pid ${parsedPid} in ${pidFilePath}; preserving schema cleanup safety\n`
+          )
+          shouldCleanupSchema = false
+          continue
+        }
+        if (processClassification === 'unknown') {
+          process.stderr.write(
+            `Could not classify pid ${parsedPid} in ${pidFilePath}; preserving pid marker and skipping schema cleanup\n`
+          )
+          shouldCleanupSchema = false
+          continue
+        }
+
+        const stopped = await stopProcess(parsedPid)
+        if (!stopped) {
+          process.stderr.write(
+            `Failed to stop web integration API process pid=${parsedPid} slot=${workerSlot}; skipping schema cleanup\n`
+          )
+          shouldCleanupSchema = false
+          continue
+        }
+
+        rmSync(pidFilePath, { force: true })
+      } else {
+        rmSync(pidFilePath, { force: true })
       }
-      rmSync(pidFilePath, { force: true })
+    }
+
+    if (!shouldCleanupSchema) {
+      continue
     }
 
     try {

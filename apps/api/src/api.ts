@@ -1,9 +1,14 @@
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from '@effect/platform'
 import {
+  forgotPasswordRequestSchema,
+  forgotPasswordResponseSchema,
   invitationAssignableRoles,
   invitationStatuses,
+  organizationOnboardingDataSchema,
+  resetPasswordRequestSchema,
+  resetPasswordResponseSchema,
   sortOrders,
-  taskStatuses
+  subscriptionStatuses
 } from '@tx-agent-kit/contracts'
 import * as Schema from 'effect/Schema'
 
@@ -72,7 +77,7 @@ const AuthResponse = Schema.Struct({
 const PrincipalResponse = Schema.Struct({
   userId: Schema.String,
   email: Schema.String,
-  workspaceId: Schema.optional(Schema.String),
+  organizationId: Schema.optional(Schema.String),
   roles: Schema.Array(Schema.String)
 })
 
@@ -91,33 +96,58 @@ const SignInBody = Schema.Struct({
   password: Schema.String
 })
 
-const Workspace = Schema.Struct({
+const ForgotPasswordBody = forgotPasswordRequestSchema
+
+const ForgotPasswordResponse = forgotPasswordResponseSchema
+
+const ResetPasswordBody = resetPasswordRequestSchema
+
+const ResetPasswordResponse = resetPasswordResponseSchema
+
+const Organization = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
-  ownerUserId: Schema.String,
-  createdAt: Schema.String
+  billingEmail: Schema.NullOr(Schema.String),
+  onboardingData: Schema.NullOr(organizationOnboardingDataSchema),
+  stripeCustomerId: Schema.NullOr(Schema.String),
+  stripeSubscriptionId: Schema.NullOr(Schema.String),
+  stripePaymentMethodId: Schema.NullOr(Schema.String),
+  creditsBalance: Schema.Number,
+  reservedCredits: Schema.Number,
+  autoRechargeEnabled: Schema.Boolean,
+  autoRechargeThreshold: Schema.NullOr(Schema.Number),
+  autoRechargeAmount: Schema.NullOr(Schema.Number),
+  isSubscribed: Schema.Boolean,
+  subscriptionStatus: Schema.Literal(...subscriptionStatuses),
+  subscriptionPlan: Schema.NullOr(Schema.String),
+  subscriptionStartedAt: Schema.NullOr(Schema.String),
+  subscriptionEndsAt: Schema.NullOr(Schema.String),
+  subscriptionCurrentPeriodEnd: Schema.NullOr(Schema.String),
+  createdAt: Schema.String,
+  updatedAt: Schema.String
 })
 
-const WorkspacesResponse = paginatedResponseSchema(Workspace)
+const OrganizationsResponse = paginatedResponseSchema(Organization)
 
-const WorkspacesListParams = Schema.Struct({
+const OrganizationsListParams = Schema.Struct({
   cursor: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.String),
   sortBy: Schema.optional(Schema.String),
   sortOrder: Schema.optional(Schema.Literal(...sortOrders))
 })
 
-const CreateWorkspaceBody = Schema.Struct({
+const CreateOrganizationBody = Schema.Struct({
   name: Schema.String
 })
 
-const UpdateWorkspaceBody = Schema.Struct({
-  name: Schema.optional(Schema.String)
+const UpdateOrganizationBody = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  onboardingData: Schema.optional(Schema.NullOr(organizationOnboardingDataSchema))
 })
 
 const Invitation = Schema.Struct({
   id: Schema.String,
-  workspaceId: Schema.String,
+  organizationId: Schema.String,
   email: Schema.String,
   role: Schema.Literal(...invitationAssignableRoles),
   status: Schema.Literal(...invitationStatuses),
@@ -139,7 +169,7 @@ const InvitationsListParams = Schema.Struct({
 })
 
 const CreateInvitationBody = Schema.Struct({
-  workspaceId: Schema.String,
+  organizationId: Schema.String,
   email: Schema.String,
   role: Schema.Literal(...invitationAssignableRoles)
 })
@@ -155,57 +185,47 @@ const AcceptInvitationResponse = Schema.Struct({
 
 const InvitationTokenParam = HttpApiSchema.param('token', Schema.String)
 const InvitationIdParam = HttpApiSchema.param('invitationId', Schema.String)
-const WorkspaceIdParam = HttpApiSchema.param('workspaceId', Schema.String)
-const TaskIdParam = HttpApiSchema.param('taskId', Schema.String)
+const OrganizationIdParam = HttpApiSchema.param('organizationId', Schema.String)
+const TeamIdParam = HttpApiSchema.param('teamId', Schema.String)
 
-const Task = Schema.Struct({
+const Team = Schema.Struct({
   id: Schema.String,
-  workspaceId: Schema.String,
-  title: Schema.String,
-  description: Schema.NullOr(Schema.String),
-  status: Schema.Literal(...taskStatuses),
-  createdByUserId: Schema.String,
-  createdAt: Schema.String
+  organizationId: Schema.String,
+  name: Schema.String,
+  website: Schema.NullOr(Schema.String),
+  createdAt: Schema.String,
+  updatedAt: Schema.String
+})
+
+const TeamsResponse = paginatedResponseSchema(Team)
+
+const TeamsListParams = Schema.Struct({
+  organizationId: Schema.String,
+  cursor: Schema.optional(Schema.String),
+  limit: Schema.optional(Schema.String),
+  sortBy: Schema.optional(Schema.String),
+  sortOrder: Schema.optional(Schema.Literal(...sortOrders))
+})
+
+const CreateTeamBody = Schema.Struct({
+  organizationId: Schema.String,
+  name: Schema.String
+})
+
+const UpdateTeamBody = Schema.Struct({
+  name: Schema.optional(Schema.String)
 })
 
 const IdsBody = Schema.Struct({
   ids: Schema.Array(Schema.UUID)
 })
 
-const WorkspacesManyResponse = Schema.Struct({
-  data: Schema.Array(Workspace)
+const OrganizationsManyResponse = Schema.Struct({
+  data: Schema.Array(Organization)
 })
 
 const InvitationsManyResponse = Schema.Struct({
   data: Schema.Array(Invitation)
-})
-
-const TasksManyResponse = Schema.Struct({
-  data: Schema.Array(Task)
-})
-
-const TasksResponse = paginatedResponseSchema(Task)
-
-const TasksListParams = Schema.Struct({
-  workspaceId: Schema.String,
-  cursor: Schema.optional(Schema.String),
-  limit: Schema.optional(Schema.String),
-  sortBy: Schema.optional(Schema.String),
-  sortOrder: Schema.optional(Schema.Literal(...sortOrders)),
-  'filter[status]': Schema.optional(Schema.String),
-  'filter[createdByUserId]': Schema.optional(Schema.String)
-})
-
-const CreateTaskBody = Schema.Struct({
-  workspaceId: Schema.String,
-  title: Schema.String,
-  description: Schema.optional(Schema.String)
-})
-
-const UpdateTaskBody = Schema.Struct({
-  title: Schema.optional(Schema.String),
-  description: Schema.optional(Schema.NullOr(Schema.String)),
-  status: Schema.optional(Schema.Literal(...taskStatuses))
 })
 
 const HealthResponse = Schema.Struct({
@@ -224,32 +244,42 @@ export const HealthGroup = HttpApiGroup.make('health')
 export const AuthGroup = HttpApiGroup.make('auth')
   .add(HttpApiEndpoint.post('signUp', '/v1/auth/sign-up').setPayload(SignUpBody).addSuccess(AuthResponse, { status: 201 }))
   .add(HttpApiEndpoint.post('signIn', '/v1/auth/sign-in').setPayload(SignInBody).addSuccess(AuthResponse))
+  .add(
+    HttpApiEndpoint.post('forgotPassword', '/v1/auth/forgot-password')
+      .setPayload(ForgotPasswordBody)
+      .addSuccess(ForgotPasswordResponse, { status: 202 })
+  )
+  .add(
+    HttpApiEndpoint.post('resetPassword', '/v1/auth/reset-password')
+      .setPayload(ResetPasswordBody)
+      .addSuccess(ResetPasswordResponse)
+  )
   .add(HttpApiEndpoint.get('me', '/v1/auth/me').addSuccess(PrincipalResponse))
   .add(HttpApiEndpoint.del('deleteMe', '/v1/auth/me').addSuccess(DeleteMeResponse))
 
-export const WorkspacesGroup = HttpApiGroup.make('workspaces')
+export const OrganizationsGroup = HttpApiGroup.make('organizations')
   .add(
-    HttpApiEndpoint.get('listWorkspaces', '/v1/workspaces')
-      .setUrlParams(WorkspacesListParams)
-      .addSuccess(WorkspacesResponse)
+    HttpApiEndpoint.get('listOrganizations', '/v1/organizations')
+      .setUrlParams(OrganizationsListParams)
+      .addSuccess(OrganizationsResponse)
   )
-  .add(HttpApiEndpoint.post('createWorkspace', '/v1/workspaces').setPayload(CreateWorkspaceBody).addSuccess(Workspace, { status: 201 }))
+  .add(HttpApiEndpoint.post('createOrganization', '/v1/organizations').setPayload(CreateOrganizationBody).addSuccess(Organization, { status: 201 }))
   .add(
-    HttpApiEndpoint.get('getWorkspace')`/v1/workspaces/${WorkspaceIdParam}`
-      .addSuccess(Workspace)
+    HttpApiEndpoint.get('getOrganization')`/v1/organizations/${OrganizationIdParam}`
+      .addSuccess(Organization)
   )
   .add(
-    HttpApiEndpoint.post('getManyWorkspaces', '/v1/workspaces/batch/get-many')
+    HttpApiEndpoint.post('getManyOrganizations', '/v1/organizations/batch/get-many')
       .setPayload(IdsBody)
-      .addSuccess(WorkspacesManyResponse)
+      .addSuccess(OrganizationsManyResponse)
   )
   .add(
-    HttpApiEndpoint.patch('updateWorkspace')`/v1/workspaces/${WorkspaceIdParam}`
-      .setPayload(UpdateWorkspaceBody)
-      .addSuccess(Workspace)
+    HttpApiEndpoint.patch('updateOrganization')`/v1/organizations/${OrganizationIdParam}`
+      .setPayload(UpdateOrganizationBody)
+      .addSuccess(Organization)
   )
   .add(
-    HttpApiEndpoint.del('removeWorkspace')`/v1/workspaces/${WorkspaceIdParam}`
+    HttpApiEndpoint.del('removeOrganization')`/v1/organizations/${OrganizationIdParam}`
       .addSuccess(DeletedResponse)
   )
   .add(
@@ -278,29 +308,24 @@ export const WorkspacesGroup = HttpApiGroup.make('workspaces')
   )
   .add(HttpApiEndpoint.post('acceptInvitation')`/v1/invitations/${InvitationTokenParam}/accept`.addSuccess(AcceptInvitationResponse))
 
-export const TasksGroup = HttpApiGroup.make('tasks')
+export const TeamsGroup = HttpApiGroup.make('teams')
   .add(
-    HttpApiEndpoint.get('listTasks', '/v1/tasks')
-      .setUrlParams(TasksListParams)
-      .addSuccess(TasksResponse)
+    HttpApiEndpoint.get('listTeams', '/v1/teams')
+      .setUrlParams(TeamsListParams)
+      .addSuccess(TeamsResponse)
   )
-  .add(HttpApiEndpoint.post('createTask', '/v1/tasks').setPayload(CreateTaskBody).addSuccess(Task, { status: 201 }))
+  .add(HttpApiEndpoint.post('createTeam', '/v1/teams').setPayload(CreateTeamBody).addSuccess(Team, { status: 201 }))
   .add(
-    HttpApiEndpoint.get('getTask')`/v1/tasks/${TaskIdParam}`
-      .addSuccess(Task)
-  )
-  .add(
-    HttpApiEndpoint.post('getManyTasks', '/v1/tasks/batch/get-many')
-      .setPayload(IdsBody)
-      .addSuccess(TasksManyResponse)
+    HttpApiEndpoint.get('getTeam')`/v1/teams/${TeamIdParam}`
+      .addSuccess(Team)
   )
   .add(
-    HttpApiEndpoint.patch('updateTask')`/v1/tasks/${TaskIdParam}`
-      .setPayload(UpdateTaskBody)
-      .addSuccess(Task)
+    HttpApiEndpoint.patch('updateTeam')`/v1/teams/${TeamIdParam}`
+      .setPayload(UpdateTeamBody)
+      .addSuccess(Team)
   )
   .add(
-    HttpApiEndpoint.del('removeTask')`/v1/tasks/${TaskIdParam}`
+    HttpApiEndpoint.del('removeTeam')`/v1/teams/${TeamIdParam}`
       .addSuccess(DeletedResponse)
   )
 
@@ -312,5 +337,5 @@ export class TxAgentApi extends HttpApi.make('tx-agent-kit')
   .addError(InternalError, { status: 500 })
   .add(HealthGroup)
   .add(AuthGroup)
-  .add(WorkspacesGroup)
-  .add(TasksGroup) {}
+  .add(OrganizationsGroup)
+  .add(TeamsGroup) {}

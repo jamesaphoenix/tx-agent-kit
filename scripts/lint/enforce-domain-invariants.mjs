@@ -3,6 +3,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
+import ts from 'typescript'
 
 const repoRoot = process.cwd()
 const errors = []
@@ -49,9 +50,9 @@ const extractTableConstants = (schemaSource) => {
 }
 
 const getTableNamesFromSchema = () => {
-  const schemaRoot = resolve(repoRoot, 'packages/db/src')
+  const schemaRoot = resolve(repoRoot, 'packages/infra/db/src')
   if (!existsSync(schemaRoot) || !statSync(schemaRoot).isDirectory()) {
-    fail('Missing `packages/db/src` directory.')
+    fail('Missing `packages/infra/db/src` directory.')
     return []
   }
 
@@ -87,18 +88,487 @@ const getTableNamesFromSchema = () => {
 
   const sortedNames = [...tableNames].sort()
   if (sortedNames.length === 0) {
-    fail('No `pgTable(...)` declarations were found in `packages/db/src`.')
+    fail('No `pgTable(...)` declarations were found in `packages/infra/db/src`.')
   }
 
   return sortedNames
 }
 
+const parseTypeScriptSourceFile = (filePath, source) =>
+  ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+
+const unwrapTsExpression = (expression) => {
+  let current = expression
+
+  while (current) {
+    if (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isNonNullExpression(current)) {
+      current = current.expression
+      continue
+    }
+
+    if (typeof ts.isSatisfiesExpression === 'function' && ts.isSatisfiesExpression(current)) {
+      current = current.expression
+      continue
+    }
+
+    return current
+  }
+
+  return expression
+}
+
+const unwrapTsTypeNode = (typeNode) => {
+  let current = typeNode
+
+  while (current && ts.isParenthesizedTypeNode(current)) {
+    current = current.type
+  }
+
+  return current
+}
+
+const getTypeReferenceName = (typeNameNode) => {
+  if (!typeNameNode) {
+    return null
+  }
+
+  if (ts.isIdentifier(typeNameNode)) {
+    return typeNameNode.text
+  }
+
+  if (ts.isQualifiedName(typeNameNode)) {
+    return typeNameNode.right.text
+  }
+
+  return null
+}
+
+const getWeakJsonTypeReason = (typeNode) => {
+  if (!typeNode) {
+    return 'missing type argument'
+  }
+
+  const normalizedType = unwrapTsTypeNode(typeNode)
+  if (!normalizedType) {
+    return 'missing type argument'
+  }
+
+  if (normalizedType.kind === ts.SyntaxKind.AnyKeyword) {
+    return '`any`'
+  }
+
+  if (normalizedType.kind === ts.SyntaxKind.UnknownKeyword) {
+    return '`unknown`'
+  }
+
+  if (!ts.isTypeReferenceNode(normalizedType)) {
+    return null
+  }
+
+  if (getTypeReferenceName(normalizedType.typeName) !== 'Record') {
+    return null
+  }
+
+  const valueTypeNode = normalizedType.typeArguments?.[1]
+  if (!valueTypeNode) {
+    return null
+  }
+
+  const normalizedValueType = unwrapTsTypeNode(valueTypeNode)
+  if (!normalizedValueType) {
+    return null
+  }
+
+  if (normalizedValueType.kind === ts.SyntaxKind.AnyKeyword) {
+    return '`Record<string, any>`'
+  }
+
+  if (normalizedValueType.kind === ts.SyntaxKind.UnknownKeyword) {
+    return '`Record<string, unknown>`'
+  }
+
+  return null
+}
+
+const getPropertyNameText = (propertyName) => {
+  if (!propertyName) {
+    return null
+  }
+
+  if (ts.isIdentifier(propertyName) || ts.isStringLiteral(propertyName) || ts.isNumericLiteral(propertyName)) {
+    return propertyName.text
+  }
+
+  if (ts.isNoSubstitutionTemplateLiteral(propertyName)) {
+    return propertyName.text
+  }
+
+  return null
+}
+
+const collectJsonBuilderIdentifiers = (sourceFile) => {
+  const identifiers = new Set()
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) {
+      continue
+    }
+
+    if (!ts.isStringLiteral(statement.moduleSpecifier)) {
+      continue
+    }
+
+    const importPath = statement.moduleSpecifier.text
+    const isDrizzlePgCoreImport =
+      importPath === 'drizzle-orm/pg-core' || importPath.startsWith('drizzle-orm/pg-core/')
+    if (!isDrizzlePgCoreImport || !statement.importClause?.namedBindings) {
+      continue
+    }
+
+    if (!ts.isNamedImports(statement.importClause.namedBindings)) {
+      continue
+    }
+
+    for (const importSpecifier of statement.importClause.namedBindings.elements) {
+      const importedName = importSpecifier.propertyName?.text ?? importSpecifier.name.text
+      const localName = importSpecifier.name.text
+
+      if (importedName === 'json' || importedName === 'jsonb') {
+        identifiers.add(localName)
+      }
+    }
+  }
+
+  return identifiers
+}
+
+const analyzeJsonColumnInitializer = (initializerExpression, jsonBuilderIdentifiers) => {
+  let current = unwrapTsExpression(initializerExpression)
+  let hasTypeCall = false
+  let weakTypeReason = null
+
+  while (ts.isCallExpression(current) && ts.isPropertyAccessExpression(current.expression)) {
+    const methodName = current.expression.name.text
+    if (methodName === '$type') {
+      hasTypeCall = true
+      const typeWeakness = getWeakJsonTypeReason(current.typeArguments?.[0] ?? null)
+      if (typeWeakness) {
+        weakTypeReason = typeWeakness
+      }
+    }
+
+    current = unwrapTsExpression(current.expression.expression)
+  }
+
+  if (!ts.isCallExpression(current) || !ts.isIdentifier(current.expression)) {
+    return {
+      isJsonColumn: false,
+      hasTypeCall: false,
+      weakTypeReason: null
+    }
+  }
+
+  if (!jsonBuilderIdentifiers.has(current.expression.text)) {
+    return {
+      isJsonColumn: false,
+      hasTypeCall: false,
+      weakTypeReason: null
+    }
+  }
+
+  return {
+    isJsonColumn: true,
+    hasTypeCall,
+    weakTypeReason
+  }
+}
+
+const collectDbJsonColumnsByTable = () => {
+  const schemaRoot = resolve(repoRoot, 'packages/infra/db/src')
+  if (!existsSync(schemaRoot) || !statSync(schemaRoot).isDirectory()) {
+    fail('Missing `packages/infra/db/src` directory for JSON column invariant checks.')
+    return new Map()
+  }
+
+  const sourceFiles = listFilesRecursively(schemaRoot)
+    .filter((filePath) => filePath.endsWith('.ts'))
+    .filter((filePath) => !toPosix(filePath).includes('/dist/'))
+
+  const jsonColumnsByTable = new Map()
+
+  for (const filePath of sourceFiles) {
+    const source = readUtf8(filePath)
+    const sourceFile = parseTypeScriptSourceFile(filePath, source)
+    const jsonBuilderIdentifiers = collectJsonBuilderIdentifiers(sourceFile)
+    const relativePath = toPosix(relative(repoRoot, filePath))
+
+    for (const statement of sourceFile.statements) {
+      if (!ts.isVariableStatement(statement)) {
+        continue
+      }
+
+      for (const declaration of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) || !declaration.initializer) {
+          continue
+        }
+
+        const tableConstName = declaration.name.text
+        const initializer = unwrapTsExpression(declaration.initializer)
+
+        if (!ts.isCallExpression(initializer) || !ts.isIdentifier(initializer.expression) || initializer.expression.text !== 'pgTable') {
+          continue
+        }
+
+        const columnsArg = initializer.arguments[1]
+        if (!columnsArg || !ts.isObjectLiteralExpression(columnsArg)) {
+          continue
+        }
+
+        const jsonColumns = []
+        for (const property of columnsArg.properties) {
+          if (!ts.isPropertyAssignment(property)) {
+            continue
+          }
+
+          const columnName = getPropertyNameText(property.name)
+          if (!columnName) {
+            continue
+          }
+
+          const analysis = analyzeJsonColumnInitializer(property.initializer, jsonBuilderIdentifiers)
+          if (!analysis.isJsonColumn) {
+            continue
+          }
+
+          jsonColumns.push(columnName)
+
+          if (!analysis.hasTypeCall) {
+            fail(
+              [
+                `JSON/JSONB column \`${tableConstName}.${columnName}\` in \`${relativePath}\` must call \`.$type<...>()\` with an explicit payload type.`,
+                'Do not leave Drizzle JSON columns implicitly typed.'
+              ].join(' ')
+            )
+          }
+
+          if (analysis.weakTypeReason) {
+            fail(
+              [
+                `JSON/JSONB column \`${tableConstName}.${columnName}\` in \`${relativePath}\` uses weak type ${analysis.weakTypeReason}.`,
+                'Use a concrete payload interface/type alias for strong typing.'
+              ].join(' ')
+            )
+          }
+        }
+
+        if (jsonColumns.length > 0) {
+          jsonColumnsByTable.set(tableConstName, {
+            fileRelativePath: relativePath,
+            columns: jsonColumns
+          })
+        }
+      }
+    }
+  }
+
+  return jsonColumnsByTable
+}
+
+const collectSchemaNamespaceIdentifiers = (sourceFile) => {
+  const schemaNamespaces = new Set(['Schema'])
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) {
+      continue
+    }
+
+    if (!ts.isStringLiteral(statement.moduleSpecifier) || statement.moduleSpecifier.text !== 'effect/Schema') {
+      continue
+    }
+
+    const importClause = statement.importClause
+    if (!importClause || !importClause.namedBindings) {
+      continue
+    }
+
+    if (ts.isNamespaceImport(importClause.namedBindings)) {
+      schemaNamespaces.add(importClause.namedBindings.name.text)
+      continue
+    }
+
+    if (ts.isNamedImports(importClause.namedBindings)) {
+      for (const importSpecifier of importClause.namedBindings.elements) {
+        const importedName = importSpecifier.propertyName?.text ?? importSpecifier.name.text
+        if (importedName === 'Schema') {
+          schemaNamespaces.add(importSpecifier.name.text)
+        }
+      }
+    }
+  }
+
+  return schemaNamespaces
+}
+
+const findStructObjectLiteral = (expression, schemaNamespaces) => {
+  if (!expression) {
+    return null
+  }
+
+  const normalizedExpression = unwrapTsExpression(expression)
+  if (
+    ts.isCallExpression(normalizedExpression) &&
+    ts.isPropertyAccessExpression(normalizedExpression.expression) &&
+    ts.isIdentifier(normalizedExpression.expression.expression) &&
+    schemaNamespaces.has(normalizedExpression.expression.expression.text) &&
+    normalizedExpression.expression.name.text === 'Struct'
+  ) {
+    const structArgument = normalizedExpression.arguments[0]
+    if (structArgument && ts.isObjectLiteralExpression(structArgument)) {
+      return structArgument
+    }
+  }
+
+  let discoveredStructObject = null
+  ts.forEachChild(normalizedExpression, (childNode) => {
+    if (discoveredStructObject) {
+      return
+    }
+
+    const found = findStructObjectLiteral(childNode, schemaNamespaces)
+    if (found) {
+      discoveredStructObject = found
+    }
+  })
+
+  return discoveredStructObject
+}
+
+const parseEffectRowSchemaFields = (effectSchemaPath) => {
+  const source = readUtf8(effectSchemaPath)
+  const sourceFile = parseTypeScriptSourceFile(effectSchemaPath, source)
+  const schemaNamespaces = collectSchemaNamespaceIdentifiers(sourceFile)
+  const relativePath = toPosix(relative(repoRoot, effectSchemaPath))
+
+  let structObject = null
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) {
+      continue
+    }
+
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || !declaration.initializer) {
+        continue
+      }
+
+      if (!declaration.name.text.endsWith('RowSchema')) {
+        continue
+      }
+
+      structObject = findStructObjectLiteral(declaration.initializer, schemaNamespaces)
+      if (structObject) {
+        break
+      }
+    }
+
+    if (structObject) {
+      break
+    }
+  }
+
+  if (!structObject) {
+    fail(
+      `Missing parseable \`Schema.Struct({ ... })\` for \`*RowSchema\` in \`${relativePath}\` required for JSON typing parity checks.`
+    )
+    return null
+  }
+
+  const fieldInitializers = new Map()
+  for (const property of structObject.properties) {
+    if (!ts.isPropertyAssignment(property)) {
+      continue
+    }
+
+    const fieldName = getPropertyNameText(property.name)
+    if (!fieldName) {
+      continue
+    }
+
+    fieldInitializers.set(fieldName, property.initializer)
+  }
+
+  return {
+    sourceFile,
+    schemaNamespaces,
+    fieldInitializers
+  }
+}
+
+const isWeakEffectJsonSchemaExpression = (schemaExpression, sourceFile, schemaNamespaces) => {
+  const expressionSource = schemaExpression.getText(sourceFile)
+
+  for (const schemaNamespace of schemaNamespaces) {
+    const weakSchemaRegex = new RegExp(`\\b${schemaNamespace}\\.(?:Unknown|Json)\\b`, 'u')
+    if (weakSchemaRegex.test(expressionSource)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+const enforceDbJsonColumnEffectSchemaParity = () => {
+  const effectSchemasDir = resolve(repoRoot, 'packages/infra/db/src/effect-schemas')
+  if (!existsSync(effectSchemasDir) || !statSync(effectSchemasDir).isDirectory()) {
+    return
+  }
+
+  const jsonColumnsByTable = collectDbJsonColumnsByTable()
+  if (jsonColumnsByTable.size === 0) {
+    return
+  }
+
+  for (const [tableConstName, tableJsonMetadata] of jsonColumnsByTable.entries()) {
+    const effectSchemaPath = resolve(effectSchemasDir, `${toKebabCase(tableConstName)}.ts`)
+    if (!existsSync(effectSchemaPath) || !statSync(effectSchemaPath).isFile()) {
+      continue
+    }
+
+    const parsedRowSchema = parseEffectRowSchemaFields(effectSchemaPath)
+    if (!parsedRowSchema) {
+      continue
+    }
+
+    const effectSchemaRelativePath = toPosix(relative(repoRoot, effectSchemaPath))
+    for (const columnName of tableJsonMetadata.columns) {
+      const fieldSchemaExpression = parsedRowSchema.fieldInitializers.get(columnName)
+      if (!fieldSchemaExpression) {
+        fail(
+          [
+            `JSON/JSONB column \`${tableConstName}.${columnName}\` in \`${tableJsonMetadata.fileRelativePath}\` must exist in matching Effect row schema.`,
+            `Add \`${columnName}\` to \`${effectSchemaRelativePath}\` \`Schema.Struct({ ... })\`.`
+          ].join(' ')
+        )
+        continue
+      }
+
+      if (isWeakEffectJsonSchemaExpression(fieldSchemaExpression, parsedRowSchema.sourceFile, parsedRowSchema.schemaNamespaces)) {
+        fail(
+          [
+            `Effect row schema field \`${tableConstName}.${columnName}\` in \`${effectSchemaRelativePath}\` is weakly typed.`,
+            'Do not use `Schema.Unknown` or `Schema.Json` for DB JSON/JSONB columns; define explicit structured schemas.'
+          ].join(' ')
+        )
+      }
+    }
+  }
+}
+
 const enforceDbEffectSchemaParity = () => {
-  const effectSchemasDir = resolve(repoRoot, 'packages/db/src/effect-schemas')
+  const effectSchemasDir = resolve(repoRoot, 'packages/infra/db/src/effect-schemas')
   const effectSchemaIndexPath = resolve(effectSchemasDir, 'index.ts')
 
   if (!existsSync(effectSchemasDir)) {
-    fail('Missing `packages/db/src/effect-schemas` directory.')
+    fail('Missing `packages/infra/db/src/effect-schemas` directory.')
     return
   }
 
@@ -115,7 +585,7 @@ const enforceDbEffectSchemaParity = () => {
   for (const expectedFileName of expectedSchemaFiles) {
     if (!actualSchemaFiles.includes(expectedFileName)) {
       fail(
-        `Missing Effect schema file for table: expected \`packages/db/src/effect-schemas/${expectedFileName}\`.`
+        `Missing Effect schema file for table: expected \`packages/infra/db/src/effect-schemas/${expectedFileName}\`.`
       )
     }
   }
@@ -123,7 +593,7 @@ const enforceDbEffectSchemaParity = () => {
   for (const actualFileName of actualSchemaFiles) {
     if (!expectedSchemaFiles.includes(actualFileName)) {
       fail(
-        `Orphan Effect schema file without matching table: \`packages/db/src/effect-schemas/${actualFileName}\`.`
+        `Orphan Effect schema file without matching table: \`packages/infra/db/src/effect-schemas/${actualFileName}\`.`
       )
     }
   }
@@ -147,7 +617,7 @@ const enforceDbEffectSchemaParity = () => {
   }
 
   if (!existsSync(effectSchemaIndexPath)) {
-    fail('Missing `packages/db/src/effect-schemas/index.ts`.')
+    fail('Missing `packages/infra/db/src/effect-schemas/index.ts`.')
     return
   }
 
@@ -159,18 +629,18 @@ const enforceDbEffectSchemaParity = () => {
   for (const expectedFileName of expectedSchemaFiles) {
     if (!exportedSchemaFiles.has(expectedFileName)) {
       fail(
-        `Missing re-export in \`packages/db/src/effect-schemas/index.ts\` for \`${expectedFileName}\`.`
+        `Missing re-export in \`packages/infra/db/src/effect-schemas/index.ts\` for \`${expectedFileName}\`.`
       )
     }
   }
 }
 
 const enforceDbFactoryParity = () => {
-  const factoriesDir = resolve(repoRoot, 'packages/db/src/factories')
+  const factoriesDir = resolve(repoRoot, 'packages/infra/db/src/factories')
   const factoryIndexPath = resolve(factoriesDir, 'index.ts')
 
   if (!existsSync(factoriesDir)) {
-    fail('Missing `packages/db/src/factories` directory.')
+    fail('Missing `packages/infra/db/src/factories` directory.')
     return
   }
 
@@ -190,7 +660,7 @@ const enforceDbFactoryParity = () => {
   for (const expectedFileName of expectedFactoryFiles) {
     if (!actualFactoryFiles.includes(expectedFileName)) {
       fail(
-        `Missing factory file for table: expected \`packages/db/src/factories/${expectedFileName}\`.`
+        `Missing factory file for table: expected \`packages/infra/db/src/factories/${expectedFileName}\`.`
       )
     }
   }
@@ -198,7 +668,7 @@ const enforceDbFactoryParity = () => {
   for (const actualFileName of actualFactoryFiles) {
     if (!expectedFactoryFiles.includes(actualFileName)) {
       fail(
-        `Orphan factory file without matching table: \`packages/db/src/factories/${actualFileName}\`.`
+        `Orphan factory file without matching table: \`packages/infra/db/src/factories/${actualFileName}\`.`
       )
     }
   }
@@ -214,7 +684,7 @@ const enforceDbFactoryParity = () => {
   }
 
   if (!existsSync(factoryIndexPath)) {
-    fail('Missing `packages/db/src/factories/index.ts`.')
+    fail('Missing `packages/infra/db/src/factories/index.ts`.')
     return
   }
 
@@ -226,7 +696,7 @@ const enforceDbFactoryParity = () => {
   for (const expectedFileName of expectedFactoryFiles) {
     if (!exportedFactoryFiles.has(expectedFileName)) {
       fail(
-        `Missing re-export in \`packages/db/src/factories/index.ts\` for \`${expectedFileName}\`.`
+        `Missing re-export in \`packages/infra/db/src/factories/index.ts\` for \`${expectedFileName}\`.`
       )
     }
   }
@@ -537,9 +1007,9 @@ const enforceNoPromisePorts = () => {
 }
 
 const enforceDbRepositoryDecodeContracts = () => {
-  const repositoriesDir = resolve(repoRoot, 'packages/db/src/repositories')
+  const repositoriesDir = resolve(repoRoot, 'packages/infra/db/src/repositories')
   if (!existsSync(repositoriesDir) || !statSync(repositoriesDir).isDirectory()) {
-    fail('Missing `packages/db/src/repositories` directory.')
+    fail('Missing `packages/infra/db/src/repositories` directory.')
     return
   }
 
@@ -550,6 +1020,11 @@ const enforceDbRepositoryDecodeContracts = () => {
   for (const filePath of repositoryFiles) {
     const source = readUtf8(filePath)
     const relativePath = toPosix(relative(repoRoot, filePath))
+    const isRepositoryImplementation = /export const [A-Za-z0-9_]+Repository\s*=/.test(source)
+
+    if (!isRepositoryImplementation) {
+      continue
+    }
 
     if (!/from\s+['"]\.\.\/effect-schemas\//.test(source)) {
       fail(`DB repository must import matching Effect schema decoder(s): \`${relativePath}\`.`)
@@ -637,6 +1112,10 @@ const enforceNoSuppressionDirectives = () => {
         return false
       }
 
+      if (normalized.includes('/apps/docs/.source/') || normalized.startsWith('apps/docs/.source/')) {
+        return false
+      }
+
       if (normalized.includes('/lib/api/generated/')) {
         return false
       }
@@ -652,135 +1131,6 @@ const enforceNoSuppressionDirectives = () => {
 
       fail(
         `Suppression directives are disallowed in source modules: \`${toPosix(relative(repoRoot, sourceFile))}\`. Fix root types/rules instead of suppressing.`
-      )
-    }
-  }
-}
-
-const enforceNoAnyTypeAssertions = () => {
-  const roots = [resolve(repoRoot, 'apps'), resolve(repoRoot, 'packages')]
-  const anyAssertionRegex = /(?:\bas\s+any\b|<\s*any\s*>)/u
-
-  for (const root of roots) {
-    if (!existsSync(root) || !statSync(root).isDirectory()) {
-      continue
-    }
-
-    const sourceFiles = listFilesRecursively(root).filter((filePath) => {
-      const normalized = toPosix(filePath)
-      if (!/\.(ts|tsx)$/u.test(normalized)) {
-        return false
-      }
-
-      if (normalized.includes('/.next/') || normalized.includes('/dist/') || normalized.includes('/node_modules/')) {
-        return false
-      }
-
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx')) {
-        return false
-      }
-
-      if (normalized.includes('/lib/api/generated/')) {
-        return false
-      }
-
-      return true
-    })
-
-    for (const sourceFile of sourceFiles) {
-      const source = readUtf8(sourceFile)
-      if (!anyAssertionRegex.test(source)) {
-        continue
-      }
-
-      fail(
-        `Type assertion \`as any\` is disallowed in source modules: \`${toPosix(relative(repoRoot, sourceFile))}\`. Replace with precise types or decode unknowns via schema.`
-      )
-    }
-  }
-}
-
-const enforceNoEmptyCatchBlocks = () => {
-  const roots = [resolve(repoRoot, 'apps'), resolve(repoRoot, 'packages')]
-  const emptyCatchRegex = /catch\s*(?:\([^)]*\))?\s*\{\s*(?:(?:\/\/[^\n]*\n)|(?:\/\*[\s\S]*?\*\/\s*))*\}/u
-
-  for (const root of roots) {
-    if (!existsSync(root) || !statSync(root).isDirectory()) {
-      continue
-    }
-
-    const sourceFiles = listFilesRecursively(root).filter((filePath) => {
-      const normalized = toPosix(filePath)
-      if (!/\.(ts|tsx|js|mjs)$/u.test(normalized)) {
-        return false
-      }
-
-      if (normalized.includes('/.next/') || normalized.includes('/dist/') || normalized.includes('/node_modules/')) {
-        return false
-      }
-
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx')) {
-        return false
-      }
-
-      if (normalized.includes('/lib/api/generated/')) {
-        return false
-      }
-
-      return true
-    })
-
-    for (const sourceFile of sourceFiles) {
-      const source = readUtf8(sourceFile)
-      if (!emptyCatchRegex.test(source)) {
-        continue
-      }
-
-      fail(
-        `Empty catch blocks are disallowed in source modules: \`${toPosix(relative(repoRoot, sourceFile))}\`. Handle, classify, or rethrow errors explicitly.`
-      )
-    }
-  }
-}
-
-const enforceNoChainedTypeAssertions = () => {
-  const roots = [resolve(repoRoot, 'apps'), resolve(repoRoot, 'packages')]
-  const chainedAssertionRegex = /\bas\s+unknown\s+as\b/u
-
-  for (const root of roots) {
-    if (!existsSync(root) || !statSync(root).isDirectory()) {
-      continue
-    }
-
-    const sourceFiles = listFilesRecursively(root).filter((filePath) => {
-      const normalized = toPosix(filePath)
-      if (!/\.(ts|tsx)$/u.test(normalized)) {
-        return false
-      }
-
-      if (normalized.includes('/.next/') || normalized.includes('/dist/') || normalized.includes('/node_modules/')) {
-        return false
-      }
-
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx')) {
-        return false
-      }
-
-      if (normalized.includes('/lib/api/generated/')) {
-        return false
-      }
-
-      return true
-    })
-
-    for (const sourceFile of sourceFiles) {
-      const source = readUtf8(sourceFile)
-      if (!chainedAssertionRegex.test(source)) {
-        continue
-      }
-
-      fail(
-        `Chained type assertion \`as unknown as ...\` is disallowed in source modules: \`${toPosix(relative(repoRoot, sourceFile))}\`. Model boundary types explicitly instead.`
       )
     }
   }
@@ -988,8 +1338,7 @@ const enforceCriticalIntegrationCoverage = () => {
       '/health',
       '/v1/auth/sign-in',
       '/v1/auth/me',
-      '/v1/workspaces',
-      '/v1/tasks',
+      '/v1/organizations',
       '/v1/invitations'
     ]
 
@@ -1015,7 +1364,21 @@ const enforceCriticalIntegrationCoverage = () => {
       )
     }
 
-    if (!/health-endpoint/u.test(source) || !/toBeLessThan\(1500\)/u.test(source)) {
+    const hasHealthEndpointCaseName = /health-endpoint/u.test(source)
+    const hasLiteralHealthLatencyBudgetAssertion = /toBeLessThan\((?:1500|1_500)\)/u.test(
+      source
+    )
+    const hasNamedHealthLatencyBudget =
+      (
+        /const\s+healthReadinessLatencyBudgetMs\s*=\s*(?:1500|1_500)/u.test(source) ||
+        /const\s+healthReadinessLatencyBudgetMs\s*=\s*parsePositiveInt\s*\(/u.test(source)
+      ) &&
+      /toBeLessThan\(healthReadinessLatencyBudgetMs\)/u.test(source)
+
+    if (
+      !hasHealthEndpointCaseName ||
+      (!hasLiteralHealthLatencyBudgetAssertion && !hasNamedHealthLatencyBudget)
+    ) {
       fail(
         'Critical API flow coverage missing: health endpoint readiness/performance assertion was not detected in API integration suite.'
       )
@@ -1025,10 +1388,9 @@ const enforceCriticalIntegrationCoverage = () => {
   const requiredWebIntegrationSuites = [
     'apps/web/app/dashboard/page.integration.test.tsx',
     'apps/web/app/invitations/page.integration.test.tsx',
-    'apps/web/app/workspaces/page.integration.test.tsx',
+    'apps/web/app/organizations/page.integration.test.tsx',
     'apps/web/components/AuthForm.integration.test.tsx',
-    'apps/web/components/CreateWorkspaceForm.integration.test.tsx',
-    'apps/web/components/CreateTaskForm.integration.test.tsx',
+    'apps/web/components/CreateOrganizationForm.integration.test.tsx',
     'apps/web/components/CreateInvitationForm.integration.test.tsx',
     'apps/web/components/AcceptInvitationForm.integration.test.tsx',
     'apps/web/components/SignOutButton.integration.test.tsx',
@@ -1086,24 +1448,24 @@ const enforceCriticalIntegrationCoverage = () => {
     }
   }
 
-  const workspacesPageSuitePath = resolve(repoRoot, 'apps/web/app/workspaces/page.integration.test.tsx')
-  if (existsSync(workspacesPageSuitePath) && statSync(workspacesPageSuitePath).isFile()) {
-    const workspacesSource = readUtf8(workspacesPageSuitePath)
-    if (!workspacesSource.includes('/sign-in?next=%2Fworkspaces')) {
+  const organizationsPageSuitePath = resolve(repoRoot, 'apps/web/app/organizations/page.integration.test.tsx')
+  if (existsSync(organizationsPageSuitePath) && statSync(organizationsPageSuitePath).isFile()) {
+    const organizationsSource = readUtf8(organizationsPageSuitePath)
+    if (!organizationsSource.includes('/sign-in?next=%2Forganizations')) {
       fail(
-        'Workspaces page integration suite must assert unauthenticated redirect behavior (`/sign-in?next=%2Fworkspaces`).'
+        'Organizations page integration suite must assert unauthenticated redirect behavior (`/sign-in?next=%2Forganizations`).'
       )
     }
 
-    if (!/auth token is invalid/u.test(workspacesSource)) {
+    if (!/auth token is invalid/u.test(organizationsSource)) {
       fail(
-        'Workspaces page integration suite must cover invalid-token redirect behavior.'
+        'Organizations page integration suite must cover invalid-token redirect behavior.'
       )
     }
 
-    if (!/\bcreateUser\s*\(/u.test(workspacesSource) || !/\bcreateTeam\s*\(/u.test(workspacesSource)) {
+    if (!/\bcreateUser\s*\(/u.test(organizationsSource) || !/\bcreateTeam\s*\(/u.test(organizationsSource)) {
       fail(
-        'Workspaces page integration suite must cover authenticated data flow setup via `createUser(...)` and `createTeam(...)`.'
+        'Organizations page integration suite must cover authenticated data flow setup via `createUser(...)` and `createTeam(...)`.'
       )
     }
   }
@@ -1124,40 +1486,28 @@ const enforceCriticalIntegrationCoverage = () => {
   } else {
     const workerActivitiesSource = readUtf8(workerActivitiesSuitePath)
 
-    if (!/\bseedTask\s*=\s*async/u.test(workerActivitiesSource)) {
-      fail(
-        'Worker activities integration suite must seed task/workspace/user fixtures via helper (`seedTask(...)`).'
-      )
-    }
-
     if (/\bTRUNCATE\s+TABLE\b/u.test(workerActivitiesSource) || /\bresetPublicTables\s*\(/u.test(workerActivitiesSource)) {
       fail(
         'Worker activities integration suite must not truncate shared tables; rely on unique fixtures to avoid cross-project clobbering.'
       )
     }
 
-    if (!/\bactivities\.processTask\s*\(/u.test(workerActivitiesSource)) {
+    if (!/\bactivities\.ping\s*\(/u.test(workerActivitiesSource)) {
       fail(
-        'Worker activities integration suite must execute `activities.processTask(...)`.'
+        'Worker activities integration suite must execute `activities.ping(...)` as a baseline smoke test.'
       )
     }
 
-    if (!/alreadyProcessed:\s*true/u.test(workerActivitiesSource)) {
+    if (!/\bpingWorkflow\b/u.test(workerActivitiesSource)) {
       fail(
-        'Worker activities integration suite must assert idempotency (`alreadyProcessed: true`) on duplicate operations.'
-      )
-    }
-
-    if (!/alreadyProcessed:\s*false/u.test(workerActivitiesSource)) {
-      fail(
-        'Worker activities integration suite must assert first-time processing (`alreadyProcessed: false`).'
+        'Worker activities integration suite must execute the `pingWorkflow` end-to-end.'
       )
     }
   }
 
-  const observabilitySuitePath = resolve(repoRoot, 'packages/observability/src/stack.integration.test.ts')
+  const observabilitySuitePath = resolve(repoRoot, 'packages/infra/observability/src/stack.integration.test.ts')
   if (!existsSync(observabilitySuitePath) || !statSync(observabilitySuitePath).isFile()) {
-    fail('Critical observability integration coverage missing: `packages/observability/src/stack.integration.test.ts`.')
+    fail('Critical observability integration coverage missing: `packages/infra/observability/src/stack.integration.test.ts`.')
   } else {
     const observabilitySource = readUtf8(observabilitySuitePath)
     const requiredObservabilityMarkers = [
@@ -1173,7 +1523,7 @@ const enforceCriticalIntegrationCoverage = () => {
     for (const marker of requiredObservabilityMarkers) {
       if (!observabilitySource.includes(marker)) {
         fail(
-          `Critical observability flow coverage missing in \`packages/observability/src/stack.integration.test.ts\`: expected marker \`${marker}\`.`
+          `Critical observability flow coverage missing in \`packages/infra/observability/src/stack.integration.test.ts\`: expected marker \`${marker}\`.`
         )
       }
     }
@@ -1243,16 +1593,16 @@ const enforceWebIntegrationHarnessContracts = () => {
 }
 
 const enforcePgTapTriggerCoverage = () => {
-  const migrationsDir = resolve(repoRoot, 'packages/db/drizzle/migrations')
-  const pgtapDir = resolve(repoRoot, 'packages/db/pgtap')
+  const migrationsDir = resolve(repoRoot, 'packages/infra/db/drizzle/migrations')
+  const pgtapDir = resolve(repoRoot, 'packages/infra/db/pgtap')
 
   if (!existsSync(migrationsDir) || !statSync(migrationsDir).isDirectory()) {
-    fail('Missing migrations directory: `packages/db/drizzle/migrations`.')
+    fail('Missing migrations directory: `packages/infra/db/drizzle/migrations`.')
     return
   }
 
   if (!existsSync(pgtapDir) || !statSync(pgtapDir).isDirectory()) {
-    fail('Missing pgTAP directory: `packages/db/pgtap`.')
+    fail('Missing pgTAP directory: `packages/infra/db/pgtap`.')
     return
   }
 
@@ -1282,7 +1632,7 @@ const enforcePgTapTriggerCoverage = () => {
     .sort()
 
   if (pgtapFiles.length === 0) {
-    fail('No pgTAP SQL suites found in `packages/db/pgtap`.')
+    fail('No pgTAP SQL suites found in `packages/infra/db/pgtap`.')
     return
   }
 
@@ -1292,7 +1642,7 @@ const enforcePgTapTriggerCoverage = () => {
     const triggerReferenceRegex = new RegExp(`\\b${triggerName}\\b`, 'u')
     if (!triggerReferenceRegex.test(pgtapSource)) {
       fail(
-        `Missing pgTAP coverage marker for trigger \`${triggerName}\`. Reference this trigger in \`packages/db/pgtap/*.sql\`.`
+        `Missing pgTAP coverage marker for trigger \`${triggerName}\`. Reference this trigger in \`packages/infra/db/pgtap/*.sql\`.`
       )
     }
   }
@@ -1436,10 +1786,11 @@ const enforceNoDirectProcessEnvInSource = () => {
     'apps/worker/src/config/env.ts',
     'apps/web/lib/env.ts',
     'apps/mobile/lib/env.ts',
-    'packages/auth/src/env.ts',
-    'packages/db/src/env.ts',
-    'packages/logging/src/env.ts',
-    'packages/observability/src/env.ts',
+    'packages/infra/auth/src/env.ts',
+    'packages/infra/db/src/env.ts',
+    'packages/infra/logging/src/env.ts',
+    'packages/infra/observability/src/env.ts',
+    'packages/infra/ai/src/env.ts',
     'packages/testkit/src/env.ts'
   ])
 
@@ -1523,6 +1874,10 @@ const enforceNoSourcePlaceholderComments = () => {
       }
 
       if (normalized.includes('/__tests__/') || /\.(test|spec)\.(ts|tsx)$/u.test(normalized)) {
+        return false
+      }
+
+      if (normalized.includes('/apps/docs/.source/') || normalized.startsWith('apps/docs/.source/')) {
         return false
       }
 
@@ -1618,417 +1973,8 @@ const enforceNoDefaultExportsInDdd = () => {
   }
 }
 
-const getFirstMeaningfulLine = (source) => {
-  const withoutBom = source.replace(/^\uFEFF/u, '')
-  const withoutBlockComments = withoutBom.replace(/\/\*[\s\S]*?\*\//gu, (match) => {
-    const newlineCount = match.split('\n').length - 1
-    return newlineCount > 0 ? '\n'.repeat(newlineCount) : ''
-  })
-  const lines = withoutBlockComments.split(/\r?\n/u)
-
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('//')) {
-      continue
-    }
-
-    return trimmed
-  }
-
-  return ''
-}
-
-const enforceWebClientOnlyContracts = () => {
-  const disallowedApiDir = resolve(repoRoot, 'apps/web/app/api')
-  if (existsSync(disallowedApiDir)) {
-    fail('`apps/web/app/api` is forbidden. Next.js web must stay client-only and call `apps/api` directly.')
-  }
-
-  const disallowedWebRuntimeFiles = [
-    resolve(repoRoot, 'apps/web/proxy.ts'),
-    resolve(repoRoot, 'apps/web/middleware.ts')
-  ]
-
-  for (const disallowedFile of disallowedWebRuntimeFiles) {
-    if (existsSync(disallowedFile) && statSync(disallowedFile).isFile()) {
-      fail(
-        `Server-side web runtime file is forbidden for client-only mode: \`${toPosix(relative(repoRoot, disallowedFile))}\`.`
-      )
-    }
-  }
-
-  const webAppRoot = resolve(repoRoot, 'apps/web/app')
-  if (existsSync(webAppRoot) && statSync(webAppRoot).isDirectory()) {
-    const routeFiles = listFilesRecursively(webAppRoot).filter(
-      (filePath) => filePath.endsWith('/route.ts') || filePath.endsWith('/route.tsx')
-    )
-
-    for (const routeFile of routeFiles) {
-      fail(
-        `Next route handlers are forbidden in web app client-only mode: \`${toPosix(relative(repoRoot, routeFile))}\`.`
-      )
-    }
-  }
-
-  const clientOnlyRoots = [
-    resolve(repoRoot, 'apps/web/app'),
-    resolve(repoRoot, 'apps/web/components')
-  ]
-
-  for (const root of clientOnlyRoots) {
-    if (!existsSync(root) || !statSync(root).isDirectory()) {
-      continue
-    }
-
-    const sourceFiles = listFilesRecursively(root).filter((filePath) => {
-      const normalized = toPosix(filePath)
-      if (!normalized.endsWith('.tsx')) {
-        return false
-      }
-
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.tsx')) {
-        return false
-      }
-
-      return true
-    })
-
-    for (const sourceFile of sourceFiles) {
-      const source = readUtf8(sourceFile)
-      const firstMeaningfulLine = getFirstMeaningfulLine(source)
-      const isClientDirective = /^['"]use client['"];?$/u.test(firstMeaningfulLine)
-
-      if (!isClientDirective) {
-        fail(
-          `Client-only web source must start with \`'use client'\`: \`${toPosix(relative(repoRoot, sourceFile))}\`.`
-        )
-      }
-    }
-  }
-
-  const webLibRoot = resolve(repoRoot, 'apps/web/lib')
-  if (existsSync(webLibRoot) && statSync(webLibRoot).isDirectory()) {
-    const sourceFiles = listFilesRecursively(webLibRoot).filter((filePath) => {
-      const normalized = toPosix(filePath)
-      if (!/\.(ts|tsx)$/u.test(normalized)) {
-        return false
-      }
-
-      if (normalized.includes('/lib/api/generated/')) {
-        return false
-      }
-
-      return true
-    })
-
-    for (const sourceFile of sourceFiles) {
-      const source = readUtf8(sourceFile)
-      if (/(?:['"`])\/api\//u.test(source)) {
-        fail(
-          [
-            'Web client source must not use Next API proxy paths (`/api/*`).',
-            `Use API base URL from apps/web/lib/env.ts instead: \`${toPosix(relative(repoRoot, sourceFile))}\`.`
-          ].join(' ')
-        )
-      }
-    }
-  }
-
-  const webSourceFiles = listFilesRecursively(resolve(repoRoot, 'apps/web')).filter((filePath) => {
-    const normalized = toPosix(filePath)
-    if (!/\.(ts|tsx)$/u.test(normalized)) {
-      return false
-    }
-
-    if (normalized.includes('/.next/') || normalized.includes('/dist/') || normalized.includes('/node_modules/')) {
-      return false
-    }
-
-    if (normalized.includes('/lib/api/generated/')) {
-      return false
-    }
-
-    return true
-  })
-
-  for (const sourceFile of webSourceFiles) {
-    const relativePath = toPosix(relative(repoRoot, sourceFile))
-    const source = readUtf8(sourceFile)
-
-    if (/\bwindow\.location\b/u.test(source)) {
-      fail(
-        `Do not read \`window.location\` directly in web source: \`${relativePath}\`. Use url-state wrappers instead.`
-      )
-    }
-
-    const isNotifyWrapper = relativePath === 'apps/web/lib/notify.tsx'
-    if (!isNotifyWrapper && /from\s+['"]sonner(?:\/[^'"]*)?['"]/u.test(source)) {
-      fail(
-        `Direct sonner imports are forbidden outside \`apps/web/lib/notify.tsx\`: \`${relativePath}\`.`
-      )
-    }
-
-    const isUrlStateWrapper = relativePath === 'apps/web/lib/url-state.tsx'
-    if (!isUrlStateWrapper && /from\s+['"]nuqs(?:\/[^'"]*)?['"]/u.test(source)) {
-      fail(
-        `Direct nuqs imports are forbidden outside \`apps/web/lib/url-state.tsx\`: \`${relativePath}\`.`
-      )
-    }
-  }
-
-  const webAxiosPath = resolve(repoRoot, 'apps/web/lib/axios.ts')
-  if (existsSync(webAxiosPath) && statSync(webAxiosPath).isFile()) {
-    const axiosSource = readUtf8(webAxiosPath)
-    if (!/baseURL:\s*webEnv\.API_BASE_URL/u.test(axiosSource)) {
-      fail(
-        'Web axios client must use `webEnv.API_BASE_URL` as baseURL in `apps/web/lib/axios.ts`.'
-      )
-    }
-  }
-}
-
-const crudMethodNames = ['list', 'getById', 'create', 'update', 'remove']
-const crudRouteVerbMatchers = {
-  list: /^list([A-Z]|$)/,
-  getById: /^get(ById)?([A-Z]|$)/,
-  create: /^create([A-Z]|$)/,
-  update: /^update([A-Z]|$)/,
-  remove: /^(remove|delete)([A-Z]|$)/
-}
-
-const hasCrudMethodSurface = (source) =>
-  crudMethodNames.every((methodName) => new RegExp(`\\b${methodName}\\s*:`).test(source))
-
-const hasCrudHandlerSurface = (handlerIds) =>
-  Object.values(crudRouteVerbMatchers).every((matcher) => handlerIds.some((handlerId) => matcher.test(handlerId)))
-
-const getKindsFromSource = (source, kindSuffix) => {
-  const regex = new RegExp(`export const [A-Za-z0-9_]+${kindSuffix}\\s*=\\s*'(crud|custom)'\\s+as const`, 'g')
-  return [...source.matchAll(regex)].map((match) => match[1])
-}
-
-const getHandlerIdsFromSource = (source) =>
-  [...source.matchAll(/\.handle\(\s*'([^']+)'/g)].map((match) => match[1])
-
-const collectCoreRepositoryKinds = () => {
-  const root = resolve(repoRoot, 'packages/core/src/domains')
-  const records = []
-
-  if (!existsSync(root) || !statSync(root).isDirectory()) {
-    fail('Missing `packages/core/src/domains` directory required for route/repository kind checks.')
-    return records
-  }
-
-  const domainDirs = readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory())
-  for (const domainDir of domainDirs) {
-    const domainName = domainDir.name
-    const portsDir = join(root, domainName, 'ports')
-    if (!existsSync(portsDir) || !statSync(portsDir).isDirectory()) {
-      fail(`Domain \`packages/core/src/domains/${domainName}\` is missing a \`ports/\` folder for kind checks.`)
-      continue
-    }
-
-    const portFiles = listFilesRecursively(portsDir).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) &&
-        !filePath.endsWith('/index.ts') &&
-        !filePath.endsWith('/index.tsx')
-    )
-
-    for (const filePath of portFiles) {
-      const source = readUtf8(filePath)
-      const relativePath = toPosix(relative(repoRoot, filePath))
-      const kinds = getKindsFromSource(source, 'RepositoryKind')
-
-      if (kinds.length === 0) {
-        fail(
-          `Port file \`${relativePath}\` must declare \`export const <Name>RepositoryKind = 'crud' | 'custom' as const\`.`
-        )
-        continue
-      }
-
-      if (kinds.length > 1) {
-        fail(`Port file \`${relativePath}\` declares multiple repository kind markers; keep exactly one.`)
-        continue
-      }
-
-      const kind = kinds[0]
-      const hasCrudShape = hasCrudMethodSurface(source)
-
-      if (kind === 'crud' && !hasCrudShape) {
-        fail(
-          `Repository kind marker says \`crud\` but full CRUD method surface is missing in \`${relativePath}\` (list/getById/create/update/remove).`
-        )
-      }
-
-      if (kind === 'custom' && hasCrudShape) {
-        fail(
-          `Repository in \`${relativePath}\` exposes full CRUD but is marked \`custom\`. Mark it \`crud\` or remove unused CRUD methods.`
-        )
-      }
-
-      records.push({
-        domain: domainName,
-        kind,
-        file: relativePath
-      })
-    }
-  }
-
-  return records
-}
-
-const collectApiRouteKinds = (rootRelativePath, expectsHandlers, requiredPathToken = null) => {
-  const root = resolve(repoRoot, rootRelativePath)
-  const records = []
-
-  if (!existsSync(root) || !statSync(root).isDirectory()) {
-    return records
-  }
-
-  const routeFiles = listFilesRecursively(root).filter((filePath) => {
-    const normalized = toPosix(filePath)
-    if (!normalized.endsWith('.ts') && !normalized.endsWith('.tsx')) {
-      return false
-    }
-
-    if (normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx')) {
-      return false
-    }
-
-    if (requiredPathToken && !normalized.includes(requiredPathToken)) {
-      return false
-    }
-
-    return !normalized.endsWith('/index.ts') && !normalized.endsWith('/index.tsx')
-  })
-
-  for (const filePath of routeFiles) {
-    const source = readUtf8(filePath)
-    const relativePath = toPosix(relative(repoRoot, filePath))
-    const kinds = getKindsFromSource(source, 'RouteKind')
-
-    if (kinds.length === 0) {
-      fail(`Route file \`${relativePath}\` must declare \`export const <Name>RouteKind = 'crud' | 'custom' as const\`.`)
-      continue
-    }
-
-    if (kinds.length > 1) {
-      fail(`Route file \`${relativePath}\` declares multiple route kind markers; keep exactly one.`)
-      continue
-    }
-
-    const kind = kinds[0]
-    let hasCrudSurface = hasCrudMethodSurface(source)
-
-    if (expectsHandlers) {
-      const handlerIds = getHandlerIdsFromSource(source)
-      hasCrudSurface = hasCrudHandlerSurface(handlerIds)
-    }
-
-    if (kind === 'crud' && !hasCrudSurface) {
-      fail(
-        `Route kind marker says \`crud\` but full CRUD surface is missing in \`${relativePath}\` (list/get/create/update/remove).`
-      )
-    }
-
-    if (kind === 'custom' && hasCrudSurface) {
-      fail(
-        `Route in \`${relativePath}\` exposes full CRUD but is marked \`custom\`. Mark it \`crud\` or remove unused CRUD handlers.`
-      )
-    }
-
-    records.push({
-      rootRelativePath,
-      file: relativePath,
-      baseName: toPosix(relative(root, filePath)).replace(/\.(ts|tsx)$/u, ''),
-      kind
-    })
-  }
-
-  return records
-}
-
-const enforceRouteRepositoryKindContracts = () => {
-  const repositoryRecords = collectCoreRepositoryKinds()
-  const appRouteRecords = collectApiRouteKinds('apps/api/src/routes', true)
-  const domainRouteRecords = collectApiRouteKinds('apps/api/src/domains', false, '/routes/')
-
-  if (repositoryRecords.length === 0) {
-    fail('No repository kind markers were discovered in `packages/core/src/domains/*/ports`.')
-  }
-
-  if (appRouteRecords.length === 0) {
-    fail('No route kind markers were discovered in `apps/api/src/routes`.')
-  }
-
-  const routeToDomain = {
-    auth: 'auth',
-    tasks: 'task',
-    workspaces: 'workspace'
-  }
-
-  for (const [routeName, domainName] of Object.entries(routeToDomain)) {
-    const routeRecord = appRouteRecords.find((record) => record.baseName === routeName)
-    if (!routeRecord) {
-      fail(`Expected route kind marker file for \`apps/api/src/routes/${routeName}.ts\`.`)
-      continue
-    }
-
-    const domainKinds = new Set(
-      repositoryRecords.filter((record) => record.domain === domainName).map((record) => record.kind)
-    )
-
-    if (domainKinds.size === 0) {
-      fail(`No repository kind marker found for mapped domain \`${domainName}\`.`)
-      continue
-    }
-
-    if (domainKinds.size > 1) {
-      fail(
-        `Mapped domain \`${domainName}\` mixes \`crud\` and \`custom\` repository kinds. Split route ownership or make kind intent explicit per route/domain.`
-      )
-      continue
-    }
-
-    const [domainKind] = [...domainKinds]
-    if (domainKind !== routeRecord.kind) {
-      fail(
-        `Kind mismatch for \`${routeRecord.file}\`: route=${routeRecord.kind}, mapped repositories(${domainName})=${domainKind}.`
-      )
-    }
-  }
-
-  for (const record of domainRouteRecords) {
-    const domainMatch = record.file.match(/apps\/api\/src\/domains\/([^/]+)\//)
-    if (!domainMatch) {
-      continue
-    }
-
-    const domainName = domainMatch[1]
-    const domainKinds = new Set(
-      repositoryRecords.filter((repositoryRecord) => repositoryRecord.domain === domainName).map((repositoryRecord) => repositoryRecord.kind)
-    )
-
-    if (domainKinds.size === 0) {
-      continue
-    }
-
-    if (domainKinds.size > 1) {
-      fail(
-        `Domain route \`${record.file}\` belongs to \`${domainName}\` which mixes repository kinds. Keep domain kind consistent for scaffolded route slices.`
-      )
-      continue
-    }
-
-    const [domainKind] = [...domainKinds]
-    if (domainKind !== record.kind) {
-      fail(`Kind mismatch for scaffolded route \`${record.file}\`: route=${record.kind}, domain=${domainKind}.`)
-    }
-  }
-}
-
 enforceDbEffectSchemaParity()
+enforceDbJsonColumnEffectSchemaParity()
 enforceDbFactoryParity()
 enforceDomainDirectoryContracts()
 enforceNoRootServiceBypass()
@@ -2048,11 +1994,35 @@ enforceNoDirectProcessEnvInSource()
 enforceNoSourcePlaceholderComments()
 enforceNoBuildArtifactsInSource()
 enforceNoDefaultExportsInDdd()
-enforceWebClientOnlyContracts()
-enforceRouteRepositoryKindContracts()
-enforceNoAnyTypeAssertions()
-enforceNoEmptyCatchBlocks()
-enforceNoChainedTypeAssertions()
+
+// ── RPC placement ──────────────────────────────────────────────────────
+const enforceRpcPlacement = () => {
+  const dbRoot = resolve(repoRoot, 'packages/infra/db')
+  const allowedRpcDir = resolve(dbRoot, 'src/rpcs')
+  const migrationsDir = resolve(dbRoot, 'drizzle/migrations')
+  const pgtapDir = resolve(dbRoot, 'pgtap')
+
+  const sqlFiles = listFilesRecursively(dbRoot)
+    .filter((f) => f.endsWith('.sql'))
+    .filter((f) => !f.startsWith(migrationsDir))
+    .filter((f) => !f.startsWith(pgtapDir))
+
+  for (const filePath of sqlFiles) {
+    const content = readUtf8(filePath)
+    const hasNonTriggerFunction =
+      /CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\b/i.test(content) &&
+      !/RETURNS\s+trigger/i.test(content)
+
+    if (hasNonTriggerFunction && !filePath.startsWith(allowedRpcDir)) {
+      fail(
+        `RPC/function definition found outside packages/infra/db/src/rpcs/: ${relative(repoRoot, filePath)}. ` +
+        'Move non-trigger SQL functions to packages/infra/db/src/rpcs/.'
+      )
+    }
+  }
+}
+
+enforceRpcPlacement()
 
 if (errors.length > 0) {
   console.error('Domain invariant check failed:\n')

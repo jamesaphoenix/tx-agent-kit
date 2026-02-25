@@ -9,7 +9,7 @@ This page describes every app and package in the monorepo, their responsibilitie
 
 ### `apps/api`: Effect HttpApi Server
 
-The API server is built with Effect HttpApi, providing typed REST endpoints for all domain operations. It handles authentication (sign-up, sign-in, JWT token management), CRUD operations for workspaces, tasks, and invitations, OpenAPI spec generation, and request validation using `effect/Schema` contracts.
+The API server is built with Effect HttpApi, providing typed REST endpoints for all domain operations. It handles authentication (sign-up, sign-in, JWT token management), CRUD operations for organizations and invitations, OpenAPI spec generation, and request validation using `effect/Schema` contracts.
 
 | File / Directory | Role |
 |-----------------|------|
@@ -17,16 +17,28 @@ The API server is built with Effect HttpApi, providing typed REST endpoints for 
 | `src/routes/` | Route handlers organized by domain |
 | `openapi.json` | Generated OpenAPI specification |
 
-The API is the only application that directly uses `packages/db` for persistence. Routes must consume contracts from `packages/contracts` for request and response types. Whenever routes change, the OpenAPI spec must be regenerated with `pnpm openapi:generate`.
+The API is the only application that directly uses `packages/infra/db` for persistence. Routes must consume contracts from `packages/contracts` for request and response types. Whenever routes change, the OpenAPI spec must be regenerated with `pnpm openapi:generate`.
 
 ### `apps/web`: Client-Only Next.js SPA
 
-The web application is a strictly client-side Next.js SPA. It communicates with the API server via HTTP and never performs server-side operations. It provides the dashboard UI for workspaces, tasks, and invitations, manages authentication flows (sign-up, sign-in, sign-out), and uses URL-based state management.
+The web application is a strictly client-side Next.js SPA. It communicates with the API server via HTTP and never performs server-side operations. It uses Next.js route groups to separate public marketing from the authenticated app:
+
+| Route Group | Purpose |
+|-------------|---------|
+| `app/(website)/` | Public marketing: landing, blog (listing + post), pricing, terms, privacy. `WebsiteHeader`/`WebsiteFooter` layout |
+| `app/(application)/` | Authenticated: org/team dashboard, workspaces. Auth-guard layout |
+| `app/sign-in/`, `sign-up/`, etc. | Auth pages with split-panel layout (form left, brand right) |
 
 | File / Directory | Role |
 |-----------------|------|
-| `app/` | Next.js app router pages (all `'use client'`) |
-| `components/` | Reusable UI components (all `'use client'`) |
+| `config/index.ts` | Site-wide config (company, homepage content, blog, dashboard nav) |
+| `lib/seo.ts` | SEO utilities + JSON-LD structured data builders |
+| `lib/blog.ts` | Backend-agnostic blog data layer (`BlogDataSource` interface) |
+| `lib/blog-seo.ts` | Blog-specific JSON-LD structured data |
+| `components/Breadcrumbs.tsx` | Breadcrumb navigation |
+| `components/StructuredData.tsx` | JSON-LD `<script>` renderer |
+| `components/WebsiteHeader.tsx` | Sticky header (config-driven, auth-aware) |
+| `components/WebsiteFooter.tsx` | Footer (config-driven, product/legal/support links) |
 | `lib/env.ts` | Centralized runtime environment reads |
 | `lib/auth-token.ts` | Only file that reads/writes `localStorage` |
 | `lib/url-state.tsx` | Only entry point for URL query state (wraps `nuqs`) |
@@ -67,15 +79,15 @@ The mobile app is a cross-platform Expo React Native client that mirrors the web
 | Navigation | Expo Router for file-system-based native navigation |
 | State management | Same URL-state and session-store patterns adapted for mobile |
 
-The mobile app has full integration test coverage including component test suites for `AuthForm`, `CreateWorkspaceForm`, `CreateTaskForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `AuthBootstrapProvider`, plus unit test suites for `env`, `auth-token`, `axios`, `client-api`, `client-auth`, `url-state`, and `session-store`.
+The mobile app has full integration test coverage including component test suites for `AuthForm`, `CreateOrganizationForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `AuthBootstrapProvider`, plus unit test suites for `env`, `auth-token`, `axios`, `client-api`, `client-auth`, `url-state`, and `session-store`.
 
 ## Packages
 
 ### `packages/core`: DDD Domain Slices
 
-All domain logic lives here, organized by bounded context. Each domain follows the DDD construction pattern with `domain/`, `ports/`, and `application/` directories. No persistence implementations live in this package. Those belong in `packages/db/src/repositories/`. See the [DDD Pattern](/docs/architecture/ddd-pattern) page for the full layer breakdown.
+All domain logic lives here, organized by bounded context. Each domain follows the DDD construction pattern with `domain/`, `ports/`, and `application/` directories. No persistence implementations live in this package. Those belong in `packages/infra/db/src/repositories/`. See the [DDD Pattern](/docs/architecture/ddd-pattern) page for the full layer breakdown.
 
-### `packages/db`: Database Layer
+### `packages/infra/db`: Database Layer
 
 Everything related to PostgreSQL lives in this package: Drizzle schema definitions, migrations, repository implementations, effect-schemas for runtime validation, and factories for test data generation.
 
@@ -91,15 +103,15 @@ Everything related to PostgreSQL lives in this package: Drizzle schema definitio
 
 This package holds `effect/Schema` definitions shared between the API server and its consumers. These schemas define the shape of API requests, responses, and domain identifiers, forming the single source of truth for the API contract.
 
-### `packages/auth`: Authentication Primitives
+### `packages/infra/auth`: Authentication Primitives
 
 Password hashing (bcrypt/argon2) and JWT token creation/verification. The API server uses this package for all auth flows.
 
-### `packages/logging`: Structured Logger
+### `packages/infra/logging`: Structured Logger
 
 A structured JSON logger that replaces `console.*` across the codebase. All source modules must use this package for logging. Direct `console.*` calls are lint-banned.
 
-### `packages/observability`: OpenTelemetry Bootstrap
+### `packages/infra/observability`: OpenTelemetry Bootstrap
 
 Configures OpenTelemetry tracing and metrics. Provides bootstrap functions for instrumenting the API server and worker at startup.
 

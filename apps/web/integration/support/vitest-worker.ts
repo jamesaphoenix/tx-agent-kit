@@ -6,21 +6,10 @@ import { fileURLToPath } from 'node:url'
 const slotClaimDirRelativePath = '.vitest/web-integration/slot-claims'
 const slotClaimPidRegex = /^pid=(\d+)$/
 const staleClaimWithoutPidMs = 5_000
+const defaultSlotClaimWaitMs = 120_000
+const defaultSlotClaimPollMs = 100
 const workerSupportDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(workerSupportDir, '../../../..')
-
-const parsePositiveIndex = (value: string | undefined): number | null => {
-  if (!value) {
-    return null
-  }
-
-  const parsed = Number.parseInt(value, 10)
-  if (Number.isNaN(parsed) || parsed < 1) {
-    return null
-  }
-
-  return parsed
-}
 
 const resolveMaxWorkers = (): number => {
   const parseEnvWorkers = (value: string | undefined): number | null => {
@@ -53,13 +42,43 @@ const resolveMaxWorkers = (): number => {
   }
 }
 
-const toBoundedOneBasedIndex = (rawZeroBasedIndex: number, maxWorkers: number): number =>
-  (rawZeroBasedIndex % maxWorkers) + 1
-
 const resolveSlotClaimDir = (): string => {
-  const claimDir = resolve(repoRoot, slotClaimDirRelativePath)
+  const claimDir = resolve(
+    process.env.WEB_INTEGRATION_SLOT_CLAIM_DIR ??
+      resolve(repoRoot, slotClaimDirRelativePath)
+  )
   mkdirSync(claimDir, { recursive: true })
   return claimDir
+}
+
+const parsePositiveInt = (value: string | undefined): number | null => {
+  if (!value) {
+    return null
+  }
+
+  const parsed = Number.parseInt(value, 10)
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return null
+  }
+
+  return parsed
+}
+
+const resolveSlotClaimWaitMs = (): number => {
+  return parsePositiveInt(process.env.WEB_INTEGRATION_SLOT_WAIT_MS) ?? defaultSlotClaimWaitMs
+}
+
+const resolveSlotClaimPollMs = (): number => {
+  return parsePositiveInt(process.env.WEB_INTEGRATION_SLOT_POLL_MS) ?? defaultSlotClaimPollMs
+}
+
+const blockFor = (durationMs: number): void => {
+  if (durationMs <= 0) {
+    return
+  }
+
+  const slotWaitArray = new Int32Array(new SharedArrayBuffer(4))
+  Atomics.wait(slotWaitArray, 0, 0, durationMs)
 }
 
 const resolveSlotClaimPath = (slot: number): string =>
@@ -140,16 +159,21 @@ const clearClaimIfStale = (slot: number): void => {
 let resolvedWorkerSlot: number | null = null
 let releaseHookRegistered = false
 
-const registerReleaseHook = (slot: number): void => {
+const releaseCurrentSlot = (): void => {
+  if (resolvedWorkerSlot === null) {
+    return
+  }
+
+  rmSync(resolveSlotClaimPath(resolvedWorkerSlot), { force: true })
+  resolvedWorkerSlot = null
+}
+
+const registerReleaseHook = (): void => {
   if (releaseHookRegistered) {
     return
   }
 
-  const release = (): void => {
-    rmSync(resolveSlotClaimPath(slot), { force: true })
-  }
-
-  process.once('exit', release)
+  process.once('exit', releaseCurrentSlot)
   releaseHookRegistered = true
 }
 
@@ -192,7 +216,7 @@ const tryClaimSlot = (slot: number, workerIdentity: string): boolean => {
     }
   }
 
-  registerReleaseHook(slot)
+  registerReleaseHook()
   return true
 }
 
@@ -210,33 +234,36 @@ export const resolveVitestWorkerSlot = (): number => {
     .filter((value): value is string => typeof value === 'string' && value.length > 0)
     .join(':')
 
-  for (let slot = 1; slot <= maxWorkers; slot += 1) {
-    if (tryClaimSlot(slot, workerIdentity)) {
-      resolvedWorkerSlot = slot
-      return slot
+  const slotClaimDeadline = Date.now() + resolveSlotClaimWaitMs()
+  const slotClaimPollMs = resolveSlotClaimPollMs()
+
+  while (Date.now() <= slotClaimDeadline) {
+    for (let slot = 1; slot <= maxWorkers; slot += 1) {
+      if (tryClaimSlot(slot, workerIdentity)) {
+        resolvedWorkerSlot = slot
+        return slot
+      }
+    }
+
+    if (slotClaimPollMs > 0) {
+      blockFor(slotClaimPollMs)
     }
   }
 
-  // Fallback: all slots were already claimed by active processes.
-  // Use one of Vitest's worker identifiers to return a bounded slot.
-  const worker = parsePositiveIndex(process.env.VITEST_WORKER_ID)
-  if (worker !== null) {
-    resolvedWorkerSlot = toBoundedOneBasedIndex(worker - 1, maxWorkers)
-    return resolvedWorkerSlot
-  }
-
-  const poolWorker = parsePositiveIndex(process.env.VITEST_POOL_ID)
-  if (poolWorker !== null) {
-    resolvedWorkerSlot = toBoundedOneBasedIndex(poolWorker - 1, maxWorkers)
-    return resolvedWorkerSlot
-  }
-
-  if (resolvedWorkerSlot === null) {
-    resolvedWorkerSlot = toBoundedOneBasedIndex(process.pid, maxWorkers)
-  }
-  return resolvedWorkerSlot
+  const claimDir = resolveSlotClaimDir()
+  throw new Error(
+    [
+      `Unable to claim a web integration worker slot. maxWorkers=${maxWorkers}.`,
+      `workerIdentity=${workerIdentity || `pid:${process.pid}`}.`,
+      `Try increasing WEB_INTEGRATION_MAX_WORKERS/INTEGRATION_MAX_WORKERS or clear stale claims at ${claimDir}.`
+    ].join(' ')
+  )
 }
 
 export const resolveVitestWorkerOffset = (): number => {
   return resolveVitestWorkerSlot() - 1
+}
+
+export const releaseVitestWorkerSlot = (): void => {
+  releaseCurrentSlot()
 }

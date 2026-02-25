@@ -1,16 +1,16 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.node.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist"
   },
   "include": ["src/**/*"],
   "references": [
-    { "path": "../../packages/auth" },
+    { "path": "../../packages/infra/auth" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
     { "path": "../../packages/testkit" },
-    { "path": "../../packages/logging" },
-    { "path": "../../packages/observability" }
+    { "path": "../../packages/infra/logging" },
+    { "path": "../../packages/infra/observability" }
   ]
 }

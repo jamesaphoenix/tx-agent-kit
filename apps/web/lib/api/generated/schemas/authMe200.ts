@@ -9,6 +9,6 @@
 export type AuthMe200 = {
   userId: string;
   email: string;
-  workspaceId?: string;
+  organizationId?: string;
   roles: string[];
 };

@@ -43,8 +43,8 @@ This additionally generates the following artifacts:
 
 | File | Contents |
 |------|----------|
-| `packages/db/src/effect-schemas/invoices.ts` | Effect schema with `InvoicesRowSchema` and `InvoicesRowShape` |
-| `packages/db/src/factories/invoices.factory.ts` | Test factory with `createInvoicesFactory` |
+| `packages/infra/db/src/effect-schemas/invoices.ts` | Effect schema with `InvoicesRowSchema` and `InvoicesRowShape` |
+| `packages/infra/db/src/factories/invoices.factory.ts` | Test factory with `createInvoicesFactory` |
 
 ## Step 3: Add Contracts
 
@@ -69,7 +69,7 @@ Fill in the generated domain file with entity types, validation rules, and pure 
 // packages/core/src/domains/billing/domain/billing-domain.ts
 export interface InvoiceRecord {
   id: string
-  workspaceId: string
+  organizationId: string
   amount: number
   status: InvoiceStatus
   createdAt: Date
@@ -83,26 +83,26 @@ Remember: no `Date.now()`, `new Date()`, or `Math.random()` in domain code.
 
 ## Step 5: Update Database Schema
 
-If this domain requires persistence, update `packages/db/src/schema.ts`:
+If this domain requires persistence, update `packages/infra/db/src/schema.ts`:
 
 ```typescript
 export const invoices = pgTable('invoices', {
   id: uuid('id').primaryKey().defaultRandom(),
-  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id),
   amount: integer('amount').notNull(),
   status: varchar('status', { length: 50 }).notNull().default('draft'),
   createdAt: timestamp('created_at').notNull().defaultNow()
 })
 ```
 
-Then ensure parity artifacts exist: an Effect schema in `packages/db/src/effect-schemas/invoices.ts`, a factory in `packages/db/src/factories/invoices.factory.ts`, and both re-exported from their respective `index.ts` files.
+Then ensure parity artifacts exist: an Effect schema in `packages/infra/db/src/effect-schemas/invoices.ts`, a factory in `packages/infra/db/src/factories/invoices.factory.ts`, and both re-exported from their respective `index.ts` files.
 
 ## Step 6: Add Repository
 
-Implement the concrete repository in `packages/db/src/repositories/`:
+Implement the concrete repository in `packages/infra/db/src/repositories/`:
 
 ```typescript
-// packages/db/src/repositories/invoice-repository.ts
+// packages/infra/db/src/repositories/invoice-repository.ts
 // Must import effect-schemas for row decoding
 // Must use provideDB() for query execution
 // Must not use .then() Promise chaining

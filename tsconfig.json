@@ -1,13 +1,32 @@
 {
   "extends": "./tsconfig.base.json",
-  "files": [],
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "jsx": "preserve"
+  },
+  "include": [],
+  "exclude": [
+    "**/node_modules",
+    "**/dist",
+    "**/.next",
+    "**/build",
+    "**/coverage",
+    "**/.turbo",
+    "**/playwright-report",
+    "**/test-results",
+    "**/debug-*"
+  ],
   "references": [
     { "path": "./packages/contracts" },
-    { "path": "./packages/auth" },
-    { "path": "./packages/db" },
+    { "path": "./packages/infra/ai" },
+    { "path": "./packages/infra/auth" },
+    { "path": "./packages/infra/db" },
     { "path": "./packages/testkit" },
     { "path": "./packages/core" },
-    { "path": "./packages/observability" },
+    { "path": "./packages/infra/logging" },
+    { "path": "./packages/infra/observability" },
+    { "path": "./packages/temporal-client" },
     { "path": "./apps/api" },
     { "path": "./apps/worker" },
     { "path": "./apps/web" }

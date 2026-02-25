@@ -1,14 +1,14 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.node.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist"
   },
   "include": ["src/**/*"],
   "references": [
-    { "path": "../../packages/db" },
-    { "path": "../../packages/logging" },
-    { "path": "../../packages/observability" },
+    { "path": "../../packages/infra/db" },
+    { "path": "../../packages/infra/logging" },
+    { "path": "../../packages/infra/observability" },
     { "path": "../../packages/temporal-client" }
   ]
 }

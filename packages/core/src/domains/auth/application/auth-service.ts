@@ -1,9 +1,11 @@
 import { Context, Effect, Layer } from 'effect'
 import { badRequest, conflict, notFound, unauthorized, type CoreError } from '../../../errors.js'
 import {
+  type ForgotPasswordCommand,
   isValidDisplayName,
   isValidEmail,
   normalizeEmail,
+  type ResetPasswordCommand,
   toAuthPrincipal,
   toAuthUser,
   type AuthPrincipal,
@@ -13,20 +15,45 @@ import {
 } from '../domain/auth-domain.js'
 import {
   AuthUsersPort,
-  AuthWorkspaceOwnershipPort,
+  AuthOrganizationOwnershipPort,
+  PasswordResetEmailPort,
+  PasswordResetTokenPort,
   PasswordHasherPort,
   SessionTokenPort
 } from '../ports/auth-ports.js'
+
+const isEmailUniqueViolation = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+
+  const code = 'code' in error ? String((error as { code?: unknown }).code) : ''
+  return code === 'DB_USER_EMAIL_UNIQUE_VIOLATION'
+}
 
 export class AuthService extends Context.Tag('AuthService')<
   AuthService,
   {
     signUp: (input: SignUpCommand) => Effect.Effect<AuthSession, CoreError, AuthUsersPort | PasswordHasherPort | SessionTokenPort>
     signIn: (input: SignInCommand) => Effect.Effect<AuthSession, CoreError, AuthUsersPort | PasswordHasherPort | SessionTokenPort>
+    requestPasswordReset: (
+      input: ForgotPasswordCommand
+    ) => Effect.Effect<
+      { accepted: true },
+      CoreError,
+      AuthUsersPort | PasswordResetTokenPort | PasswordResetEmailPort
+    >
+    resetPassword: (
+      input: ResetPasswordCommand
+    ) => Effect.Effect<
+      { reset: true },
+      CoreError,
+      AuthUsersPort | PasswordHasherPort | PasswordResetTokenPort
+    >
     getPrincipalFromToken: (token: string) => Effect.Effect<AuthPrincipal, CoreError, AuthUsersPort | SessionTokenPort>
     deleteUser: (
       principal: { userId: string }
-    ) => Effect.Effect<{ deleted: true }, CoreError, AuthUsersPort | AuthWorkspaceOwnershipPort>
+    ) => Effect.Effect<{ deleted: true }, CoreError, AuthUsersPort | AuthOrganizationOwnershipPort>
   }
 >() {}
 
@@ -62,7 +89,13 @@ export const AuthServiceLive = Layer.effect(
           email,
           passwordHash,
           name
-        }).pipe(Effect.mapError(() => badRequest('Sign-up failed')))
+        }).pipe(
+          Effect.catchAll((error) =>
+            isEmailUniqueViolation(error)
+              ? Effect.fail(conflict('Email is already in use'))
+              : Effect.fail(badRequest('Sign-up failed'))
+          )
+        )
 
         if (!created) {
           return yield* Effect.fail(badRequest('User creation failed'))
@@ -70,7 +103,8 @@ export const AuthServiceLive = Layer.effect(
 
         const token = yield* sessionTokenPort.sign({
           sub: created.id,
-          email: created.email
+          email: created.email,
+          pwd: created.passwordChangedAt.getTime()
         }).pipe(Effect.mapError(() => unauthorized('Failed to create session token')))
 
         return {
@@ -109,13 +143,87 @@ export const AuthServiceLive = Layer.effect(
 
         const token = yield* sessionTokenPort.sign({
           sub: user.id,
-          email: user.email
+          email: user.email,
+          pwd: user.passwordChangedAt.getTime()
         }).pipe(Effect.mapError(() => unauthorized('Failed to create session token')))
 
         return {
           token,
           user: toAuthUser(user)
         }
+      }),
+
+    requestPasswordReset: (input) =>
+      Effect.gen(function* () {
+        const usersPort = yield* AuthUsersPort
+        const passwordResetTokenPort = yield* PasswordResetTokenPort
+        const passwordResetEmailPort = yield* PasswordResetEmailPort
+
+        if (!isValidEmail(input.email)) {
+          return yield* Effect.fail(badRequest('Invalid forgot-password payload'))
+        }
+
+        const email = normalizeEmail(input.email)
+        const user = yield* usersPort.findByEmail(email).pipe(
+          Effect.mapError(() => badRequest('Failed to process forgot-password request'))
+        )
+
+        if (!user) {
+          return { accepted: true as const }
+        }
+
+        yield* passwordResetTokenPort.revokeTokensForUser(user.id).pipe(
+          Effect.mapError(() => badRequest('Failed to process forgot-password request'))
+        )
+
+        const token = yield* passwordResetTokenPort.createToken(user.id).pipe(
+          Effect.mapError(() => badRequest('Failed to process forgot-password request'))
+        )
+
+        yield* passwordResetEmailPort.sendPasswordResetEmail({
+          email: user.email,
+          name: user.name,
+          token
+        }).pipe(Effect.mapError(() => badRequest('Failed to process forgot-password request')))
+
+        return { accepted: true as const }
+      }),
+
+    resetPassword: (input) =>
+      Effect.gen(function* () {
+        const usersPort = yield* AuthUsersPort
+        const passwordHasher = yield* PasswordHasherPort
+        const passwordResetTokenPort = yield* PasswordResetTokenPort
+
+        if (input.token.trim().length < 1 || input.password.length < 8) {
+          return yield* Effect.fail(badRequest('Invalid reset-password payload'))
+        }
+
+        const tokenPrincipal = yield* passwordResetTokenPort.consumeToken(input.token).pipe(
+          Effect.mapError(() => badRequest('Invalid or expired password reset token'))
+        )
+
+        if (!tokenPrincipal) {
+          return yield* Effect.fail(badRequest('Invalid or expired password reset token'))
+        }
+
+        const passwordHash = yield* passwordHasher.hash(input.password).pipe(
+          Effect.mapError(() => badRequest('Could not hash password'))
+        )
+
+        const updatedUser = yield* usersPort
+          .updatePasswordHash(tokenPrincipal.userId, passwordHash)
+          .pipe(Effect.mapError(() => badRequest('Failed to reset password')))
+
+        if (!updatedUser) {
+          return yield* Effect.fail(notFound('User not found'))
+        }
+
+        yield* passwordResetTokenPort.revokeTokensForUser(tokenPrincipal.userId).pipe(
+          Effect.mapError(() => badRequest('Failed to finalize password reset'))
+        )
+
+        return { reset: true as const }
       }),
 
     getPrincipalFromToken: (token: string) =>
@@ -135,6 +243,14 @@ export const AuthServiceLive = Layer.effect(
           return yield* Effect.fail(unauthorized('Invalid token'))
         }
 
+        if (typeof payload.pwd !== 'number') {
+          return yield* Effect.fail(unauthorized('Invalid token'))
+        }
+
+        if (payload.pwd < user.passwordChangedAt.getTime()) {
+          return yield* Effect.fail(unauthorized('Invalid token'))
+        }
+
         return toAuthPrincipal({
           sub: user.id,
           email: user.email
@@ -144,7 +260,7 @@ export const AuthServiceLive = Layer.effect(
     deleteUser: (principal) =>
       Effect.gen(function* () {
         const usersPort = yield* AuthUsersPort
-        const workspaceOwnershipPort = yield* AuthWorkspaceOwnershipPort
+        const organizationOwnershipPort = yield* AuthOrganizationOwnershipPort
 
         const existing = yield* usersPort.findById(principal.userId).pipe(
           Effect.mapError(() => badRequest('Failed to read user'))
@@ -154,12 +270,12 @@ export const AuthServiceLive = Layer.effect(
           return yield* Effect.fail(notFound('User not found'))
         }
 
-        const ownedWorkspaceCount = yield* workspaceOwnershipPort.countOwnedByUser(principal.userId).pipe(
-          Effect.mapError(() => badRequest('Failed to validate workspace ownership'))
+        const ownedOrganizationCount = yield* organizationOwnershipPort.countOwnedByUser(principal.userId).pipe(
+          Effect.mapError(() => badRequest('Failed to validate organization ownership'))
         )
 
-        if (ownedWorkspaceCount > 0) {
-          return yield* Effect.fail(conflict('Cannot delete account while owning workspaces. Transfer ownership first.'))
+        if (ownedOrganizationCount > 0) {
+          return yield* Effect.fail(conflict('Cannot delete account while owning organizations. Transfer ownership first.'))
         }
 
         const deleted = yield* usersPort.deleteById(principal.userId).pipe(

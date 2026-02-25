@@ -34,14 +34,14 @@ const requestCounter = meter.createCounter('http.requests.total', {
   description: 'Total HTTP requests',
   unit: 'requests'
 })
-requestCounter.add(1, { 'http.method': 'GET', 'http.route': '/v1/tasks' })
+requestCounter.add(1, { 'http.method': 'GET', 'http.route': '/v1/organizations' })
 
 // Histogram - distribution of values
 const latencyHistogram = meter.createHistogram('http.request.duration', {
   description: 'HTTP request latency',
   unit: 'ms'
 })
-latencyHistogram.record(42, { 'http.method': 'GET', 'http.route': '/v1/tasks' })
+latencyHistogram.record(42, { 'http.method': 'GET', 'http.route': '/v1/organizations' })
 
 // UpDownCounter - value that can increase or decrease
 const activeConnections = meter.createUpDownCounter('db.connections.active', {

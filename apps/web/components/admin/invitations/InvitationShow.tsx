@@ -6,7 +6,7 @@ export const InvitationShow = () => (
   <Show>
     <SimpleShowLayout>
       <TextField source="id" />
-      <TextField source="workspaceId" />
+      <TextField source="organizationId" />
       <TextField source="email" />
       <TextField source="role" />
       <TextField source="status" />

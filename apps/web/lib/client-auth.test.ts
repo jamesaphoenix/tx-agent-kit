@@ -32,10 +32,10 @@ describe('client-auth guards', () => {
   it('redirects to sign-in when token is missing', () => {
     const router = { replace: vi.fn<(path: string) => void>() }
 
-    const hasSession = ensureSessionOrRedirect(router, '/workspaces')
+    const hasSession = ensureSessionOrRedirect(router, '/organizations')
 
     expect(hasSession).toBe(false)
-    expect(router.replace).toHaveBeenCalledWith('/sign-in?next=%2Fworkspaces')
+    expect(router.replace).toHaveBeenCalledWith('/sign-in?next=%2Forganizations')
   })
 
   it('clears auth token, session store, and redirects on 401', () => {

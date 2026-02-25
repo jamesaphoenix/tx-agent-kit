@@ -9,6 +9,7 @@ cd "$PROJECT_ROOT"
 MISSING_STRICT_MODE=()
 NOT_EXECUTABLE=()
 INVALID_GITATTRIBUTES_LINES=()
+BASH4_ONLY_PATTERNS=()
 
 while IFS= read -r script_file; do
   if ! grep -Eq "^set -euo pipefail$" "$script_file"; then
@@ -17,6 +18,10 @@ while IFS= read -r script_file; do
 
   if [[ ! -x "$script_file" ]]; then
     NOT_EXECUTABLE+=("$script_file")
+  fi
+
+  if grep -Eq '^[[:space:]]*declare[[:space:]]+-A([[:space:]]|$)' "$script_file"; then
+    BASH4_ONLY_PATTERNS+=("$script_file")
   fi
 done < <(find scripts -type f -name '*.sh' | sort)
 
@@ -29,6 +34,12 @@ fi
 if [[ ${#NOT_EXECUTABLE[@]} -gt 0 ]]; then
   echo "Shell invariant failed: scripts not executable"
   printf '%s\n' "${NOT_EXECUTABLE[@]}"
+  exit 1
+fi
+
+if [[ ${#BASH4_ONLY_PATTERNS[@]} -gt 0 ]]; then
+  echo "Shell invariant failed: scripts must stay compatible with macOS bash 3.2 (no 'declare -A')"
+  printf '%s\n' "${BASH4_ONLY_PATTERNS[@]}"
   exit 1
 fi
 

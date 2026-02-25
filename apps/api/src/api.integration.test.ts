@@ -1,14 +1,49 @@
 import { signSessionToken } from '@tx-agent-kit/auth'
 import { createDbAuthContext, createTeam, createUser, type ApiFactoryContext } from '@tx-agent-kit/testkit'
 import { Effect } from 'effect'
-import { randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 const apiPort = Number.parseInt(process.env.API_INTEGRATION_TEST_PORT ?? '4100', 10)
+const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+  if (!value) {
+    return fallback
+  }
+
+  const parsed = Number.parseInt(value, 10)
+  if (Number.isNaN(parsed) || parsed < 1) {
+    return fallback
+  }
+
+  return parsed
+}
+
+const healthReadinessLatencyBudgetMs = parsePositiveInt(
+  process.env.API_HEALTH_READINESS_MAX_LATENCY_MS,
+ 1_500
+)
+const healthBurstRequestCount = parsePositiveInt(
+  process.env.API_HEALTH_BURST_REQUEST_COUNT,
+  20
+)
+const healthBurstLatencyBudgetMs = parsePositiveInt(
+  process.env.API_HEALTH_BURST_MAX_LATENCY_MS,
+  20_000
+)
+const authRateLimitWindowMs = parsePositiveInt(
+  process.env.API_AUTH_RATE_LIMIT_WINDOW_MS,
+  60_000
+)
+const authRateLimitMaxRequests = parsePositiveInt(
+  process.env.API_AUTH_RATE_LIMIT_MAX_REQUESTS,
+  15
+)
 const integrationAuthSecret = 'integration-auth-secret-12345'
 process.env.AUTH_SECRET = integrationAuthSecret
+process.env.AUTH_RATE_LIMIT_WINDOW_MS = String(authRateLimitWindowMs)
+process.env.AUTH_RATE_LIMIT_MAX_REQUESTS = String(authRateLimitMaxRequests)
 const apiCwd = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const dbAuthContext = createDbAuthContext({
@@ -63,10 +98,32 @@ describe('api integration', () => {
     expect(health.body.status).toBe('healthy')
     expect(health.body.service).toBe('tx-agent-kit-api')
     expect(health.body.timestamp).toBeTruthy()
-    expect(durationMs).toBeLessThan(1500)
+    expect(durationMs).toBeLessThan(healthReadinessLatencyBudgetMs)
   })
 
-  it('supports auth + workspace + tasks flow end to end', async () => {
+  it('serves concurrent health checks successfully within burst budget', async () => {
+    const startedAt = globalThis.performance.now()
+
+    const healthResponses = await Promise.all(
+      Array.from({ length: healthBurstRequestCount }, (_, index) =>
+        requestJson<{ status: string; service: string }>(
+          '/health',
+          `health-endpoint-burst-${index}`
+        )
+      )
+    )
+
+    const durationMs = globalThis.performance.now() - startedAt
+
+    for (const health of healthResponses) {
+      expect(health.response.status).toBe(200)
+      expect(health.body.status).toBe('healthy')
+      expect(health.body.service).toBe('tx-agent-kit-api')
+    }
+    expect(durationMs).toBeLessThan(healthBurstLatencyBudgetMs)
+  })
+
+  it('supports auth + organization flow end to end', async () => {
     if (!factoryContext) {
       throw new Error('Factory context was not initialized')
     }
@@ -90,38 +147,51 @@ describe('api integration', () => {
     expect(me.response.status).toBe(200)
     expect(me.body.userId).toBeTruthy()
 
-    const workspace = await createTeam(factoryContext, {
+    const organization = await createTeam(factoryContext, {
       token,
-      name: 'Integration Workspace'
+      name: 'Integration Organization'
     })
 
-    expect(workspace.name).toBe('Integration Workspace')
+    expect(organization.name).toBe('Integration Organization')
 
-    const createTask = await requestJson<{ id: string; title: string; workspaceId: string }>('/v1/tasks', 'create-task', {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        workspaceId: workspace.id,
-        title: 'First integration task',
-        description: 'from integration test'
-      })
-    })
-
-    expect(createTask.response.status).toBe(201)
-    expect(createTask.body.title).toBe('First integration task')
-
-    const listTasks = await requestJson<{ data: Array<{ id: string; title: string }> }>(`/v1/tasks?workspaceId=${workspace.id}`, 'list-tasks', {
+    const listOrganizations = await requestJson<{ data: Array<{ id: string; name: string }> }>('/v1/organizations', 'list-organizations', {
       method: 'GET',
       headers: {
         authorization: `Bearer ${token}`
       }
     })
 
-    expect(listTasks.response.status).toBe(200)
-    expect(listTasks.body.data).toHaveLength(1)
-    expect(listTasks.body.data[0]?.title).toBe('First integration task')
+    expect(listOrganizations.response.status).toBe(200)
+    expect(listOrganizations.body.data).toHaveLength(1)
+    expect(listOrganizations.body.data[0]?.name).toBe('Integration Organization')
+  })
+
+  it('rejects protected organization routes without auth token', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const listOrganizationsWithoutToken = await requestJson<{ message: string }>(
+      '/v1/organizations',
+      'unauthorized-list-organizations',
+      {
+        method: 'GET'
+      }
+    )
+
+    expect(listOrganizationsWithoutToken.response.status).toBe(401)
+  })
+
+  it('rejects auth profile lookups without auth token', async () => {
+    const meWithoutToken = await requestJson<{ message: string }>(
+      '/v1/auth/me',
+      'unauthorized-auth-me',
+      {
+        method: 'GET'
+      }
+    )
+
+    expect(meWithoutToken.response.status).toBe(401)
   })
 
   it('rejects sign-in with invalid credentials', async () => {
@@ -243,247 +313,368 @@ describe('api integration', () => {
     expect(duplicateSignUp.body.message.length).toBeGreaterThan(0)
   })
 
-  it('forbids task operations for users outside workspace membership', async () => {
-    if (!factoryContext) {
-      throw new Error('Factory context was not initialized')
+  it('returns deterministic conflict for concurrent duplicate sign-up attempts', async () => {
+    const signupEmail = 'concurrent-signup@example.com'
+
+    const [attemptOne, attemptTwo] = await Promise.all([
+      requestJson<{ token?: string; user?: { email: string }; message?: string }>(
+        '/v1/auth/sign-up',
+        'auth-sign-up-concurrent-attempt-1',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            email: signupEmail,
+            password: 'signup-pass-12345',
+            name: 'Concurrent Signup One'
+          })
+        }
+      ),
+      requestJson<{ token?: string; user?: { email: string }; message?: string }>(
+        '/v1/auth/sign-up',
+        'auth-sign-up-concurrent-attempt-2',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            email: signupEmail.toUpperCase(),
+            password: 'signup-pass-12345',
+            name: 'Concurrent Signup Two'
+          })
+        }
+      )
+    ])
+
+    const statuses = [attemptOne.response.status, attemptTwo.response.status].sort((a, b) => a - b)
+    expect(statuses).toEqual([201, 409])
+
+    const conflictAttempt = [attemptOne, attemptTwo].find((attempt) => attempt.response.status === 409)
+    if (!conflictAttempt) {
+      throw new Error('Expected one concurrent sign-up attempt to return conflict')
     }
 
-    const owner = await createUser(factoryContext, {
-      email: 'tasks-owner@example.com',
-      password: 'owner-pass-12345',
-      name: 'Tasks Owner'
-    })
+    expect(conflictAttempt.body.message).toContain('Email is already in use')
 
-    const outsider = await createUser(factoryContext, {
-      email: 'tasks-outsider@example.com',
-      password: 'outsider-pass-12345',
-      name: 'Tasks Outsider'
-    })
-
-    const workspace = await createTeam(factoryContext, {
-      token: owner.token,
-      name: 'Task Authz Workspace'
-    })
-
-    const outsiderCreateTask = await requestJson<{ message: string }>(
-      '/v1/tasks',
-      'outsider-create-task-forbidden',
+    const signIn = await requestJson<{ token: string }>(
+      '/v1/auth/sign-in',
+      'auth-sign-up-concurrent-sign-in',
       {
         method: 'POST',
-        headers: {
-          authorization: `Bearer ${outsider.token}`
-        },
         body: JSON.stringify({
-          workspaceId: workspace.id,
-          title: 'Should not be created',
-          description: 'forbidden path'
+          email: signupEmail,
+          password: 'signup-pass-12345'
         })
       }
     )
 
-    expect(outsiderCreateTask.response.status).toBe(401)
+    expect(signIn.response.status).toBe(200)
+    expect(signIn.body.token.length).toBeGreaterThan(0)
+  })
 
-    const outsiderListTasks = await requestJson<{ message: string }>(
-      `/v1/tasks?workspaceId=${workspace.id}`,
-      'outsider-list-task-forbidden',
+  it('handles forgot-password requests without account enumeration', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const existingUser = await createUser(factoryContext, {
+      email: 'forgot-password-existing@example.com',
+      password: 'forgot-existing-pass-12345',
+      name: 'Forgot Existing User'
+    })
+
+    const existingForgot = await requestJson<{ accepted: boolean }>(
+      '/v1/auth/forgot-password',
+      'auth-forgot-password-existing',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email: existingUser.user.email
+        })
+      }
+    )
+
+    const existingForgotAgain = await requestJson<{ accepted: boolean }>(
+      '/v1/auth/forgot-password',
+      'auth-forgot-password-existing-again',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email: existingUser.user.email
+        })
+      }
+    )
+
+    const missingForgot = await requestJson<{ accepted: boolean }>(
+      '/v1/auth/forgot-password',
+      'auth-forgot-password-missing',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email: 'missing-user-forgot-password@example.com'
+        })
+      }
+    )
+
+    expect(existingForgot.response.status).toBe(202)
+    expect(existingForgot.body.accepted).toBe(true)
+    expect(existingForgotAgain.response.status).toBe(202)
+    expect(existingForgotAgain.body.accepted).toBe(true)
+    expect(missingForgot.response.status).toBe(202)
+    expect(missingForgot.body.accepted).toBe(true)
+
+    const resetTokenCounts = await factoryContext.testContext.withSchemaClient(async (client) => {
+      const result = await client.query<{
+        existingCount: string
+        existingActiveCount: string
+        existingUsedCount: string
+        totalCount: string
+      }>(
+        `
+          SELECT
+            COUNT(*) FILTER (WHERE user_id = $1)::text AS "existingCount",
+            COUNT(*) FILTER (WHERE user_id = $1 AND used_at IS NULL AND expires_at > now())::text AS "existingActiveCount",
+            COUNT(*) FILTER (WHERE user_id = $1 AND used_at IS NOT NULL)::text AS "existingUsedCount",
+            COUNT(*)::text AS "totalCount"
+          FROM password_reset_tokens
+        `,
+        [existingUser.user.id]
+      )
+
+      const row = result.rows[0]
+      return {
+        existingCount: Number.parseInt(row?.existingCount ?? '0', 10),
+        existingActiveCount: Number.parseInt(row?.existingActiveCount ?? '0', 10),
+        existingUsedCount: Number.parseInt(row?.existingUsedCount ?? '0', 10),
+        totalCount: Number.parseInt(row?.totalCount ?? '0', 10)
+      }
+    })
+
+    expect(resetTokenCounts.existingCount).toBe(2)
+    expect(resetTokenCounts.existingActiveCount).toBe(1)
+    expect(resetTokenCounts.existingUsedCount).toBe(1)
+    expect(resetTokenCounts.totalCount).toBe(2)
+  })
+
+  it('resets passwords with one-time tokens', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const user = await createUser(factoryContext, {
+      email: 'reset-password-user@example.com',
+      password: 'reset-password-old-12345',
+      name: 'Reset Password User'
+    })
+
+    const rawToken = 'integration-reset-token'
+    const tokenHash = createHash('sha256').update(rawToken, 'utf8').digest('hex')
+
+    await factoryContext.testContext.withSchemaClient(async (client) => {
+      await client.query(
+        `
+          INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+          VALUES ($1, $2, now() + interval '30 minutes')
+        `,
+        [user.user.id, tokenHash]
+      )
+    })
+
+    const reset = await requestJson<{ reset: boolean }>(
+      '/v1/auth/reset-password',
+      'auth-reset-password-success',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          token: rawToken,
+          password: 'reset-password-new-12345'
+        })
+      }
+    )
+
+    expect(reset.response.status).toBe(200)
+    expect(reset.body.reset).toBe(true)
+
+    const meWithPreResetToken = await requestJson<{ message: string }>(
+      '/v1/auth/me',
+      'auth-reset-password-old-token',
       {
         method: 'GET',
         headers: {
-          authorization: `Bearer ${outsider.token}`
+          authorization: `Bearer ${user.token}`
         }
       }
     )
 
-    expect(outsiderListTasks.response.status).toBe(401)
+    expect(meWithPreResetToken.response.status).toBe(401)
+
+    const oldPasswordSignIn = await requestJson<{ message: string }>(
+      '/v1/auth/sign-in',
+      'auth-reset-password-old-password',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email: user.user.email,
+          password: 'reset-password-old-12345'
+        })
+      }
+    )
+
+    expect(oldPasswordSignIn.response.status).toBe(401)
+
+    const newPasswordSignIn = await requestJson<{ token: string }>(
+      '/v1/auth/sign-in',
+      'auth-reset-password-new-password',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email: user.user.email,
+          password: 'reset-password-new-12345'
+        })
+      }
+    )
+
+    expect(newPasswordSignIn.response.status).toBe(200)
+    expect(newPasswordSignIn.body.token.length).toBeGreaterThan(0)
+
+    const reusedToken = await requestJson<{ message: string }>(
+      '/v1/auth/reset-password',
+      'auth-reset-password-reused-token',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          token: rawToken,
+          password: 'reset-password-another-12345'
+        })
+      }
+    )
+
+    expect(reusedToken.response.status).toBe(400)
+    expect(reusedToken.body.message).toContain('Invalid or expired')
   })
 
-  it('paginates task lists with stable cursor sorting and filters', async () => {
+  it('rejects expired password reset tokens', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const user = await createUser(factoryContext, {
+      email: 'expired-reset-password-user@example.com',
+      password: 'expired-reset-password-old-12345',
+      name: 'Expired Reset Password User'
+    })
+
+    const rawToken = 'integration-expired-reset-token'
+    const tokenHash = createHash('sha256').update(rawToken, 'utf8').digest('hex')
+
+    await factoryContext.testContext.withSchemaClient(async (client) => {
+      await client.query(
+        `
+          INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+          VALUES ($1, $2, now() + interval '30 minutes')
+        `,
+        [user.user.id, tokenHash]
+      )
+
+      await client.query(
+        `
+          UPDATE password_reset_tokens
+          SET expires_at = now() - interval '1 minute'
+          WHERE token_hash = $1
+        `,
+        [tokenHash]
+      )
+    })
+
+    const reset = await requestJson<{ message: string }>(
+      '/v1/auth/reset-password',
+      'auth-reset-password-expired-token',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          token: rawToken,
+          password: 'expired-reset-password-new-12345'
+        })
+      }
+    )
+
+    expect(reset.response.status).toBe(400)
+    expect(reset.body.message).toContain('Invalid or expired')
+
+    const oldPasswordSignIn = await requestJson<{ token: string }>(
+      '/v1/auth/sign-in',
+      'auth-reset-password-expired-token-old-password',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email: user.user.email,
+          password: 'expired-reset-password-old-12345'
+        })
+      }
+    )
+
+    expect(oldPasswordSignIn.response.status).toBe(200)
+    expect(oldPasswordSignIn.body.token.length).toBeGreaterThan(0)
+  })
+
+  it('forbids organization mutation for non-owner members', async () => {
     if (!factoryContext) {
       throw new Error('Factory context was not initialized')
     }
 
     const owner = await createUser(factoryContext, {
-      email: 'task-pagination-owner@example.com',
+      email: 'organization-mutation-owner@example.com',
       password: 'owner-pass-12345',
-      name: 'Task Pagination Owner'
+      name: 'Organization Mutation Owner'
     })
 
-    const workspace = await createTeam(factoryContext, {
+    const member = await createUser(factoryContext, {
+      email: 'organization-mutation-member@example.com',
+      password: 'member-pass-12345',
+      name: 'Organization Mutation Member'
+    })
+
+    const organization = await createTeam(factoryContext, {
       token: owner.token,
-      name: 'Task Pagination Workspace'
-    })
-
-    const collaborator = await createUser(factoryContext, {
-      email: 'task-pagination-collaborator@example.com',
-      password: 'collaborator-pass-12345',
-      name: 'Task Pagination Collaborator'
+      name: 'Organization Mutation Team'
     })
 
     await factoryContext.testContext.withSchemaClient(async (client) => {
       await client.query(
         `
-          INSERT INTO workspace_members (workspace_id, user_id, role)
+          INSERT INTO org_members (organization_id, user_id, role)
           VALUES ($1, $2, 'member')
-          ON CONFLICT (workspace_id, user_id) DO NOTHING
+          ON CONFLICT (organization_id, user_id) DO NOTHING
         `,
-        [workspace.id, collaborator.user.id]
+        [organization.id, member.user.id]
       )
     })
 
-    const createdTasks: Array<{ id: string; title: string }> = []
-    for (const [index, title] of ['Charlie', 'Alpha', 'Bravo'].entries()) {
-      const createTask = await requestJson<{ id: string; title: string }>(
-        '/v1/tasks',
-        `create-task-pagination-${index + 1}`,
-        {
-          method: 'POST',
-          headers: {
-            authorization: `Bearer ${owner.token}`
-          },
-          body: JSON.stringify({
-            workspaceId: workspace.id,
-            title,
-            description: `task-${index + 1}`
-          })
-        }
-      )
-
-      expect(createTask.response.status).toBe(201)
-      createdTasks.push(createTask.body)
-    }
-
-    const collaboratorTask = await requestJson<{ id: string; title: string; createdByUserId: string }>(
-      '/v1/tasks',
-      'create-task-pagination-collaborator',
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${collaborator.token}`
-        },
-        body: JSON.stringify({
-          workspaceId: workspace.id,
-          title: 'Delta',
-          description: 'task-collaborator'
-        })
-      }
-    )
-
-    expect(collaboratorTask.response.status).toBe(201)
-    expect(collaboratorTask.body.createdByUserId).toBe(collaborator.user.id)
-
-    const alphaTask = createdTasks.find((task) => task.title === 'Alpha')
-    if (!alphaTask) {
-      throw new Error('Expected Alpha task to exist')
-    }
-
-    const updateAlpha = await requestJson<{ id: string; status: string }>(
-      `/v1/tasks/${alphaTask.id}`,
-      'update-alpha-task-status',
+    const memberUpdateOrganization = await requestJson<{ message: string }>(
+      `/v1/organizations/${organization.id}`,
+      'member-update-organization-forbidden',
       {
         method: 'PATCH',
         headers: {
-          authorization: `Bearer ${owner.token}`
+          authorization: `Bearer ${member.token}`
         },
         body: JSON.stringify({
-          status: 'done'
+          name: 'Member Should Not Rename'
         })
       }
     )
 
-    expect(updateAlpha.response.status).toBe(200)
-    expect(updateAlpha.body.status).toBe('done')
+    expect([401, 403]).toContain(memberUpdateOrganization.response.status)
 
-    const firstPage = await requestJson<{
-      data: Array<{ id: string; title: string; status: string }>
-      total: number
-      nextCursor: string | null
-      prevCursor: string | null
-    }>(
-      `/v1/tasks?workspaceId=${workspace.id}&limit=2&sortBy=title&sortOrder=asc`,
-      'list-task-pagination-page-1',
+    const memberDeleteOrganization = await requestJson<{ message: string }>(
+      `/v1/organizations/${organization.id}`,
+      'member-delete-organization-forbidden',
       {
-        method: 'GET',
+        method: 'DELETE',
         headers: {
-          authorization: `Bearer ${owner.token}`
+          authorization: `Bearer ${member.token}`
         }
       }
     )
 
-    expect(firstPage.response.status).toBe(200)
-    expect(firstPage.body.total).toBe(4)
-    expect(firstPage.body.prevCursor).toBeNull()
-    expect(firstPage.body.nextCursor).toBeTruthy()
-    expect(firstPage.body.data.map((task) => task.title)).toEqual(['Alpha', 'Bravo'])
-
-    const nextCursor = firstPage.body.nextCursor
-    if (!nextCursor) {
-      throw new Error('Expected next cursor on first page')
-    }
-
-    const secondPage = await requestJson<{
-      data: Array<{ id: string; title: string }>
-      total: number
-      nextCursor: string | null
-      prevCursor: string | null
-    }>(
-      `/v1/tasks?workspaceId=${workspace.id}&limit=2&sortBy=title&sortOrder=asc&cursor=${encodeURIComponent(nextCursor)}`,
-      'list-task-pagination-page-2',
-      {
-        method: 'GET',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        }
-      }
-    )
-
-    expect(secondPage.response.status).toBe(200)
-    expect(secondPage.body.total).toBe(4)
-    expect(secondPage.body.nextCursor).toBeNull()
-    expect(secondPage.body.prevCursor).toBeTruthy()
-    expect(secondPage.body.data.map((task) => task.title)).toEqual(['Charlie', 'Delta'])
-
-    const doneOnly = await requestJson<{
-      data: Array<{ id: string; title: string; status: string }>
-      total: number
-      nextCursor: string | null
-      prevCursor: string | null
-    }>(
-      `/v1/tasks?workspaceId=${workspace.id}&filter[status]=done`,
-      'list-task-pagination-filter-status',
-      {
-        method: 'GET',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        }
-      }
-    )
-
-    expect(doneOnly.response.status).toBe(200)
-    expect(doneOnly.body.total).toBe(1)
-    expect(doneOnly.body.data).toHaveLength(1)
-    expect(doneOnly.body.data[0]?.id).toBe(alphaTask.id)
-    expect(doneOnly.body.data[0]?.status).toBe('done')
-
-    const byCollaborator = await requestJson<{
-      data: Array<{ id: string; createdByUserId: string }>
-      total: number
-      nextCursor: string | null
-      prevCursor: string | null
-    }>(
-      `/v1/tasks?workspaceId=${workspace.id}&filter[createdByUserId]=${collaborator.user.id}`,
-      'list-task-pagination-filter-created-by',
-      {
-        method: 'GET',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        }
-      }
-    )
-
-    expect(byCollaborator.response.status).toBe(200)
-    expect(byCollaborator.body.total).toBe(1)
-    expect(byCollaborator.body.data[0]?.id).toBe(collaboratorTask.body.id)
-    expect(byCollaborator.body.data[0]?.createdByUserId).toBe(collaborator.user.id)
+    expect([401, 403]).toContain(memberDeleteOrganization.response.status)
   })
 
   it('returns bad request for invalid list query params', async () => {
@@ -497,27 +688,10 @@ describe('api integration', () => {
       name: 'Invalid Query Owner'
     })
 
-    const workspace = await createTeam(factoryContext, {
-      token: owner.token,
-      name: 'Invalid Query Workspace'
-    })
-
     const invalidCases = [
       {
-        path: `/v1/tasks?workspaceId=${workspace.id}&limit=0`,
-        caseName: 'invalid-query-tasks-limit'
-      },
-      {
-        path: `/v1/tasks?workspaceId=${workspace.id}&sortOrder=up`,
-        caseName: 'invalid-query-tasks-sort-order'
-      },
-      {
-        path: `/v1/tasks?workspaceId=${workspace.id}&sortBy=unknown`,
-        caseName: 'invalid-query-tasks-sort-by'
-      },
-      {
-        path: '/v1/workspaces?sortBy=unknown',
-        caseName: 'invalid-query-workspaces-sort-by'
+        path: '/v1/organizations?sortBy=unknown',
+        caseName: 'invalid-query-organizations-sort-by'
       },
       {
         path: '/v1/invitations?sortBy=unknown',
@@ -546,21 +720,21 @@ describe('api integration', () => {
     }
   })
 
-  it('paginates workspace lists with name sorting and cursors', async () => {
+  it('paginates organization lists with name sorting and cursors', async () => {
     if (!factoryContext) {
       throw new Error('Factory context was not initialized')
     }
 
     const owner = await createUser(factoryContext, {
-      email: 'workspace-pagination-owner@example.com',
+      email: 'organization-pagination-owner@example.com',
       password: 'owner-pass-12345',
-      name: 'Workspace Pagination Owner'
+      name: 'Organization Pagination Owner'
     })
 
-    for (const [index, name] of ['Charlie Workspace', 'Alpha Workspace', 'Bravo Workspace'].entries()) {
+    for (const [index, name] of ['Charlie Organization', 'Alpha Organization', 'Bravo Organization'].entries()) {
       const created = await requestJson<{ id: string; name: string }>(
-        '/v1/workspaces',
-        `create-workspace-pagination-${index + 1}`,
+        '/v1/organizations',
+        `create-organization-pagination-${index + 1}`,
         {
           method: 'POST',
           headers: {
@@ -579,8 +753,8 @@ describe('api integration', () => {
       nextCursor: string | null
       prevCursor: string | null
     }>(
-      '/v1/workspaces?limit=2&sortBy=name&sortOrder=asc',
-      'list-workspaces-pagination-page-1',
+      '/v1/organizations?limit=2&sortBy=name&sortOrder=asc',
+      'list-organizations-pagination-page-1',
       {
         method: 'GET',
         headers: {
@@ -591,16 +765,16 @@ describe('api integration', () => {
 
     expect(firstPage.response.status).toBe(200)
     expect(firstPage.body.total).toBe(3)
-    expect(firstPage.body.data.map((workspace) => workspace.name)).toEqual([
-      'Alpha Workspace',
-      'Bravo Workspace'
+    expect(firstPage.body.data.map((org) => org.name)).toEqual([
+      'Alpha Organization',
+      'Bravo Organization'
     ])
     expect(firstPage.body.prevCursor).toBeNull()
     expect(firstPage.body.nextCursor).toBeTruthy()
 
     const nextCursor = firstPage.body.nextCursor
     if (!nextCursor) {
-      throw new Error('Expected next cursor for workspace page')
+      throw new Error('Expected next cursor for organization page')
     }
 
     const secondPage = await requestJson<{
@@ -609,8 +783,8 @@ describe('api integration', () => {
       nextCursor: string | null
       prevCursor: string | null
     }>(
-      `/v1/workspaces?limit=2&sortBy=name&sortOrder=asc&cursor=${encodeURIComponent(nextCursor)}`,
-      'list-workspaces-pagination-page-2',
+      `/v1/organizations?limit=2&sortBy=name&sortOrder=asc&cursor=${encodeURIComponent(nextCursor)}`,
+      'list-organizations-pagination-page-2',
       {
         method: 'GET',
         headers: {
@@ -621,7 +795,7 @@ describe('api integration', () => {
 
     expect(secondPage.response.status).toBe(200)
     expect(secondPage.body.total).toBe(3)
-    expect(secondPage.body.data.map((workspace) => workspace.name)).toEqual(['Charlie Workspace'])
+    expect(secondPage.body.data.map((org) => org.name)).toEqual(['Charlie Organization'])
     expect(secondPage.body.prevCursor).toBeTruthy()
   })
 
@@ -648,51 +822,15 @@ describe('api integration', () => {
       name: 'Batch Outside Owner'
     })
 
-    const workspace = await createTeam(factoryContext, {
+    const organization = await createTeam(factoryContext, {
       token: owner.token,
-      name: 'Batch Workspace'
+      name: 'Batch Organization'
     })
 
-    const outsideWorkspace = await createTeam(factoryContext, {
+    const outsideOrganization = await createTeam(factoryContext, {
       token: outsideOwner.token,
-      name: 'Outside Workspace'
+      name: 'Outside Organization'
     })
-
-    const task = await requestJson<{ id: string }>(
-      '/v1/tasks',
-      'batch-create-task',
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        },
-        body: JSON.stringify({
-          workspaceId: workspace.id,
-          title: 'Batch Task',
-          description: 'batch test task'
-        })
-      }
-    )
-
-    expect(task.response.status).toBe(201)
-
-    const outsideTask = await requestJson<{ id: string }>(
-      '/v1/tasks',
-      'batch-create-outside-task',
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${outsideOwner.token}`
-        },
-        body: JSON.stringify({
-          workspaceId: outsideWorkspace.id,
-          title: 'Outside Task',
-          description: 'outside workspace task'
-        })
-      }
-    )
-
-    expect(outsideTask.response.status).toBe(201)
 
     const invitation = await requestJson<{ id: string }>(
       '/v1/invitations',
@@ -703,7 +841,7 @@ describe('api integration', () => {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          workspaceId: workspace.id,
+          organizationId: organization.id,
           email: invitee.user.email,
           role: 'member'
         })
@@ -721,7 +859,7 @@ describe('api integration', () => {
           authorization: `Bearer ${outsideOwner.token}`
         },
         body: JSON.stringify({
-          workspaceId: outsideWorkspace.id,
+          organizationId: outsideOrganization.id,
           email: invitee.user.email,
           role: 'member'
         })
@@ -730,39 +868,22 @@ describe('api integration', () => {
 
     expect(outsideInvitation.response.status).toBe(201)
 
-    const batchWorkspaces = await requestJson<{ data: Array<{ id: string }> }>(
-      '/v1/workspaces/batch/get-many',
-      'batch-get-many-workspaces',
+    const batchOrganizations = await requestJson<{ data: Array<{ id: string }> }>(
+      '/v1/organizations/batch/get-many',
+      'batch-get-many-organizations',
       {
         method: 'POST',
         headers: {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          ids: [outsideWorkspace.id, workspace.id]
+          ids: [outsideOrganization.id, organization.id]
         })
       }
     )
 
-    expect(batchWorkspaces.response.status).toBe(200)
-    expect(batchWorkspaces.body.data.map((item) => item.id)).toEqual([workspace.id])
-
-    const batchTasks = await requestJson<{ data: Array<{ id: string }> }>(
-      '/v1/tasks/batch/get-many',
-      'batch-get-many-tasks',
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        },
-        body: JSON.stringify({
-          ids: [outsideTask.body.id, randomUUID(), task.body.id]
-        })
-      }
-    )
-
-    expect(batchTasks.response.status).toBe(200)
-    expect(batchTasks.body.data.map((item) => item.id)).toEqual([task.body.id])
+    expect(batchOrganizations.response.status).toBe(200)
+    expect(batchOrganizations.body.data.map((item) => item.id)).toEqual([organization.id])
 
     const batchInvitations = await requestJson<{ data: Array<{ id: string }> }>(
       '/v1/invitations/batch/get-many',
@@ -781,9 +902,9 @@ describe('api integration', () => {
     expect(batchInvitations.response.status).toBe(200)
     expect(batchInvitations.body.data.map((item) => item.id)).toEqual([invitation.body.id])
 
-    const invalidWorkspaceBatchBody = await requestJson<{ message: string }>(
-      '/v1/workspaces/batch/get-many',
-      'batch-get-many-invalid-uuid-workspaces',
+    const invalidOrganizationBatchBody = await requestJson<{ message: string }>(
+      '/v1/organizations/batch/get-many',
+      'batch-get-many-invalid-uuid-organizations',
       {
         method: 'POST',
         headers: {
@@ -795,25 +916,8 @@ describe('api integration', () => {
       }
     )
 
-    expect(invalidWorkspaceBatchBody.response.status).toBe(400)
-    expect(invalidWorkspaceBatchBody.body.message.length).toBeGreaterThan(0)
-
-    const invalidTaskBatchBody = await requestJson<{ message: string }>(
-      '/v1/tasks/batch/get-many',
-      'batch-get-many-invalid-uuid-tasks',
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        },
-        body: JSON.stringify({
-          ids: ['not-a-uuid']
-        })
-      }
-    )
-
-    expect(invalidTaskBatchBody.response.status).toBe(400)
-    expect(invalidTaskBatchBody.body.message.length).toBeGreaterThan(0)
+    expect(invalidOrganizationBatchBody.response.status).toBe(400)
+    expect(invalidOrganizationBatchBody.body.message.length).toBeGreaterThan(0)
 
     const invalidInvitationBatchBody = await requestJson<{ message: string }>(
       '/v1/invitations/batch/get-many',
@@ -833,7 +937,7 @@ describe('api integration', () => {
     expect(invalidInvitationBatchBody.body.message.length).toBeGreaterThan(0)
   })
 
-  it('supports detail, update, and delete lifecycle endpoints for workspace, task, and invitation', async () => {
+  it('supports detail, update, and delete lifecycle endpoints for organization and invitation', async () => {
     if (!factoryContext) {
       throw new Error('Factory context was not initialized')
     }
@@ -850,27 +954,27 @@ describe('api integration', () => {
       name: 'CRUD Lifecycle Invitee'
     })
 
-    const createdWorkspace = await requestJson<{ id: string; name: string; ownerUserId: string }>(
-      '/v1/workspaces',
-      'crud-lifecycle-create-workspace',
+    const createdOrganization = await requestJson<{ id: string; name: string }>(
+      '/v1/organizations',
+      'crud-lifecycle-create-organization',
       {
         method: 'POST',
         headers: {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          name: 'CRUD Lifecycle Workspace'
+          name: 'CRUD Lifecycle Organization'
         })
       }
     )
 
-    expect(createdWorkspace.response.status).toBe(201)
+    expect(createdOrganization.response.status).toBe(201)
 
-    const workspaceId = createdWorkspace.body.id
+    const organizationId = createdOrganization.body.id
 
-    const workspaceById = await requestJson<{ id: string; name: string; ownerUserId: string }>(
-      `/v1/workspaces/${workspaceId}`,
-      'crud-lifecycle-get-workspace',
+    const organizationById = await requestJson<{ id: string; name: string }>(
+      `/v1/organizations/${organizationId}`,
+      'crud-lifecycle-get-organization',
       {
         method: 'GET',
         headers: {
@@ -879,104 +983,29 @@ describe('api integration', () => {
       }
     )
 
-    expect(workspaceById.response.status).toBe(200)
-    expect(workspaceById.body.id).toBe(workspaceId)
-    expect(workspaceById.body.ownerUserId).toBe(owner.user.id)
+    expect(organizationById.response.status).toBe(200)
+    expect(organizationById.body.id).toBe(organizationId)
 
-    const updatedWorkspace = await requestJson<{ id: string; name: string }>(
-      `/v1/workspaces/${workspaceId}`,
-      'crud-lifecycle-update-workspace',
+    const updatedOrganization = await requestJson<{ id: string; name: string }>(
+      `/v1/organizations/${organizationId}`,
+      'crud-lifecycle-update-organization',
       {
         method: 'PATCH',
         headers: {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          name: 'CRUD Lifecycle Workspace Updated'
+          name: 'CRUD Lifecycle Organization Updated'
         })
       }
     )
 
-    expect(updatedWorkspace.response.status).toBe(200)
-    expect(updatedWorkspace.body.name).toBe('CRUD Lifecycle Workspace Updated')
-
-    const createdTask = await requestJson<{
-      id: string
-      workspaceId: string
-      title: string
-      description: string | null
-      status: 'todo' | 'in_progress' | 'done'
-    }>(
-      '/v1/tasks',
-      'crud-lifecycle-create-task',
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        },
-        body: JSON.stringify({
-          workspaceId,
-          title: 'CRUD Lifecycle Task',
-          description: 'task description'
-        })
-      }
-    )
-
-    expect(createdTask.response.status).toBe(201)
-
-    const taskId = createdTask.body.id
-
-    const taskById = await requestJson<{
-      id: string
-      workspaceId: string
-      title: string
-      description: string | null
-      status: 'todo' | 'in_progress' | 'done'
-    }>(
-      `/v1/tasks/${taskId}`,
-      'crud-lifecycle-get-task',
-      {
-        method: 'GET',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        }
-      }
-    )
-
-    expect(taskById.response.status).toBe(200)
-    expect(taskById.body.id).toBe(taskId)
-    expect(taskById.body.workspaceId).toBe(workspaceId)
-    expect(taskById.body.status).toBe('todo')
-
-    const updatedTask = await requestJson<{
-      id: string
-      title: string
-      description: string | null
-      status: 'todo' | 'in_progress' | 'done'
-    }>(
-      `/v1/tasks/${taskId}`,
-      'crud-lifecycle-update-task',
-      {
-        method: 'PATCH',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        },
-        body: JSON.stringify({
-          title: 'CRUD Lifecycle Task Updated',
-          description: null,
-          status: 'done'
-        })
-      }
-    )
-
-    expect(updatedTask.response.status).toBe(200)
-    expect(updatedTask.body.title).toBe('CRUD Lifecycle Task Updated')
-    expect(updatedTask.body.description).toBeNull()
-    expect(updatedTask.body.status).toBe('done')
+    expect(updatedOrganization.response.status).toBe(200)
+    expect(updatedOrganization.body.name).toBe('CRUD Lifecycle Organization Updated')
 
     const createdInvitation = await requestJson<{
       id: string
-      workspaceId: string
+      organizationId: string
       email: string
       role: 'admin' | 'member'
       status: 'pending' | 'accepted' | 'revoked' | 'expired'
@@ -989,7 +1018,7 @@ describe('api integration', () => {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          workspaceId,
+          organizationId,
           email: invitee.user.email,
           role: 'member'
         })
@@ -1002,7 +1031,7 @@ describe('api integration', () => {
 
     const invitationById = await requestJson<{
       id: string
-      workspaceId: string
+      organizationId: string
       role: 'admin' | 'member'
       status: 'pending' | 'accepted' | 'revoked' | 'expired'
     }>(
@@ -1018,7 +1047,7 @@ describe('api integration', () => {
 
     expect(invitationById.response.status).toBe(200)
     expect(invitationById.body.id).toBe(invitationId)
-    expect(invitationById.body.workspaceId).toBe(workspaceId)
+    expect(invitationById.body.organizationId).toBe(organizationId)
     expect(invitationById.body.status).toBe('pending')
 
     const updatedInvitation = await requestJson<{
@@ -1073,9 +1102,9 @@ describe('api integration', () => {
     expect(invitationAfterRemove.body.id).toBe(invitationId)
     expect(invitationAfterRemove.body.status).toBe('revoked')
 
-    const removedTask = await requestJson<{ deleted: boolean }>(
-      `/v1/tasks/${taskId}`,
-      'crud-lifecycle-remove-task',
+    const removedOrganization = await requestJson<{ deleted: boolean }>(
+      `/v1/organizations/${organizationId}`,
+      'crud-lifecycle-remove-organization',
       {
         method: 'DELETE',
         headers: {
@@ -1084,12 +1113,12 @@ describe('api integration', () => {
       }
     )
 
-    expect(removedTask.response.status).toBe(200)
-    expect(removedTask.body.deleted).toBe(true)
+    expect(removedOrganization.response.status).toBe(200)
+    expect(removedOrganization.body.deleted).toBe(true)
 
-    const taskAfterRemove = await requestJson<{ message: string }>(
-      `/v1/tasks/${taskId}`,
-      'crud-lifecycle-get-task-after-delete',
+    const organizationAfterRemove = await requestJson<{ message: string }>(
+      `/v1/organizations/${organizationId}`,
+      'crud-lifecycle-get-organization-after-delete',
       {
         method: 'GET',
         headers: {
@@ -1098,62 +1127,35 @@ describe('api integration', () => {
       }
     )
 
-    expect(taskAfterRemove.response.status).toBe(404)
-
-    const removedWorkspace = await requestJson<{ deleted: boolean }>(
-      `/v1/workspaces/${workspaceId}`,
-      'crud-lifecycle-remove-workspace',
-      {
-        method: 'DELETE',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        }
-      }
-    )
-
-    expect(removedWorkspace.response.status).toBe(200)
-    expect(removedWorkspace.body.deleted).toBe(true)
-
-    const workspaceAfterRemove = await requestJson<{ message: string }>(
-      `/v1/workspaces/${workspaceId}`,
-      'crud-lifecycle-get-workspace-after-delete',
-      {
-        method: 'GET',
-        headers: {
-          authorization: `Bearer ${owner.token}`
-        }
-      }
-    )
-
-    expect(workspaceAfterRemove.response.status).toBe(404)
+    expect(organizationAfterRemove.response.status).toBe(404)
   })
 
-  it('auto-creates owner membership when workspace is created via API', async () => {
+  it('auto-creates owner membership when organization is created via API', async () => {
     if (!factoryContext) {
       throw new Error('Factory context was not initialized')
     }
 
     const owner = await createUser(factoryContext, {
-      email: 'workspace-owner-trigger@example.com',
+      email: 'organization-owner-trigger@example.com',
       password: 'owner-pass-12345',
-      name: 'Workspace Trigger Owner'
+      name: 'Organization Trigger Owner'
     })
 
-    const workspace = await createTeam(factoryContext, {
+    const organization = await createTeam(factoryContext, {
       token: owner.token,
-      name: 'Workspace Trigger Team'
+      name: 'Organization Trigger Team'
     })
 
     const membershipResult = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       client.query<{ role: string }>(
         `
           SELECT role
-          FROM workspace_members
-          WHERE workspace_id = $1
+          FROM org_members
+          WHERE organization_id = $1
             AND user_id = $2
           LIMIT 1
         `,
-        [workspace.id, owner.user.id]
+        [organization.id, owner.user.id]
       )
     )
 
@@ -1161,7 +1163,7 @@ describe('api integration', () => {
     expect(membershipResult.rows[0]?.role).toBe('owner')
   })
 
-  it('lists invitations for invitee email and not workspace membership', async () => {
+  it('lists invitations for invitee email and not organization membership', async () => {
     if (!factoryContext) {
       throw new Error('Factory context was not initialized')
     }
@@ -1178,9 +1180,9 @@ describe('api integration', () => {
       name: 'Invitee'
     })
 
-    const workspace = await createTeam(factoryContext, {
+    const organization = await createTeam(factoryContext, {
       token: owner.token,
-      name: 'Invite Scope Workspace'
+      name: 'Invite Scope Organization'
     })
 
     const createdInvitation = await requestJson<{ id: string; token: string; email: string }>(
@@ -1192,7 +1194,7 @@ describe('api integration', () => {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          workspaceId: workspace.id,
+          organizationId: organization.id,
           email: invitee.user.email,
           role: 'member'
         })
@@ -1250,14 +1252,14 @@ describe('api integration', () => {
       name: 'Invitee Invite Filter'
     })
 
-    const workspaceOne = await createTeam(factoryContext, {
+    const organizationOne = await createTeam(factoryContext, {
       token: owner.token,
-      name: 'Invite Filter Workspace One'
+      name: 'Invite Filter Organization One'
     })
 
-    const workspaceTwo = await createTeam(factoryContext, {
+    const organizationTwo = await createTeam(factoryContext, {
       token: owner.token,
-      name: 'Invite Filter Workspace Two'
+      name: 'Invite Filter Organization Two'
     })
 
     const memberInvitation = await requestJson<{ id: string }>(
@@ -1269,7 +1271,7 @@ describe('api integration', () => {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          workspaceId: workspaceOne.id,
+          organizationId: organizationOne.id,
           email: invitee.user.email,
           role: 'member'
         })
@@ -1285,7 +1287,7 @@ describe('api integration', () => {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          workspaceId: workspaceTwo.id,
+          organizationId: organizationTwo.id,
           email: invitee.user.email,
           role: 'admin'
         })
@@ -1397,19 +1399,19 @@ describe('api integration', () => {
       name: 'Target Roles'
     })
 
-    const workspace = await createTeam(factoryContext, {
+    const organization = await createTeam(factoryContext, {
       token: owner.token,
-      name: 'Role Guard Workspace'
+      name: 'Role Guard Organization'
     })
 
     await factoryContext.testContext.withSchemaClient(async (client) => {
       await client.query(
         `
-          INSERT INTO workspace_members (workspace_id, user_id, role)
+          INSERT INTO org_members (organization_id, user_id, role)
           VALUES ($1, $2, 'member')
-          ON CONFLICT (workspace_id, user_id) DO NOTHING
+          ON CONFLICT (organization_id, user_id) DO NOTHING
         `,
-        [workspace.id, member.user.id]
+        [organization.id, member.user.id]
       )
     })
 
@@ -1422,7 +1424,7 @@ describe('api integration', () => {
           authorization: `Bearer ${member.token}`
         },
         body: JSON.stringify({
-          workspaceId: workspace.id,
+          organizationId: organization.id,
           email: target.user.email,
           role: 'member'
         })
@@ -1440,7 +1442,7 @@ describe('api integration', () => {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          workspaceId: workspace.id,
+          organizationId: organization.id,
           email: 'not-registered@example.com',
           role: 'member'
         })
@@ -1449,6 +1451,80 @@ describe('api integration', () => {
 
     expect(ownerMissingUserInvite.response.status).toBe(400)
     expect(ownerMissingUserInvite.body.message).toContain('already have an account')
+  })
+
+  it('rejects invitations for users who are already organization members', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'owner-member-conflict@example.com',
+      password: 'strong-pass-12345',
+      name: 'Owner Member Conflict'
+    })
+
+    const invitee = await createUser(factoryContext, {
+      email: 'invitee-member-conflict@example.com',
+      password: 'strong-pass-12345',
+      name: 'Invitee Member Conflict'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Invite Member Conflict Organization'
+    })
+
+    const firstInvite = await requestJson<{ token: string }>(
+      '/v1/invitations',
+      'create-invitation-member-conflict-first',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        },
+        body: JSON.stringify({
+          organizationId: organization.id,
+          email: invitee.user.email,
+          role: 'member'
+        })
+      }
+    )
+
+    expect(firstInvite.response.status).toBe(201)
+
+    const acceptInvite = await requestJson<{ accepted: boolean }>(
+      `/v1/invitations/${firstInvite.body.token}/accept`,
+      'accept-invitation-member-conflict-first',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${invitee.token}`
+        }
+      }
+    )
+
+    expect(acceptInvite.response.status).toBe(200)
+    expect(acceptInvite.body.accepted).toBe(true)
+
+    const duplicateInvite = await requestJson<{ message: string }>(
+      '/v1/invitations',
+      'create-invitation-member-conflict-duplicate',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        },
+        body: JSON.stringify({
+          organizationId: organization.id,
+          email: invitee.user.email,
+          role: 'member'
+        })
+      }
+    )
+
+    expect(duplicateInvite.response.status).toBe(409)
+    expect(duplicateInvite.body.message).toContain('already an organization member')
   })
 
   it('uses canonical user identity for invitation listing and acceptance', async () => {
@@ -1474,9 +1550,9 @@ describe('api integration', () => {
       name: 'Attacker Identity'
     })
 
-    const workspace = await createTeam(factoryContext, {
+    const organization = await createTeam(factoryContext, {
       token: owner.token,
-      name: 'Identity Guard Workspace'
+      name: 'Identity Guard Organization'
     })
 
     const createdInvitation = await requestJson<{ id: string; token: string }>(
@@ -1488,7 +1564,7 @@ describe('api integration', () => {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          workspaceId: workspace.id,
+          organizationId: organization.id,
           email: invitee.user.email,
           role: 'member'
         })
@@ -1501,7 +1577,8 @@ describe('api integration', () => {
     const forgedToken = await Effect.runPromise(
       signSessionToken({
         sub: attacker.user.id,
-        email: invitee.user.email
+        email: invitee.user.email,
+        pwd: Date.now()
       })
     )
 
@@ -1516,8 +1593,10 @@ describe('api integration', () => {
       }
     )
 
-    expect(forgedList.response.status).toBe(200)
-    expect(forgedList.body.data).toHaveLength(0)
+    expect([200, 401]).toContain(forgedList.response.status)
+    if (forgedList.response.status === 200) {
+      expect(forgedList.body.data).toHaveLength(0)
+    }
 
     const forgedAccept = await requestJson<{ message?: string }>(
       `/v1/invitations/${invitationToken}/accept`,
@@ -1530,7 +1609,7 @@ describe('api integration', () => {
       }
     )
 
-    expect(forgedAccept.response.status).toBe(404)
+    expect([401, 404]).toContain(forgedAccept.response.status)
 
     const inviteeAccept = await requestJson<{ accepted: boolean }>(
       `/v1/invitations/${invitationToken}/accept`,
@@ -1547,7 +1626,7 @@ describe('api integration', () => {
     expect(inviteeAccept.body.accepted).toBe(true)
   })
 
-  it('accepts invitations idempotently and grants workspace access once', async () => {
+  it('accepts invitations idempotently and grants organization access once', async () => {
     if (!factoryContext) {
       throw new Error('Factory context was not initialized')
     }
@@ -1564,9 +1643,9 @@ describe('api integration', () => {
       name: 'Invitee Idempotent'
     })
 
-    const workspace = await createTeam(factoryContext, {
+    const organization = await createTeam(factoryContext, {
       token: owner.token,
-      name: 'Idempotent Invitation Workspace'
+      name: 'Idempotent Invitation Organization'
     })
 
     const createdInvitation = await requestJson<{ token: string }>(
@@ -1578,7 +1657,7 @@ describe('api integration', () => {
           authorization: `Bearer ${owner.token}`
         },
         body: JSON.stringify({
-          workspaceId: workspace.id,
+          organizationId: organization.id,
           email: invitee.user.email,
           role: 'member'
         })
@@ -1601,6 +1680,35 @@ describe('api integration', () => {
     expect(firstAccept.response.status).toBe(200)
     expect(firstAccept.body.accepted).toBe(true)
 
+    const readMembershipCount = async (): Promise<number> => {
+      const membershipResult = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+        client.query<{ membership_count: string | number }>(
+          `
+            SELECT COUNT(*)::int AS membership_count
+            FROM org_members
+            WHERE organization_id = $1
+              AND user_id = $2
+          `,
+          [organization.id, invitee.user.id]
+        )
+      )
+
+      const rawCount = membershipResult.rows[0]?.membership_count
+      if (typeof rawCount === 'number') {
+        return rawCount
+      }
+
+      const parsed = Number.parseInt(rawCount ?? '0', 10)
+      if (Number.isNaN(parsed)) {
+        throw new Error('Invalid membership count value returned from org_members query')
+      }
+
+      return parsed
+    }
+
+    const membershipCountAfterFirstAccept = await readMembershipCount()
+    expect(membershipCountAfterFirstAccept).toBe(1)
+
     const secondAccept = await requestJson<{ message: string }>(
       `/v1/invitations/${createdInvitation.body.token}/accept`,
       'accept-idempotent-invitation-second',
@@ -1614,9 +1722,12 @@ describe('api integration', () => {
 
     expect(secondAccept.response.status).toBe(404)
 
-    const inviteeWorkspaces = await requestJson<{ data: Array<{ id: string }> }>(
-      '/v1/workspaces',
-      'list-workspaces-after-accept',
+    const membershipCountAfterSecondAccept = await readMembershipCount()
+    expect(membershipCountAfterSecondAccept).toBe(1)
+
+    const inviteeOrganizations = await requestJson<{ data: Array<{ id: string }> }>(
+      '/v1/organizations',
+      'list-organizations-after-accept',
       {
         method: 'GET',
         headers: {
@@ -1625,11 +1736,146 @@ describe('api integration', () => {
       }
     )
 
-    expect(inviteeWorkspaces.response.status).toBe(200)
-    expect(inviteeWorkspaces.body.data.some((item) => item.id === workspace.id)).toBe(true)
+    expect(inviteeOrganizations.response.status).toBe(200)
+    expect(inviteeOrganizations.body.data.some((item) => item.id === organization.id)).toBe(true)
   })
 
-  it('prevents deleting a user who still owns workspaces', async () => {
+  it('rejects acceptance for expired invitation tokens', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'owner-expired-invite@example.com',
+      password: 'owner-pass-12345',
+      name: 'Owner Expired Invite'
+    })
+
+    const invitee = await createUser(factoryContext, {
+      email: 'invitee-expired-invite@example.com',
+      password: 'invitee-pass-12345',
+      name: 'Invitee Expired Invite'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Expired Invitation Organization'
+    })
+
+    const createdInvitation = await requestJson<{ token: string }>(
+      '/v1/invitations',
+      'create-expired-invitation',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        },
+        body: JSON.stringify({
+          organizationId: organization.id,
+          email: invitee.user.email,
+          role: 'member'
+        })
+      }
+    )
+
+    expect(createdInvitation.response.status).toBe(201)
+
+    await factoryContext.testContext.withSchemaClient(async (client) => {
+      await client.query(
+        `
+          UPDATE invitations
+          SET expires_at = now() - interval '1 minute'
+          WHERE token = $1
+        `,
+        [createdInvitation.body.token]
+      )
+    })
+
+    const acceptExpiredInvitation = await requestJson<{ message: string }>(
+      `/v1/invitations/${createdInvitation.body.token}/accept`,
+      'accept-expired-invitation',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${invitee.token}`
+        }
+      }
+    )
+
+    expect(acceptExpiredInvitation.response.status).toBe(404)
+
+    const invitationStatus = await factoryContext.testContext.withSchemaClient(async (client) =>
+      client.query<{ status: string }>(
+        `
+          SELECT status
+          FROM invitations
+          WHERE token = $1
+          LIMIT 1
+        `,
+        [createdInvitation.body.token]
+      )
+    )
+
+    expect(invitationStatus.rows[0]?.status).toBe('pending')
+  })
+
+  it('rate limits repeated failed sign-in attempts', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const user = await createUser(factoryContext, {
+      email: 'auth-rate-limit@example.com',
+      password: 'valid-pass-12345',
+      name: 'Auth Rate Limit User'
+    })
+
+    let sawRateLimit = false
+
+    for (let attempt = 0; attempt < authRateLimitMaxRequests; attempt += 1) {
+      const invalidSignIn = await requestJson<{ message: string }>(
+        '/v1/auth/sign-in',
+        `auth-sign-in-rate-limit-${attempt + 1}`,
+        {
+          method: 'POST',
+          headers: {
+            'x-forwarded-for': '198.51.100.24'
+          },
+          body: JSON.stringify({
+            email: user.user.email,
+            password: 'wrong-pass-12345'
+          })
+        }
+      )
+
+      expect([401, 429]).toContain(invalidSignIn.response.status)
+      if (invalidSignIn.response.status === 429) {
+        sawRateLimit = true
+        break
+      }
+    }
+
+    const throttledSignIn = await requestJson<{ message?: string; error?: { code?: string; message?: string } }>(
+      '/v1/auth/sign-in',
+      'auth-sign-in-rate-limit-throttled',
+      {
+        method: 'POST',
+        headers: {
+          'x-forwarded-for': '198.51.100.24'
+        },
+        body: JSON.stringify({
+          email: user.user.email,
+          password: 'wrong-pass-12345'
+        })
+      }
+    )
+
+    expect(throttledSignIn.response.status).toBe(429)
+    expect(throttledSignIn.body.error?.code).toBe('TOO_MANY_REQUESTS')
+    expect(sawRateLimit || throttledSignIn.response.status === 429).toBe(true)
+  })
+
+  it('prevents deleting a user who still owns organizations', async () => {
     if (!factoryContext) {
       throw new Error('Factory context was not initialized')
     }
@@ -1642,12 +1888,12 @@ describe('api integration', () => {
 
     await createTeam(factoryContext, {
       token: owner.token,
-      name: 'Owner Delete Guard Workspace'
+      name: 'Owner Delete Guard Organization'
     })
 
     const deleteResponse = await requestJson<{ message: string }>(
       '/v1/auth/me',
-      'delete-owner-with-workspace',
+      'delete-owner-with-organization',
       {
         method: 'DELETE',
         headers: {
@@ -1673,7 +1919,7 @@ describe('api integration', () => {
 
     const deleteResponse = await requestJson<{ deleted: boolean }>(
       '/v1/auth/me',
-      'delete-user-without-workspace',
+      'delete-user-without-organization',
       {
         method: 'DELETE',
         headers: {

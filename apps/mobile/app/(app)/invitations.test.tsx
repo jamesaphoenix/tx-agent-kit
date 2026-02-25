@@ -24,7 +24,7 @@ vi.mock('../../lib/client-auth', () => ({
 vi.mock('../../lib/client-api', () => ({
   clientApi: {
     listInvitations: vi.fn(),
-    listWorkspaces: vi.fn()
+    listOrganizations: vi.fn()
   }
 }))
 
@@ -48,8 +48,8 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-const workspace = { id: 'w-1', name: 'Alpha', ownerUserId: 'u-1' }
-const invitation = { id: 'inv-1', email: 'peer@co.com', role: 'member', status: 'pending', workspaceId: 'w-1' }
+const organization = { id: 'o-1', name: 'Alpha', ownerUserId: 'u-1' }
+const invitation = { id: 'inv-1', email: 'peer@co.com', role: 'member', status: 'pending', organizationId: 'o-1' }
 
 describe('InvitationsScreen', () => {
   it('stops loading without API calls when no session exists', async () => {
@@ -59,13 +59,13 @@ describe('InvitationsScreen', () => {
     await flush()
 
     expect(clientApi.listInvitations).not.toHaveBeenCalled()
-    expect(clientApi.listWorkspaces).not.toHaveBeenCalled()
+    expect(clientApi.listOrganizations).not.toHaveBeenCalled()
   })
 
-  it('loads invitations and workspaces on success', async () => {
+  it('loads invitations and organizations on success', async () => {
     ;(ensureSessionOrRedirect as Mock).mockReturnValue(true)
     ;(clientApi.listInvitations as Mock).mockResolvedValue({ invitations: [invitation] })
-    ;(clientApi.listWorkspaces as Mock).mockResolvedValue({ workspaces: [workspace] })
+    ;(clientApi.listOrganizations as Mock).mockResolvedValue({ organizations: [organization] })
 
     const tree = create(<InvitationsScreen />)
     await flush()
@@ -78,7 +78,7 @@ describe('InvitationsScreen', () => {
   it('shows empty state when no invitations exist', async () => {
     ;(ensureSessionOrRedirect as Mock).mockReturnValue(true)
     ;(clientApi.listInvitations as Mock).mockResolvedValue({ invitations: [] })
-    ;(clientApi.listWorkspaces as Mock).mockResolvedValue({ workspaces: [] })
+    ;(clientApi.listOrganizations as Mock).mockResolvedValue({ organizations: [] })
 
     const tree = create(<InvitationsScreen />)
     await flush()
@@ -91,7 +91,7 @@ describe('InvitationsScreen', () => {
     const err = new Error('unauthorized')
     ;(ensureSessionOrRedirect as Mock).mockReturnValue(true)
     ;(clientApi.listInvitations as Mock).mockRejectedValue(err)
-    ;(clientApi.listWorkspaces as Mock).mockResolvedValue({ workspaces: [] })
+    ;(clientApi.listOrganizations as Mock).mockResolvedValue({ organizations: [] })
     ;(handleUnauthorizedApiError as Mock).mockResolvedValue(true)
 
     create(<InvitationsScreen />)
@@ -103,7 +103,7 @@ describe('InvitationsScreen', () => {
   it('shows error message on non-auth API failure', async () => {
     ;(ensureSessionOrRedirect as Mock).mockReturnValue(true)
     ;(clientApi.listInvitations as Mock).mockRejectedValue(new Error('Connection refused'))
-    ;(clientApi.listWorkspaces as Mock).mockResolvedValue({ workspaces: [] })
+    ;(clientApi.listOrganizations as Mock).mockResolvedValue({ organizations: [] })
     ;(handleUnauthorizedApiError as Mock).mockResolvedValue(false)
 
     const tree = create(<InvitationsScreen />)

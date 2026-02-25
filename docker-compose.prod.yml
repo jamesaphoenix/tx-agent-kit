@@ -1,4 +1,17 @@
 services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.146.1
+    restart: unless-stopped
+    env_file:
+      - ${DEPLOY_ENV_FILE:?DEPLOY_ENV_FILE must point to rendered env}
+    command:
+      - --config=/etc/otel-collector/otel-collector.${OTEL_COLLECTOR_BACKEND:-gcp}.yaml
+    volumes:
+      - ./monitoring/production/otel-collector.gcp.yaml:/etc/otel-collector/otel-collector.gcp.yaml:ro
+      - ./monitoring/production/otel-collector.oss.yaml:/etc/otel-collector/otel-collector.oss.yaml:ro
+      - "${OTEL_COLLECTOR_GCP_CREDENTIALS_DIR:-./deploy/gcp-empty}:/var/secrets/google:ro"
+      - "${OTEL_COLLECTOR_GCLOUD_CONFIG_DIR:-./deploy/gcloud-empty}:/root/.config/gcloud:ro"
+
   api:
     image: ${API_IMAGE:?API_IMAGE must be set to a pinned image reference}
     restart: unless-stopped
@@ -7,8 +20,13 @@ services:
     environment:
       API_PORT: '4000'
       API_HOST: 0.0.0.0
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-otlp}
     ports:
       - '${API_PORT:-4000}:4000'
+    depends_on:
+      otel-collector:
+        condition: service_started
     healthcheck:
       test:
         - CMD
@@ -25,6 +43,11 @@ services:
     restart: unless-stopped
     env_file:
       - ${DEPLOY_ENV_FILE:?DEPLOY_ENV_FILE must point to rendered env}
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-otlp}
     depends_on:
       api:
         condition: service_healthy
+      otel-collector:
+        condition: service_started

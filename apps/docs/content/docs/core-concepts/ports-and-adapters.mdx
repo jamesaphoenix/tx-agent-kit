@@ -10,22 +10,20 @@ The ports and adapters pattern (also known as hexagonal architecture) is central
 A port is a type alias that describes what a capability does, without specifying how it does it:
 
 ```typescript
-// packages/core/src/domains/tasks/ports/task-repository.port.ts
+// packages/core/src/domains/organization/ports/organization-repository.port.ts
 
-import type { TaskRecord, TaskStatus } from "../domain/task.js"
+import type { OrganizationRecord } from "../domain/organization.js"
 
-export type TaskRepositoryPort = {
-  readonly findById: (id: string) => Effect.Effect<TaskRecord | null>
-  readonly create: (input: CreateTaskInput) => Effect.Effect<TaskRecord>
-  readonly updateStatus: (id: string, status: TaskStatus) => Effect.Effect<TaskRecord>
-  readonly listByWorkspace: (workspaceId: string) => Effect.Effect<ReadonlyArray<TaskRecord>>
+export type OrganizationRepositoryPort = {
+  readonly findById: (id: string) => Effect.Effect<OrganizationRecord | null>
+  readonly create: (input: CreateOrganizationInput) => Effect.Effect<OrganizationRecord>
+  readonly update: (id: string, input: UpdateOrganizationInput) => Effect.Effect<OrganizationRecord>
+  readonly listByUser: (userId: string) => Effect.Effect<ReadonlyArray<OrganizationRecord>>
   readonly delete: (id: string) => Effect.Effect<void>
 }
 
-export type CreateTaskInput = {
-  readonly workspaceId: string
-  readonly title: string
-  readonly description: string | null
+export type CreateOrganizationInput = {
+  readonly name: string
 }
 ```
 
@@ -37,51 +35,48 @@ Port files must use `export type` instead of `export interface`. This is a mecha
 
 ```typescript
 // WRONG - will fail structural invariant check
-export interface TaskRepositoryPort {
-  findById(id: string): Effect.Effect<TaskRecord | null>
+export interface OrganizationRepositoryPort {
+  findById(id: string): Effect.Effect<OrganizationRecord | null>
 }
 
 // CORRECT - use export type
-export type TaskRepositoryPort = {
-  readonly findById: (id: string) => Effect.Effect<TaskRecord | null>
+export type OrganizationRepositoryPort = {
+  readonly findById: (id: string) => Effect.Effect<OrganizationRecord | null>
 }
 ```
 
-Record types come from `domain/`. Port files import `TaskRecord`, `TaskStatus`, and other domain types from the `domain/` directory. They never define their own entity types.
+Record types come from `domain/`. Port files import `OrganizationRecord` and other domain types from the `domain/` directory. They never define their own entity types.
 
-Ports import only `domain/` and `ports/`. A port file cannot import from `application/`, `adapters/`, `packages/db`, or any infrastructure package.
+Ports import only `domain/` and `ports/`. A port file cannot import from `application/`, `adapters/`, `packages/infra/db`, or any infrastructure package.
 
 ## Adapters: concrete implementations
 
-Adapters implement port contracts using specific technologies. In tx-agent-kit, the primary adapters are Drizzle-based repository implementations in `packages/db/src/repositories/`:
+Adapters implement port contracts using specific technologies. In tx-agent-kit, the primary adapters are Drizzle-based repository implementations in `packages/infra/db/src/repositories/`:
 
 ```typescript
-// packages/db/src/repositories/task.repository.ts
+// packages/infra/db/src/repositories/organizations.ts
 
 import { eq } from "drizzle-orm"
-import { tasks } from "../schema.js"
-import type { TaskRepositoryPort } from "@tx-agent-kit/core/domains/tasks/ports/task-repository.port.js"
+import { organizations } from "../schema.js"
+import type { OrganizationRepositoryPort } from "@tx-agent-kit/core/domains/organization/ports/organization-repository.port.js"
 
-export const makeTaskRepository = (db: DrizzleClient): TaskRepositoryPort => ({
+export const makeOrganizationRepository = (db: DrizzleClient): OrganizationRepositoryPort => ({
   findById: (id) =>
     Effect.tryPromise(() =>
       db
         .select()
-        .from(tasks)
-        .where(eq(tasks.id, id))
+        .from(organizations)
+        .where(eq(organizations.id, id))
         .then((rows) => rows[0] ?? null),
     ),
 
   create: (input) =>
     Effect.tryPromise(() =>
       db
-        .insert(tasks)
+        .insert(organizations)
         .values({
           id: generateId(),
-          workspaceId: input.workspaceId,
-          title: input.title,
-          description: input.description,
-          status: "open",
+          name: input.name,
         })
         .returning()
         .then((rows) => rows[0]!),
@@ -91,11 +86,11 @@ export const makeTaskRepository = (db: DrizzleClient): TaskRepositoryPort => ({
 })
 ```
 
-### Why adapters live in packages/db
+### Why adapters live in packages/infra/db
 
-In many hexagonal architecture implementations, adapters live next to the domain. tx-agent-kit takes a different approach: **persistence adapters live in `packages/db/src/repositories/`**.
+In many hexagonal architecture implementations, adapters live next to the domain. tx-agent-kit takes a different approach: **persistence adapters live in `packages/infra/db/src/repositories/`**.
 
-This decision is deliberate. First, `packages/core` stays free of `drizzle-orm`. If repositories lived in core, core would need a dependency on the database library. Second, all database code is colocated: schema, migrations, repositories, effect-schemas, and factories all live together in `packages/db`. Third, the structural invariant enforces it. The check script verifies that `packages/core/src/domains/*/repositories/` does not exist.
+This decision is deliberate. First, `packages/core` stays free of `drizzle-orm`. If repositories lived in core, core would need a dependency on the database library. Second, all database code is colocated: schema, migrations, repositories, effect-schemas, and factories all live together in `packages/infra/db`. Third, the structural invariant enforces it. The check script verifies that `packages/core/src/domains/*/repositories/` does not exist.
 
 ## Wiring ports to adapters
 
@@ -103,16 +98,16 @@ The connection between abstract ports and concrete adapters happens through Effe
 
 ```typescript
 // apps/api - layer wiring
-import { TaskRepository } from "@tx-agent-kit/core/domains/tasks/ports/task-repository.port.js"
-import { makeTaskRepository } from "@tx-agent-kit/db/repositories/task.repository.js"
+import { OrganizationRepository } from "@tx-agent-kit/core/domains/organization/ports/organization-repository.port.js"
+import { makeOrganizationRepository } from "@tx-agent-kit/db/repositories/organizations.js"
 
-const TaskRepositoryLive = Layer.succeed(
-  TaskRepository,
-  makeTaskRepository(dbClient),
+const OrganizationRepositoryLive = Layer.succeed(
+  OrganizationRepository,
+  makeOrganizationRepository(dbClient),
 )
 ```
 
-Route handlers and application services depend on the abstract `TaskRepository` tag. The layer system provides the concrete Drizzle implementation at runtime.
+Route handlers and application services depend on the abstract `OrganizationRepository` tag. The layer system provides the concrete Drizzle implementation at runtime.
 
 ## Testing with ports
 
@@ -120,22 +115,23 @@ Ports make testing straightforward. You can create in-memory implementations for
 
 ```typescript
 // Test with an in-memory adapter
-const makeInMemoryTaskRepo = (): TaskRepositoryPort => {
-  const store = new Map<string, TaskRecord>()
+const makeInMemoryOrgRepo = (): OrganizationRepositoryPort => {
+  const store = new Map<string, OrganizationRecord>()
 
   return {
     findById: (id) => Effect.succeed(store.get(id) ?? null),
     create: (input) => {
-      const task: TaskRecord = {
-        id: `task-${store.size + 1}`,
-        ...input,
-        status: "open",
-        assigneeId: null,
+      const org: OrganizationRecord = {
+        id: `org-${store.size + 1}`,
+        name: input.name,
+        billingEmail: null,
+        isSubscribed: false,
+        subscriptionStatus: "inactive",
         createdAt: new Date("2024-01-01"),
         updatedAt: new Date("2024-01-01"),
       }
-      store.set(task.id, task)
-      return Effect.succeed(task)
+      store.set(org.id, org)
+      return Effect.succeed(org)
     },
     // ... other methods
   }

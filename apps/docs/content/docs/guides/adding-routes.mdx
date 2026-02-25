@@ -11,7 +11,7 @@ Every route file must export a kind marker constant:
 
 ```typescript
 // CRUD routes expose list/get/create/update/remove
-export const TasksRouteKind = 'crud' as const
+export const OrganizationsRouteKind = 'crud' as const
 
 // Custom routes expose domain-specific operations
 export const AuthRouteKind = 'custom' as const
@@ -21,33 +21,33 @@ The enforcement layer validates that routes marked `crud` expose the full CRUD s
 
 ## Creating a CRUD Route
 
-A `crud` route follows a predictable pattern. Using tasks as an example:
+A `crud` route follows a predictable pattern. Using organizations as an example:
 
 ```typescript
-// apps/api/src/routes/tasks.ts
+// apps/api/src/routes/organizations.ts
 import { HttpApiBuilder, HttpServerRequest } from '@effect/platform'
-import { principalFromAuthorization, TaskService } from '@tx-agent-kit/core'
+import { principalFromAuthorization, OrganizationService } from '@tx-agent-kit/core'
 import { Effect } from 'effect'
 import { TxAgentApi, mapCoreError } from '../api.js'
 
-export const TasksRouteKind = 'crud' as const
+export const OrganizationsRouteKind = 'crud' as const
 
-export const TasksLive = HttpApiBuilder.group(TxAgentApi, 'tasks', (handlers) =>
+export const OrganizationsLive = HttpApiBuilder.group(TxAgentApi, 'organizations', (handlers) =>
   handlers
-    .handle('listTasks', ({ urlParams }) =>
+    .handle('listOrganizations', ({ urlParams }) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const principal = yield* principalFromAuthorization(
           request.headers.authorization
         ).pipe(Effect.mapError(mapCoreError))
-        const service = yield* TaskService
+        const service = yield* OrganizationService
         // ... list logic
       })
     )
-    .handle('getTask', ({ path }) => /* ... */)
-    .handle('createTask', ({ payload }) => /* ... */)
-    .handle('updateTask', ({ path, payload }) => /* ... */)
-    .handle('removeTask', ({ path }) => /* ... */)
+    .handle('getOrganization', ({ path }) => /* ... */)
+    .handle('createOrganization', ({ payload }) => /* ... */)
+    .handle('updateOrganization', ({ path, payload }) => /* ... */)
+    .handle('removeOrganization', ({ path }) => /* ... */)
 )
 ```
 

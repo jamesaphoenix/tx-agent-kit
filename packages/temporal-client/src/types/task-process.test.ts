@@ -13,7 +13,7 @@ describe('task process workflow schemas', () => {
     const input = decodeInput({
       operationId: 'op-1',
       taskId: 'task-1',
-      workspaceId: 'workspace-1'
+      organizationId: 'organization-1'
     })
     const output = decodeOutput({
       success: true,
@@ -24,7 +24,7 @@ describe('task process workflow schemas', () => {
     expect(input).toEqual({
       operationId: 'op-1',
       taskId: 'task-1',
-      workspaceId: 'workspace-1'
+      organizationId: 'organization-1'
     })
     expect(output).toEqual({
       success: true,
@@ -41,7 +41,7 @@ describe('task process workflow schemas', () => {
       decodeInput({
         operationId: 'op-1',
         taskId: 123,
-        workspaceId: 'workspace-1'
+        organizationId: 'organization-1'
       })
     ).toThrow()
 

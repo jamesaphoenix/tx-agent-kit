@@ -21,12 +21,12 @@ const logger = createLogger('my-service')
 logger.info('Server started')
 ```
 
-### No `drizzle-orm` Outside `packages/db`
+### No `drizzle-orm` Outside `packages/infra/db`
 
-Database access is fully isolated. Only `packages/db` may import from `drizzle-orm`:
+Database access is fully isolated. Only `packages/infra/db` may import from `drizzle-orm`:
 
 ```typescript
-// Only allowed in packages/db/src/**
+// Only allowed in packages/infra/db/src/**
 import { pgTable, uuid, varchar } from 'drizzle-orm/pg-core'
 ```
 
@@ -99,15 +99,15 @@ Domain, port, application, adapter, and route files must use named exports:
 
 ```typescript
 // Forbidden
-export default class TaskService { }
+export default class OrganizationService { }
 
 // Required
-export class TaskService { }
+export class OrganizationService { }
 ```
 
 ## Package Boundaries
 
-The `eslint-plugin-boundaries` configuration enforces dependency direction between packages. For example, `apps/web` cannot import from `packages/db` or `packages/core`, and `packages/core` cannot import from `packages/db`. On the other hand, `apps/api` can import from both `packages/core` and `packages/db`.
+The `eslint-plugin-boundaries` configuration enforces dependency direction between packages. For example, `apps/web` cannot import from `packages/infra/db` or `packages/core`, and `packages/core` cannot import from `packages/infra/db`. On the other hand, `apps/api` can import from both `packages/core` and `packages/infra/db`.
 
 ## Running ESLint
 

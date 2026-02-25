@@ -8,7 +8,8 @@ import { setTimeout as sleep } from 'node:timers/promises'
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(scriptDir, '../..')
 
-const defaultLockTimeoutSeconds = 900
+const defaultLockTimeoutSeconds = 1800
+const defaultMissingPidGraceSeconds = 15
 const maxAutoIntegrationWorkers = 6
 const maxAutoWebIntegrationWorkers = 4
 const composeProjectName = process.env.COMPOSE_PROJECT_NAME ?? 'tx-agent-kit'
@@ -48,25 +49,68 @@ const isProcessAlive = (pid: number): boolean => {
 
 const tryReapStaleIntegrationLock = (
   lockDir: string,
-  timeoutSeconds: number
+  timeoutSeconds: number,
+  missingPidGraceSeconds: number
 ): boolean => {
   if (!existsSync(lockDir)) {
     return false
   }
 
   if (existsSync(integrationLockPidFilePath)) {
-    const parsedPid = Number.parseInt(readFileSync(integrationLockPidFilePath, 'utf8').trim(), 10)
-    if (!Number.isNaN(parsedPid) && parsedPid > 0 && !isProcessAlive(parsedPid)) {
+    if (process.env.INTEGRATION_FORCE_LOCK_RELEASE === '1') {
       rmSync(lockDir, { recursive: true, force: true })
       return true
+    }
+
+    const parsedPid = Number.parseInt(readFileSync(integrationLockPidFilePath, 'utf8').trim(), 10)
+    if (!Number.isNaN(parsedPid) && parsedPid > 0) {
+      if (!isProcessAlive(parsedPid)) {
+        rmSync(lockDir, { recursive: true, force: true })
+        return true
+      }
+
+      try {
+        const commandLine = execFileSync('ps', ['-p', String(parsedPid), '-o', 'command='], {
+          cwd: projectRoot,
+          env: process.env,
+          encoding: 'utf8'
+        })
+          .trim()
+          .toLowerCase()
+        const looksLikeIntegrationRunner =
+          commandLine.includes('vitest') ||
+          commandLine.includes('run-integration.sh') ||
+          commandLine.includes('test-integration-quiet.sh')
+
+        if (!looksLikeIntegrationRunner) {
+          rmSync(lockDir, { recursive: true, force: true })
+          return true
+        }
+      } catch {
+        rmSync(lockDir, { recursive: true, force: true })
+        return true
+      }
     }
     return false
   }
 
   // Lock directories are expected to always include a pid marker.
-  // If it's missing, only treat the lock as stale after a grace period.
-  const ageMs = Date.now() - statSync(lockDir).mtimeMs
-  if (ageMs >= timeoutSeconds * 1000) {
+  // If it's missing, reap aggressively after a short grace window since this
+  // usually means a crashed process between mkdir and pid file write.
+  let lockMtimeMs: number
+  try {
+    lockMtimeMs = statSync(lockDir).mtimeMs
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENOENT') {
+      return false
+    }
+    throw error
+  }
+
+  const ageMs = Date.now() - lockMtimeMs
+  const effectiveMissingPidGraceSeconds = Math.min(timeoutSeconds, missingPidGraceSeconds)
+  if (ageMs >= effectiveMissingPidGraceSeconds * 1000) {
     rmSync(lockDir, { recursive: true, force: true })
     return true
   }
@@ -76,7 +120,8 @@ const tryReapStaleIntegrationLock = (
 
 const acquireIntegrationLock = async (
   lockDir: string,
-  timeoutSeconds: number
+  timeoutSeconds: number,
+  missingPidGraceSeconds: number
 ): Promise<void> => {
   const startedAt = Date.now()
 
@@ -91,7 +136,7 @@ const acquireIntegrationLock = async (
         throw error
       }
 
-      tryReapStaleIntegrationLock(lockDir, timeoutSeconds)
+      tryReapStaleIntegrationLock(lockDir, timeoutSeconds, missingPidGraceSeconds)
 
       const elapsedSeconds = (Date.now() - startedAt) / 1000
       if (elapsedSeconds >= timeoutSeconds) {
@@ -106,6 +151,36 @@ const acquireIntegrationLock = async (
 const releaseIntegrationLock = (lockDir: string): void => {
   rmSync(resolve(lockDir, 'pid'), { force: true })
   rmSync(lockDir, { recursive: true, force: true })
+}
+
+const readProcessCommandLine = (pid: number): string | undefined => {
+  try {
+    const command = execFileSync('ps', ['-p', String(pid), '-o', 'command='], {
+      cwd: projectRoot,
+      env: process.env,
+      encoding: 'utf8'
+    }).trim()
+
+    return command.length > 0 ? command : undefined
+  } catch {
+    return undefined
+  }
+}
+
+type ProcessClassification = 'expected' | 'unexpected' | 'unknown'
+
+const classifyWebIntegrationApiProcess = (pid: number): ProcessClassification => {
+  const commandLine = readProcessCommandLine(pid)
+  if (!commandLine) {
+    return 'unknown'
+  }
+
+  const normalized = commandLine.toLowerCase()
+  if (normalized.includes('apps/api/src/server.ts') && normalized.includes('node')) {
+    return 'expected'
+  }
+
+  return 'unexpected'
 }
 
 const resolveWebIntegrationMaxWorkers = (): number => {
@@ -195,7 +270,15 @@ const cleanupPersistentWebHarnessProcesses = async (): Promise<void> => {
     }
 
     const parsedPid = Number.parseInt(readFileSync(pidFilePath, 'utf8').trim(), 10)
-    if (!Number.isNaN(parsedPid) && parsedPid > 0) {
+    if (!Number.isNaN(parsedPid) && parsedPid > 0 && isProcessAlive(parsedPid)) {
+      const processClassification = classifyWebIntegrationApiProcess(parsedPid)
+      if (processClassification !== 'expected') {
+        process.stderr.write(
+          `Skipping stop for non-harness pid ${parsedPid} (${processClassification}) in ${pidFilePath}; leaving pid marker in place\n`
+        )
+        continue
+      }
+
       const stopped = await stopProcess(parsedPid)
       if (!stopped) {
         throw new Error(`Failed to stop lingering web integration API process pid=${parsedPid} slot=${workerSlot}`)
@@ -206,6 +289,13 @@ const cleanupPersistentWebHarnessProcesses = async (): Promise<void> => {
   }
 
   rmSync(resolveWebIntegrationSlotClaimDir(), { recursive: true, force: true })
+}
+
+const cleanupPersistentWebHarnessSchemas = async (): Promise<void> => {
+  const { cleanupPersistentWebIntegrationHarnesses } = await import(
+    '../../apps/web/integration/support/web-integration-harness'
+  )
+  await cleanupPersistentWebIntegrationHarnesses(resolveWebIntegrationMaxWorkers())
 }
 
 const runSetupCommand = (scriptRelativePath: string, args: string[] = []): void => {
@@ -232,11 +322,16 @@ export default async () => {
     process.env.INTEGRATION_LOCK_TIMEOUT_SECONDS,
     defaultLockTimeoutSeconds
   )
+  const missingPidGraceSeconds = parsePositiveInt(
+    process.env.INTEGRATION_LOCK_MISSING_PID_GRACE_SECONDS,
+    defaultMissingPidGraceSeconds
+  )
 
-  await acquireIntegrationLock(integrationLockDir, timeoutSeconds)
+  await acquireIntegrationLock(integrationLockDir, timeoutSeconds, missingPidGraceSeconds)
 
   try {
     await cleanupPersistentWebHarnessProcesses()
+    await cleanupPersistentWebHarnessSchemas()
     runGlobalIntegrationSetup()
   } catch (error) {
     releaseIntegrationLock(integrationLockDir)
@@ -246,6 +341,7 @@ export default async () => {
   return async () => {
     try {
       await cleanupPersistentWebHarnessProcesses()
+      await cleanupPersistentWebHarnessSchemas()
     } finally {
       releaseIntegrationLock(integrationLockDir)
     }

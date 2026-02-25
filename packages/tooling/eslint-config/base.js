@@ -9,7 +9,9 @@ export const baseConfig = [
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          defaultProject: 'tsconfig.json'
+        },
         tsconfigRootDir: process.cwd()
       },
       globals: {

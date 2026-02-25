@@ -17,7 +17,7 @@ import { createLogger } from '@tx-agent-kit/logging'
 const logger = createLogger('my-service')
 
 logger.info('Server started', { port: 4000 })
-logger.error('Request failed', { path: '/v1/tasks' }, error)
+logger.error('Request failed', { path: '/v1/organizations' }, error)
 ```
 
 Each log call writes a JSON object to stdout and emits an OTEL log record to the configured collector.
@@ -68,7 +68,7 @@ Create scoped child loggers that inherit the parent service name:
 const dbLogger = logger.child('db', { component: 'repository' })
 
 // Service name becomes "api:db"
-dbLogger.info('Query executed', { table: 'tasks', duration: 42 })
+dbLogger.info('Query executed', { table: 'organizations', duration: 42 })
 ```
 
 ## Utility functions
@@ -92,7 +92,7 @@ try {
 ```typescript
 import { createPerfLogger } from '@tx-agent-kit/logging'
 
-const perf = createPerfLogger(logger, 'database.query', { table: 'tasks' })
+const perf = createPerfLogger(logger, 'database.query', { table: 'organizations' })
 const result = await db.query(...)
 perf.end({ rowCount: result.length })
 // Logs: "database.query completed in 42ms"

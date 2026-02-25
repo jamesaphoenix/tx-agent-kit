@@ -3,14 +3,14 @@ title: Database
 description: Drizzle schema, Effect repositories, migrations, pgTAP trigger suites, and parity-enforced factories.
 ---
 
-# Database (`packages/db`)
+# Database (`packages/infra/db`)
 
 The database package is the only package that may import `drizzle-orm`. It manages the PostgreSQL schema, migrations, repositories, Effect schemas, and test factories.
 
 ## Structure
 
 ```
-packages/db/
+packages/infra/db/
   src/
     schema.ts              # Drizzle table definitions
     effect-schemas/        # One Effect schema per table
@@ -27,14 +27,14 @@ packages/db/
 All tables are defined using Drizzle's `pgTable` in source files under `src/`. Each table must be declared as an exported constant:
 
 ```typescript
-export const tasks = pgTable('tasks', {
+export const organizations = pgTable('organizations', {
   id: uuid('id').primaryKey().defaultRandom(),
-  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id),
-  title: varchar('title', { length: 200 }).notNull(),
-  description: text('description'),
-  status: varchar('status', { length: 50 }).notNull().default('open'),
-  createdByUserId: uuid('created_by_user_id').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow()
+  name: text('name').notNull(),
+  billingEmail: text('billing_email'),
+  isSubscribed: boolean('is_subscribed').notNull().default(false),
+  subscriptionStatus: subscriptionStatusEnum('subscription_status').notNull().default('inactive'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 })
 ```
 
@@ -46,9 +46,9 @@ Each database table must have a corresponding file in `src/effect-schemas/`:
 
 ```
 src/effect-schemas/
-  tasks.ts         # TasksRowSchema + TasksRowShape
+  organizations.ts # OrganizationsRowSchema + OrganizationsRowShape
   users.ts         # UsersRowSchema + UsersRowShape
-  workspaces.ts    # WorkspacesRowSchema + WorkspacesRowShape
+  invitations.ts   # InvitationsRowSchema + InvitationsRowShape
   index.ts         # Re-exports all schemas
 ```
 
@@ -62,9 +62,9 @@ Each table must have a corresponding factory in `src/factories/`:
 
 ```
 src/factories/
-  tasks.factory.ts
+  organizations.factory.ts
   users.factory.ts
-  workspaces.factory.ts
+  invitations.factory.ts
   index.ts
 ```
 

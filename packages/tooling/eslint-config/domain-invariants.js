@@ -35,7 +35,7 @@ const drizzleIsolationRestrictions = {
   patterns: [
     {
       group: ['drizzle-orm', 'drizzle-orm/*'],
-      message: 'Only `packages/db` may import Drizzle. Use repositories and Effect services elsewhere.'
+      message: 'Only `packages/infra/db` may import Drizzle. Use repositories and Effect services elsewhere.'
     }
   ]
 }
@@ -43,8 +43,32 @@ const drizzleIsolationRestrictions = {
 export const domainInvariantConfig = [
   {
     files: ['**/*.{ts,tsx}'],
+    ignores: ['packages/infra/ai/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', effectSchemaOnlyRestrictions]
+    }
+  },
+  {
+    files: ['packages/infra/**/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@tx-agent-kit/core',
+              message:
+                'Infrastructure packages must not import from core. Dependency direction: core → infra, never infra → core.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['@tx-agent-kit/core/*'],
+              message: 'Infrastructure packages must not import from core.'
+            }
+          ]
+        }
+      ]
     }
   },
   {
@@ -83,7 +107,7 @@ export const domainInvariantConfig = [
   },
   {
     files: [
-      'packages/db/src/**/*.{ts,tsx}',
+      'packages/infra/db/src/**/*.{ts,tsx}',
       'packages/contracts/src/**/*.{ts,tsx}',
       'apps/api/src/**/*.{ts,tsx}'
     ],
@@ -104,7 +128,7 @@ export const domainInvariantConfig = [
   {
     files: [
       'packages/contracts/src/**/*.{ts,tsx}',
-      'packages/db/src/effect-schemas/**/*.{ts,tsx}',
+      'packages/infra/db/src/effect-schemas/**/*.{ts,tsx}',
       'apps/api/src/**/*.{ts,tsx}'
     ],
     ignores: [
@@ -121,12 +145,13 @@ export const domainInvariantConfig = [
     }
   },
   {
-    files: ['packages/db/src/schema.ts'],
+    files: ['packages/infra/db/src/schema.ts'],
     plugins: {
       'domain-structure': domainStructurePlugin
     },
     rules: {
-      'domain-structure/no-inline-pgenum-array': 'error'
+      'domain-structure/no-inline-pgenum-array': 'error',
+      'domain-structure/json-columns-require-explicit-drizzle-type': 'error'
     }
   },
   {
@@ -260,10 +285,11 @@ export const domainInvariantConfig = [
       'apps/api/src/config/env.ts',
       'apps/api/src/config/openapi-env.ts',
       'apps/worker/src/config/env.ts',
-      'packages/auth/src/env.ts',
-      'packages/db/src/env.ts',
-      'packages/logging/src/env.ts',
-      'packages/observability/src/env.ts',
+      'packages/infra/auth/src/env.ts',
+      'packages/infra/db/src/env.ts',
+      'packages/infra/logging/src/env.ts',
+      'packages/infra/observability/src/env.ts',
+      'packages/infra/ai/src/env.ts',
       'packages/testkit/src/env.ts'
     ],
     rules: {
@@ -455,7 +481,7 @@ export const domainInvariantConfig = [
   },
   {
     files: ['**/*.{ts,tsx}'],
-    ignores: ['packages/db/**/*.{ts,tsx}'],
+    ignores: ['packages/infra/db/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', drizzleIsolationRestrictions]
     }
@@ -595,7 +621,7 @@ export const domainInvariantConfig = [
     }
   },
   {
-    files: ['packages/db/src/repositories/**/*.{ts,tsx}'],
+    files: ['packages/infra/db/src/repositories/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
         'error',

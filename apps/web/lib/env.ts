@@ -6,6 +6,7 @@ export interface WebEnv {
   API_BASE_URL: string
   OTEL_EXPORTER_OTLP_ENDPOINT: string
   NODE_ENV: string
+  SITE_URL: string
 }
 
 let cachedEnv: WebEnv | null = null
@@ -27,7 +28,10 @@ export const getWebEnv = (): WebEnv => {
     NODE_ENV:
       process.env.NEXT_PUBLIC_NODE_ENV ??
       process.env.NODE_ENV ??
-      defaultNodeEnv
+      defaultNodeEnv,
+    SITE_URL:
+      process.env.NEXT_PUBLIC_SITE_URL ??
+      'http://localhost:3000'
   }
 
   return cachedEnv

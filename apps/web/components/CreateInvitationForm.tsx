@@ -4,19 +4,19 @@ import { useState, type FormEvent } from 'react'
 import { clientApi } from '../lib/client-api'
 import { notify } from '../lib/notify'
 
-interface WorkspaceOption {
+interface OrganizationOption {
   id: string
   name: string
 }
 
 export function CreateInvitationForm({
-  workspaces,
+  organizations,
   onCreated
 }: {
-  workspaces: ReadonlyArray<WorkspaceOption>
+  organizations: ReadonlyArray<OrganizationOption>
   onCreated?: () => void | Promise<void>
 }) {
-  const [workspaceId, setWorkspaceId] = useState(workspaces[0]?.id ?? '')
+  const [organizationId, setOrganizationId] = useState(organizations[0]?.id ?? '')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'admin' | 'member'>('member')
   const [error, setError] = useState<string | null>(null)
@@ -25,8 +25,8 @@ export function CreateInvitationForm({
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!workspaceId) {
-      const message = 'Create a workspace first'
+    if (!organizationId) {
+      const message = 'Create an organization first'
       setError(message)
       notify.error(message)
       return
@@ -36,7 +36,7 @@ export function CreateInvitationForm({
     setError(null)
 
     try {
-      await clientApi.createInvitation({ workspaceId, email, role })
+      await clientApi.createInvitation({ organizationId, email, role })
       setEmail('')
       notify.success('Invitation sent')
       await onCreated?.()
@@ -58,10 +58,10 @@ export function CreateInvitationForm({
     >
       <h3>Invite teammate</h3>
       <label className="stack">
-        <span>Workspace</span>
-        <select value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)}>
-          {workspaces.map((workspace) => (
-            <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
+        <span>Organization</span>
+        <select value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
+          {organizations.map((organization) => (
+            <option key={organization.id} value={organization.id}>{organization.name}</option>
           ))}
         </select>
       </label>

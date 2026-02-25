@@ -21,6 +21,7 @@ get_file_mtime_epoch() {
 lock_try_reap_stale() {
   local lock_dir="$1"
   local stale_after_seconds="${2:-900}"
+  local missing_pid_grace_seconds="${3:-15}"
   local pid_file="$lock_dir/pid"
 
   if [[ -f "$pid_file" ]]; then
@@ -42,8 +43,13 @@ lock_try_reap_stale() {
     return 1
   fi
 
+  local effective_missing_pid_grace_seconds="$missing_pid_grace_seconds"
+  if (( effective_missing_pid_grace_seconds > stale_after_seconds )); then
+    effective_missing_pid_grace_seconds="$stale_after_seconds"
+  fi
+
   local age=$((now - mtime))
-  if (( age > stale_after_seconds )); then
+  if (( age >= effective_missing_pid_grace_seconds )); then
     rm -rf "$lock_dir"
     return 0
   fi
@@ -54,10 +60,11 @@ lock_try_reap_stale() {
 lock_acquire() {
   local lock_dir="$1"
   local timeout_seconds="${2:-900}"
+  local missing_pid_grace_seconds="${3:-15}"
   local waited=0
 
   while ! mkdir "$lock_dir" 2>/dev/null; do
-    lock_try_reap_stale "$lock_dir" "$timeout_seconds" || true
+    lock_try_reap_stale "$lock_dir" "$timeout_seconds" "$missing_pid_grace_seconds" || true
 
     if (( waited >= timeout_seconds )); then
       echo "Timed out waiting for lock: $lock_dir"

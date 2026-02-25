@@ -35,7 +35,7 @@ The web app (or mobile app) sends an HTTP request to the API server. The web app
 
 ```typescript
 // apps/web - using generated API hooks
-const { data: tasks } = useListTasks({ workspaceId })
+const { data: organizations } = useListOrganizations()
 ```
 
 The request goes directly to `API_BASE_URL` (e.g., `http://localhost:4000`). There is no proxy layer or BFF. The web app is a pure client that communicates with the API over HTTP.
@@ -46,9 +46,9 @@ The Effect HttpApi server receives the request, matches it to a route, and valid
 
 ```typescript
 // apps/api - route handler
-const CreateTaskRoute = HttpApiEndpoint.post("createTask", "/v1/tasks")
-  .setPayload(CreateTaskRequest)   // effect/Schema from packages/contracts
-  .addSuccess(TaskResponse)
+const CreateOrganizationRoute = HttpApiEndpoint.post("createOrganization", "/v1/organizations")
+  .setPayload(createOrganizationRequestSchema)   // effect/Schema from packages/contracts
+  .addSuccess(organizationSchema)
   .addError(UnauthorizedError)
 ```
 
@@ -60,10 +60,8 @@ For valid requests, the route handler calls the application service in `packages
 
 ```typescript
 // Application service orchestrates domain logic
-const task = yield* taskService.create({
-  workspaceId: payload.workspaceId,
-  title: payload.title,
-  description: payload.description,
+const org = yield* organizationService.create({
+  name: payload.name,
 })
 ```
 
@@ -71,16 +69,14 @@ The application service calls domain functions for business rule validation, inv
 
 ### 4. Repository persists data
 
-The repository implementation in `packages/db` translates domain operations into Drizzle queries:
+The repository implementation in `packages/infra/db` translates domain operations into Drizzle queries:
 
 ```typescript
-// packages/db - repository implementation
+// packages/infra/db - repository implementation
 create: (input) => Effect.tryPromise(() =>
-  db.insert(tasks).values({
+  db.insert(organizations).values({
     id: generateId(),
-    workspaceId: input.workspaceId,
-    title: input.title,
-    description: input.description,
+    name: input.name,
   }).returning().then(rows => rows[0]!)
 )
 ```

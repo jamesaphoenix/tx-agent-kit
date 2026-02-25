@@ -16,12 +16,12 @@ ESLint catches import violations, banned APIs, and naming conventions at the fil
 The domain invariants live in `packages/tooling/eslint-config/domain-invariants.js`:
 
 ```js
-// Example: ban drizzle-orm imports outside packages/db
+// Example: ban drizzle-orm imports outside packages/infra/db
 {
   "no-restricted-imports": [
     {
       name: "drizzle-orm",
-      message: "drizzle-orm may only be imported from packages/db"
+      message: "drizzle-orm may only be imported from packages/infra/db"
     }
   ]
 }
@@ -31,7 +31,7 @@ The following table summarizes the key rules enforced via ESLint:
 
 | Rule | What it prevents |
 |------|-----------------|
-| No `drizzle-orm` imports outside `packages/db` | Direct DB access from app or domain code |
+| No `drizzle-orm` imports outside `packages/infra/db` | Direct DB access from app or domain code |
 | No `effect` imports from `apps/web` | Effect dependencies leaking into the web client |
 | No `console.*` in source modules | Unstructured logging; use `@tx-agent-kit/logging` instead |
 | No `process.env` in domain/services code | Environment coupling in business logic |

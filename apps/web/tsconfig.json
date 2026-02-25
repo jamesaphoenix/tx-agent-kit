@@ -1,38 +1,30 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.nextjs.json",
   "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "allowImportingTsExtensions": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "isolatedModules": true,
     "disableSourceOfProjectReferenceRedirect": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@tx-agent-kit/auth": ["../../packages/auth/src/index.ts"],
+      "@tx-agent-kit/auth": ["../../packages/infra/auth/src/index.ts"],
       "@tx-agent-kit/contracts": ["../../packages/contracts/src/index.ts"],
       "@tx-agent-kit/core": ["../../packages/core/src/index.ts"],
-      "@tx-agent-kit/db": ["../../packages/db/src/index.ts"],
-      "@tx-agent-kit/logging": ["../../packages/logging/src/index.ts"],
-      "@tx-agent-kit/observability": ["../../packages/observability/src/index.ts"],
-      "@tx-agent-kit/observability/*": ["../../packages/observability/src/*"],
+      "@tx-agent-kit/db": ["../../packages/infra/db/src/index.ts"],
+      "@tx-agent-kit/logging": ["../../packages/infra/logging/src/index.ts"],
+      "@tx-agent-kit/observability": ["../../packages/infra/observability/dist/index.js"],
+      "@tx-agent-kit/observability/*": ["../../packages/infra/observability/dist/*"],
       "@tx-agent-kit/testkit": ["../../packages/testkit/src/index.ts"],
       "@tx-agent-kit/temporal-client": ["../../packages/temporal-client/src/index.ts"]
     },
     "typeRoots": ["./node_modules/@types", "../../node_modules/@types"],
-    "types": ["node", "react", "react-dom"],
-    "plugins": [{ "name": "next" }],
-    "noEmit": true
+    "types": ["node", "react", "react-dom"]
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"],
   "references": [
-    { "path": "../../packages/observability" },
+    { "path": "../../packages/infra/observability" },
     { "path": "../../packages/contracts" },
-    { "path": "../../packages/auth" },
-    { "path": "../../packages/db" },
+    { "path": "../../packages/infra/auth" },
+    { "path": "../../packages/infra/db" },
     { "path": "../../packages/testkit" }
   ]
 }

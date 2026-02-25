@@ -37,6 +37,7 @@ test('domain-invariants enables all critical domain-structure rules', () => {
     'no-inline-string-union-enums',
     'no-raw-schema-literal-enums',
     'no-inline-pgenum-array',
+    'json-columns-require-explicit-drizzle-type',
     'core-adapters-use-db-row-mappers'
   ]
 

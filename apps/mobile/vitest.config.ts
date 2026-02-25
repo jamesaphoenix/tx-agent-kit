@@ -17,14 +17,16 @@ export default mergeConfig(
         '**/node_modules/**',
         '**/dist/**',
         '**/.expo/**',
-        '**/coverage/**'
+        '**/coverage/**',
+        '**/*.integration.test.ts',
+        '**/*.integration.test.tsx'
       ]
     },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./', import.meta.url)),
         '@tx-agent-kit/observability/client': fileURLToPath(
-          new URL('../../packages/observability/src/client.ts', import.meta.url)
+          new URL('../../packages/infra/observability/src/client.ts', import.meta.url)
         ),
         'react-native': fileURLToPath(
           new URL('./__mocks__/react-native.ts', import.meta.url)

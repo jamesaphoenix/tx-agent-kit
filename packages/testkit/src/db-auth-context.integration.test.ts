@@ -58,23 +58,22 @@ describe('db auth context integration', () => {
     expect(meAfterDelete.status).toBe(401)
   })
 
-  it('creates workspaces via context factory helpers', async () => {
+  it('creates organizations via context factory helpers', async () => {
     const owner = await dbAuthContext.createUser({
-      email: 'testkit-team-owner@example.com',
+      email: 'testkit-org-owner@example.com',
       password: 'strong-pass-12345',
-      name: 'Testkit Team Owner'
+      name: 'Testkit Organization Owner'
     })
 
-    const team = await dbAuthContext.createTeam({
+    const organization = await dbAuthContext.createTeam({
       token: owner.token,
-      name: 'Testkit Team Workspace'
+      name: 'Testkit Organization'
     })
 
-    expect(team.ownerUserId).toBe(owner.user.id)
-    expect(team.name).toBe('Testkit Team Workspace')
+    expect(organization.name).toBe('Testkit Organization')
   })
 
-  it('creates organization/team records and relies on trigger-owned membership', async () => {
+  it('creates organization/team records via direct DB seeding', async () => {
     const owner = await dbAuthContext.createUser({
       email: 'org-team-owner@example.com',
       password: 'strong-pass-12345',
@@ -90,21 +89,5 @@ describe('db auth context integration', () => {
     expect(created.organization.name).toBe('Integration Org')
     expect(created.team.name).toBe('Integration Team')
     expect(created.team.organizationId).toBe(created.organization.id)
-    expect(created.team.ownerUserId).toBe(owner.user.id)
-
-    const membershipResult = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      client.query<{ role: string }>(
-        `
-          SELECT role::text AS role
-          FROM workspace_members
-          WHERE workspace_id = $1
-            AND user_id = $2
-        `,
-        [created.team.id, owner.user.id]
-      )
-    )
-
-    expect(membershipResult.rows).toHaveLength(1)
-    expect(membershipResult.rows[0]?.role).toBe('owner')
   })
 })

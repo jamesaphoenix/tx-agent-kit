@@ -32,12 +32,12 @@ describe('customInstance', () => {
   it('calls api with merged config and returns data', async () => {
     mockApi.mockResolvedValue({ data: { id: 'w-1' } })
 
-    const config: AxiosRequestConfig = { url: '/workspaces', method: 'GET' }
+    const config: AxiosRequestConfig = { url: '/organizations', method: 'GET' }
     const result = await customInstance<{ id: string }>(config)
 
     expect(result).toEqual({ id: 'w-1' })
     expect(mockApi).toHaveBeenCalledWith(
-      expect.objectContaining({ url: '/workspaces', method: 'GET' })
+      expect.objectContaining({ url: '/organizations', method: 'GET' })
     )
   })
 

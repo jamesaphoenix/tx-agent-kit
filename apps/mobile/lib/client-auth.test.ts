@@ -66,10 +66,10 @@ describe('ensureSessionOrRedirect', () => {
   it('encodes the next path parameter', async () => {
     const router = createMockRouter()
 
-    await ensureSessionOrRedirect(router, '/workspaces?tab=active')
+    await ensureSessionOrRedirect(router, '/organizations?tab=active')
 
     expect(router.replace).toHaveBeenCalledWith(
-      '/sign-in?next=%2Fworkspaces%3Ftab%3Dactive'
+      '/sign-in?next=%2Forganizations%3Ftab%3Dactive'
     )
   })
 })

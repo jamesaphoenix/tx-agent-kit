@@ -2,10 +2,9 @@ import type {
   AuthPrincipal,
   AuthResponse,
   Invitation,
+  Organization,
   SignInRequest,
-  SignUpRequest,
-  Task,
-  Workspace
+  SignUpRequest
 } from '@tx-agent-kit/contracts'
 import { clearAuthToken, writeAuthToken } from './auth-token'
 import { api, getApiErrorMessage, getApiErrorStatus } from './axios'
@@ -61,45 +60,21 @@ export const clientApi = {
     }
   },
 
-  listWorkspaces: async (): Promise<{ workspaces: Workspace[] }> => {
+  listOrganizations: async (): Promise<{ organizations: Organization[] }> => {
     try {
-      const { data } = await api.get<{ workspaces: Workspace[] }>('/v1/workspaces')
-      return data
+      const { data } = await api.get<{ organizations: Organization[] }>('/v1/organizations')
+      return { organizations: data.organizations }
     } catch (error) {
-      return fail(error, 'Failed to list workspaces')
+      return fail(error, 'Failed to list organizations')
     }
   },
 
-  createWorkspace: async (input: { name: string }): Promise<Workspace> => {
+  createOrganization: async (input: { name: string }): Promise<Organization> => {
     try {
-      const { data } = await api.post<Workspace>('/v1/workspaces', input)
+      const { data } = await api.post<Organization>('/v1/organizations', input)
       return data
     } catch (error) {
-      return fail(error, 'Failed to create workspace')
-    }
-  },
-
-  listTasks: async (workspaceId: string): Promise<{ tasks: Task[] }> => {
-    try {
-      const { data } = await api.get<{ tasks: Task[] }>('/v1/tasks', {
-        params: { workspaceId }
-      })
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to list tasks')
-    }
-  },
-
-  createTask: async (input: {
-    workspaceId: string
-    title: string
-    description?: string
-  }): Promise<Task> => {
-    try {
-      const { data } = await api.post<Task>('/v1/tasks', input)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to create task')
+      return fail(error, 'Failed to create organization')
     }
   },
 
@@ -113,12 +88,16 @@ export const clientApi = {
   },
 
   createInvitation: async (input: {
-    workspaceId: string
+    organizationId: string
     email: string
     role: 'admin' | 'member'
   }): Promise<Invitation> => {
     try {
-      const { data } = await api.post<Invitation>('/v1/invitations', input)
+      const { data } = await api.post<Invitation>('/v1/invitations', {
+        organizationId: input.organizationId,
+        email: input.email,
+        role: input.role
+      })
       return data
     } catch (error) {
       return fail(error, 'Failed to send invitation')

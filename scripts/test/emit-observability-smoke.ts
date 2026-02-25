@@ -3,6 +3,7 @@ import {
   startTelemetry,
   stopTelemetry
 } from '@tx-agent-kit/observability'
+import { createLogger } from '@tx-agent-kit/logging'
 import {
   emitClientTelemetrySmoke,
   stopClientTelemetry
@@ -11,6 +12,7 @@ import {
 const defaultOtelEndpoint = 'http://localhost:4320'
 const nodeServiceNames = ['tx-agent-kit-api', 'tx-agent-kit-worker'] as const
 const clientServiceNames = ['tx-agent-kit-web', 'tx-agent-kit-mobile'] as const
+const defaultSmokeLogMarker = 'observability.smoke.log'
 
 const resolveOtelEndpoint = (): string =>
   process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
@@ -22,10 +24,15 @@ const emitNodeSmokeSignals = async (
   otlpEndpoint: string,
   serviceName: string
 ): Promise<void> => {
+  const smokeLogMarker = process.env.OTEL_SMOKE_LOG_MARKER ?? defaultSmokeLogMarker
   process.env.OTEL_EXPORTER_OTLP_ENDPOINT = otlpEndpoint
 
   await startTelemetry(serviceName)
   emitNodeTelemetrySmoke(serviceName)
+  createLogger(serviceName).info(smokeLogMarker, {
+    'smoke.service': serviceName,
+    'smoke.signal': 'logs'
+  })
   await stopTelemetry()
 }
 

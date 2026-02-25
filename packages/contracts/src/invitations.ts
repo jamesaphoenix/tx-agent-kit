@@ -7,7 +7,7 @@ export const invitationRoleSchema = Schema.Literal(...invitationAssignableRoles)
 
 export const invitationSchema = Schema.Struct({
   id: Schema.UUID,
-  workspaceId: Schema.UUID,
+  organizationId: Schema.UUID,
   email: emailSchema,
   role: invitationRoleSchema,
   status: invitationStatusSchema,
@@ -18,7 +18,7 @@ export const invitationSchema = Schema.Struct({
 })
 
 export const createInvitationRequestSchema = Schema.Struct({
-  workspaceId: Schema.UUID,
+  organizationId: Schema.UUID,
   email: emailSchema,
   role: invitationRoleSchema
 })

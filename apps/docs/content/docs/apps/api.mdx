@@ -1,6 +1,6 @@
 ---
 title: API Server
-description: Effect HttpApi server powering auth, workspaces, tasks, and invitations with OpenAPI spec generation.
+description: Effect HttpApi server powering auth, organizations, and invitations with OpenAPI spec generation.
 ---
 
 # API Server (`apps/api`)
@@ -32,35 +32,22 @@ Auth routes use the `custom` kind marker since they expose domain-specific opera
 | `/v1/auth/me` | GET | Return the authenticated principal |
 | `/v1/auth/me` | DELETE | Delete the authenticated user |
 
-### Workspaces (`/v1/workspaces`)
+### Organizations (`/v1/organizations`)
 
-Workspace routes use the `crud` kind marker and expose the full CRUD surface.
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v1/workspaces` | GET | List workspaces for the current user (paginated) |
-| `/v1/workspaces/:id` | GET | Get a single workspace by ID |
-| `/v1/workspaces/many` | POST | Get multiple workspaces by IDs |
-| `/v1/workspaces` | POST | Create a workspace |
-| `/v1/workspaces/:id` | PATCH | Update a workspace |
-| `/v1/workspaces/:id` | DELETE | Remove a workspace |
-
-### Tasks (`/v1/tasks`)
-
-Task routes also use the `crud` kind marker.
+Organization routes use the `crud` kind marker and expose the full CRUD surface.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/v1/tasks` | GET | List tasks for a workspace (paginated) |
-| `/v1/tasks/:id` | GET | Get a single task |
-| `/v1/tasks/many` | POST | Get multiple tasks by IDs |
-| `/v1/tasks` | POST | Create a task |
-| `/v1/tasks/:id` | PATCH | Update a task |
-| `/v1/tasks/:id` | DELETE | Remove a task |
+| `/v1/organizations` | GET | List organizations for the current user (paginated) |
+| `/v1/organizations/:id` | GET | Get a single organization by ID |
+| `/v1/organizations/many` | POST | Get multiple organizations by IDs |
+| `/v1/organizations` | POST | Create an organization |
+| `/v1/organizations/:id` | PATCH | Update an organization |
+| `/v1/organizations/:id` | DELETE | Remove an organization |
 
 ### Invitations (`/v1/invitations`)
 
-Invitation endpoints are nested under the workspaces group and include idempotent acceptance.
+Invitation endpoints are nested under the organizations group and include idempotent acceptance.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -76,8 +63,8 @@ Invitation endpoints are nested under the workspaces group and include idempoten
 Every route file declares an explicit kind marker that must match the corresponding repository port kind:
 
 ```typescript
-// apps/api/src/routes/workspaces.ts
-export const WorkspacesRouteKind = 'crud' as const
+// apps/api/src/routes/organizations.ts
+export const OrganizationsRouteKind = 'crud' as const
 
 // apps/api/src/routes/auth.ts
 export const AuthRouteKind = 'custom' as const

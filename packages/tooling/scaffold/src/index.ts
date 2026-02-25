@@ -622,15 +622,15 @@ const dbFilePlan = (n: NameSet): PlannedFile[] => {
   const dbNames = buildDbNames(n)
   return [
     {
-      path: `packages/db/src/effect-schemas/${dbNames.tableFileSlug}.ts`,
+      path: `packages/infra/db/src/effect-schemas/${dbNames.tableFileSlug}.ts`,
       content: dbEffectSchemaFile(n)
     },
     {
-      path: `packages/db/src/factories/${dbNames.tableFileSlug}.factory.ts`,
+      path: `packages/infra/db/src/factories/${dbNames.tableFileSlug}.factory.ts`,
       content: dbFactoryFile(n, dbNames)
     },
     {
-      path: `packages/db/src/repositories/${dbNames.tableFileSlug}.ts`,
+      path: `packages/infra/db/src/repositories/${dbNames.tableFileSlug}.ts`,
       content: dbRepositoryFile(n, dbNames)
     }
   ]
@@ -691,7 +691,7 @@ const ensureLineInFile = async (
 }
 
 const ensureDbSchemaTable = async (repoRoot: string, names: NameSet): Promise<boolean> => {
-  const schemaPath = join(repoRoot, 'packages/db/src/schema.ts')
+  const schemaPath = join(repoRoot, 'packages/infra/db/src/schema.ts')
   if (!existsSync(schemaPath)) {
     return false
   }
@@ -733,37 +733,37 @@ const ensureDbScaffoldWiring = async (
   const updated: string[] = []
 
   if (await ensureDbSchemaTable(repoRoot, names)) {
-    updated.push('packages/db/src/schema.ts')
+    updated.push('packages/infra/db/src/schema.ts')
   }
 
   if (
     await ensureLineInFile(
       repoRoot,
-      'packages/db/src/effect-schemas/index.ts',
+      'packages/infra/db/src/effect-schemas/index.ts',
       `export * from './${dbNames.tableFileSlug}.js'`
     )
   ) {
-    updated.push('packages/db/src/effect-schemas/index.ts')
+    updated.push('packages/infra/db/src/effect-schemas/index.ts')
   }
 
   if (
     await ensureLineInFile(
       repoRoot,
-      'packages/db/src/factories/index.ts',
+      'packages/infra/db/src/factories/index.ts',
       `export * from './${dbNames.tableFileSlug}.factory.js'`
     )
   ) {
-    updated.push('packages/db/src/factories/index.ts')
+    updated.push('packages/infra/db/src/factories/index.ts')
   }
 
   if (
     await ensureLineInFile(
       repoRoot,
-      'packages/db/src/index.ts',
+      'packages/infra/db/src/index.ts',
       `export { ${names.entity}DbRepository } from './repositories/${dbNames.tableFileSlug}.js'`
     )
   ) {
-    updated.push('packages/db/src/index.ts')
+    updated.push('packages/infra/db/src/index.ts')
   }
 
   return updated
@@ -822,6 +822,39 @@ export const applyCrudScaffold = async (options: CrudScaffoldOptions): Promise<A
   }
 }
 
+export const CrudArgsUsage =
+  'Usage: --domain <name> --entity <name> [--plural <name>] [--dry-run] [--force] [--with-db]'
+
+const valueCrudFlags = new Set(['--domain', '--entity', '--plural'])
+const booleanCrudFlags = new Set(['--dry-run', '--force', '--with-db'])
+
+const parseInlineCrudOption = (arg: string): { flag: string; value: string } | null => {
+  if (!arg.startsWith('--') || !arg.includes('=')) {
+    return null
+  }
+
+  const separatorIndex = arg.indexOf('=')
+  return {
+    flag: arg.slice(0, separatorIndex),
+    value: arg.slice(separatorIndex + 1)
+  }
+}
+
+const usageError = (message: string): Error => new Error(`${message}\n${CrudArgsUsage}`)
+
+const parseInlineBoolean = (value: string, flag: string): boolean => {
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'true') {
+    return true
+  }
+
+  if (normalized === 'false') {
+    return false
+  }
+
+  throw usageError(`Invalid boolean value for ${flag}: ${value}`)
+}
+
 export const parseCrudArgs = (
   argv: string[]
 ): CrudScaffoldInput & { dryRun: boolean; force: boolean; withDb: boolean } => {
@@ -831,47 +864,109 @@ export const parseCrudArgs = (
   let dryRun = false
   let force = false
   let withDb = false
+  const seenFlags = new Set<string>()
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
-    const next = argv[i + 1]
+    if (arg === undefined) {
+      continue
+    }
 
-    if (arg === '--domain' && next) {
-      domain = next
+    const inlineOption = parseInlineCrudOption(arg)
+
+    if (inlineOption) {
+      const { flag, value } = inlineOption
+      if (valueCrudFlags.has(flag)) {
+        if (seenFlags.has(flag)) {
+          throw usageError(`Duplicate option: ${flag}`)
+        }
+
+        if (!value.trim()) {
+          throw usageError(`Missing value for ${flag}`)
+        }
+
+        if (flag === '--domain') {
+          domain = value
+        } else if (flag === '--entity') {
+          entity = value
+        } else {
+          plural = value
+        }
+
+        seenFlags.add(flag)
+        continue
+      }
+
+      if (booleanCrudFlags.has(flag)) {
+        if (seenFlags.has(flag)) {
+          throw usageError(`Duplicate option: ${flag}`)
+        }
+
+        const parsed = parseInlineBoolean(value, flag)
+        if (flag === '--dry-run') {
+          dryRun = parsed
+        } else if (flag === '--force') {
+          force = parsed
+        } else {
+          withDb = parsed
+        }
+
+        seenFlags.add(flag)
+        continue
+      }
+
+      throw usageError(`Unknown option: ${flag}`)
+    }
+
+    if (booleanCrudFlags.has(arg)) {
+      if (seenFlags.has(arg)) {
+        throw usageError(`Duplicate option: ${arg}`)
+      }
+
+      if (arg === '--dry-run') {
+        dryRun = true
+      } else if (arg === '--force') {
+        force = true
+      } else {
+        withDb = true
+      }
+
+      seenFlags.add(arg)
+      continue
+    }
+
+    if (valueCrudFlags.has(arg)) {
+      if (seenFlags.has(arg)) {
+        throw usageError(`Duplicate option: ${arg}`)
+      }
+
+      const next = argv[i + 1]
+      if (!next || next.startsWith('-')) {
+        throw usageError(`Missing value for ${arg}`)
+      }
+
+      if (arg === '--domain') {
+        domain = next
+      } else if (arg === '--entity') {
+        entity = next
+      } else {
+        plural = next
+      }
+
+      seenFlags.add(arg)
       i += 1
       continue
     }
 
-    if (arg === '--entity' && next) {
-      entity = next
-      i += 1
-      continue
+    if (arg.startsWith('-')) {
+      throw usageError(`Unknown option: ${arg}`)
     }
 
-    if (arg === '--plural' && next) {
-      plural = next
-      i += 1
-      continue
-    }
-
-    if (arg === '--dry-run') {
-      dryRun = true
-      continue
-    }
-
-    if (arg === '--force') {
-      force = true
-      continue
-    }
-
-    if (arg === '--with-db') {
-      withDb = true
-      continue
-    }
+    throw usageError(`Unexpected argument: ${arg}`)
   }
 
   if (!domain || !entity) {
-    throw new Error('Usage: --domain <name> --entity <name> [--plural <name>] [--dry-run] [--force] [--with-db]')
+    throw usageError('Missing required options: --domain and --entity')
   }
 
   return { domain, entity, plural, dryRun, force, withDb }

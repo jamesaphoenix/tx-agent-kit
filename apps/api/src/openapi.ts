@@ -20,11 +20,7 @@ const DDD_INVARIANTS = {
     },
     {
       name: 'Collaboration',
-      owns: ['Workspaces', 'Invitations', 'Membership']
-    },
-    {
-      name: 'WorkExecution',
-      owns: ['Tasks']
+      owns: ['Organizations', 'Teams', 'Invitations', 'Membership']
     }
   ],
   closedInvariants: [
@@ -33,8 +29,12 @@ const DDD_INVARIANTS = {
       rule: 'Password must be at least 8 characters.'
     },
     {
-      id: 'INV-WS-001',
-      rule: 'Workspace members are the only actors allowed to read/create tasks in that workspace.'
+      id: 'INV-AUTH-002',
+      rule: 'Forgot-password responses are account-enumeration safe.'
+    },
+    {
+      id: 'INV-ORG-001',
+      rule: 'Organization members are the only actors allowed to manage resources in that organization.'
     },
     {
       id: 'INV-INV-001',
@@ -54,21 +54,22 @@ const DDD_INVARIANTS = {
 const OPERATION_INVARIANTS: Record<string, readonly string[]> = {
   'auth.signUp': ['INV-AUTH-001'],
   'auth.signIn': ['INV-AUTH-001'],
+  'auth.forgotPassword': ['INV-AUTH-002'],
+  'auth.resetPassword': ['INV-AUTH-001'],
   'auth.deleteMe': ['INV-ARCH-001'],
-  'workspaces.createInvitation': ['INV-WS-001'],
-  'workspaces.listInvitations': ['INV-INV-002'],
-  'workspaces.getInvitation': ['INV-INV-002'],
-  'workspaces.getManyInvitations': ['INV-INV-002'],
-  'workspaces.updateInvitation': ['INV-WS-001'],
-  'workspaces.removeInvitation': ['INV-WS-001'],
-  'workspaces.getManyWorkspaces': ['INV-WS-001'],
-  'tasks.listTasks': ['INV-WS-001'],
-  'tasks.getTask': ['INV-WS-001'],
-  'tasks.getManyTasks': ['INV-WS-001'],
-  'tasks.createTask': ['INV-WS-001'],
-  'tasks.updateTask': ['INV-WS-001'],
-  'tasks.removeTask': ['INV-WS-001'],
-  'workspaces.acceptInvitation': ['INV-INV-001']
+  'organizations.createInvitation': ['INV-ORG-001'],
+  'organizations.listInvitations': ['INV-INV-002'],
+  'organizations.getInvitation': ['INV-INV-002'],
+  'organizations.getManyInvitations': ['INV-INV-002'],
+  'organizations.updateInvitation': ['INV-ORG-001'],
+  'organizations.removeInvitation': ['INV-ORG-001'],
+  'organizations.getManyOrganizations': ['INV-ORG-001'],
+  'organizations.acceptInvitation': ['INV-INV-001'],
+  'teams.listTeams': ['INV-ORG-001'],
+  'teams.getTeam': ['INV-ORG-001'],
+  'teams.createTeam': ['INV-ORG-001'],
+  'teams.updateTeam': ['INV-ORG-001'],
+  'teams.removeTeam': ['INV-ORG-001']
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -115,7 +116,7 @@ const generate = async (): Promise<void> => {
       ...baseSpec.info,
       title: 'tx-agent-kit API',
       version: '0.1.0',
-      summary: 'Effect-based API for auth, workspaces, invitations, and tasks.',
+      summary: 'Effect-based API for auth, organizations, teams, and invitations.',
       description: 'Contract for apps/api. Domain behavior is modeled as closed invariants at API boundaries.'
     },
     servers: [

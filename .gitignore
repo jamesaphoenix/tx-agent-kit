@@ -16,4 +16,10 @@ deploy/artifacts
 apps/*/.next
 apps/*/dist
 packages/*/dist
+packages/infra/db/drizzle.config.js
+packages/infra/db/drizzle.config.js.map
+packages/infra/db/drizzle.config.d.ts
+packages/infra/db/drizzle.config.d.ts.map
 pgdata
+.data/
+.vercel

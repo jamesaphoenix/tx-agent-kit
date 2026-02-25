@@ -3,7 +3,7 @@ title: Auth
 description: Password hashing and JWT token primitives for the API auth endpoints.
 ---
 
-# Auth (`packages/auth`)
+# Auth (`packages/infra/auth`)
 
 The auth package provides low-level authentication primitives: password hashing and JWT token operations. It is consumed by the API server's auth routes and the core domain's auth service.
 
@@ -33,7 +33,7 @@ const payload = await verifyToken(token)
 
 ## Environment
 
-Auth-specific configuration (e.g., JWT secret, token expiry) is read from `packages/auth/src/env.ts`. Direct `process.env` access is forbidden in other source modules within this package.
+Auth-specific configuration (e.g., JWT secret, token expiry) is read from `packages/infra/auth/src/env.ts`. Direct `process.env` access is forbidden in other source modules within this package.
 
 ## Usage in the Stack
 
@@ -42,8 +42,8 @@ The auth package sits between the API layer and the core domain:
 ```
 API Route (apps/api/src/routes/auth.ts)
   -> AuthService (packages/core/src/domains/auth/application/)
-    -> Auth Primitives (packages/auth)
-    -> User Repository (packages/db/src/repositories/)
+    -> Auth Primitives (packages/infra/auth)
+    -> User Repository (packages/infra/db/src/repositories/)
 ```
 
 The API route handles HTTP concerns, the domain service orchestrates the auth flow, and this package provides the cryptographic primitives.

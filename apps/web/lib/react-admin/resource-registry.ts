@@ -1,20 +1,15 @@
 'use client'
 
 export interface AdminResourceConfig {
-  endpoint: '/v1/tasks' | '/v1/workspaces' | '/v1/invitations'
+  endpoint: '/v1/organizations' | '/v1/invitations'
   label: string
   defaultSortBy: string
 }
 
 export const ADMIN_RESOURCES = {
-  tasks: {
-    endpoint: '/v1/tasks',
-    label: 'Tasks',
-    defaultSortBy: 'createdAt'
-  },
-  workspaces: {
-    endpoint: '/v1/workspaces',
-    label: 'Workspaces',
+  organizations: {
+    endpoint: '/v1/organizations',
+    label: 'Organizations',
     defaultSortBy: 'createdAt'
   },
   invitations: {

@@ -198,8 +198,8 @@ test('enforce-layer-boundaries allows domain -> domain import', async () => {
 test('enforce-layer-boundaries blocks cross-domain imports unless shared', async () => {
   const messages = await runRule({
     ruleName: 'enforce-layer-boundaries',
-    filePath: 'packages/core/src/domains/task/application/task-service.ts',
-    code: "import { x } from '../../workspace/domain/workspace-types.js'\nexport const y = x\n"
+    filePath: 'packages/core/src/domains/invitation/application/invitation-service.ts',
+    code: "import { x } from '../../organization/domain/organization-types.js'\nexport const y = x\n"
   })
 
   assert.equal(messages.length, 1)
@@ -209,7 +209,7 @@ test('enforce-layer-boundaries blocks cross-domain imports unless shared', async
 test('enforce-layer-boundaries allows cross-domain shared imports', async () => {
   const messages = await runRule({
     ruleName: 'enforce-layer-boundaries',
-    filePath: 'packages/core/src/domains/task/application/task-service.ts',
+    filePath: 'packages/core/src/domains/invitation/application/invitation-service.ts',
     code: "import { x } from '../../shared/domain-shared/value.js'\nexport const y = x\n"
   })
 
@@ -475,8 +475,8 @@ test('no-raw-schema-literal-enums allows spread tuples imported from contracts',
     filePath: 'apps/api/src/example.ts',
     code: [
       "import * as Schema from 'effect/Schema'",
-      "import { taskStatuses } from '@tx-agent-kit/contracts'",
-      'const s = Schema.Literal(...taskStatuses)'
+      "import { subscriptionStatuses } from '@tx-agent-kit/contracts'",
+      'const s = Schema.Literal(...subscriptionStatuses)'
     ].join('\n')
   })
 
@@ -490,7 +490,7 @@ test('no-raw-schema-literal-enums allows namespace import tuples from contracts'
     code: [
       "import * as Schema from 'effect/Schema'",
       "import * as literals from '@tx-agent-kit/contracts/literals'",
-      'const s = Schema.Literal(...literals.taskStatuses)'
+      'const s = Schema.Literal(...literals.subscriptionStatuses)'
     ].join('\n')
   })
 
@@ -510,7 +510,7 @@ test('no-raw-schema-literal-enums allows single-value Schema.Literal', async () 
 test('no-inline-pgenum-array reports inline pgEnum arrays', async () => {
   const messages = await runRule({
     ruleName: 'no-inline-pgenum-array',
-    filePath: 'packages/db/src/schema.ts',
+    filePath: 'packages/infra/db/src/schema.ts',
     code: "import { pgEnum } from 'drizzle-orm/pg-core'\nconst e = pgEnum('status', ['a', 'b'])\n"
   })
 
@@ -521,7 +521,7 @@ test('no-inline-pgenum-array reports inline pgEnum arrays', async () => {
 test('no-inline-pgenum-array reports local tuple constants', async () => {
   const messages = await runRule({
     ruleName: 'no-inline-pgenum-array',
-    filePath: 'packages/db/src/schema.ts',
+    filePath: 'packages/infra/db/src/schema.ts',
     code: "import { pgEnum } from 'drizzle-orm/pg-core'\nconst values = ['a', 'b'] as const\nconst e = pgEnum('status', values)\n"
   })
 
@@ -532,7 +532,7 @@ test('no-inline-pgenum-array reports local tuple constants', async () => {
 test('no-inline-pgenum-array allows tuples imported from contracts', async () => {
   const messages = await runRule({
     ruleName: 'no-inline-pgenum-array',
-    filePath: 'packages/db/src/schema.ts',
+    filePath: 'packages/infra/db/src/schema.ts',
     code: [
       "import { pgEnum } from 'drizzle-orm/pg-core'",
       "import { invitationStatuses } from '@tx-agent-kit/contracts'",
@@ -546,11 +546,82 @@ test('no-inline-pgenum-array allows tuples imported from contracts', async () =>
 test('no-inline-pgenum-array allows namespace-imported tuples from contracts', async () => {
   const messages = await runRule({
     ruleName: 'no-inline-pgenum-array',
-    filePath: 'packages/db/src/schema.ts',
+    filePath: 'packages/infra/db/src/schema.ts',
     code: [
       "import { pgEnum } from 'drizzle-orm/pg-core'",
       "import * as literals from '@tx-agent-kit/contracts'",
       "const e = pgEnum('status', literals.invitationStatuses)"
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 0)
+})
+
+test('json-columns-require-explicit-drizzle-type reports jsonb columns without .$type', async () => {
+  const messages = await runRule({
+    ruleName: 'json-columns-require-explicit-drizzle-type',
+    filePath: 'packages/infra/db/src/schema.ts',
+    code: [
+      "import { jsonb, pgTable, uuid } from 'drizzle-orm/pg-core'",
+      "export const widgets = pgTable('widgets', {",
+      "  id: uuid('id').defaultRandom().primaryKey(),",
+      "  metadata: jsonb('metadata').notNull()",
+      '})'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 1)
+  assert.match(messages[0].message, /must include `\.\$type<\.\.\.>\(\)`/)
+})
+
+test('json-columns-require-explicit-drizzle-type reports weak unknown type arguments', async () => {
+  const messages = await runRule({
+    ruleName: 'json-columns-require-explicit-drizzle-type',
+    filePath: 'packages/infra/db/src/schema.ts',
+    code: [
+      "import { jsonb, pgTable, uuid } from 'drizzle-orm/pg-core'",
+      "export const widgets = pgTable('widgets', {",
+      "  id: uuid('id').defaultRandom().primaryKey(),",
+      "  metadata: jsonb('metadata').$type<unknown>().notNull()",
+      '})'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 1)
+  assert.match(messages[0].message, /weak type `unknown` is disallowed/)
+})
+
+test('json-columns-require-explicit-drizzle-type reports weak Record<string, unknown> types', async () => {
+  const messages = await runRule({
+    ruleName: 'json-columns-require-explicit-drizzle-type',
+    filePath: 'packages/infra/db/src/schema.ts',
+    code: [
+      "import { jsonb, pgTable, uuid } from 'drizzle-orm/pg-core'",
+      "export const widgets = pgTable('widgets', {",
+      "  id: uuid('id').defaultRandom().primaryKey(),",
+      "  metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull()",
+      '})'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 1)
+  assert.match(messages[0].message, /Record<string, unknown>/)
+})
+
+test('json-columns-require-explicit-drizzle-type allows explicit typed payloads', async () => {
+  const messages = await runRule({
+    ruleName: 'json-columns-require-explicit-drizzle-type',
+    filePath: 'packages/infra/db/src/schema.ts',
+    code: [
+      "import { jsonb, pgTable, uuid } from 'drizzle-orm/pg-core'",
+      'type WidgetMetadata = {',
+      '  enabled: boolean',
+      '  tags: ReadonlyArray<string>',
+      '}',
+      "export const widgets = pgTable('widgets', {",
+      "  id: uuid('id').defaultRandom().primaryKey(),",
+      "  metadata: jsonb('metadata').$type<WidgetMetadata>().notNull()",
+      '})'
     ].join('\n')
   })
 

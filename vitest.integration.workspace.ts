@@ -8,7 +8,7 @@ const requiredIntegrationConfigMarkers = [
   'apps/api/vitest.integration.config.ts',
   'apps/mobile/vitest.integration.config.ts',
   'apps/web/vitest.integration.config.ts',
-  'packages/observability/vitest.integration.config.ts',
+  'packages/infra/observability/vitest.integration.config.ts',
   'packages/testkit/vitest.integration.config.ts',
   'apps/worker/vitest.integration.config.ts'
 ] as const

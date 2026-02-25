@@ -3,7 +3,7 @@ title: Observability
 description: OpenTelemetry bootstrap helpers for traces, metrics, and logs with configurable backend routing.
 ---
 
-# Observability (`packages/observability`)
+# Observability (`packages/infra/observability`)
 
 The observability package provides OpenTelemetry (OTEL) bootstrap helpers that configure trace, metric, and log exporters for the entire stack. All services call `startTelemetry()` on startup to initialize the SDK.
 
@@ -42,7 +42,7 @@ The OTEL collector routes telemetry to different backends based on `OTEL_COLLECT
 
 ## Environment Configuration
 
-Configuration is centralized in `packages/observability/src/env.ts`:
+Configuration is centralized in `packages/infra/observability/src/env.ts`:
 
 | Variable | Description |
 |----------|-------------|
@@ -65,7 +65,7 @@ emitNodeTelemetrySmoke('tx-agent-kit-api')
 
 ## Integration Testing
 
-The stack integration suite at `packages/observability/src/stack.integration.test.ts` validates end-to-end telemetry flow across all four services (`api`, `worker`, `web`, `mobile`). It checks:
+The stack integration suite at `packages/infra/observability/src/stack.integration.test.ts` validates end-to-end telemetry flow across all four services (`api`, `worker`, `web`, `mobile`). It checks:
 
 | Signal | Validation |
 |--------|------------|

@@ -22,10 +22,10 @@ Activities are normal async functions registered with the worker. They handle al
 ```typescript
 // apps/worker/src/activities.ts
 export const activities = {
-  processTask: async (taskId: string) => {
+  processOperation: async (operationId: string) => {
     // Database queries and external calls are fine here
     const result = await db.query(...)
-    return { alreadyProcessed: false, taskId }
+    return { alreadyProcessed: false, operationId }
   },
 
   sendNotification: async (userId: string, message: string) => {
@@ -45,15 +45,15 @@ Workflows orchestrate activities and must be fully deterministic:
 import { proxyActivities } from '@temporalio/workflow'
 import type { activities } from './activities.js'
 
-const { processTask, sendNotification } = proxyActivities<typeof activities>({
+const { processOperation, sendNotification } = proxyActivities<typeof activities>({
   startToCloseTimeout: '30s'
 })
 
-export async function taskProcessingWorkflow(taskId: string): Promise<void> {
-  const result = await processTask(taskId)
+export async function operationProcessingWorkflow(operationId: string): Promise<void> {
+  const result = await processOperation(operationId)
 
   if (!result.alreadyProcessed) {
-    await sendNotification(result.userId, `Task ${taskId} processed`)
+    await sendNotification(result.userId, `Operation ${operationId} processed`)
   }
 }
 ```
@@ -107,11 +107,11 @@ New workflows are automatically discovered from the `workflowsPath` file.
 Test activities directly by calling them as functions. The worker integration suite validates idempotent behavior:
 
 ```typescript
-// First call processes the task
-const first = await activities.processTask(taskId)
+// First call processes the operation
+const first = await activities.processOperation(operationId)
 expect(first.alreadyProcessed).toBe(false)
 
 // Second call detects the duplicate
-const second = await activities.processTask(taskId)
+const second = await activities.processOperation(operationId)
 expect(second.alreadyProcessed).toBe(true)
 ```

@@ -1,69 +1,64 @@
 import { randomUUID } from 'node:crypto'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { getPool as GetDbPool } from '@tx-agent-kit/db'
+import { Client } from '@temporalio/client'
+import { NativeConnection, Worker } from '@temporalio/worker'
 import type { activities as WorkerActivities } from './activities.js'
+import {
+  getWorkerEnv,
+  resolveWorkerTemporalConnectionOptions
+} from './config/env.js'
 
 let activitiesRef: typeof WorkerActivities | undefined
-let getPoolRef: typeof GetDbPool | undefined
+let temporalConnection: NativeConnection | undefined
+let workflowClient: Client | undefined
+let workflowWorker: Worker | undefined
+let workflowWorkerRunPromise: Promise<void> | undefined
+let workflowTaskQueue: string | undefined
 
-const seedTask = async (): Promise<{ workspaceId: string; taskId: string }> => {
-  if (!getPoolRef) {
-    throw new Error('DB pool is not initialized')
-  }
-
-  const client = await getPoolRef().connect()
-  try {
-    const ownerUserId = randomUUID()
-    const workspaceId = randomUUID()
-    const taskId = randomUUID()
-
-    await client.query(
-      `
-        INSERT INTO users (id, email, password_hash, name)
-        VALUES ($1, $2, 'hash', 'Worker Integration Owner')
-      `,
-      [ownerUserId, `worker-owner-${ownerUserId}@example.com`]
-    )
-
-    await client.query(
-      `
-        INSERT INTO workspaces (id, name, owner_user_id)
-        VALUES ($1, 'Worker Integration Workspace', $2)
-      `,
-      [workspaceId, ownerUserId]
-    )
-
-    await client.query(
-      `
-        INSERT INTO tasks (id, workspace_id, title, description, status, created_by_user_id)
-        VALUES ($1, $2, 'Worker Integration Task', 'task for worker integration flow', 'todo', $3)
-      `,
-      [taskId, workspaceId, ownerUserId]
-    )
-
-    return { workspaceId, taskId }
-  } finally {
-    client.release()
-  }
+interface PingWorkflowResult {
+  readonly ok: boolean
 }
 
 beforeAll(async () => {
-  const [{ activities }, dbModule] = await Promise.all([
-    import('./activities.js'),
-    import('@tx-agent-kit/db')
+  const [{ activities }] = await Promise.all([
+    import('./activities.js')
   ])
 
   activitiesRef = activities
-  getPoolRef = dbModule.getPool
+  const workerEnv = getWorkerEnv()
+
+  temporalConnection = await NativeConnection.connect(
+    resolveWorkerTemporalConnectionOptions(workerEnv)
+  )
+  workflowClient = new Client({
+    connection: temporalConnection,
+    namespace: workerEnv.TEMPORAL_NAMESPACE
+  })
+
+  workflowTaskQueue = `tx-agent-kit-worker-integration-${randomUUID()}`
+  const sourceDir = dirname(fileURLToPath(import.meta.url))
+
+  workflowWorker = await Worker.create({
+    connection: temporalConnection,
+    namespace: workerEnv.TEMPORAL_NAMESPACE,
+    taskQueue: workflowTaskQueue,
+    workflowsPath: resolve(sourceDir, 'workflows.ts'),
+    activities
+  })
+  workflowWorkerRunPromise = workflowWorker.run()
 })
 
 afterAll(async () => {
-  try {
-    if (getPoolRef) {
-      await getPoolRef().end()
-    }
-  } catch {
-    // Pool may not be initialized in failing/short-circuit paths.
+  if (workflowWorker) {
+    workflowWorker.shutdown()
+  }
+  if (workflowWorkerRunPromise) {
+    await workflowWorkerRunPromise
+  }
+  if (temporalConnection) {
+    await temporalConnection.close()
   }
 })
 
@@ -75,41 +70,48 @@ const getActivities = (): typeof WorkerActivities => {
   return activitiesRef
 }
 
+const getWorkflowClient = (): Client => {
+  if (!workflowClient) {
+    throw new Error('Workflow client was not initialized')
+  }
+
+  return workflowClient
+}
+
+const parsePingWorkflowResult = (value: unknown): PingWorkflowResult => {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('Workflow result must be an object')
+  }
+
+  const record = value as Record<string, unknown>
+  if (typeof record.ok !== 'boolean') {
+    throw new Error('Workflow result.ok must be a boolean')
+  }
+
+  return { ok: record.ok }
+}
+
 describe('worker activities integration', () => {
-  it('marks duplicated operation ids as already processed', async () => {
-    const { workspaceId, taskId } = await seedTask()
-    const operationId = randomUUID()
-
+  it('executes ping activity directly', async () => {
     const activities = getActivities()
-    const first = await activities.processTask({ operationId, workspaceId, taskId })
-    const second = await activities.processTask({ operationId, workspaceId, taskId })
+    const result = await activities.ping()
 
-    expect(first).toEqual({
-      operationId,
-      alreadyProcessed: false
-    })
-    expect(second).toEqual({
-      operationId,
-      alreadyProcessed: true
-    })
+    expect(result).toEqual({ ok: true })
   })
 
-  it('allows distinct operation ids for the same task', async () => {
-    const { workspaceId, taskId } = await seedTask()
+  it('executes pingWorkflow end to end', async () => {
+    if (!workflowTaskQueue) {
+      throw new Error('Workflow task queue was not initialized')
+    }
 
-    const activities = getActivities()
-    const first = await activities.processTask({
-      operationId: randomUUID(),
-      workspaceId,
-      taskId
+    const client = getWorkflowClient()
+    const handle = await client.workflow.start('pingWorkflow', {
+      taskQueue: workflowTaskQueue,
+      workflowId: `ping-${randomUUID()}`,
+      args: []
     })
-    const second = await activities.processTask({
-      operationId: randomUUID(),
-      workspaceId,
-      taskId
-    })
+    const result = parsePingWorkflowResult(await handle.result())
 
-    expect(first.alreadyProcessed).toBe(false)
-    expect(second.alreadyProcessed).toBe(false)
-  })
+    expect(result.ok).toBe(true)
+  }, 120_000)
 })

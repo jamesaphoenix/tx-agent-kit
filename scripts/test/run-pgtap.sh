@@ -4,9 +4,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$PROJECT_ROOT/scripts/lib/lock.sh"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-tx-agent-kit}"
 DB_NAME="${TX_AGENT_DB_NAME:-tx_agent_kit}"
-PGTAP_DIR="$PROJECT_ROOT/packages/db/pgtap"
+PGTAP_DIR="$PROJECT_ROOT/packages/infra/db/pgtap"
+LOCK_DIR="/tmp/${COMPOSE_PROJECT_NAME}-db-reset.lock"
 SKIP_SETUP="false"
 
 if [[ "${1:-}" == "--skip-setup" ]]; then
@@ -21,6 +23,12 @@ if [[ "$#" -gt 0 ]]; then
 fi
 
 cd "$PROJECT_ROOT"
+
+lock_acquire \
+  "$LOCK_DIR" \
+  "${DB_RESET_LOCK_TIMEOUT_SECONDS:-900}" \
+  "${DB_RESET_LOCK_MISSING_PID_GRACE_SECONDS:-15}"
+trap 'lock_release "$LOCK_DIR"' EXIT
 
 if [[ "$SKIP_SETUP" != "true" ]]; then
   "$PROJECT_ROOT/scripts/start-dev-services.sh"

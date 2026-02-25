@@ -10,7 +10,7 @@ Database triggers require both a migration file and pgTAP test coverage. The sca
 Use the trigger scaffold command:
 
 ```bash
-pnpm db:trigger:new --name set_updated_at --table tasks
+pnpm db:trigger:new --name set_updated_at --table organizations
 ```
 
 ### Options
@@ -25,15 +25,15 @@ pnpm db:trigger:new --name set_updated_at --table tasks
 
 ### What Gets Generated
 
-1. **Migration file** in `packages/db/drizzle/migrations/` with a `CREATE TRIGGER` statement and a placeholder trigger function
-2. **pgTAP test file** in `packages/db/pgtap/` with a `fail()` placeholder that you must replace with real assertions
+1. **Migration file** in `packages/infra/db/drizzle/migrations/` with a `CREATE TRIGGER` statement and a placeholder trigger function
+2. **pgTAP test file** in `packages/infra/db/pgtap/` with a `fail()` placeholder that you must replace with real assertions
 
 ## Step 2: Implement the Trigger Function
 
 Open the generated migration and implement the trigger function:
 
 ```sql
--- packages/db/drizzle/migrations/XXXX_set_updated_at.sql
+-- packages/infra/db/drizzle/migrations/XXXX_set_updated_at.sql
 
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
@@ -44,7 +44,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER set_updated_at
-  BEFORE UPDATE ON tasks
+  BEFORE UPDATE ON organizations
   FOR EACH ROW
   EXECUTE FUNCTION set_updated_at();
 ```
@@ -54,15 +54,15 @@ CREATE TRIGGER set_updated_at
 Replace the scaffold `fail()` placeholder in the generated pgTAP file with real assertions:
 
 ```sql
--- packages/db/pgtap/set_updated_at.sql
+-- packages/infra/db/pgtap/set_updated_at.sql
 BEGIN;
 SELECT plan(2);
 
 -- Verify the trigger exists
-SELECT has_trigger('tasks', 'set_updated_at', 'Trigger set_updated_at exists on tasks');
+SELECT has_trigger('organizations', 'set_updated_at', 'Trigger set_updated_at exists on organizations');
 
 -- Verify it fires on UPDATE
-SELECT trigger_is('tasks', 'set_updated_at', 'set_updated_at',
+SELECT trigger_is('organizations', 'set_updated_at', 'set_updated_at',
   'set_updated_at trigger calls set_updated_at function');
 
 SELECT * FROM finish();
@@ -87,7 +87,7 @@ If you add a trigger without pgTAP coverage, `pnpm lint` will fail with:
 
 ```
 Missing pgTAP coverage marker for trigger `set_updated_at`.
-Reference this trigger in `packages/db/pgtap/*.sql`.
+Reference this trigger in `packages/infra/db/pgtap/*.sql`.
 ```
 
 ## Full Validation

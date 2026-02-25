@@ -5,7 +5,14 @@ import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const originalCwd = process.cwd()
-const envVarNames = ['WEB_INTEGRATION_MAX_WORKERS', 'VITEST_POOL_ID', 'VITEST_WORKER_ID'] as const
+const envVarNames = [
+  'WEB_INTEGRATION_MAX_WORKERS',
+  'VITEST_POOL_ID',
+  'VITEST_WORKER_ID',
+  'WEB_INTEGRATION_SLOT_CLAIM_DIR',
+  'WEB_INTEGRATION_SLOT_WAIT_MS',
+  'WEB_INTEGRATION_SLOT_POLL_MS'
+] as const
 let currentTempDir: string | undefined
 let currentChild: ChildProcess | undefined
 
@@ -34,6 +41,10 @@ const teardownChild = (): void => {
 const withIsolatedCwd = (): void => {
   const tempDir = mkdtempSync(resolve(tmpdir(), 'tx-agent-kit-web-worker-slot-'))
   process.chdir(tempDir)
+  process.env.WEB_INTEGRATION_SLOT_CLAIM_DIR = resolve(
+    tempDir,
+    '.vitest/web-integration/slot-claims'
+  )
   currentTempDir = tempDir
 }
 
@@ -92,5 +103,32 @@ describe('resolveVitestWorkerSlot', () => {
 
     const claimContents = readFileSync(resolveClaimPath(1), 'utf8')
     expect(claimContents).toContain(`pid=${process.pid}`)
+  })
+
+  it('fails fast when all worker slots are actively claimed', async () => {
+    withIsolatedCwd()
+    process.env.WEB_INTEGRATION_MAX_WORKERS = '1'
+    process.env.WEB_INTEGRATION_SLOT_WAIT_MS = '0'
+    process.env.VITEST_POOL_ID = '1'
+    delete process.env.VITEST_WORKER_ID
+
+    const claimDir = resolve(process.cwd(), '.vitest/web-integration/slot-claims')
+    mkdirSync(claimDir, { recursive: true })
+
+    currentChild = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30_000)'], {
+      stdio: 'ignore'
+    })
+
+    if (!currentChild.pid) {
+      throw new Error('Failed to start child process for slot claim test')
+    }
+
+    writeFileSync(resolveClaimPath(1), `pid=${currentChild.pid}\nworker=other\n`, 'utf8')
+
+    const { resolveVitestWorkerSlot } = await import('./vitest-worker')
+
+    expect(() => resolveVitestWorkerSlot()).toThrowError(
+      /Unable to claim a web integration worker slot/
+    )
   })
 })

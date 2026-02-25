@@ -9,7 +9,7 @@ The contracts package defines shared API schemas and types that are consumed by 
 
 ## Purpose
 
-Contracts provide a single source of truth for request/response payload shapes, enum types and value sets (such as task statuses, invitation statuses, and member roles), and shared type definitions imported by domain and API layers.
+Contracts provide a single source of truth for request/response payload shapes, enum types and value sets (such as subscription statuses, invitation statuses, and member roles), and shared type definitions imported by domain and API layers.
 
 ## Usage
 
@@ -17,10 +17,10 @@ Contracts are imported by the API routes for request validation and by the domai
 
 ```typescript
 // Used in domain layer
-import { type TaskStatus, taskStatuses } from '@tx-agent-kit/contracts'
+import { type SubscriptionStatus, subscriptionStatuses } from '@tx-agent-kit/contracts'
 
 // Used in API route validation
-import { CreateWorkspaceSchema } from '@tx-agent-kit/contracts'
+import { createOrganizationRequestSchema } from '@tx-agent-kit/contracts'
 ```
 
 ## Schema-First Boundaries
@@ -30,10 +30,10 @@ The project enforces schema-first validation at all system boundaries. Rather th
 ```typescript
 import { Schema } from 'effect'
 
-export const TaskStatusSchema = Schema.Literal('open', 'in_progress', 'done', 'cancelled')
-export type TaskStatus = Schema.Schema.Type<typeof TaskStatusSchema>
+export const subscriptionStatusSchema = Schema.Literal('active', 'inactive', 'trialing', 'past_due', 'canceled', 'paused', 'unpaid')
+export type SubscriptionStatus = Schema.Schema.Type<typeof subscriptionStatusSchema>
 
-export const taskStatuses = ['open', 'in_progress', 'done', 'cancelled'] as const
+export const subscriptionStatuses = ['active', 'inactive', 'trialing', 'past_due', 'canceled', 'paused', 'unpaid'] as const
 ```
 
 ## Governance

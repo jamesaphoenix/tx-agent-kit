@@ -1,11 +1,16 @@
 import type {
   AuthPrincipal,
   AuthResponse,
+  CreateOrganizationRequest,
+  CreateTeamRequest,
+  ForgotPasswordRequest,
   Invitation,
+  Organization,
+  ResetPasswordRequest,
   SignInRequest,
   SignUpRequest,
-  Task,
-  Workspace
+  Team,
+  UpdateOrganizationRequest
 } from '@tx-agent-kit/contracts'
 import { clearAuthToken, writeAuthToken } from './auth-token'
 import { api, getApiErrorMessage, getApiErrorStatus } from './axios'
@@ -149,108 +154,66 @@ export const clientApi = {
     }
   },
 
-  listWorkspaces: async (query?: ListQuery): Promise<PaginatedResponse<Workspace>> => {
+  forgotPassword: async (input: ForgotPasswordRequest): Promise<void> => {
     try {
-      const { data } = await api.get<unknown>('/v1/workspaces', {
+      await api.post('/v1/auth/forgot-password', input)
+    } catch (error) {
+      return fail(error, 'Failed to process forgot-password request')
+    }
+  },
+
+  resetPassword: async (input: ResetPasswordRequest): Promise<void> => {
+    try {
+      await api.post('/v1/auth/reset-password', input)
+    } catch (error) {
+      return fail(error, 'Failed to reset password')
+    }
+  },
+
+  listOrganizations: async (query?: ListQuery): Promise<PaginatedResponse<Organization>> => {
+    try {
+      const { data } = await api.get<unknown>('/v1/organizations', {
         params: toListParams(query)
       })
-      return normalizePaginatedResponse<Workspace>(data, 'workspaces')
+      return normalizePaginatedResponse<Organization>(data, 'organizations')
     } catch (error) {
-      return fail(error, 'Failed to list workspaces')
+      return fail(error, 'Failed to list organizations')
     }
   },
 
-  getWorkspace: async (id: string): Promise<Workspace> => {
+  getOrganization: async (id: string): Promise<Organization> => {
     try {
-      const { data } = await api.get<Workspace>(`/v1/workspaces/${encodeURIComponent(id)}`)
+      const { data } = await api.get<Organization>(`/v1/organizations/${encodeURIComponent(id)}`)
       return data
     } catch (error) {
-      return fail(error, 'Failed to fetch workspace')
+      return fail(error, 'Failed to fetch organization')
     }
   },
 
-  createWorkspace: async (input: { name: string }): Promise<Workspace> => {
+  createOrganization: async (input: CreateOrganizationRequest): Promise<Organization> => {
     try {
-      const { data } = await api.post<Workspace>('/v1/workspaces', input)
+      const { data } = await api.post<Organization>('/v1/organizations', input)
       return data
     } catch (error) {
-      return fail(error, 'Failed to create workspace')
+      return fail(error, 'Failed to create organization')
     }
   },
 
-  updateWorkspace: async (id: string, input: { name?: string }): Promise<Workspace> => {
+  updateOrganization: async (id: string, input: UpdateOrganizationRequest): Promise<Organization> => {
     try {
-      const { data } = await api.patch<Workspace>(`/v1/workspaces/${encodeURIComponent(id)}`, input)
+      const { data } = await api.patch<Organization>(`/v1/organizations/${encodeURIComponent(id)}`, input)
       return data
     } catch (error) {
-      return fail(error, 'Failed to update workspace')
+      return fail(error, 'Failed to update organization')
     }
   },
 
-  removeWorkspace: async (id: string): Promise<{ deleted: true }> => {
+  removeOrganization: async (id: string): Promise<{ deleted: true }> => {
     try {
-      const { data } = await api.delete<{ deleted: true }>(`/v1/workspaces/${encodeURIComponent(id)}`)
+      const { data } = await api.delete<{ deleted: true }>(`/v1/organizations/${encodeURIComponent(id)}`)
       return data
     } catch (error) {
-      return fail(error, 'Failed to delete workspace')
-    }
-  },
-
-  listTasks: async (workspaceId: string, query?: ListQuery): Promise<PaginatedResponse<Task>> => {
-    try {
-      const { data } = await api.get<unknown>('/v1/tasks', {
-        params: {
-          workspaceId,
-          ...toListParams(query)
-        }
-      })
-      return normalizePaginatedResponse<Task>(data, 'tasks')
-    } catch (error) {
-      return fail(error, 'Failed to list tasks')
-    }
-  },
-
-  getTask: async (id: string): Promise<Task> => {
-    try {
-      const { data } = await api.get<Task>(`/v1/tasks/${encodeURIComponent(id)}`)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to fetch task')
-    }
-  },
-
-  createTask: async (input: {
-    workspaceId: string
-    title: string
-    description?: string
-  }): Promise<Task> => {
-    try {
-      const { data } = await api.post<Task>('/v1/tasks', input)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to create task')
-    }
-  },
-
-  updateTask: async (id: string, input: {
-    title?: string
-    description?: string | null
-    status?: 'todo' | 'in_progress' | 'done'
-  }): Promise<Task> => {
-    try {
-      const { data } = await api.patch<Task>(`/v1/tasks/${encodeURIComponent(id)}`, input)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to update task')
-    }
-  },
-
-  removeTask: async (id: string): Promise<{ deleted: true }> => {
-    try {
-      const { data } = await api.delete<{ deleted: true }>(`/v1/tasks/${encodeURIComponent(id)}`)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to delete task')
+      return fail(error, 'Failed to delete organization')
     }
   },
 
@@ -275,7 +238,7 @@ export const clientApi = {
   },
 
   createInvitation: async (input: {
-    workspaceId: string
+    organizationId: string
     email: string
     role: 'admin' | 'member'
   }): Promise<Invitation> => {
@@ -316,6 +279,53 @@ export const clientApi = {
       return data
     } catch (error) {
       return fail(error, 'Failed to accept invitation')
+    }
+  },
+
+  listTeams: async (organizationId: string, query?: ListQuery): Promise<PaginatedResponse<Team>> => {
+    try {
+      const { data } = await api.get<unknown>('/v1/teams', {
+        params: { ...toListParams(query), organizationId }
+      })
+      return normalizePaginatedResponse<Team>(data, 'teams')
+    } catch (error) {
+      return fail(error, 'Failed to list teams')
+    }
+  },
+
+  getTeam: async (id: string): Promise<Team> => {
+    try {
+      const { data } = await api.get<Team>(`/v1/teams/${encodeURIComponent(id)}`)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to fetch team')
+    }
+  },
+
+  createTeam: async (input: CreateTeamRequest): Promise<Team> => {
+    try {
+      const { data } = await api.post<Team>('/v1/teams', input)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to create team')
+    }
+  },
+
+  updateTeam: async (id: string, input: { name?: string }): Promise<Team> => {
+    try {
+      const { data } = await api.patch<Team>(`/v1/teams/${encodeURIComponent(id)}`, input)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to update team')
+    }
+  },
+
+  removeTeam: async (id: string): Promise<{ deleted: true }> => {
+    try {
+      const { data } = await api.delete<{ deleted: true }>(`/v1/teams/${encodeURIComponent(id)}`)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to delete team')
     }
   }
 }

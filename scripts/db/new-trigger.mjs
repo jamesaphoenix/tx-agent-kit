@@ -1,20 +1,37 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 
-const usage = `
+export const usage = `
 Usage:
   pnpm db:trigger:new --name <trigger-name> --table <table> [--timing BEFORE|AFTER] [--events INSERT,UPDATE] [--level ROW|STATEMENT]
+  pnpm tx db:trigger:new --name <trigger-name> --table <table> [--timing BEFORE|AFTER] [--events INSERT,UPDATE] [--level ROW|STATEMENT]
 
 Examples:
   pnpm db:trigger:new --name normalize-project-email --table invitations --timing BEFORE --events INSERT,UPDATE
   pnpm db:trigger:new --name workspace-billing-rollup --table tasks --timing AFTER --events INSERT,UPDATE,DELETE
 `.trim()
 
+const valueOptionFlags = new Set(['--name', '--table', '--timing', '--events', '--level'])
+
+const parseInlineOption = (arg) => {
+  if (!arg.startsWith('--') || !arg.includes('=')) {
+    return null
+  }
+
+  const separatorIndex = arg.indexOf('=')
+  return {
+    flag: arg.slice(0, separatorIndex),
+    value: arg.slice(separatorIndex + 1)
+  }
+}
+
 const parseArgs = (argv) => {
   const options = {
+    help: false,
     name: '',
     table: '',
     timing: 'BEFORE',
@@ -22,24 +39,55 @@ const parseArgs = (argv) => {
     level: 'ROW'
   }
 
+  const seenOptions = new Set()
+
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
+
     if (arg === '--help' || arg === '-h') {
-      options.help = 'true'
-      continue
+      options.help = true
+      break
     }
 
-    if (!arg.startsWith('--')) {
+    if (!arg.startsWith('-')) {
       throw new Error(`Unexpected argument: ${arg}`)
     }
 
-    const key = arg.slice(2)
-    const next = argv[index + 1]
-    if (!next || next.startsWith('--')) {
-      throw new Error(`Missing value for --${key}`)
+    const inlineOption = parseInlineOption(arg)
+    if (inlineOption) {
+      const { flag, value } = inlineOption
+      if (!valueOptionFlags.has(flag)) {
+        throw new Error(`Unknown option: ${flag}`)
+      }
+
+      if (seenOptions.has(flag)) {
+        throw new Error(`Duplicate option: ${flag}`)
+      }
+
+      if (!value.trim()) {
+        throw new Error(`Missing value for ${flag}`)
+      }
+
+      options[flag.slice(2)] = value
+      seenOptions.add(flag)
+      continue
     }
 
-    options[key] = next
+    if (!valueOptionFlags.has(arg)) {
+      throw new Error(`Unknown option: ${arg}`)
+    }
+
+    if (seenOptions.has(arg)) {
+      throw new Error(`Duplicate option: ${arg}`)
+    }
+
+    const next = argv[index + 1]
+    if (!next || next.startsWith('-')) {
+      throw new Error(`Missing value for ${arg}`)
+    }
+
+    options[arg.slice(2)] = next
+    seenOptions.add(arg)
     index += 1
   }
 
@@ -63,10 +111,25 @@ const ensureIdentifier = (value, label) => {
   }
 }
 
+const ensureIdentifierLength = (value, label) => {
+  if (value.length > 63) {
+    throw new Error(`${label} exceeds PostgreSQL identifier length limit (63): ${value}`)
+  }
+}
+
 const ensureQualifiedTable = (value) => {
   if (!/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)?$/u.test(value)) {
     throw new Error(`table must be "<table>" or "<schema>.<table>" with snake_case identifiers (received: ${value})`)
   }
+
+  const [firstSegment, secondSegment] = value.split('.')
+  if (!secondSegment) {
+    ensureIdentifierLength(firstSegment, 'table name')
+    return
+  }
+
+  ensureIdentifierLength(firstSegment, 'schema name')
+  ensureIdentifierLength(secondSegment, 'table name')
 }
 
 const getNextIndex = (entries, regex, width) => {
@@ -86,9 +149,64 @@ const getNextIndex = (entries, regex, width) => {
   return String(maxIndex + 1).padStart(width, '0')
 }
 
-const main = () => {
-  const options = parseArgs(process.argv.slice(2))
-  if (options.help === 'true') {
+const findRepoRoot = (startDir) => {
+  let current = resolve(startDir)
+
+  while (true) {
+    const packageJsonPath = resolve(current, 'package.json')
+    const migrationsDir = resolve(current, 'packages/infra/db/drizzle/migrations')
+
+    if (existsSync(packageJsonPath) && existsSync(migrationsDir)) {
+      try {
+        const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+        if (packageJson && packageJson.name === 'tx-agent-kit') {
+          return current
+        }
+      } catch {
+        // Ignore parse errors and continue searching upwards.
+      }
+    }
+
+    const parent = dirname(current)
+    if (parent === current) {
+      break
+    }
+
+    current = parent
+  }
+
+  throw new Error('Unable to locate tx-agent-kit repository root from current working directory.')
+}
+
+const buildReturnBlock = (level) => {
+  if (level === 'STATEMENT') {
+    return ['  RETURN NULL;']
+  }
+
+  return [
+    "  IF TG_OP = 'DELETE' THEN",
+    '    RETURN OLD;',
+    '  END IF;',
+    '',
+    '  RETURN NEW;'
+  ]
+}
+
+const writeExclusiveFile = (path, content, label) => {
+  try {
+    writeFileSync(path, content, { encoding: 'utf8', flag: 'wx' })
+  } catch (error) {
+    const errno = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+    if (errno === 'EEXIST') {
+      throw new Error(`${label} already exists (possibly created concurrently): ${path}`)
+    }
+    throw error
+  }
+}
+
+export const runNewTrigger = (argv, cwd = process.cwd()) => {
+  const options = parseArgs(argv)
+  if (options.help) {
     process.stdout.write(`${usage}\n`)
     return
   }
@@ -107,13 +225,19 @@ const main = () => {
   const tableIdentifier = options.table.trim().toLowerCase()
   const timing = options.timing.trim().toUpperCase()
   const level = options.level.trim().toUpperCase()
-  const eventTokens = options.events
-    .split(',')
-    .map((event) => event.trim().toUpperCase())
-    .filter(Boolean)
+  const eventTokens = [
+    ...new Set(
+      options.events
+        .split(',')
+        .map((event) => event.trim().toUpperCase())
+        .filter(Boolean)
+    )
+  ]
 
   ensureIdentifier(triggerIdentifier, 'trigger name')
   ensureIdentifier(functionIdentifier, 'function name')
+  ensureIdentifierLength(triggerIdentifier, 'trigger name')
+  ensureIdentifierLength(functionIdentifier, 'function name')
   ensureQualifiedTable(tableIdentifier)
 
   const validTimings = new Set(['BEFORE', 'AFTER'])
@@ -138,9 +262,13 @@ const main = () => {
     }
   }
 
-  const repoRoot = process.cwd()
-  const migrationsDir = resolve(repoRoot, 'packages/db/drizzle/migrations')
-  const pgtapDir = resolve(repoRoot, 'packages/db/pgtap')
+  if (level === 'ROW' && eventTokens.includes('TRUNCATE')) {
+    throw new Error('TRUNCATE triggers must use --level STATEMENT')
+  }
+
+  const repoRoot = findRepoRoot(cwd)
+  const migrationsDir = resolve(repoRoot, 'packages/infra/db/drizzle/migrations')
+  const pgtapDir = resolve(repoRoot, 'packages/infra/db/pgtap')
 
   if (!existsSync(migrationsDir)) {
     throw new Error(`Missing migrations directory: ${migrationsDir}`)
@@ -150,25 +278,20 @@ const main = () => {
     mkdirSync(pgtapDir, { recursive: true })
   }
 
-  const migrationPrefix = getNextIndex(readdirSync(migrationsDir), /^(\d{4})_.+\.sql$/u, 4)
-  const pgtapPrefix = getNextIndex(readdirSync(pgtapDir), /^(\d{3})_.+\.pgtap\.sql$/u, 3)
+  const migrationEntries = readdirSync(migrationsDir)
+  const pgtapEntries = readdirSync(pgtapDir)
+  const fileStem = triggerSlug.replace(/-/gu, '_')
 
-  const migrationFileName = `${migrationPrefix}_${triggerSlug.replace(/-/gu, '_')}.sql`
-  const pgtapFileName = `${pgtapPrefix}_${triggerSlug.replace(/-/gu, '_')}.pgtap.sql`
-
-  const migrationPath = resolve(migrationsDir, migrationFileName)
-  const pgtapPath = resolve(pgtapDir, pgtapFileName)
-
-  if (existsSync(migrationPath)) {
-    throw new Error(`Migration already exists: ${migrationPath}`)
+  if (migrationEntries.some((entry) => entry.endsWith(`_${fileStem}.sql`))) {
+    throw new Error(`Migration for trigger already exists: ${fileStem}`)
   }
 
-  if (existsSync(pgtapPath)) {
-    throw new Error(`pgTAP suite already exists: ${pgtapPath}`)
+  if (pgtapEntries.some((entry) => entry.endsWith(`_${fileStem}.pgtap.sql`))) {
+    throw new Error(`pgTAP suite for trigger already exists: ${fileStem}`)
   }
 
   const eventsSql = eventTokens.join(' OR ')
-  const transitionRow = level === 'ROW' ? '  RETURN NEW;' : ''
+  const returnBlock = buildReturnBlock(level)
 
   const migrationSql = [
     `CREATE OR REPLACE FUNCTION ${functionIdentifier}()`,
@@ -176,8 +299,8 @@ const main = () => {
     'LANGUAGE plpgsql',
     'AS $$',
     'BEGIN',
-    '  -- TODO: implement trigger behavior.',
-    transitionRow,
+    '  -- Implement trigger behavior.',
+    ...returnBlock,
     'END;',
     '$$;',
     '',
@@ -198,7 +321,7 @@ const main = () => {
     '',
     'SELECT plan(1);',
     '',
-    `SELECT fail('TODO: replace scaffold assertion with concrete pgTAP checks for ${triggerIdentifier}');`,
+    `SELECT fail('Replace scaffold assertion with concrete pgTAP checks for ${triggerIdentifier}');`,
     '',
     'SELECT * FROM finish();',
     '',
@@ -206,21 +329,89 @@ const main = () => {
     ''
   ].join('\n')
 
-  writeFileSync(migrationPath, migrationSql, { encoding: 'utf8', flag: 'wx' })
-  writeFileSync(pgtapPath, pgtapSql, { encoding: 'utf8', flag: 'wx' })
+  const maxPrefixAllocationAttempts = 20
+  let migrationFileName = ''
+  let pgtapFileName = ''
+  let wroteFiles = false
+  let lastWriteError
 
-  process.stdout.write(`Created migration: packages/db/drizzle/migrations/${migrationFileName}\n`)
-  process.stdout.write(`Created pgTAP suite: packages/db/pgtap/${pgtapFileName}\n\n`)
+  for (
+    let allocationAttempt = 0;
+    allocationAttempt < maxPrefixAllocationAttempts;
+    allocationAttempt += 1
+  ) {
+    const migrationPrefix = getNextIndex(
+      readdirSync(migrationsDir),
+      /^(\d{4})_.+\.sql$/u,
+      4
+    )
+    const pgtapPrefix = getNextIndex(
+      readdirSync(pgtapDir),
+      /^(\d{3})_.+\.pgtap\.sql$/u,
+      3
+    )
+
+    migrationFileName = `${migrationPrefix}_${fileStem}.sql`
+    pgtapFileName = `${pgtapPrefix}_${fileStem}.pgtap.sql`
+
+    const migrationPath = resolve(migrationsDir, migrationFileName)
+    const pgtapPath = resolve(pgtapDir, pgtapFileName)
+
+    if (existsSync(migrationPath) || existsSync(pgtapPath)) {
+      continue
+    }
+
+    try {
+      writeExclusiveFile(migrationPath, migrationSql, 'Migration')
+      writeExclusiveFile(pgtapPath, pgtapSql, 'pgTAP suite')
+      wroteFiles = true
+      break
+    } catch (error) {
+      rmSync(migrationPath, { force: true })
+      lastWriteError = error
+      continue
+    }
+  }
+
+  if (!wroteFiles) {
+    if (lastWriteError instanceof Error) {
+      throw new Error(
+        `Unable to allocate trigger scaffold files after ${maxPrefixAllocationAttempts} attempts: ${lastWriteError.message}`
+      )
+    }
+
+    throw new Error(
+      `Unable to allocate trigger scaffold files after ${maxPrefixAllocationAttempts} attempts.`
+    )
+  }
+
+  process.stdout.write(`Created migration: packages/infra/db/drizzle/migrations/${migrationFileName}\n`)
+  process.stdout.write(`Created pgTAP suite: packages/infra/db/pgtap/${pgtapFileName}\n\n`)
   process.stdout.write('Next steps:\n')
   process.stdout.write('1. Implement trigger function body in generated migration file.\n')
-  process.stdout.write('2. Replace scaffold `fail(...)` in generated pgTAP file with real assertions.\n')
+  process.stdout.write('2. Replace scaffold fail(...) in generated pgTAP file with real assertions.\n')
   process.stdout.write('3. Run `pnpm db:migrate` and `pnpm test:db:pgtap`.\n')
 }
 
-try {
-  main()
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error)
-  process.stderr.write(`${message}\n\n${usage}\n`)
-  process.exit(1)
+const main = () => {
+  runNewTrigger(process.argv.slice(2))
+}
+
+const isDirectInvocation = () => {
+  const scriptPath = process.argv[1]
+  if (!scriptPath) {
+    return false
+  }
+
+  return resolve(scriptPath) === fileURLToPath(import.meta.url)
+}
+
+if (isDirectInvocation()) {
+  try {
+    main()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    process.stderr.write(`${message}\n\n${usage}\n`)
+    process.exit(1)
+  }
 }

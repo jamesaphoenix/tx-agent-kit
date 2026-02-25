@@ -22,6 +22,18 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) =>
         return toApiAuthSession(session)
       }).pipe(Effect.mapError(mapCoreError))
     )
+    .handle('forgotPassword', ({ payload }) =>
+      Effect.gen(function* () {
+        const authService = yield* AuthService
+        return yield* authService.requestPasswordReset(payload)
+      }).pipe(Effect.mapError(mapCoreError))
+    )
+    .handle('resetPassword', ({ payload }) =>
+      Effect.gen(function* () {
+        const authService = yield* AuthService
+        return yield* authService.resetPassword(payload)
+      }).pipe(Effect.mapError(mapCoreError))
+    )
     .handle('me', () =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest

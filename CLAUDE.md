@@ -22,7 +22,7 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
 ## Hard Constraints
 - Use `effect/Schema` only for validation/contracts.
 - Domain record interfaces (`*Record` types) must be defined in `domain/` and imported by `ports/`; `export interface` is banned in port files.
-- Never import `drizzle-orm` outside `packages/db`.
+- Never import `drizzle-orm` outside `packages/infra/db`.
 - Never query DB directly from `apps/web`.
 - Do not import `effect`/`effect/*` from `apps/web`; keep web as a dumb API consumer.
 - Keep `apps/web` strictly client-only: no `app/api` routes, no `proxy.ts`/`middleware.ts`, and no `next/server`/`next/headers`.
@@ -35,8 +35,8 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
 - Do not use direct `fetch` in `apps/web`; use typed API client layers.
 - Keep `apps/api/openapi.json` generated from `apps/api` (`pnpm openapi:generate`).
 - Keep web API hooks generated from API spec (`pnpm api:client:generate`).
-- Maintain table-to-schema parity in `packages/db/src/effect-schemas`.
-- Maintain table-to-factory parity in `packages/db/src/factories`.
+- Maintain table-to-schema parity in `packages/infra/db/src/effect-schemas`.
+- Maintain table-to-factory parity in `packages/infra/db/src/factories`.
 - Enforce explicit route/repository kind markers (`crud` vs `custom`) and keep them consistent.
 - Domain layer files must use named exports only (no default exports).
 - Source hygiene: TODO/FIXME/HACK comments are disallowed in source modules.
@@ -56,9 +56,9 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
 - Test structure is colocated-only: `__tests__` directories, `.spec.ts[x]`, and `.integration.ts[x]` files are disallowed. Use `<file>.test.ts[x]` and `<file>.integration.test.ts[x]`.
 - API integration harness is standardized: `apps/api/src/api.integration.test.ts` must use `createDbAuthContext(...)` (no manual process spawning or direct `createSqlTestContext(...)` wiring).
 - Critical-flow integration baseline is enforced:
-  - API coverage includes `/v1/auth/sign-up`, `/v1/auth/sign-in`, `/v1/auth/me`, `/v1/workspaces`, `/v1/tasks`, `/v1/invitations`, plus invitation idempotency.
-  - Web coverage includes `AuthForm`, `CreateWorkspaceForm`, `CreateTaskForm`, `CreateInvitationForm`, `AcceptInvitationForm`, and `SignOutButton` integration suites.
-  - Mobile coverage includes `AuthForm`, `CreateWorkspaceForm`, `CreateTaskForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `AuthBootstrapProvider` component test suites, plus `env`, `auth-token`, `axios`, `client-api`, `client-auth`, `url-state`, and `session-store` unit test suites.
+  - API coverage includes `/v1/auth/sign-up`, `/v1/auth/sign-in`, `/v1/auth/me`, `/v1/organizations`, `/v1/invitations`, plus invitation idempotency.
+  - Web coverage includes `AuthForm`, `CreateOrganizationForm`, `CreateInvitationForm`, `AcceptInvitationForm`, and `SignOutButton` integration suites.
+  - Mobile coverage includes `AuthForm`, `CreateOrganizationForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `AuthBootstrapProvider` component test suites, plus `env`, `auth-token`, `axios`, `client-api`, `client-auth`, `url-state`, and `session-store` unit test suites.
 
 ## DDD Construction Pattern
 For each domain, create:
@@ -89,21 +89,21 @@ Golden path for CRUD domain setup:
 
 1. Add/extend contracts in `packages/contracts` with `effect/Schema`.
 2. Add domain logic under `packages/core/src/domains/<domain>/...`.
-3. If persistence changes, update `packages/db/src/schema.ts` and matching `packages/db/src/effect-schemas/*.ts`.
-4. Add/update matching table factory in `packages/db/src/factories/*.factory.ts`.
+3. If persistence changes, update `packages/infra/db/src/schema.ts` and matching `packages/infra/db/src/effect-schemas/*.ts`.
+4. Add/update matching table factory in `packages/infra/db/src/factories/*.factory.ts`.
 4.5. For DB triggers, scaffold using `pnpm db:trigger:new ...` and keep pgTAP coverage referencing trigger names.
 5. Expose API behavior from `apps/api`, then regenerate OpenAPI.
 6. Regenerate web API hooks from OpenAPI when API contract changes.
 7. Run `pnpm lint && pnpm type-check && pnpm test`.
 
 ## DB + Schema Contract
-When adding a table in `packages/db/src/schema.ts`:
-1. Add matching file in `packages/db/src/effect-schemas/<table-name>.ts`.
+When adding a table in `packages/infra/db/src/schema.ts`:
+1. Add matching file in `packages/infra/db/src/effect-schemas/<table-name>.ts`.
 2. Export `*RowSchema` and `*RowShape` from that file.
-3. Re-export it in `packages/db/src/effect-schemas/index.ts`.
-4. Add matching factory file in `packages/db/src/factories/<table-name>.factory.ts`.
-5. Re-export the factory in `packages/db/src/factories/index.ts`.
-6. If you add a DB trigger, add pgTAP coverage that references the trigger name (`packages/db/pgtap/*.pgtap.sql`).
+3. Re-export it in `packages/infra/db/src/effect-schemas/index.ts`.
+4. Add matching factory file in `packages/infra/db/src/factories/<table-name>.factory.ts`.
+5. Re-export the factory in `packages/infra/db/src/factories/index.ts`.
+6. If you add a DB trigger, add pgTAP coverage that references the trigger name (`packages/infra/db/pgtap/*.pgtap.sql`).
 
 ## Route + Repository Kind Contract
 - In `packages/core/src/domains/*/ports/*.ts`, declare:
@@ -115,7 +115,13 @@ When adding a table in `packages/db/src/schema.ts`:
 
 ## Mechanical Enforcement
 - ESLint restrictions live in `packages/tooling/eslint-config/domain-invariants.js`.
-- Structural checks live in `scripts/lint/enforce-domain-invariants.mjs`.
+- Structural checks live in dedicated scripts under `scripts/lint/`:
+  - `enforce-domain-invariants.mjs`
+  - `enforce-web-client-contracts.mjs`
+  - `enforce-route-kind-contracts.mjs`
+  - `enforce-source-type-safety.mjs`
+  - `enforce-compose-runtime-contracts.mjs`
+  - `enforce-tsconfig-alignment.mjs`
 - Shell checks live in `scripts/check-shell-invariants.sh`.
 - `pnpm lint` executes ESLint + structural invariants + shell invariants.
 

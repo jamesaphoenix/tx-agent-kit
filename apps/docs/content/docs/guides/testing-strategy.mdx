@@ -51,7 +51,7 @@ pnpm test:db:pgtap
 | Property | Value |
 |----------|-------|
 | Framework | pgTAP |
-| Location | `packages/db/pgtap/*.sql` |
+| Location | `packages/infra/db/pgtap/*.sql` |
 | Coverage | Every `CREATE TRIGGER` in migrations must be referenced |
 
 ### Smoke Tests
@@ -62,7 +62,7 @@ Post-deployment health checks.
 pnpm deploy:smoke
 ```
 
-Validates health, auth, workspace, task, and invitation endpoints against a running deployment.
+Validates health, auth, organization, and invitation endpoints against a running deployment.
 
 ## Test Naming Conventions
 
@@ -109,9 +109,9 @@ The invariant checker enforces minimum coverage for critical flows:
 
 | App | Required coverage |
 |-----|-------------------|
-| API | `/health`, `/v1/auth/sign-up`, `/v1/auth/sign-in`, `/v1/auth/me`, `/v1/workspaces`, `/v1/tasks`, `/v1/invitations`, plus invitation idempotency and health readiness latency |
-| Web | Integration suites for `DashboardPage`, `WorkspacesPage`, `InvitationsPage`, `AuthForm`, `CreateWorkspaceForm`, `CreateTaskForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `client-auth` |
-| Worker | Idempotent `activities.processTask(...)` behavior |
+| API | `/health`, `/v1/auth/sign-up`, `/v1/auth/sign-in`, `/v1/auth/me`, `/v1/organizations`, `/v1/invitations`, plus invitation idempotency and health readiness latency |
+| Web | Integration suites for `DashboardPage`, `OrganizationsPage`, `InvitationsPage`, `AuthForm`, `CreateOrganizationForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `client-auth` |
+| Worker | Idempotent `activities.processOperation(...)` behavior |
 
 ## Quiet Runners
 

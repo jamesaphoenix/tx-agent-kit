@@ -34,7 +34,8 @@ export interface SqlTestContext {
   withEffectContext: <A, E, R>(effect: Effect.Effect<A, E, R>, caseName: string) => Effect.Effect<A, E, R>
 }
 
-const migrationsRelativePath = 'packages/db/drizzle/migrations'
+const migrationsRelativePath = 'packages/infra/db/drizzle/migrations'
+const localDatabaseHosts = new Set(['localhost', '127.0.0.1', '::1'])
 
 const quoteIdentifier = (value: string): string => `"${value.replace(/"/g, '""')}"`
 
@@ -79,6 +80,34 @@ const resolveRepoRoot = (start = process.cwd()): string => {
   }
 }
 
+const assertSafeDatabaseUrl = (
+  databaseUrl: string,
+  allowUnsafeDatabaseUrl: boolean
+): void => {
+  if (allowUnsafeDatabaseUrl) {
+    return
+  }
+
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(databaseUrl)
+  } catch {
+    throw new Error(`Invalid DATABASE_URL for test context: ${databaseUrl}`)
+  }
+
+  const host = parsedUrl.hostname.toLowerCase()
+  if (localDatabaseHosts.has(host)) {
+    return
+  }
+
+  throw new Error(
+    [
+      `Refusing to run integration DB operations against non-local host: ${host}.`,
+      'Set TESTKIT_ALLOW_UNSAFE_DATABASE_URL=true to override intentionally.'
+    ].join(' ')
+  )
+}
+
 const getMigrationFiles = (repoRoot: string): ReadonlyArray<{ name: string; sql: string }> => {
   const migrationDir = resolve(repoRoot, migrationsRelativePath)
   const fileNames = readdirSync(migrationDir)
@@ -111,6 +140,21 @@ const ensureMigrationTable = async (client: Client): Promise<void> => {
   `)
 }
 
+const globalMigrationLockId = 4_602_001
+
+const withGlobalMigrationLock = async <A>(
+  client: Client,
+  callback: () => Promise<A>
+): Promise<A> => {
+  await client.query('SELECT pg_advisory_lock($1)', [globalMigrationLockId])
+
+  try {
+    return await callback()
+  } finally {
+    await client.query('SELECT pg_advisory_unlock($1)', [globalMigrationLockId])
+  }
+}
+
 const seedIfPresent = async (client: Client, tableNames: ReadonlySet<string>): Promise<void> => {
   if (tableNames.has('roles')) {
     await client.query(`
@@ -123,7 +167,7 @@ const seedIfPresent = async (client: Client, tableNames: ReadonlySet<string>): P
   if (tableNames.has('permissions')) {
     await client.query(`
       INSERT INTO permissions (key)
-      VALUES ('workspace.read'), ('workspace.write'), ('invite.manage'), ('task.manage')
+      VALUES ('organization.read'), ('organization.write'), ('organization.manage'), ('invite.manage')
       ON CONFLICT (key) DO NOTHING
     `)
   }
@@ -136,6 +180,8 @@ export const createSqlTestContext = (
   const schemaName = buildSchemaName(testRunId, options.schemaPrefix ?? 'test')
   const testkitEnv = getTestkitEnv()
   const baseDatabaseUrl = options.baseDatabaseUrl ?? testkitEnv.DATABASE_URL ?? defaultTestDatabaseUrl
+  const allowUnsafeDatabaseUrl = testkitEnv.TESTKIT_ALLOW_UNSAFE_DATABASE_URL === 'true'
+  assertSafeDatabaseUrl(baseDatabaseUrl, allowUnsafeDatabaseUrl)
   const schemaDatabaseUrl = buildSchemaDatabaseUrl(baseDatabaseUrl, schemaName)
   const repoRoot = options.repoRoot ?? resolveRepoRoot()
 
@@ -162,24 +208,26 @@ export const createSqlTestContext = (
     const migrationFiles = getMigrationFiles(repoRoot)
 
     await withSchemaClient(async (client) => {
-      const applied = await client.query<{ name: string }>('SELECT name FROM __tx_agent_migrations')
-      const appliedSet = new Set(applied.rows.map((row) => row.name))
+      await withGlobalMigrationLock(client, async () => {
+        const applied = await client.query<{ name: string }>('SELECT name FROM __tx_agent_migrations')
+        const appliedSet = new Set(applied.rows.map((row) => row.name))
 
-      for (const migration of migrationFiles) {
-        if (appliedSet.has(migration.name)) {
-          continue
-        }
+        for (const migration of migrationFiles) {
+          if (appliedSet.has(migration.name)) {
+            continue
+          }
 
-        await client.query('BEGIN')
-        try {
-          await client.query(migration.sql)
-          await client.query('INSERT INTO __tx_agent_migrations (name) VALUES ($1)', [migration.name])
-          await client.query('COMMIT')
-        } catch (error) {
-          await client.query('ROLLBACK')
-          throw error
+          await client.query('BEGIN')
+          try {
+            await client.query(migration.sql)
+            await client.query('INSERT INTO __tx_agent_migrations (name) VALUES ($1)', [migration.name])
+            await client.query('COMMIT')
+          } catch (error) {
+            await client.query('ROLLBACK')
+            throw error
+          }
         }
-      }
+      })
     })
 
     await reset()

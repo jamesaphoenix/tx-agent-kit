@@ -11,9 +11,9 @@ The kit combines several technologies, each chosen for a specific role:
 
 | Technology | Role | Where used |
 |-----------|------|------------|
-| **Effect** | Dependency injection, typed errors, service composition | `packages/core`, `packages/db`, `apps/api`, `apps/worker` |
-| **effect/Schema** | Validation, serialization, API contracts | `packages/contracts`, `packages/db/src/effect-schemas` |
-| **Drizzle ORM** | Database schema, migrations, queries | `packages/db` only |
+| **Effect** | Dependency injection, typed errors, service composition | `packages/core`, `packages/infra/db`, `apps/api`, `apps/worker` |
+| **effect/Schema** | Validation, serialization, API contracts | `packages/contracts`, `packages/infra/db/src/effect-schemas` |
+| **Drizzle ORM** | Database schema, migrations, queries | `packages/infra/db` only |
 | **Next.js** | Client-side SPA framework | `apps/web` only |
 | **Temporal** | Durable workflow orchestration | `apps/worker` only |
 | **Expo** | Cross-platform mobile | `apps/mobile` only |
@@ -40,7 +40,7 @@ The typical flow through these concepts:
 2. The API validates the request and calls a domain **service** (Effect service).
 3. The service executes **domain logic** (pure functions from `domain/`).
 4. The service calls a **port** (abstract repository interface).
-5. The port is implemented by an **adapter** (Drizzle repository in `packages/db`).
+5. The port is implemented by an **adapter** (Drizzle repository in `packages/infra/db`).
 6. Effect's **layer system** wires the concrete adapter to the abstract port at runtime.
 
 Each concept handles one concern. Together, they provide a complete architecture with clear boundaries and testable components.

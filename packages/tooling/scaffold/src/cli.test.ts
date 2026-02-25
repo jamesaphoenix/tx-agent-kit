@@ -79,13 +79,13 @@ describe('crud scaffold planner', () => {
   it('plans db artifacts when withDb is enabled', () => {
     const planned = planCrudScaffold({ domain: 'billing', entity: 'invoice' }, { withDb: true })
     expect(planned.length).toBe(27)
-    expect(planned.some((file) => file.path === 'packages/db/src/effect-schemas/billing-invoices.ts')).toBe(true)
-    expect(planned.some((file) => file.path === 'packages/db/src/factories/billing-invoices.factory.ts')).toBe(true)
-    expect(planned.some((file) => file.path === 'packages/db/src/repositories/billing-invoices.ts')).toBe(true)
+    expect(planned.some((file) => file.path === 'packages/infra/db/src/effect-schemas/billing-invoices.ts')).toBe(true)
+    expect(planned.some((file) => file.path === 'packages/infra/db/src/factories/billing-invoices.factory.ts')).toBe(true)
+    expect(planned.some((file) => file.path === 'packages/infra/db/src/repositories/billing-invoices.ts')).toBe(true)
 
-    const effectSchemaFile = planned.find((file) => file.path === 'packages/db/src/effect-schemas/billing-invoices.ts')
-    const factoryFile = planned.find((file) => file.path === 'packages/db/src/factories/billing-invoices.factory.ts')
-    const repositoryFile = planned.find((file) => file.path === 'packages/db/src/repositories/billing-invoices.ts')
+    const effectSchemaFile = planned.find((file) => file.path === 'packages/infra/db/src/effect-schemas/billing-invoices.ts')
+    const factoryFile = planned.find((file) => file.path === 'packages/infra/db/src/factories/billing-invoices.factory.ts')
+    const repositoryFile = planned.find((file) => file.path === 'packages/infra/db/src/repositories/billing-invoices.ts')
 
     expect(effectSchemaFile?.content).toContain('updatedAt: Schema.DateFromSelf')
     expect(factoryFile?.content).toContain('updatedAt?: Date')
@@ -150,17 +150,17 @@ describe('crud scaffold apply', () => {
 
   it('writes db files and updates db wiring when withDb is enabled', async () => {
     const repoRoot = await createFixtureRepo()
-    await mkdir(join(repoRoot, 'packages/db/src/effect-schemas'), { recursive: true })
-    await mkdir(join(repoRoot, 'packages/db/src/factories'), { recursive: true })
-    await mkdir(join(repoRoot, 'packages/db/src/repositories'), { recursive: true })
+    await mkdir(join(repoRoot, 'packages/infra/db/src/effect-schemas'), { recursive: true })
+    await mkdir(join(repoRoot, 'packages/infra/db/src/factories'), { recursive: true })
+    await mkdir(join(repoRoot, 'packages/infra/db/src/repositories'), { recursive: true })
     await writeFile(
-      join(repoRoot, 'packages/db/src/schema.ts'),
-      "import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'\n\nexport const users = pgTable('users', {\n  id: uuid('id').defaultRandom().primaryKey(),\n  email: text('email').notNull(),\n  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()\n})\n\nexport const usersRelations = relations(users, ({ many }) => ({\n  workspaces: many(users)\n}))\n",
+      join(repoRoot, 'packages/infra/db/src/schema.ts'),
+      "import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'\n\nexport const users = pgTable('users', {\n  id: uuid('id').defaultRandom().primaryKey(),\n  email: text('email').notNull(),\n  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()\n})\n\nexport const usersRelations = relations(users, ({ many }) => ({\n  organizations: many(users)\n}))\n",
       'utf8'
     )
-    await writeFile(join(repoRoot, 'packages/db/src/effect-schemas/index.ts'), '', 'utf8')
-    await writeFile(join(repoRoot, 'packages/db/src/factories/index.ts'), '', 'utf8')
-    await writeFile(join(repoRoot, 'packages/db/src/index.ts'), '', 'utf8')
+    await writeFile(join(repoRoot, 'packages/infra/db/src/effect-schemas/index.ts'), '', 'utf8')
+    await writeFile(join(repoRoot, 'packages/infra/db/src/factories/index.ts'), '', 'utf8')
+    await writeFile(join(repoRoot, 'packages/infra/db/src/index.ts'), '', 'utf8')
 
     const result = await applyCrudScaffold({
       repoRoot,
@@ -170,16 +170,16 @@ describe('crud scaffold apply', () => {
     })
 
     expect(result.written.length).toBe(27)
-    expect(result.updatedBarrels).toContain('packages/db/src/schema.ts')
-    expect(result.updatedBarrels).toContain('packages/db/src/effect-schemas/index.ts')
-    expect(result.updatedBarrels).toContain('packages/db/src/factories/index.ts')
-    expect(result.updatedBarrels).toContain('packages/db/src/index.ts')
+    expect(result.updatedBarrels).toContain('packages/infra/db/src/schema.ts')
+    expect(result.updatedBarrels).toContain('packages/infra/db/src/effect-schemas/index.ts')
+    expect(result.updatedBarrels).toContain('packages/infra/db/src/factories/index.ts')
+    expect(result.updatedBarrels).toContain('packages/infra/db/src/index.ts')
 
-    const schemaFile = await readFile(join(repoRoot, 'packages/db/src/schema.ts'), 'utf8')
+    const schemaFile = await readFile(join(repoRoot, 'packages/infra/db/src/schema.ts'), 'utf8')
     expect(schemaFile).toContain("export const billingInvoices = pgTable('billing_invoices'")
     expect(schemaFile).toContain("updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()")
 
-    const dbIndexFile = await readFile(join(repoRoot, 'packages/db/src/index.ts'), 'utf8')
+    const dbIndexFile = await readFile(join(repoRoot, 'packages/infra/db/src/index.ts'), 'utf8')
     expect(dbIndexFile).toContain("export { invoiceDbRepository } from './repositories/billing-invoices.js'")
   })
 
@@ -377,9 +377,56 @@ describe('crud scaffold args parser', () => {
     expect(parsed.withDb).toBe(false)
   })
 
-  it('keeps parsing when unknown flags are present', () => {
-    const parsed = parseCrudArgs(['--domain', 'billing', '--entity', 'invoice', '--unknown-flag'])
-    expect(parsed.domain).toBe('billing')
-    expect(parsed.entity).toBe('invoice')
+  it('throws when unknown flags are provided', () => {
+    expect(() => parseCrudArgs(['--domain', 'billing', '--entity', 'invoice', '--unknown-flag'])).toThrow(
+      'Unknown option: --unknown-flag'
+    )
+  })
+
+  it('throws when a value flag is missing its value', () => {
+    expect(() => parseCrudArgs(['--domain', 'billing', '--entity'])).toThrow('Missing value for --entity')
+  })
+
+  it('throws when options are duplicated', () => {
+    expect(() => parseCrudArgs(['--domain', 'billing', '--domain', 'ops', '--entity', 'invoice'])).toThrow(
+      'Duplicate option: --domain'
+    )
+  })
+
+  it('supports inline value flags', () => {
+    const parsed = parseCrudArgs(['--domain=billing', '--entity=invoice', '--plural=invoices', '--with-db'])
+    expect(parsed).toEqual({
+      domain: 'billing',
+      entity: 'invoice',
+      plural: 'invoices',
+      dryRun: false,
+      force: false,
+      withDb: true
+    })
+  })
+
+  it('supports inline boolean flags', () => {
+    const parsed = parseCrudArgs([
+      '--domain=billing',
+      '--entity=invoice',
+      '--with-db=true',
+      '--dry-run=false',
+      '--force=true'
+    ])
+
+    expect(parsed).toEqual({
+      domain: 'billing',
+      entity: 'invoice',
+      plural: undefined,
+      dryRun: false,
+      force: true,
+      withDb: true
+    })
+  })
+
+  it('throws for invalid inline boolean values', () => {
+    expect(() =>
+      parseCrudArgs(['--domain=billing', '--entity=invoice', '--with-db=yes'])
+    ).toThrow('Invalid boolean value for --with-db')
   })
 })

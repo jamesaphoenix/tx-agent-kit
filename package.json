@@ -25,7 +25,7 @@
     "type-check:quiet": "./scripts/type-check-quiet.sh",
     "lint": "turbo run lint && pnpm lint:invariants && pnpm lint:ci-env && pnpm lint:shell",
     "lint:quiet": "./scripts/lint-quiet.sh",
-    "lint:invariants": "node ./scripts/lint/enforce-domain-invariants.mjs",
+    "lint:invariants": "node ./scripts/lint/enforce-domain-invariants.mjs && node ./scripts/lint/enforce-web-client-contracts.mjs && node ./scripts/lint/enforce-route-kind-contracts.mjs && node ./scripts/lint/enforce-source-type-safety.mjs && node ./scripts/lint/enforce-compose-runtime-contracts.mjs && node ./scripts/lint/enforce-tsconfig-alignment.mjs",
     "lint:ci-env": "node ./scripts/validate-ci-env.mjs",
     "lint:shell": "./scripts/check-shell-invariants.sh",
     "test": "turbo run test",
@@ -88,5 +88,10 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.53.0",
     "vitest": "^4.0.18"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@openrouter/sdk@0.9.11": "patches/@openrouter__sdk@0.9.11.patch"
+    }
   }
 }

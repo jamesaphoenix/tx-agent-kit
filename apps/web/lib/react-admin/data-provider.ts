@@ -143,20 +143,6 @@ const getList = async <RecordType extends RaRecord = RaRecord>(
     queryParams.cursor = cursor
   }
 
-  if (resourceName === 'tasks') {
-    const workspaceId = filter.workspaceId
-    if (typeof workspaceId !== 'string' || workspaceId.length === 0) {
-      cursorCache.setCursor(cacheKey, page + 1, null)
-      return {
-        data: [],
-        total: 0
-      }
-    }
-
-    queryParams.workspaceId = workspaceId
-    delete queryParams['filter[workspaceId]']
-  }
-
   const response = await api.get<CursorPaginatedResponse<RecordType>>(config.endpoint, {
     params: queryParams
   })

@@ -1,6 +1,6 @@
 ---
 title: Smoke Tests
-description: Post-deployment verification covering auth, workspaces, tasks, and invitations
+description: Post-deployment verification covering auth, organizations, and invitations
 ---
 
 Smoke tests verify that a deployed environment is functional by exercising the critical API flows end-to-end. They run automatically after deployment (when `RUN_SMOKE=1`) and can be triggered manually against any API endpoint.
@@ -36,35 +36,26 @@ GET  /v1/auth/me          (verifies the returned JWT token works)
 
 Signs up a new user with a random email and password, then uses the returned JWT to verify the `/v1/auth/me` endpoint returns the authenticated user.
 
-### 3. Workspace CRUD
+### 3. Organization CRUD
 
 ```
-POST /v1/workspaces       (creates a workspace)
-GET  /v1/workspaces       (lists workspaces, confirms creation)
+POST /v1/organizations       (creates an organization)
+GET  /v1/organizations       (lists organizations, confirms creation)
 ```
 
-Creates a workspace under the authenticated user and verifies it appears in the list.
+Creates an organization under the authenticated user and verifies it appears in the list.
 
-### 4. Task CRUD
-
-```
-POST /v1/tasks            (creates a task in the workspace)
-GET  /v1/tasks            (lists tasks, confirms creation)
-```
-
-Creates a task linked to the workspace and verifies it appears in the filtered task list.
-
-### 5. Invitation flow
+### 4. Invitation flow
 
 ```
 POST /v1/auth/sign-up              (creates a second user as invitee)
-POST /v1/invitations               (invites the second user to the workspace)
+POST /v1/invitations               (invites the second user to the organization)
 GET  /v1/invitations               (lists invitations)
 POST /v1/invitations/:token/accept (accepts the invitation)
 POST /v1/invitations/:token/accept (re-accepts, expects 404 - idempotency)
 ```
 
-This exercises the full invitation lifecycle. It creates a second user account, sends a workspace invitation from the first user to the second, accepts the invitation using the invitation token, and then verifies that accepting the same invitation again returns a 404 (the invitation is consumed).
+This exercises the full invitation lifecycle. It creates a second user account, sends an organization invitation from the first user to the second, accepts the invitation using the invitation token, and then verifies that accepting the same invitation again returns a 404 (the invitation is consumed).
 
 ## Test data
 
@@ -74,8 +65,7 @@ All test data is created with random suffixes:
 |-------|---------|
 | Email | `deploy-smoke-<timestamp>-<random>@example.com` |
 | Password | `Sm0ke-<random>-Pass!` |
-| Workspace name | `Smoke Workspace <random>` |
-| Task title | `Smoke Task <random>` |
+| Organization name | `Smoke Organization <random>` |
 
 This prevents collisions when running smoke tests multiple times against the same environment.
 
@@ -88,10 +78,8 @@ The script asserts exact HTTP status codes for each operation:
 | Health check | 200 |
 | Sign up | 201 |
 | Auth me | 200 |
-| Create workspace | 201 |
-| List workspaces | 200 |
-| Create task | 201 |
-| List tasks | 200 |
+| Create organization | 201 |
+| List organizations | 200 |
 | Create invitation | 201 |
 | List invitations | 200 |
 | Accept invitation | 200 |

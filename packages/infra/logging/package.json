@@ -1,0 +1,21 @@
+{
+  "name": "@tx-agent-kit/logging",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "type-check": "tsc -b --pretty false",
+    "lint": "eslint src --max-warnings=0",
+    "test": "vitest run -c vitest.config.ts"
+  },
+  "dependencies": {
+    "@opentelemetry/api-logs": "^0.207.0",
+    "effect": "^3.19.16"
+  },
+  "devDependencies": {
+    "@tx-agent-kit/vitest-config": "workspace:*"
+  }
+}

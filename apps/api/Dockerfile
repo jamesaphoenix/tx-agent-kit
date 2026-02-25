@@ -6,11 +6,11 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json tsconfig.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
-COPY packages/auth/package.json packages/auth/package.json
-COPY packages/db/package.json packages/db/package.json
+COPY packages/infra/auth/package.json packages/infra/auth/package.json
+COPY packages/infra/db/package.json packages/infra/db/package.json
 COPY packages/core/package.json packages/core/package.json
-COPY packages/logging/package.json packages/logging/package.json
-COPY packages/observability/package.json packages/observability/package.json
+COPY packages/infra/logging/package.json packages/infra/logging/package.json
+COPY packages/infra/observability/package.json packages/infra/observability/package.json
 COPY packages/testkit/package.json packages/testkit/package.json
 COPY packages/tooling/vitest-config/package.json packages/tooling/vitest-config/package.json
 RUN pnpm install --frozen-lockfile

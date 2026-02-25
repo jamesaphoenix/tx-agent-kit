@@ -43,13 +43,13 @@ Activities are normal async functions that handle all side effects. They are inj
 ```typescript
 // apps/worker/src/activities.ts
 export const activities = {
-  processTask: async (taskId: string) => {
+  processOperation: async (operationId: string) => {
     // Database queries, API calls, etc. are allowed here
   }
 }
 ```
 
-The `processTask` activity demonstrates idempotent processing: calling it twice for the same task returns `{ alreadyProcessed: true }` on the second call.
+The `processOperation` activity demonstrates idempotent processing: calling it twice for the same operation returns `{ alreadyProcessed: true }` on the second call.
 
 ## Configuration
 
@@ -83,4 +83,4 @@ The worker handles `SIGINT` and `SIGTERM` signals for clean shutdown. It stops a
 
 ## Integration Testing
 
-The worker Temporal integration suite at `apps/worker/src/activities.integration.test.ts` validates that first-time task processing returns `{ alreadyProcessed: false }`, duplicate processing returns `{ alreadyProcessed: true }`, and test fixtures are seeded per test (no shared table truncation).
+The worker Temporal integration suite at `apps/worker/src/activities.integration.test.ts` validates that first-time operation processing returns `{ alreadyProcessed: false }`, duplicate processing returns `{ alreadyProcessed: true }`, and test fixtures are seeded per test (no shared table truncation).

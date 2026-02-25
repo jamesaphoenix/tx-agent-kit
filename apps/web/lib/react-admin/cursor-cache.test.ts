@@ -4,7 +4,7 @@ import { CursorCache } from './cursor-cache'
 describe('CursorCache', () => {
   it('stores and reads page cursors', () => {
     const cache = new CursorCache()
-    const key = 'tasks:default'
+    const key = 'organizations:default'
 
     cache.ensureFirstPage(key)
     expect(cache.getCursor(key, 1)).toBeUndefined()

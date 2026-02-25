@@ -1,0 +1,12 @@
+diff --git a/tsconfig.json b/tsconfig.json
+index feac755105182e970c7a41d712f0de91768a1a08..cb5bf9f9fb505f4f676ca728ca5d8f800d683dfe 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -35,6 +35,6 @@
+     "skipLibCheck": true,
+     "forceConsistentCasingInFileNames": true
+   },
+-  "include": ["src"],
++  "include": ["esm"],
+   "exclude": ["node_modules"]
+ }

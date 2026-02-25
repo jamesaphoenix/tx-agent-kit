@@ -85,7 +85,7 @@ Beyond the DDD layers, there are package-level import restrictions:
 | `apps/web` cannot import `drizzle-orm` | ESLint `no-restricted-imports` |
 | `apps/web` cannot import `effect` | ESLint `no-restricted-imports` |
 | `apps/web` cannot import `next/server` | ESLint `no-restricted-imports` |
-| Only `packages/db` may import `drizzle-orm` | ESLint + structural check |
+| Only `packages/infra/db` may import `drizzle-orm` | ESLint + structural check |
 | Source modules cannot use `console.*` | ESLint (use `@tx-agent-kit/logging`) |
 | Source modules cannot use `as any` | ESLint |
 
@@ -95,7 +95,7 @@ The inward dependency direction provides concrete benefits.
 
 **Testability.** Domain logic can be tested with no infrastructure. Port interfaces can be mocked trivially. Application services can be tested with in-memory implementations.
 
-**Replaceability.** Switching from PostgreSQL to another database means replacing repository implementations in `packages/db`. The domain layer, ports, and application logic do not change.
+**Replaceability.** Switching from PostgreSQL to another database means replacing repository implementations in `packages/infra/db`. The domain layer, ports, and application logic do not change.
 
 **Clarity.** When reading domain code, you know it contains no hidden side effects. When reading a port, you know it defines a contract, not an implementation. The layer tells you the role.
 
@@ -103,10 +103,10 @@ The inward dependency direction provides concrete benefits.
 
 ## Practical example
 
-Consider adding a validation rule that invoices cannot exceed a workspace's credit limit:
+Consider adding a validation rule that invoices cannot exceed an organization's credit limit:
 
-1. **Domain layer**: Add a pure function `isWithinCreditLimit(invoice, workspace)` to `domain/`
-2. **Port layer**: No changes needed (workspace data comes through existing ports)
+1. **Domain layer**: Add a pure function `isWithinCreditLimit(invoice, organization)` to `domain/`
+2. **Port layer**: No changes needed (organization data comes through existing ports)
 3. **Application layer**: Call `isWithinCreditLimit` before creating an invoice in the service
 4. **Repository layer**: No changes needed
 

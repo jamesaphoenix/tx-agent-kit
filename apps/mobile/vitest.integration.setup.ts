@@ -8,18 +8,16 @@ import {
 } from './integration/support/mobile-integration-context'
 import { afterAll, beforeAll, beforeEach, vi } from 'vitest'
 
-process.env.MOBILE_INTEGRATION_API_BASE_URL = mobileIntegrationBaseUrl
-process.env.EXPO_PUBLIC_API_BASE_URL = mobileIntegrationBaseUrl
+const integrationRuntime = globalThis as Record<string, unknown>
+integrationRuntime.__MOBILE_INTEGRATION_API_BASE_URL = mobileIntegrationBaseUrl
 
 beforeAll(async () => {
-  process.env.MOBILE_INTEGRATION_API_BASE_URL = mobileIntegrationBaseUrl
-  process.env.EXPO_PUBLIC_API_BASE_URL = mobileIntegrationBaseUrl
+  integrationRuntime.__MOBILE_INTEGRATION_API_BASE_URL = mobileIntegrationBaseUrl
   await setupMobileIntegrationSuite()
 })
 
 beforeEach(async () => {
-  process.env.MOBILE_INTEGRATION_API_BASE_URL = mobileIntegrationBaseUrl
-  process.env.EXPO_PUBLIC_API_BASE_URL = mobileIntegrationBaseUrl
+  integrationRuntime.__MOBILE_INTEGRATION_API_BASE_URL = mobileIntegrationBaseUrl
   await resetMobileIntegrationCase()
   await clearAuthToken()
   sessionStoreActions.clear()

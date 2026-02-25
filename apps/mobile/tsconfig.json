@@ -4,18 +4,24 @@
     "strict": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "jsx": "react-native",
     "paths": {
-      "@/*": ["./*"],
-      "@tx-agent-kit/observability": ["../../packages/observability/src/index.ts"],
-      "@tx-agent-kit/observability/*": ["../../packages/observability/src/*"]
+      "@/*": [
+        "./*"
+      ],
+      "@tx-agent-kit/observability": [
+        "../../packages/infra/observability/dist/index.js"
+      ],
+      "@tx-agent-kit/observability/*": [
+        "../../packages/infra/observability/dist/*"
+      ]
     }
   },
   "include": [
     "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "**/*.tsx"
   ],
   "exclude": [
     "node_modules"

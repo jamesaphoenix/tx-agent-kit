@@ -12,7 +12,9 @@ LOCK_DIR="/tmp/${COMPOSE_PROJECT_NAME}-db-reset.lock"
 
 cd "$PROJECT_ROOT"
 
-"$PROJECT_ROOT/scripts/start-dev-services.sh"
+if [[ "${TX_AGENT_SKIP_INFRA_ENSURE:-0}" != "1" ]]; then
+  "$PROJECT_ROOT/scripts/start-dev-services.sh"
+fi
 
 derive_db_name_from_url() {
   local database_url="${1:-}"
@@ -69,7 +71,10 @@ if [[ -n "${DATABASE_URL:-}" ]]; then
   fi
 fi
 
-lock_acquire "$LOCK_DIR" "${DB_RESET_LOCK_TIMEOUT_SECONDS:-900}"
+lock_acquire \
+  "$LOCK_DIR" \
+  "${DB_RESET_LOCK_TIMEOUT_SECONDS:-900}" \
+  "${DB_RESET_LOCK_MISSING_PID_GRACE_SECONDS:-15}"
 trap 'lock_release "$LOCK_DIR"' EXIT
 
 echo "Applying migrations..."
@@ -82,7 +87,7 @@ if [[ -z "$POSTGRES_CONTAINER_ID" ]]; then
 fi
 
 echo "Resetting test database state in '$DB_NAME'..."
-docker exec -i "$POSTGRES_CONTAINER_ID" psql -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" <<'SQL'
+docker exec -i "$POSTGRES_CONTAINER_ID" psql -1 -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" <<'SQL'
 DO $$
 DECLARE
   truncate_sql text;
@@ -107,7 +112,7 @@ VALUES ('owner'), ('admin'), ('member')
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO permissions (key)
-VALUES ('workspace.read'), ('workspace.write'), ('invite.manage'), ('task.manage')
+VALUES ('organization.read'), ('organization.write'), ('organization.manage'), ('invite.manage')
 ON CONFLICT (key) DO NOTHING;
 SQL
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { dirname, relative, resolve } from 'node:path'
+import { basename, dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -48,7 +48,7 @@ const walk = (dirPath) => {
     if (packageName) {
       records.push({
         packageName,
-        projectId: dirPath.split('/').pop()?.toLowerCase() ?? '',
+        projectId: basename(dirPath).toLowerCase(),
         configPath: relative(repoRoot, resolve(dirPath, integrationConfigEntry.name))
       })
     }

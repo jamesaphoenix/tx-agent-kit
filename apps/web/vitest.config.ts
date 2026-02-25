@@ -15,7 +15,6 @@ export default mergeConfig(
         '**/dist/**',
         '**/.next/**',
         '**/coverage/**',
-        'integration/**/*',
         '**/*.integration.test.ts',
         '**/*.integration.test.tsx'
       ]
@@ -24,7 +23,7 @@ export default mergeConfig(
       alias: {
         '@': fileURLToPath(new URL('./', import.meta.url)),
         '@tx-agent-kit/observability/client': fileURLToPath(
-          new URL('../../packages/observability/src/client.ts', import.meta.url)
+          new URL('../../packages/infra/observability/src/client.ts', import.meta.url)
         )
       }
     }

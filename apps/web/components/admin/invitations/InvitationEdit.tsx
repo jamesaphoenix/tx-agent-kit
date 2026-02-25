@@ -6,7 +6,7 @@ export const InvitationEdit = () => (
   <Edit>
     <SimpleForm>
       <TextInput source="id" disabled />
-      <TextInput source="workspaceId" disabled />
+      <TextInput source="organizationId" disabled />
       <TextInput source="email" disabled />
       <SelectInput
         source="role"

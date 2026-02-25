@@ -1,0 +1,19 @@
+{
+  "name": "@tx-agent-kit/typescript-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "base.json",
+    "node.json",
+    "nextjs.json",
+    "react-native.json",
+    "package.json"
+  ],
+  "exports": {
+    "./base.json": "./base.json",
+    "./node.json": "./node.json",
+    "./nextjs.json": "./nextjs.json",
+    "./react-native.json": "./react-native.json"
+  }
+}

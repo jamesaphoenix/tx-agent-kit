@@ -10,6 +10,11 @@ env:
   DATABASE_URL: postgres://postgres:postgres@localhost:5432/tx_agent_kit
   AUTH_SECRET: ci-auth-secret-123456
   API_CORS_ORIGIN: http://localhost:3000
+  AUTH_RATE_LIMIT_WINDOW_MS: '60000'
+  AUTH_RATE_LIMIT_MAX_REQUESTS: '100'
+  RESEND_API_KEY: ''
+  RESEND_FROM_EMAIL: ''
+  WEB_BASE_URL: http://localhost:3000
 
 jobs:
   placeholder:

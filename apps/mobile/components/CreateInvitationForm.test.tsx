@@ -26,14 +26,14 @@ beforeEach(() => {
 const findByType = (root: ReturnType<typeof create>['root'], type: string) =>
   root.findAllByType(type as never)
 
-const workspaces = [
-  { id: 'w-1', name: 'Alpha' },
-  { id: 'w-2', name: 'Beta' }
+const organizations = [
+  { id: 'o-1', name: 'Alpha' },
+  { id: 'o-2', name: 'Beta' }
 ]
 
 describe('CreateInvitationForm', () => {
-  it('renders workspace chips, email input, role chips, and send button', () => {
-    const tree = create(<CreateInvitationForm workspaces={workspaces} />)
+  it('renders organization chips, email input, role chips, and send button', () => {
+    const tree = create(<CreateInvitationForm organizations={organizations} />)
     const texts = findByType(tree.root, 'Text')
     const labels = texts.map((t) => t.props.children).flat()
 
@@ -46,19 +46,19 @@ describe('CreateInvitationForm', () => {
   })
 
   it('disables button when email is empty', () => {
-    const tree = create(<CreateInvitationForm workspaces={workspaces} />)
+    const tree = create(<CreateInvitationForm organizations={organizations} />)
     const buttons = findByType(tree.root, 'TouchableOpacity')
     // The last TouchableOpacity is the submit button
     const submitButton = buttons[buttons.length - 1]
     expect(submitButton.props.disabled).toBe(true)
   })
 
-  it('calls createInvitation with first workspace and member role by default', async () => {
-    const invitation = { id: 'inv-1', email: 'peer@co.com', role: 'member', status: 'pending', workspaceId: 'w-1' }
+  it('calls createInvitation with first organization and member role by default', async () => {
+    const invitation = { id: 'inv-1', email: 'peer@co.com', role: 'member', status: 'pending', organizationId: 'o-1' }
     ;(clientApi.createInvitation as Mock).mockResolvedValue(invitation)
     const onCreated = vi.fn()
 
-    const tree = create(<CreateInvitationForm workspaces={workspaces} onCreated={onCreated} />)
+    const tree = create(<CreateInvitationForm organizations={organizations} onCreated={onCreated} />)
     const emailInput = findByType(tree.root, 'TextInput').find(
       (i) => i.props.placeholder === 'teammate@company.com'
     )!
@@ -79,7 +79,7 @@ describe('CreateInvitationForm', () => {
     })
 
     expect(clientApi.createInvitation).toHaveBeenCalledWith({
-      workspaceId: 'w-1',
+      organizationId: 'o-1',
       email: 'peer@co.com',
       role: 'member'
     })
@@ -90,7 +90,7 @@ describe('CreateInvitationForm', () => {
   it('selects admin role when admin chip is pressed', async () => {
     ;(clientApi.createInvitation as Mock).mockResolvedValue({ id: 'inv-1' })
 
-    const tree = create(<CreateInvitationForm workspaces={workspaces} />)
+    const tree = create(<CreateInvitationForm organizations={organizations} />)
     const emailInput = findByType(tree.root, 'TextInput').find(
       (i) => i.props.placeholder === 'teammate@company.com'
     )!
@@ -123,8 +123,8 @@ describe('CreateInvitationForm', () => {
     )
   })
 
-  it('shows error when no workspaces exist', async () => {
-    const tree = create(<CreateInvitationForm workspaces={[]} />)
+  it('shows error when no organizations exist', async () => {
+    const tree = create(<CreateInvitationForm organizations={[]} />)
     const emailInput = findByType(tree.root, 'TextInput').find(
       (i) => i.props.placeholder === 'teammate@company.com'
     )!
@@ -145,13 +145,13 @@ describe('CreateInvitationForm', () => {
     })
 
     expect(clientApi.createInvitation).not.toHaveBeenCalled()
-    expect(notify.error).toHaveBeenCalledWith('Create a workspace first')
+    expect(notify.error).toHaveBeenCalledWith('Create an organization first')
   })
 
   it('clears email after successful invitation', async () => {
     ;(clientApi.createInvitation as Mock).mockResolvedValue({ id: 'inv-1' })
 
-    const tree = create(<CreateInvitationForm workspaces={workspaces} />)
+    const tree = create(<CreateInvitationForm organizations={organizations} />)
     const emailInput = findByType(tree.root, 'TextInput').find(
       (i) => i.props.placeholder === 'teammate@company.com'
     )!
@@ -181,7 +181,7 @@ describe('CreateInvitationForm', () => {
       () => new Promise((r) => { resolveCreate = r })
     )
 
-    const tree = create(<CreateInvitationForm workspaces={workspaces} />)
+    const tree = create(<CreateInvitationForm organizations={organizations} />)
     const emailInput = findByType(tree.root, 'TextInput').find(
       (i) => i.props.placeholder === 'teammate@company.com'
     )!
@@ -211,12 +211,12 @@ describe('CreateInvitationForm', () => {
     expect(clientApi.createInvitation).toHaveBeenCalledTimes(1)
   })
 
-  it('resets workspace selection when workspaces prop changes', async () => {
+  it('resets organization selection when organizations prop changes', async () => {
     ;(clientApi.createInvitation as Mock).mockResolvedValue({ id: 'inv-1' })
 
-    const tree = create(<CreateInvitationForm workspaces={workspaces} />)
+    const tree = create(<CreateInvitationForm organizations={organizations} />)
 
-    // Select the second workspace (Beta)
+    // Select the second organization (Beta)
     const allButtons = findByType(tree.root, 'TouchableOpacity')
     const betaChip = allButtons.find((btn) => {
       const childTexts = findByType(btn, 'Text')
@@ -227,14 +227,14 @@ describe('CreateInvitationForm', () => {
       betaChip.props.onPress()
     })
 
-    // Re-render with a new workspaces array
-    const updatedWorkspaces = [
-      { id: 'w-3', name: 'Gamma' },
-      { id: 'w-4', name: 'Delta' }
+    // Re-render with a new organizations array
+    const updatedOrganizations = [
+      { id: 'o-3', name: 'Gamma' },
+      { id: 'o-4', name: 'Delta' }
     ]
 
     await act(async () => {
-      tree.update(<CreateInvitationForm workspaces={updatedWorkspaces} />)
+      tree.update(<CreateInvitationForm organizations={updatedOrganizations} />)
     })
 
     // Fill email and submit
@@ -255,16 +255,16 @@ describe('CreateInvitationForm', () => {
       await new Promise((r) => setTimeout(r, 0))
     })
 
-    // Should use the first workspace from the updated array (Gamma / w-3)
+    // Should use the first organization from the updated array (Gamma / o-3)
     expect(clientApi.createInvitation).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'w-3' })
+      expect.objectContaining({ organizationId: 'o-3' })
     )
   })
 
   it('shows error on API failure and resets pending', async () => {
     ;(clientApi.createInvitation as Mock).mockRejectedValue(new Error('Already invited'))
 
-    const tree = create(<CreateInvitationForm workspaces={workspaces} />)
+    const tree = create(<CreateInvitationForm organizations={organizations} />)
     const emailInput = findByType(tree.root, 'TextInput').find(
       (i) => i.props.placeholder === 'teammate@company.com'
     )!

@@ -30,7 +30,7 @@ This is the complete list of mechanically enforced invariants. Each invariant is
 | Invariant | Description |
 |-----------|-------------|
 | Logging discipline | `console.*` is banned; use `@tx-agent-kit/logging` |
-| Drizzle isolation | Only `packages/db` imports `drizzle-orm` |
+| Drizzle isolation | Only `packages/infra/db` imports `drizzle-orm` |
 | Schema-first boundaries | Validation uses `effect/Schema` only (Zod banned) |
 
 ## Database Parity
@@ -48,7 +48,7 @@ This is the complete list of mechanically enforced invariants. Each invariant is
 |-----------|-------------|
 | Kind governance | Repository ports and API routes declare `crud` or `custom` markers |
 | Core domain folder contract | Domains use `domain/ports/application/adapters`, not `repositories/services` |
-| Persistence boundary | Concrete persistence lives only in `packages/db/src/repositories/` |
+| Persistence boundary | Concrete persistence lives only in `packages/infra/db/src/repositories/` |
 | Domain legibility | Named exports only (no default exports) |
 | Source hygiene | No TODO/FIXME/HACK comments in source |
 | Domain determinism | No `Date.now`, `new Date`, `Math.random` in domain layer |
@@ -92,11 +92,11 @@ This is the complete list of mechanically enforced invariants. Each invariant is
 
 | Invariant | Description |
 |-----------|-------------|
-| API coverage | Health, auth, workspace, task, invitation endpoints + idempotency |
+| API coverage | Health, auth, organization, invitation endpoints + idempotency |
 | API health latency | Health endpoint readiness assertion required |
-| Web coverage | Dashboard, Workspaces, Invitations pages + all form components |
+| Web coverage | Dashboard, Organizations, Invitations pages + all form components |
 | Web auth flow | Unauthenticated redirect + invalid token handling |
-| Worker coverage | Idempotent `activities.processTask(...)` |
+| Worker coverage | Idempotent `activities.processOperation(...)` |
 | Observability coverage | All four services with Jaeger + Prometheus queries |
 
 ## Infrastructure

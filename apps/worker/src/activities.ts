@@ -1,13 +1,10 @@
-import { processedOperationsRepository } from '@tx-agent-kit/db'
-import { Effect } from 'effect'
+import { createLogger } from '@tx-agent-kit/logging'
 
-export interface ProcessTaskInput {
-  operationId: string
-  taskId: string
-  workspaceId: string
-}
+const logger = createLogger('tx-agent-kit-worker-activities')
 
 export const activities = {
-  processTask: (input: ProcessTaskInput): Promise<{ operationId: string; alreadyProcessed: boolean }> =>
-    Effect.runPromise(processedOperationsRepository.markProcessed(input))
+  ping: async (): Promise<{ ok: boolean }> => {
+    logger.info('Ping activity executed.')
+    return await Promise.resolve({ ok: true })
+  }
 }

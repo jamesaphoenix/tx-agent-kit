@@ -3,7 +3,7 @@
   "info": {
     "title": "tx-agent-kit API",
     "version": "0.1.0",
-    "summary": "Effect-based API for auth, workspaces, invitations, and tasks.",
+    "summary": "Effect-based API for auth, organizations, teams, and invitations.",
     "description": "Contract for apps/api. Domain behavior is modeled as closed invariants at API boundaries."
   },
   "paths": {
@@ -388,6 +388,238 @@
         ]
       }
     },
+    "/v1/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "auth.forgotPassword",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "accepted"
+                  ],
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request did not match the expected schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/HttpApiDecodeError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BadRequest"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conflict"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                    "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "x-invariants": [
+          "INV-AUTH-002"
+        ]
+      }
+    },
+    "/v1/auth/reset-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "auth.resetPassword",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "reset"
+                  ],
+                  "properties": {
+                    "reset": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request did not match the expected schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/HttpApiDecodeError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BadRequest"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conflict"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "password"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "a string at least 1 character(s) long",
+                    "title": "minLength(1)",
+                    "minLength": 1
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "a string at least 8 character(s) long",
+                    "title": "minLength(8)",
+                    "minLength": 8
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "x-invariants": [
+          "INV-AUTH-001"
+        ]
+      }
+    },
     "/v1/auth/me": {
       "get": {
         "tags": [
@@ -415,7 +647,7 @@
                     "email": {
                       "type": "string"
                     },
-                    "workspaceId": {
+                    "organizationId": {
                       "type": "string"
                     },
                     "roles": {
@@ -579,12 +811,12 @@
         ]
       }
     },
-    "/v1/workspaces": {
+    "/v1/organizations": {
       "get": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.listWorkspaces",
+        "operationId": "organizations.listOrganizations",
         "parameters": [
           {
             "name": "cursor",
@@ -645,8 +877,24 @@
                         "required": [
                           "id",
                           "name",
-                          "ownerUserId",
-                          "createdAt"
+                          "billingEmail",
+                          "onboardingData",
+                          "stripeCustomerId",
+                          "stripeSubscriptionId",
+                          "stripePaymentMethodId",
+                          "creditsBalance",
+                          "reservedCredits",
+                          "autoRechargeEnabled",
+                          "autoRechargeThreshold",
+                          "autoRechargeAmount",
+                          "isSubscribed",
+                          "subscriptionStatus",
+                          "subscriptionPlan",
+                          "subscriptionStartedAt",
+                          "subscriptionEndsAt",
+                          "subscriptionCurrentPeriodEnd",
+                          "createdAt",
+                          "updatedAt"
                         ],
                         "properties": {
                           "id": {
@@ -655,10 +903,269 @@
                           "name": {
                             "type": "string"
                           },
-                          "ownerUserId": {
-                            "type": "string"
+                          "billingEmail": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "onboardingData": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "required": [
+                                  "version",
+                                  "status",
+                                  "currentStep",
+                                  "completedSteps"
+                                ],
+                                "properties": {
+                                  "version": {
+                                    "type": "number",
+                                    "enum": [
+                                      1
+                                    ]
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "in_progress",
+                                      "completed"
+                                    ]
+                                  },
+                                  "currentStep": {
+                                    "type": "string",
+                                    "enum": [
+                                      "organization_profile",
+                                      "workspace_setup",
+                                      "goals",
+                                      "completed"
+                                    ]
+                                  },
+                                  "completedSteps": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "organization_profile",
+                                        "workspace_setup",
+                                        "goals",
+                                        "completed"
+                                      ]
+                                    }
+                                  },
+                                  "organizationProfile": {
+                                    "type": "object",
+                                    "required": [
+                                      "displayName"
+                                    ],
+                                    "properties": {
+                                      "displayName": {
+                                        "type": "string",
+                                        "description": "a string at most 64 character(s) long",
+                                        "title": "maxLength(64)",
+                                        "minLength": 2,
+                                        "maxLength": 64
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "workspaceProfile": {
+                                    "type": "object",
+                                    "required": [
+                                      "teamName",
+                                      "website"
+                                    ],
+                                    "properties": {
+                                      "teamName": {
+                                        "type": "string",
+                                        "description": "a string at most 64 character(s) long",
+                                        "title": "maxLength(64)",
+                                        "minLength": 2,
+                                        "maxLength": 64
+                                      },
+                                      "website": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "goals": {
+                                    "type": "object",
+                                    "required": [
+                                      "primaryGoal",
+                                      "teamSize"
+                                    ],
+                                    "properties": {
+                                      "primaryGoal": {
+                                        "type": "string",
+                                        "enum": [
+                                          "agent_execution",
+                                          "automation",
+                                          "analytics",
+                                          "internal_tools",
+                                          "other"
+                                        ]
+                                      },
+                                      "teamSize": {
+                                        "type": "string",
+                                        "enum": [
+                                          "1-5",
+                                          "6-20",
+                                          "21-50",
+                                          "51+"
+                                        ]
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "completedAt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stripeCustomerId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stripeSubscriptionId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stripePaymentMethodId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "creditsBalance": {
+                            "type": "number"
+                          },
+                          "reservedCredits": {
+                            "type": "number"
+                          },
+                          "autoRechargeEnabled": {
+                            "type": "boolean"
+                          },
+                          "autoRechargeThreshold": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "autoRechargeAmount": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "isSubscribed": {
+                            "type": "boolean"
+                          },
+                          "subscriptionStatus": {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "inactive",
+                              "trialing",
+                              "past_due",
+                              "canceled",
+                              "paused",
+                              "unpaid"
+                            ]
+                          },
+                          "subscriptionPlan": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "subscriptionStartedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "subscriptionEndsAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "subscriptionCurrentPeriodEnd": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
                             "type": "string"
                           }
                         },
@@ -755,9 +1262,9 @@
       },
       "post": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.createWorkspace",
+        "operationId": "organizations.createOrganization",
         "parameters": [],
         "security": [],
         "responses": {
@@ -770,8 +1277,24 @@
                   "required": [
                     "id",
                     "name",
-                    "ownerUserId",
-                    "createdAt"
+                    "billingEmail",
+                    "onboardingData",
+                    "stripeCustomerId",
+                    "stripeSubscriptionId",
+                    "stripePaymentMethodId",
+                    "creditsBalance",
+                    "reservedCredits",
+                    "autoRechargeEnabled",
+                    "autoRechargeThreshold",
+                    "autoRechargeAmount",
+                    "isSubscribed",
+                    "subscriptionStatus",
+                    "subscriptionPlan",
+                    "subscriptionStartedAt",
+                    "subscriptionEndsAt",
+                    "subscriptionCurrentPeriodEnd",
+                    "createdAt",
+                    "updatedAt"
                   ],
                   "properties": {
                     "id": {
@@ -780,10 +1303,269 @@
                     "name": {
                       "type": "string"
                     },
-                    "ownerUserId": {
-                      "type": "string"
+                    "billingEmail": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "onboardingData": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "version",
+                            "status",
+                            "currentStep",
+                            "completedSteps"
+                          ],
+                          "properties": {
+                            "version": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "in_progress",
+                                "completed"
+                              ]
+                            },
+                            "currentStep": {
+                              "type": "string",
+                              "enum": [
+                                "organization_profile",
+                                "workspace_setup",
+                                "goals",
+                                "completed"
+                              ]
+                            },
+                            "completedSteps": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "organization_profile",
+                                  "workspace_setup",
+                                  "goals",
+                                  "completed"
+                                ]
+                              }
+                            },
+                            "organizationProfile": {
+                              "type": "object",
+                              "required": [
+                                "displayName"
+                              ],
+                              "properties": {
+                                "displayName": {
+                                  "type": "string",
+                                  "description": "a string at most 64 character(s) long",
+                                  "title": "maxLength(64)",
+                                  "minLength": 2,
+                                  "maxLength": 64
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "workspaceProfile": {
+                              "type": "object",
+                              "required": [
+                                "teamName",
+                                "website"
+                              ],
+                              "properties": {
+                                "teamName": {
+                                  "type": "string",
+                                  "description": "a string at most 64 character(s) long",
+                                  "title": "maxLength(64)",
+                                  "minLength": 2,
+                                  "maxLength": 64
+                                },
+                                "website": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "goals": {
+                              "type": "object",
+                              "required": [
+                                "primaryGoal",
+                                "teamSize"
+                              ],
+                              "properties": {
+                                "primaryGoal": {
+                                  "type": "string",
+                                  "enum": [
+                                    "agent_execution",
+                                    "automation",
+                                    "analytics",
+                                    "internal_tools",
+                                    "other"
+                                  ]
+                                },
+                                "teamSize": {
+                                  "type": "string",
+                                  "enum": [
+                                    "1-5",
+                                    "6-20",
+                                    "21-50",
+                                    "51+"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "completedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stripeCustomerId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stripeSubscriptionId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stripePaymentMethodId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "creditsBalance": {
+                      "type": "number"
+                    },
+                    "reservedCredits": {
+                      "type": "number"
+                    },
+                    "autoRechargeEnabled": {
+                      "type": "boolean"
+                    },
+                    "autoRechargeThreshold": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "autoRechargeAmount": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "isSubscribed": {
+                      "type": "boolean"
+                    },
+                    "subscriptionStatus": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "inactive",
+                        "trialing",
+                        "past_due",
+                        "canceled",
+                        "paused",
+                        "unpaid"
+                      ]
+                    },
+                    "subscriptionPlan": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionStartedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionEndsAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionCurrentPeriodEnd": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
                       "type": "string"
                     }
                   },
@@ -871,15 +1653,15 @@
         }
       }
     },
-    "/v1/workspaces/{workspaceId}": {
+    "/v1/organizations/{organizationId}": {
       "get": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.getWorkspace",
+        "operationId": "organizations.getOrganization",
         "parameters": [
           {
-            "name": "workspaceId",
+            "name": "organizationId",
             "in": "path",
             "schema": {
               "type": "string"
@@ -898,8 +1680,24 @@
                   "required": [
                     "id",
                     "name",
-                    "ownerUserId",
-                    "createdAt"
+                    "billingEmail",
+                    "onboardingData",
+                    "stripeCustomerId",
+                    "stripeSubscriptionId",
+                    "stripePaymentMethodId",
+                    "creditsBalance",
+                    "reservedCredits",
+                    "autoRechargeEnabled",
+                    "autoRechargeThreshold",
+                    "autoRechargeAmount",
+                    "isSubscribed",
+                    "subscriptionStatus",
+                    "subscriptionPlan",
+                    "subscriptionStartedAt",
+                    "subscriptionEndsAt",
+                    "subscriptionCurrentPeriodEnd",
+                    "createdAt",
+                    "updatedAt"
                   ],
                   "properties": {
                     "id": {
@@ -908,10 +1706,269 @@
                     "name": {
                       "type": "string"
                     },
-                    "ownerUserId": {
-                      "type": "string"
+                    "billingEmail": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "onboardingData": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "version",
+                            "status",
+                            "currentStep",
+                            "completedSteps"
+                          ],
+                          "properties": {
+                            "version": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "in_progress",
+                                "completed"
+                              ]
+                            },
+                            "currentStep": {
+                              "type": "string",
+                              "enum": [
+                                "organization_profile",
+                                "workspace_setup",
+                                "goals",
+                                "completed"
+                              ]
+                            },
+                            "completedSteps": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "organization_profile",
+                                  "workspace_setup",
+                                  "goals",
+                                  "completed"
+                                ]
+                              }
+                            },
+                            "organizationProfile": {
+                              "type": "object",
+                              "required": [
+                                "displayName"
+                              ],
+                              "properties": {
+                                "displayName": {
+                                  "type": "string",
+                                  "description": "a string at most 64 character(s) long",
+                                  "title": "maxLength(64)",
+                                  "minLength": 2,
+                                  "maxLength": 64
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "workspaceProfile": {
+                              "type": "object",
+                              "required": [
+                                "teamName",
+                                "website"
+                              ],
+                              "properties": {
+                                "teamName": {
+                                  "type": "string",
+                                  "description": "a string at most 64 character(s) long",
+                                  "title": "maxLength(64)",
+                                  "minLength": 2,
+                                  "maxLength": 64
+                                },
+                                "website": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "goals": {
+                              "type": "object",
+                              "required": [
+                                "primaryGoal",
+                                "teamSize"
+                              ],
+                              "properties": {
+                                "primaryGoal": {
+                                  "type": "string",
+                                  "enum": [
+                                    "agent_execution",
+                                    "automation",
+                                    "analytics",
+                                    "internal_tools",
+                                    "other"
+                                  ]
+                                },
+                                "teamSize": {
+                                  "type": "string",
+                                  "enum": [
+                                    "1-5",
+                                    "6-20",
+                                    "21-50",
+                                    "51+"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "completedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stripeCustomerId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stripeSubscriptionId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stripePaymentMethodId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "creditsBalance": {
+                      "type": "number"
+                    },
+                    "reservedCredits": {
+                      "type": "number"
+                    },
+                    "autoRechargeEnabled": {
+                      "type": "boolean"
+                    },
+                    "autoRechargeThreshold": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "autoRechargeAmount": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "isSubscribed": {
+                      "type": "boolean"
+                    },
+                    "subscriptionStatus": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "inactive",
+                        "trialing",
+                        "past_due",
+                        "canceled",
+                        "paused",
+                        "unpaid"
+                      ]
+                    },
+                    "subscriptionPlan": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionStartedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionEndsAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionCurrentPeriodEnd": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
                       "type": "string"
                     }
                   },
@@ -981,12 +2038,12 @@
       },
       "patch": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.updateWorkspace",
+        "operationId": "organizations.updateOrganization",
         "parameters": [
           {
-            "name": "workspaceId",
+            "name": "organizationId",
             "in": "path",
             "schema": {
               "type": "string"
@@ -1005,8 +2062,24 @@
                   "required": [
                     "id",
                     "name",
-                    "ownerUserId",
-                    "createdAt"
+                    "billingEmail",
+                    "onboardingData",
+                    "stripeCustomerId",
+                    "stripeSubscriptionId",
+                    "stripePaymentMethodId",
+                    "creditsBalance",
+                    "reservedCredits",
+                    "autoRechargeEnabled",
+                    "autoRechargeThreshold",
+                    "autoRechargeAmount",
+                    "isSubscribed",
+                    "subscriptionStatus",
+                    "subscriptionPlan",
+                    "subscriptionStartedAt",
+                    "subscriptionEndsAt",
+                    "subscriptionCurrentPeriodEnd",
+                    "createdAt",
+                    "updatedAt"
                   ],
                   "properties": {
                     "id": {
@@ -1015,10 +2088,269 @@
                     "name": {
                       "type": "string"
                     },
-                    "ownerUserId": {
-                      "type": "string"
+                    "billingEmail": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "onboardingData": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "version",
+                            "status",
+                            "currentStep",
+                            "completedSteps"
+                          ],
+                          "properties": {
+                            "version": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "in_progress",
+                                "completed"
+                              ]
+                            },
+                            "currentStep": {
+                              "type": "string",
+                              "enum": [
+                                "organization_profile",
+                                "workspace_setup",
+                                "goals",
+                                "completed"
+                              ]
+                            },
+                            "completedSteps": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "organization_profile",
+                                  "workspace_setup",
+                                  "goals",
+                                  "completed"
+                                ]
+                              }
+                            },
+                            "organizationProfile": {
+                              "type": "object",
+                              "required": [
+                                "displayName"
+                              ],
+                              "properties": {
+                                "displayName": {
+                                  "type": "string",
+                                  "description": "a string at most 64 character(s) long",
+                                  "title": "maxLength(64)",
+                                  "minLength": 2,
+                                  "maxLength": 64
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "workspaceProfile": {
+                              "type": "object",
+                              "required": [
+                                "teamName",
+                                "website"
+                              ],
+                              "properties": {
+                                "teamName": {
+                                  "type": "string",
+                                  "description": "a string at most 64 character(s) long",
+                                  "title": "maxLength(64)",
+                                  "minLength": 2,
+                                  "maxLength": 64
+                                },
+                                "website": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "goals": {
+                              "type": "object",
+                              "required": [
+                                "primaryGoal",
+                                "teamSize"
+                              ],
+                              "properties": {
+                                "primaryGoal": {
+                                  "type": "string",
+                                  "enum": [
+                                    "agent_execution",
+                                    "automation",
+                                    "analytics",
+                                    "internal_tools",
+                                    "other"
+                                  ]
+                                },
+                                "teamSize": {
+                                  "type": "string",
+                                  "enum": [
+                                    "1-5",
+                                    "6-20",
+                                    "21-50",
+                                    "51+"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "completedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stripeCustomerId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stripeSubscriptionId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stripePaymentMethodId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "creditsBalance": {
+                      "type": "number"
+                    },
+                    "reservedCredits": {
+                      "type": "number"
+                    },
+                    "autoRechargeEnabled": {
+                      "type": "boolean"
+                    },
+                    "autoRechargeThreshold": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "autoRechargeAmount": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "isSubscribed": {
+                      "type": "boolean"
+                    },
+                    "subscriptionStatus": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "inactive",
+                        "trialing",
+                        "past_due",
+                        "canceled",
+                        "paused",
+                        "unpaid"
+                      ]
+                    },
+                    "subscriptionPlan": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionStartedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionEndsAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionCurrentPeriodEnd": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
                       "type": "string"
                     }
                   },
@@ -1094,6 +2426,141 @@
                 "properties": {
                   "name": {
                     "type": "string"
+                  },
+                  "onboardingData": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "required": [
+                          "version",
+                          "status",
+                          "currentStep",
+                          "completedSteps"
+                        ],
+                        "properties": {
+                          "version": {
+                            "type": "number",
+                            "enum": [
+                              1
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "in_progress",
+                              "completed"
+                            ]
+                          },
+                          "currentStep": {
+                            "type": "string",
+                            "enum": [
+                              "organization_profile",
+                              "workspace_setup",
+                              "goals",
+                              "completed"
+                            ]
+                          },
+                          "completedSteps": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "organization_profile",
+                                "workspace_setup",
+                                "goals",
+                                "completed"
+                              ]
+                            }
+                          },
+                          "organizationProfile": {
+                            "type": "object",
+                            "required": [
+                              "displayName"
+                            ],
+                            "properties": {
+                              "displayName": {
+                                "type": "string",
+                                "description": "a string at most 64 character(s) long",
+                                "title": "maxLength(64)",
+                                "minLength": 2,
+                                "maxLength": 64
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "workspaceProfile": {
+                            "type": "object",
+                            "required": [
+                              "teamName",
+                              "website"
+                            ],
+                            "properties": {
+                              "teamName": {
+                                "type": "string",
+                                "description": "a string at most 64 character(s) long",
+                                "title": "maxLength(64)",
+                                "minLength": 2,
+                                "maxLength": 64
+                              },
+                              "website": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "goals": {
+                            "type": "object",
+                            "required": [
+                              "primaryGoal",
+                              "teamSize"
+                            ],
+                            "properties": {
+                              "primaryGoal": {
+                                "type": "string",
+                                "enum": [
+                                  "agent_execution",
+                                  "automation",
+                                  "analytics",
+                                  "internal_tools",
+                                  "other"
+                                ]
+                              },
+                              "teamSize": {
+                                "type": "string",
+                                "enum": [
+                                  "1-5",
+                                  "6-20",
+                                  "21-50",
+                                  "51+"
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "completedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "additionalProperties": false
@@ -1105,12 +2572,12 @@
       },
       "delete": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.removeWorkspace",
+        "operationId": "organizations.removeOrganization",
         "parameters": [
           {
-            "name": "workspaceId",
+            "name": "organizationId",
             "in": "path",
             "schema": {
               "type": "string"
@@ -1199,12 +2666,12 @@
         }
       }
     },
-    "/v1/workspaces/batch/get-many": {
+    "/v1/organizations/batch/get-many": {
       "post": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.getManyWorkspaces",
+        "operationId": "organizations.getManyOrganizations",
         "parameters": [],
         "security": [],
         "responses": {
@@ -1225,8 +2692,24 @@
                         "required": [
                           "id",
                           "name",
-                          "ownerUserId",
-                          "createdAt"
+                          "billingEmail",
+                          "onboardingData",
+                          "stripeCustomerId",
+                          "stripeSubscriptionId",
+                          "stripePaymentMethodId",
+                          "creditsBalance",
+                          "reservedCredits",
+                          "autoRechargeEnabled",
+                          "autoRechargeThreshold",
+                          "autoRechargeAmount",
+                          "isSubscribed",
+                          "subscriptionStatus",
+                          "subscriptionPlan",
+                          "subscriptionStartedAt",
+                          "subscriptionEndsAt",
+                          "subscriptionCurrentPeriodEnd",
+                          "createdAt",
+                          "updatedAt"
                         ],
                         "properties": {
                           "id": {
@@ -1235,10 +2718,269 @@
                           "name": {
                             "type": "string"
                           },
-                          "ownerUserId": {
-                            "type": "string"
+                          "billingEmail": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "onboardingData": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "required": [
+                                  "version",
+                                  "status",
+                                  "currentStep",
+                                  "completedSteps"
+                                ],
+                                "properties": {
+                                  "version": {
+                                    "type": "number",
+                                    "enum": [
+                                      1
+                                    ]
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "in_progress",
+                                      "completed"
+                                    ]
+                                  },
+                                  "currentStep": {
+                                    "type": "string",
+                                    "enum": [
+                                      "organization_profile",
+                                      "workspace_setup",
+                                      "goals",
+                                      "completed"
+                                    ]
+                                  },
+                                  "completedSteps": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "organization_profile",
+                                        "workspace_setup",
+                                        "goals",
+                                        "completed"
+                                      ]
+                                    }
+                                  },
+                                  "organizationProfile": {
+                                    "type": "object",
+                                    "required": [
+                                      "displayName"
+                                    ],
+                                    "properties": {
+                                      "displayName": {
+                                        "type": "string",
+                                        "description": "a string at most 64 character(s) long",
+                                        "title": "maxLength(64)",
+                                        "minLength": 2,
+                                        "maxLength": 64
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "workspaceProfile": {
+                                    "type": "object",
+                                    "required": [
+                                      "teamName",
+                                      "website"
+                                    ],
+                                    "properties": {
+                                      "teamName": {
+                                        "type": "string",
+                                        "description": "a string at most 64 character(s) long",
+                                        "title": "maxLength(64)",
+                                        "minLength": 2,
+                                        "maxLength": 64
+                                      },
+                                      "website": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "goals": {
+                                    "type": "object",
+                                    "required": [
+                                      "primaryGoal",
+                                      "teamSize"
+                                    ],
+                                    "properties": {
+                                      "primaryGoal": {
+                                        "type": "string",
+                                        "enum": [
+                                          "agent_execution",
+                                          "automation",
+                                          "analytics",
+                                          "internal_tools",
+                                          "other"
+                                        ]
+                                      },
+                                      "teamSize": {
+                                        "type": "string",
+                                        "enum": [
+                                          "1-5",
+                                          "6-20",
+                                          "21-50",
+                                          "51+"
+                                        ]
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "completedAt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stripeCustomerId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stripeSubscriptionId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stripePaymentMethodId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "creditsBalance": {
+                            "type": "number"
+                          },
+                          "reservedCredits": {
+                            "type": "number"
+                          },
+                          "autoRechargeEnabled": {
+                            "type": "boolean"
+                          },
+                          "autoRechargeThreshold": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "autoRechargeAmount": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "isSubscribed": {
+                            "type": "boolean"
+                          },
+                          "subscriptionStatus": {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "inactive",
+                              "trialing",
+                              "past_due",
+                              "canceled",
+                              "paused",
+                              "unpaid"
+                            ]
+                          },
+                          "subscriptionPlan": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "subscriptionStartedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "subscriptionEndsAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "subscriptionCurrentPeriodEnd": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
                             "type": "string"
                           }
                         },
@@ -1332,16 +3074,16 @@
           "required": true
         },
         "x-invariants": [
-          "INV-WS-001"
+          "INV-ORG-001"
         ]
       }
     },
     "/v1/invitations": {
       "get": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.listInvitations",
+        "operationId": "organizations.listInvitations",
         "parameters": [
           {
             "name": "cursor",
@@ -1417,7 +3159,7 @@
                         "type": "object",
                         "required": [
                           "id",
-                          "workspaceId",
+                          "organizationId",
                           "email",
                           "role",
                           "status",
@@ -1430,7 +3172,7 @@
                           "id": {
                             "type": "string"
                           },
-                          "workspaceId": {
+                          "organizationId": {
                             "type": "string"
                           },
                           "email": {
@@ -1561,9 +3303,9 @@
       },
       "post": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.createInvitation",
+        "operationId": "organizations.createInvitation",
         "parameters": [],
         "security": [],
         "responses": {
@@ -1575,7 +3317,7 @@
                   "type": "object",
                   "required": [
                     "id",
-                    "workspaceId",
+                    "organizationId",
                     "email",
                     "role",
                     "status",
@@ -1588,7 +3330,7 @@
                     "id": {
                       "type": "string"
                     },
-                    "workspaceId": {
+                    "organizationId": {
                       "type": "string"
                     },
                     "email": {
@@ -1692,12 +3434,12 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "workspaceId",
+                  "organizationId",
                   "email",
                   "role"
                 ],
                 "properties": {
-                  "workspaceId": {
+                  "organizationId": {
                     "type": "string"
                   },
                   "email": {
@@ -1718,16 +3460,16 @@
           "required": true
         },
         "x-invariants": [
-          "INV-WS-001"
+          "INV-ORG-001"
         ]
       }
     },
     "/v1/invitations/{invitationId}": {
       "get": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.getInvitation",
+        "operationId": "organizations.getInvitation",
         "parameters": [
           {
             "name": "invitationId",
@@ -1748,7 +3490,7 @@
                   "type": "object",
                   "required": [
                     "id",
-                    "workspaceId",
+                    "organizationId",
                     "email",
                     "role",
                     "status",
@@ -1761,7 +3503,7 @@
                     "id": {
                       "type": "string"
                     },
-                    "workspaceId": {
+                    "organizationId": {
                       "type": "string"
                     },
                     "email": {
@@ -1865,9 +3607,9 @@
       },
       "patch": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.updateInvitation",
+        "operationId": "organizations.updateInvitation",
         "parameters": [
           {
             "name": "invitationId",
@@ -1888,7 +3630,7 @@
                   "type": "object",
                   "required": [
                     "id",
-                    "workspaceId",
+                    "organizationId",
                     "email",
                     "role",
                     "status",
@@ -1901,7 +3643,7 @@
                     "id": {
                       "type": "string"
                     },
-                    "workspaceId": {
+                    "organizationId": {
                       "type": "string"
                     },
                     "email": {
@@ -2030,14 +3772,14 @@
           "required": true
         },
         "x-invariants": [
-          "INV-WS-001"
+          "INV-ORG-001"
         ]
       },
       "delete": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.removeInvitation",
+        "operationId": "organizations.removeInvitation",
         "parameters": [
           {
             "name": "invitationId",
@@ -2128,16 +3870,16 @@
           }
         },
         "x-invariants": [
-          "INV-WS-001"
+          "INV-ORG-001"
         ]
       }
     },
     "/v1/invitations/batch/get-many": {
       "post": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.getManyInvitations",
+        "operationId": "organizations.getManyInvitations",
         "parameters": [],
         "security": [],
         "responses": {
@@ -2157,7 +3899,7 @@
                         "type": "object",
                         "required": [
                           "id",
-                          "workspaceId",
+                          "organizationId",
                           "email",
                           "role",
                           "status",
@@ -2170,7 +3912,7 @@
                           "id": {
                             "type": "string"
                           },
-                          "workspaceId": {
+                          "organizationId": {
                             "type": "string"
                           },
                           "email": {
@@ -2302,9 +4044,9 @@
     "/v1/invitations/{token}/accept": {
       "post": {
         "tags": [
-          "workspaces"
+          "organizations"
         ],
-        "operationId": "workspaces.acceptInvitation",
+        "operationId": "organizations.acceptInvitation",
         "parameters": [
           {
             "name": "token",
@@ -2399,15 +4141,15 @@
         ]
       }
     },
-    "/v1/tasks": {
+    "/v1/teams": {
       "get": {
         "tags": [
-          "tasks"
+          "teams"
         ],
-        "operationId": "tasks.listTasks",
+        "operationId": "teams.listTeams",
         "parameters": [
           {
-            "name": "workspaceId",
+            "name": "organizationId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -2449,22 +4191,6 @@
               ]
             },
             "required": false
-          },
-          {
-            "name": "filter[status]",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
-          },
-          {
-            "name": "filter[createdByUserId]",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
           }
         ],
         "security": [],
@@ -2488,24 +4214,23 @@
                         "type": "object",
                         "required": [
                           "id",
-                          "workspaceId",
-                          "title",
-                          "description",
-                          "status",
-                          "createdByUserId",
-                          "createdAt"
+                          "organizationId",
+                          "name",
+                          "website",
+                          "createdAt",
+                          "updatedAt"
                         ],
                         "properties": {
                           "id": {
                             "type": "string"
                           },
-                          "workspaceId": {
+                          "organizationId": {
                             "type": "string"
                           },
-                          "title": {
+                          "name": {
                             "type": "string"
                           },
-                          "description": {
+                          "website": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -2515,18 +4240,10 @@
                               }
                             ]
                           },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "todo",
-                              "in_progress",
-                              "done"
-                            ]
-                          },
-                          "createdByUserId": {
+                          "createdAt": {
                             "type": "string"
                           },
-                          "createdAt": {
+                          "updatedAt": {
                             "type": "string"
                           }
                         },
@@ -2621,14 +4338,14 @@
           }
         },
         "x-invariants": [
-          "INV-WS-001"
+          "INV-ORG-001"
         ]
       },
       "post": {
         "tags": [
-          "tasks"
+          "teams"
         ],
-        "operationId": "tasks.createTask",
+        "operationId": "teams.createTeam",
         "parameters": [],
         "security": [],
         "responses": {
@@ -2640,24 +4357,23 @@
                   "type": "object",
                   "required": [
                     "id",
-                    "workspaceId",
-                    "title",
-                    "description",
-                    "status",
-                    "createdByUserId",
-                    "createdAt"
+                    "organizationId",
+                    "name",
+                    "website",
+                    "createdAt",
+                    "updatedAt"
                   ],
                   "properties": {
                     "id": {
                       "type": "string"
                     },
-                    "workspaceId": {
+                    "organizationId": {
                       "type": "string"
                     },
-                    "title": {
+                    "name": {
                       "type": "string"
                     },
-                    "description": {
+                    "website": {
                       "anyOf": [
                         {
                           "type": "string"
@@ -2667,18 +4383,10 @@
                         }
                       ]
                     },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "todo",
-                        "in_progress",
-                        "done"
-                      ]
-                    },
-                    "createdByUserId": {
+                    "createdAt": {
                       "type": "string"
                     },
-                    "createdAt": {
+                    "updatedAt": {
                       "type": "string"
                     }
                   },
@@ -2751,17 +4459,14 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "workspaceId",
-                  "title"
+                  "organizationId",
+                  "name"
                 ],
                 "properties": {
-                  "workspaceId": {
+                  "organizationId": {
                     "type": "string"
                   },
-                  "title": {
-                    "type": "string"
-                  },
-                  "description": {
+                  "name": {
                     "type": "string"
                   }
                 },
@@ -2772,19 +4477,19 @@
           "required": true
         },
         "x-invariants": [
-          "INV-WS-001"
+          "INV-ORG-001"
         ]
       }
     },
-    "/v1/tasks/{taskId}": {
+    "/v1/teams/{teamId}": {
       "get": {
         "tags": [
-          "tasks"
+          "teams"
         ],
-        "operationId": "tasks.getTask",
+        "operationId": "teams.getTeam",
         "parameters": [
           {
-            "name": "taskId",
+            "name": "teamId",
             "in": "path",
             "schema": {
               "type": "string"
@@ -2802,24 +4507,23 @@
                   "type": "object",
                   "required": [
                     "id",
-                    "workspaceId",
-                    "title",
-                    "description",
-                    "status",
-                    "createdByUserId",
-                    "createdAt"
+                    "organizationId",
+                    "name",
+                    "website",
+                    "createdAt",
+                    "updatedAt"
                   ],
                   "properties": {
                     "id": {
                       "type": "string"
                     },
-                    "workspaceId": {
+                    "organizationId": {
                       "type": "string"
                     },
-                    "title": {
+                    "name": {
                       "type": "string"
                     },
-                    "description": {
+                    "website": {
                       "anyOf": [
                         {
                           "type": "string"
@@ -2829,18 +4533,10 @@
                         }
                       ]
                     },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "todo",
-                        "in_progress",
-                        "done"
-                      ]
-                    },
-                    "createdByUserId": {
+                    "createdAt": {
                       "type": "string"
                     },
-                    "createdAt": {
+                    "updatedAt": {
                       "type": "string"
                     }
                   },
@@ -2908,17 +4604,17 @@
           }
         },
         "x-invariants": [
-          "INV-WS-001"
+          "INV-ORG-001"
         ]
       },
       "patch": {
         "tags": [
-          "tasks"
+          "teams"
         ],
-        "operationId": "tasks.updateTask",
+        "operationId": "teams.updateTeam",
         "parameters": [
           {
-            "name": "taskId",
+            "name": "teamId",
             "in": "path",
             "schema": {
               "type": "string"
@@ -2936,24 +4632,23 @@
                   "type": "object",
                   "required": [
                     "id",
-                    "workspaceId",
-                    "title",
-                    "description",
-                    "status",
-                    "createdByUserId",
-                    "createdAt"
+                    "organizationId",
+                    "name",
+                    "website",
+                    "createdAt",
+                    "updatedAt"
                   ],
                   "properties": {
                     "id": {
                       "type": "string"
                     },
-                    "workspaceId": {
+                    "organizationId": {
                       "type": "string"
                     },
-                    "title": {
+                    "name": {
                       "type": "string"
                     },
-                    "description": {
+                    "website": {
                       "anyOf": [
                         {
                           "type": "string"
@@ -2963,18 +4658,10 @@
                         }
                       ]
                     },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "todo",
-                        "in_progress",
-                        "done"
-                      ]
-                    },
-                    "createdByUserId": {
+                    "createdAt": {
                       "type": "string"
                     },
-                    "createdAt": {
+                    "updatedAt": {
                       "type": "string"
                     }
                   },
@@ -3048,26 +4735,8 @@
                 "type": "object",
                 "required": [],
                 "properties": {
-                  "title": {
+                  "name": {
                     "type": "string"
-                  },
-                  "description": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "todo",
-                      "in_progress",
-                      "done"
-                    ]
                   }
                 },
                 "additionalProperties": false
@@ -3077,17 +4746,17 @@
           "required": true
         },
         "x-invariants": [
-          "INV-WS-001"
+          "INV-ORG-001"
         ]
       },
       "delete": {
         "tags": [
-          "tasks"
+          "teams"
         ],
-        "operationId": "tasks.removeTask",
+        "operationId": "teams.removeTeam",
         "parameters": [
           {
-            "name": "taskId",
+            "name": "teamId",
             "in": "path",
             "schema": {
               "type": "string"
@@ -3175,168 +4844,7 @@
           }
         },
         "x-invariants": [
-          "INV-WS-001"
-        ]
-      }
-    },
-    "/v1/tasks/batch/get-many": {
-      "post": {
-        "tags": [
-          "tasks"
-        ],
-        "operationId": "tasks.getManyTasks",
-        "parameters": [],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "data"
-                  ],
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "required": [
-                          "id",
-                          "workspaceId",
-                          "title",
-                          "description",
-                          "status",
-                          "createdByUserId",
-                          "createdAt"
-                        ],
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "workspaceId": {
-                            "type": "string"
-                          },
-                          "title": {
-                            "type": "string"
-                          },
-                          "description": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "todo",
-                              "in_progress",
-                              "done"
-                            ]
-                          },
-                          "createdByUserId": {
-                            "type": "string"
-                          },
-                          "createdAt": {
-                            "type": "string"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The request did not match the expected schema",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/HttpApiDecodeError"
-                    },
-                    {
-                      "$ref": "#/components/schemas/BadRequest"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Conflict"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalError"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "ids"
-                ],
-                "properties": {
-                  "ids": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/UUID"
-                    }
-                  }
-                },
-                "additionalProperties": false
-              }
-            }
-          },
-          "required": true
-        },
-        "x-invariants": [
-          "INV-WS-001"
+          "INV-ORG-001"
         ]
       }
     }
@@ -3550,10 +5058,10 @@
       "name": "auth"
     },
     {
-      "name": "workspaces"
+      "name": "organizations"
     },
     {
-      "name": "tasks"
+      "name": "teams"
     }
   ],
   "servers": [
@@ -3574,15 +5082,10 @@
       {
         "name": "Collaboration",
         "owns": [
-          "Workspaces",
+          "Organizations",
+          "Teams",
           "Invitations",
           "Membership"
-        ]
-      },
-      {
-        "name": "WorkExecution",
-        "owns": [
-          "Tasks"
         ]
       }
     ],
@@ -3592,8 +5095,12 @@
         "rule": "Password must be at least 8 characters."
       },
       {
-        "id": "INV-WS-001",
-        "rule": "Workspace members are the only actors allowed to read/create tasks in that workspace."
+        "id": "INV-AUTH-002",
+        "rule": "Forgot-password responses are account-enumeration safe."
+      },
+      {
+        "id": "INV-ORG-001",
+        "rule": "Organization members are the only actors allowed to manage resources in that organization."
       },
       {
         "id": "INV-INV-001",

@@ -693,6 +693,236 @@ const createNoInlinePgEnumArrayRule = (context) => {
   }
 }
 
+const unwrapExpressionNode = (node) => {
+  let current = node
+
+  while (current) {
+    if (current.type === 'TSAsExpression' || current.type === 'TSNonNullExpression') {
+      current = current.expression
+      continue
+    }
+
+    if (current.type === 'TSTypeAssertion' || current.type === 'ParenthesizedExpression') {
+      current = current.expression
+      continue
+    }
+
+    if (current.type === 'ChainExpression') {
+      current = current.expression
+      continue
+    }
+
+    return current
+  }
+
+  return node
+}
+
+const unwrapTypeNode = (node) => {
+  let current = node
+
+  while (current && current.type === 'TSParenthesizedType') {
+    current = current.typeAnnotation
+  }
+
+  return current
+}
+
+const getTypeReferenceName = (typeNameNode) => {
+  if (!typeNameNode) {
+    return null
+  }
+
+  if (typeNameNode.type === 'Identifier') {
+    return typeNameNode.name
+  }
+
+  if (typeNameNode.type === 'TSQualifiedName' && typeNameNode.right.type === 'Identifier') {
+    return typeNameNode.right.name
+  }
+
+  return null
+}
+
+const getWeakJsonTypeReason = (typeNode) => {
+  if (!typeNode) {
+    return 'missing type argument'
+  }
+
+  const normalizedType = unwrapTypeNode(typeNode)
+  if (!normalizedType) {
+    return 'missing type argument'
+  }
+
+  if (normalizedType.type === 'TSAnyKeyword') {
+    return '`any`'
+  }
+
+  if (normalizedType.type === 'TSUnknownKeyword') {
+    return '`unknown`'
+  }
+
+  if (normalizedType.type !== 'TSTypeReference') {
+    return null
+  }
+
+  if (getTypeReferenceName(normalizedType.typeName) !== 'Record') {
+    return null
+  }
+
+  const typeArgumentsNode = normalizedType.typeArguments ?? normalizedType.typeParameters
+  if (!typeArgumentsNode || typeArgumentsNode.type !== 'TSTypeParameterInstantiation') {
+    return null
+  }
+
+  if (typeArgumentsNode.params.length < 2) {
+    return null
+  }
+
+  const valueTypeNode = unwrapTypeNode(typeArgumentsNode.params[1])
+  if (!valueTypeNode) {
+    return null
+  }
+
+  if (valueTypeNode.type === 'TSAnyKeyword') {
+    return '`Record<string, any>`'
+  }
+
+  if (valueTypeNode.type === 'TSUnknownKeyword') {
+    return '`Record<string, unknown>`'
+  }
+
+  return null
+}
+
+const createJsonColumnsRequireExplicitDrizzleTypeRule = (context) => {
+  const jsonBuilderIdentifiers = new Set()
+
+  const isDrizzlePgCoreImport = (importPath) =>
+    importPath === 'drizzle-orm/pg-core' || importPath.startsWith('drizzle-orm/pg-core/')
+
+  const isFluentChainContinuation = (node) => {
+    let current = node
+    let parent = node.parent
+
+    while (
+      parent &&
+      (parent.type === 'TSAsExpression' ||
+        parent.type === 'TSNonNullExpression' ||
+        parent.type === 'TSTypeAssertion' ||
+        parent.type === 'ParenthesizedExpression' ||
+        parent.type === 'ChainExpression')
+    ) {
+      current = parent
+      parent = parent.parent
+    }
+
+    if (parent?.type === 'MemberExpression' && parent.object === current) {
+      return true
+    }
+
+    if (parent?.type === 'CallExpression' && parent.callee === current) {
+      return true
+    }
+
+    return false
+  }
+
+  const analyzeFluentChain = (callExpressionNode) => {
+    let current = unwrapExpressionNode(callExpressionNode)
+    let sawTypeCall = false
+    let weakTypeReason = null
+    let weakTypeNode = null
+
+    while (
+      current?.type === 'CallExpression' &&
+      current.callee.type === 'MemberExpression' &&
+      current.callee.property.type === 'Identifier'
+    ) {
+      const methodName = current.callee.property.name
+      if (methodName === '$type') {
+        sawTypeCall = true
+
+        const typeArgumentsNode = current.typeArguments ?? current.typeParameters
+        const firstTypeArgument =
+          typeArgumentsNode?.type === 'TSTypeParameterInstantiation'
+            ? typeArgumentsNode.params[0]
+            : null
+
+        const typeWeakness = getWeakJsonTypeReason(firstTypeArgument)
+        if (typeWeakness) {
+          weakTypeReason = typeWeakness
+          weakTypeNode = firstTypeArgument ?? current
+        }
+      }
+
+      current = unwrapExpressionNode(current.callee.object)
+    }
+
+    return {
+      root: current,
+      sawTypeCall,
+      weakTypeReason,
+      weakTypeNode
+    }
+  }
+
+  return {
+    ImportDeclaration(node) {
+      const importPath = typeof node.source.value === 'string' ? node.source.value : ''
+      if (!isDrizzlePgCoreImport(importPath)) {
+        return
+      }
+
+      for (const specifier of node.specifiers) {
+        if (specifier.type !== 'ImportSpecifier') {
+          continue
+        }
+
+        if (specifier.imported.type !== 'Identifier' || specifier.local.type !== 'Identifier') {
+          continue
+        }
+
+        if (specifier.imported.name === 'json' || specifier.imported.name === 'jsonb') {
+          jsonBuilderIdentifiers.add(specifier.local.name)
+        }
+      }
+    },
+
+    CallExpression(node) {
+      if (isFluentChainContinuation(node)) {
+        return
+      }
+
+      const { root, sawTypeCall, weakTypeReason, weakTypeNode } = analyzeFluentChain(node)
+      if (!root || root.type !== 'CallExpression' || root.callee.type !== 'Identifier') {
+        return
+      }
+
+      if (!jsonBuilderIdentifiers.has(root.callee.name)) {
+        return
+      }
+
+      if (!sawTypeCall) {
+        context.report({
+          node,
+          message:
+            'JSON/JSONB Drizzle columns must include `.$type<...>()` with an explicit payload type to keep DB and Effect schemas strongly typed.'
+        })
+        return
+      }
+
+      if (weakTypeReason) {
+        context.report({
+          node: weakTypeNode ?? node,
+          message:
+            `JSON/JSONB Drizzle columns must use explicit payload types; weak type ${weakTypeReason} is disallowed.`
+        })
+      }
+    }
+  }
+}
+
 const createCoreAdaptersUseDbRowMappersRule = (context) => {
   const sourceFilePath = toPosix(context.filename)
   const isCoreAdapterFile = /\/packages\/core\/src\/domains\/[^/]+\/adapters\/.*\.(ts|tsx)$/u.test(sourceFilePath)
@@ -858,6 +1088,17 @@ export const domainStructurePlugin = {
         schema: []
       },
       create: createNoInlinePgEnumArrayRule
+    },
+    'json-columns-require-explicit-drizzle-type': {
+      meta: {
+        type: 'problem',
+        docs: {
+          description:
+            'Requires Drizzle JSON/JSONB columns to call `.$type<...>()` with strong payload typing.'
+        },
+        schema: []
+      },
+      create: createJsonColumnsRequireExplicitDrizzleTypeRule
     },
     'core-adapters-use-db-row-mappers': {
       meta: {

@@ -19,7 +19,7 @@ packages/core/src/domains/<domain>/
   ui/             # Presentation-facing helpers (optional)
 ```
 
-Persistence implementations live separately in `packages/db/src/repositories/`, not inside the domain slice.
+Persistence implementations live separately in `packages/infra/db/src/repositories/`, not inside the domain slice.
 
 ## Layer responsibilities
 
@@ -32,7 +32,7 @@ The innermost layer containing pure domain logic with zero dependencies on infra
 
 export interface InvoiceRecord {
   readonly id: string
-  readonly workspaceId: string
+  readonly organizationId: string
   readonly amount: number
   readonly currency: string
   readonly status: InvoiceStatus
@@ -55,7 +55,7 @@ export const canTransition = (
 }
 ```
 
-All functions in `domain/` must be pure: no `Date.now`, `new Date`, `Math.random`, or any side effects. Only named exports are allowed (no default exports). The layer cannot import from `packages/db`, `effect`, or any adapter. All `*Record` interfaces that ports reference must originate here.
+All functions in `domain/` must be pure: no `Date.now`, `new Date`, `Math.random`, or any side effects. Only named exports are allowed (no default exports). The layer cannot import from `packages/infra/db`, `effect`, or any adapter. All `*Record` interfaces that ports reference must originate here.
 
 ### `ports/`
 
@@ -68,7 +68,7 @@ import type { InvoiceRecord } from "../domain/invoice.js"
 
 export type InvoiceRepositoryPort = {
   readonly findById: (id: string) => Effect.Effect<InvoiceRecord | null>
-  readonly findByWorkspace: (workspaceId: string) => Effect.Effect<ReadonlyArray<InvoiceRecord>>
+  readonly findByOrganization: (organizationId: string) => Effect.Effect<ReadonlyArray<InvoiceRecord>>
   readonly create: (input: CreateInvoiceInput) => Effect.Effect<InvoiceRecord>
   readonly updateStatus: (id: string, status: InvoiceStatus) => Effect.Effect<InvoiceRecord>
 }
@@ -103,12 +103,12 @@ export const makeInvoiceService = (repo: InvoiceRepositoryPort) => ({
 
 The application layer can import from `domain/`, `ports/`, and other `application/` files, but never from concrete infrastructure. It orchestrates calls to port methods and domain functions without containing SQL or HTTP calls itself.
 
-### Persistence in `packages/db/src/repositories/`
+### Persistence in `packages/infra/db/src/repositories/`
 
 Concrete repository implementations live in the database package, not inside the core domain:
 
 ```typescript
-// packages/db/src/repositories/invoice.repository.ts
+// packages/infra/db/src/repositories/invoice.repository.ts
 
 import type { InvoiceRepositoryPort } from "@tx-agent-kit/core/domains/billing/ports/invoice-repository.port.js"
 
@@ -128,7 +128,7 @@ The structural invariant checks enforce these prohibitions:
 
 | Prohibition | Rationale |
 |------------|-----------|
-| No `repositories/` directory inside `packages/core/src/domains/` | Persistence belongs in `packages/db` |
+| No `repositories/` directory inside `packages/core/src/domains/` | Persistence belongs in `packages/infra/db` |
 | No `services/` directory inside `packages/core/src/domains/` | Use `application/` instead for consistency |
 | No imports from `drizzle-orm`, `pg`, or database-specific packages | Core must remain infrastructure-free |
 | No `process.env` reads | Use typed config modules |

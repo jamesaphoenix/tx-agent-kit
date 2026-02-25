@@ -1,13 +1,13 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.node.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist"
   },
   "include": ["src/**/*"],
   "references": [
-    { "path": "../auth" },
+    { "path": "../infra/auth" },
     { "path": "../contracts" },
-    { "path": "../db" }
+    { "path": "../infra/db" }
   ]
 }

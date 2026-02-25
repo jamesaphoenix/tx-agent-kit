@@ -10,23 +10,22 @@ The `domain/` layer is the innermost layer of each DDD slice. It contains entiti
 Entities are the core data structures of your domain. They are defined as TypeScript interfaces with the `Record` suffix:
 
 ```typescript
-// packages/core/src/domains/tasks/domain/task.ts
+// packages/core/src/domains/organization/domain/organization.ts
 
-export interface TaskRecord {
+export interface OrganizationRecord {
   readonly id: string
-  readonly workspaceId: string
-  readonly title: string
-  readonly description: string | null
-  readonly status: TaskStatus
-  readonly assigneeId: string | null
+  readonly name: string
+  readonly billingEmail: string | null
+  readonly isSubscribed: boolean
+  readonly subscriptionStatus: SubscriptionStatus
   readonly createdAt: Date
   readonly updatedAt: Date
 }
 
-export type TaskStatus = "open" | "in_progress" | "completed" | "cancelled"
+export type SubscriptionStatus = "active" | "inactive" | "trialing" | "past_due" | "canceled" | "paused" | "unpaid"
 ```
 
-Key conventions for entities: use `readonly` properties to signal immutability intent, use the `*Record` naming convention (e.g., `TaskRecord`, `InvoiceRecord`), define them in `domain/` so `ports/` can import them (port files cannot define interfaces), and use named exports only. Default exports are banned in domain files.
+Key conventions for entities: use `readonly` properties to signal immutability intent, use the `*Record` naming convention (e.g., `OrganizationRecord`, `InvoiceRecord`), define them in `domain/` so `ports/` can import them (port files cannot define interfaces), and use named exports only. Default exports are banned in domain files.
 
 ## Value objects
 
@@ -55,29 +54,32 @@ Value objects are compared by value, not reference. Two `Money` objects with the
 Domain rules are pure functions that encode business logic. They take inputs and return outputs with no side effects:
 
 ```typescript
-// packages/core/src/domains/tasks/domain/task.ts
+// packages/core/src/domains/organization/domain/organization.ts
 
-export const canTransition = (
-  from: TaskStatus,
-  to: TaskStatus,
+export const canTransitionSubscription = (
+  from: SubscriptionStatus,
+  to: SubscriptionStatus,
 ): boolean => {
-  const allowed: Record<TaskStatus, ReadonlyArray<TaskStatus>> = {
-    open: ["in_progress", "cancelled"],
-    in_progress: ["completed", "cancelled", "open"],
-    completed: [],
-    cancelled: [],
+  const allowed: Record<SubscriptionStatus, ReadonlyArray<SubscriptionStatus>> = {
+    inactive: ["active", "trialing"],
+    trialing: ["active", "canceled"],
+    active: ["past_due", "canceled", "paused"],
+    past_due: ["active", "canceled", "unpaid"],
+    canceled: ["active"],
+    paused: ["active", "canceled"],
+    unpaid: ["canceled"],
   }
   return allowed[from].includes(to)
 }
 
-export const isOverdue = (task: TaskRecord, now: Date): boolean => {
-  if (task.status === "completed" || task.status === "cancelled") return false
-  if (!task.dueDate) return false
-  return task.dueDate < now
+export const isSubscriptionExpiring = (org: OrganizationRecord, now: Date): boolean => {
+  if (org.subscriptionStatus !== "active") return false
+  if (!org.subscriptionCurrentPeriodEnd) return false
+  return org.subscriptionCurrentPeriodEnd < now
 }
 ```
 
-Notice that `isOverdue` takes `now` as a parameter rather than calling `Date.now()`. This is a hard constraint: **domain code must not use `Date.now`, `new Date()`, or `Math.random` directly.** Time and randomness are injected through function parameters or port interfaces.
+Notice that `isSubscriptionExpiring` takes `now` as a parameter rather than calling `Date.now()`. This is a hard constraint: **domain code must not use `Date.now`, `new Date()`, or `Math.random` directly.** Time and randomness are injected through function parameters or port interfaces.
 
 This constraint exists for two reasons. First, testability: pure functions with injected time can be tested deterministically. Second, determinism: Temporal workflows replay domain logic, and non-deterministic code breaks replay.
 
@@ -86,22 +88,22 @@ This constraint exists for two reasons. First, testability: pure functions with 
 Complex business logic is built by composing simple pure functions:
 
 ```typescript
-export const canAssign = (
-  task: TaskRecord,
-  assigneeId: string,
-  workspaceMembers: ReadonlyArray<string>,
+export const canInvite = (
+  org: OrganizationRecord,
+  inviterUserId: string,
+  orgMembers: ReadonlyArray<{ userId: string; role: string }>,
 ): boolean => {
-  if (task.status === "completed" || task.status === "cancelled") return false
-  return workspaceMembers.includes(assigneeId)
+  const member = orgMembers.find(m => m.userId === inviterUserId)
+  if (!member) return false
+  return member.role === "owner" || member.role === "admin"
 }
 
-export const validateTaskCreation = (input: {
-  readonly title: string
-  readonly workspaceId: string
+export const validateOrganizationCreation = (input: {
+  readonly name: string
 }): ReadonlyArray<string> => {
   const errors: Array<string> = []
-  if (input.title.trim().length === 0) errors.push("Title must not be empty")
-  if (input.title.length > 200) errors.push("Title must be 200 characters or fewer")
+  if (input.name.trim().length < 2) errors.push("Name must be at least 2 characters")
+  if (input.name.length > 64) errors.push("Name must be 64 characters or fewer")
   return errors
 }
 ```
@@ -109,20 +111,20 @@ export const validateTaskCreation = (input: {
 These functions are trivial to unit test because they have no dependencies:
 
 ```typescript
-// domain/task.test.ts
-import { canTransition, validateTaskCreation } from "./task.js"
+// domain/organization.test.ts
+import { canTransitionSubscription, validateOrganizationCreation } from "./organization.js"
 
-test("open tasks can transition to in_progress", () => {
-  expect(canTransition("open", "in_progress")).toBe(true)
+test("inactive subscriptions can transition to active", () => {
+  expect(canTransitionSubscription("inactive", "active")).toBe(true)
 })
 
-test("completed tasks cannot transition", () => {
-  expect(canTransition("completed", "open")).toBe(false)
+test("unpaid subscriptions cannot transition to active", () => {
+  expect(canTransitionSubscription("unpaid", "active")).toBe(false)
 })
 
-test("empty title is invalid", () => {
-  const errors = validateTaskCreation({ title: "", workspaceId: "ws-1" })
-  expect(errors).toContain("Title must not be empty")
+test("short name is invalid", () => {
+  const errors = validateOrganizationCreation({ name: "A" })
+  expect(errors).toContain("Name must be at least 2 characters")
 })
 ```
 
@@ -132,7 +134,7 @@ The domain layer has strict exclusions:
 
 | Excluded | Reason |
 |----------|--------|
-| Database queries | Infrastructure concern. Belongs in `packages/db/src/repositories/` |
+| Database queries | Infrastructure concern. Belongs in `packages/infra/db/src/repositories/` |
 | HTTP calls | Infrastructure concern. Belongs in `adapters/` |
 | `Date.now()` / `new Date()` | Non-deterministic. Inject time as parameter |
 | `Math.random()` | Non-deterministic. Inject via ports |

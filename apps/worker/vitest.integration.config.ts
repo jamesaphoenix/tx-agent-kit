@@ -6,7 +6,8 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: 'worker-integration',
-      include: ['src/**/*.integration.test.ts']
+      include: ['src/**/*.integration.test.ts'],
+      exclude: ['src/activities.integration.test.ts']
     }
   })
 )

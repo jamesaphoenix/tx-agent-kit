@@ -9,12 +9,12 @@ The structural invariant checker at `scripts/lint/enforce-domain-invariants.mjs`
 
 ### Effect Schema Parity
 
-For every `pgTable(...)` declaration in `packages/db/src/`, there must be a corresponding file in `packages/db/src/effect-schemas/`:
+For every `pgTable(...)` declaration in `packages/infra/db/src/`, there must be a corresponding file in `packages/infra/db/src/effect-schemas/`:
 
 ```
-users table    -> packages/db/src/effect-schemas/users.ts
-tasks table    -> packages/db/src/effect-schemas/tasks.ts
-workspaces     -> packages/db/src/effect-schemas/workspaces.ts
+users table    -> packages/infra/db/src/effect-schemas/users.ts
+organizations  -> packages/infra/db/src/effect-schemas/organizations.ts
+invitations    -> packages/infra/db/src/effect-schemas/invitations.ts
 ```
 
 Each schema file must satisfy the following requirements:
@@ -28,11 +28,11 @@ Each schema file must satisfy the following requirements:
 
 ### Factory Parity
 
-For every table, there must be a factory in `packages/db/src/factories/`:
+For every table, there must be a factory in `packages/infra/db/src/factories/`:
 
 ```
-users table    -> packages/db/src/factories/users.factory.ts
-tasks table    -> packages/db/src/factories/tasks.factory.ts
+users table    -> packages/infra/db/src/factories/users.factory.ts
+organizations  -> packages/infra/db/src/factories/organizations.factory.ts
 ```
 
 Each factory must export a `create*Factory` function and be re-exported from `factories/index.ts`.
@@ -76,7 +76,7 @@ Cross-domain imports are forbidden. Each domain is self-contained.
 Every port file in `packages/core/src/domains/*/ports/` must declare:
 
 ```typescript
-export const TaskRepositoryKind = 'crud' as const
+export const OrganizationRepositoryKind = 'crud' as const
 ```
 
 If marked `crud`, the port must expose the full CRUD surface (list, getById, create, update, remove). If marked `custom`, it must not expose the full CRUD surface.

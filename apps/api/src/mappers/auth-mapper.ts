@@ -15,6 +15,6 @@ export const toApiAuthSession = (session: AuthSession) => ({
 export const toApiAuthPrincipal = (principal: AuthPrincipal) => ({
   userId: principal.userId,
   email: principal.email,
-  workspaceId: principal.workspaceId,
+  organizationId: principal.organizationId,
   roles: [...principal.roles]
 })

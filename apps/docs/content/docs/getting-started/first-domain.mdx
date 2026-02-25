@@ -23,9 +23,9 @@ Would create:
   packages/core/src/domains/billing/ports/invoice-repository.port.ts
   packages/core/src/domains/billing/application/invoice.service.ts
   packages/contracts/src/billing/invoice.ts
-  packages/db/src/effect-schemas/invoice.ts
-  packages/db/src/factories/invoice.factory.ts
-  packages/db/src/repositories/invoice.repository.ts
+  packages/infra/db/src/effect-schemas/invoice.ts
+  packages/infra/db/src/factories/invoice.factory.ts
+  packages/infra/db/src/repositories/invoice.repository.ts
   apps/api/src/routes/billing/invoice.routes.ts
   apps/api/src/routes/billing/invoice.routes.test.ts
   ... and more
@@ -49,7 +49,7 @@ This creates the full DDD slice across multiple packages:
 | Ports | `packages/core/src/domains/billing/ports/` | Repository port defining the persistence interface, importing record types from `domain/` |
 | Application | `packages/core/src/domains/billing/application/` | Service implementing CRUD use cases, depending only on ports |
 | Contracts | `packages/contracts/src/billing/` | `effect/Schema` definitions for API request/response types, shared between API and consumers |
-| Database | `packages/db/` | Effect schema aligned with Drizzle table, factory for test data, repository implementing the port |
+| Database | `packages/infra/db/` | Effect schema aligned with Drizzle table, factory for test data, repository implementing the port |
 | API routes | `apps/api/src/routes/billing/` | Effect HttpApi route handlers for CRUD operations, plus integration test file |
 
 ## Step 3: Customize
@@ -57,9 +57,9 @@ This creates the full DDD slice across multiple packages:
 The scaffold generates a working CRUD slice, but your domain likely needs customization:
 
 1. Add domain-specific fields to the entity in `domain/invoice.ts`
-2. Add the database columns to the Drizzle schema in `packages/db/src/schema.ts`
-3. Update the effect schema in `packages/db/src/effect-schemas/invoice.ts` to match
-4. Update the factory in `packages/db/src/factories/invoice.factory.ts`
+2. Add the database columns to the Drizzle schema in `packages/infra/db/src/schema.ts`
+3. Update the effect schema in `packages/infra/db/src/effect-schemas/invoice.ts` to match
+4. Update the factory in `packages/infra/db/src/factories/invoice.factory.ts`
 5. Add domain rules as pure functions in the domain layer
 6. Extend the API contract in `packages/contracts/src/billing/invoice.ts`
 

@@ -3,7 +3,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createSqlTestContext } from './sql-context.js'
 import {
   invitationIdentityTriggerName,
-  workspaceOwnerMembershipTriggerName
+  organizationUpdatedAtTriggerName,
+  orgMembersUpdatedAtTriggerName
 } from './db-triggers.js'
 
 const sqlContext = createSqlTestContext({
@@ -35,96 +36,9 @@ describe('database triggers integration', () => {
 
       const triggerNames = new Set(triggerRows.rows.map((row) => row.triggerName))
 
-      expect(triggerNames.has(workspaceOwnerMembershipTriggerName)).toBe(true)
+      expect(triggerNames.has(organizationUpdatedAtTriggerName)).toBe(true)
+      expect(triggerNames.has(orgMembersUpdatedAtTriggerName)).toBe(true)
       expect(triggerNames.has(invitationIdentityTriggerName)).toBe(true)
-    })
-  })
-
-  it('creates owner workspace membership automatically on workspace insert', async () => {
-    await sqlContext.withSchemaClient(async (client) => {
-      const ownerId = randomUUID()
-      const workspaceId = randomUUID()
-
-      await client.query(
-        `
-          INSERT INTO users (id, email, password_hash, name)
-          VALUES ($1, $2, $3, $4)
-        `,
-        [ownerId, 'trigger-owner@example.com', 'hash', 'Trigger Owner']
-      )
-
-      await client.query(
-        `
-          INSERT INTO workspaces (id, name, owner_user_id)
-          VALUES ($1, $2, $3)
-        `,
-        [workspaceId, 'Trigger Workspace', ownerId]
-      )
-
-      const membershipResult = await client.query<{ role: string; userId: string }>(
-        `
-          SELECT role::text AS role, user_id AS "userId"
-          FROM workspace_members
-          WHERE workspace_id = $1
-        `,
-        [workspaceId]
-      )
-
-      expect(membershipResult.rows).toHaveLength(1)
-      expect(membershipResult.rows[0]?.role).toBe('owner')
-      expect(membershipResult.rows[0]?.userId).toBe(ownerId)
-    })
-  })
-
-  it('reassigns owner role membership when workspace owner changes', async () => {
-    await sqlContext.withSchemaClient(async (client) => {
-      const firstOwnerId = randomUUID()
-      const secondOwnerId = randomUUID()
-      const workspaceId = randomUUID()
-
-      await client.query(
-        `
-          INSERT INTO users (id, email, password_hash, name)
-          VALUES
-            ($1, 'first-owner@example.com', 'hash', 'First Owner'),
-            ($2, 'second-owner@example.com', 'hash', 'Second Owner')
-        `,
-        [firstOwnerId, secondOwnerId]
-      )
-
-      await client.query(
-        `
-          INSERT INTO workspaces (id, name, owner_user_id)
-          VALUES ($1, 'Owner Reassignment Workspace', $2)
-        `,
-        [workspaceId, firstOwnerId]
-      )
-
-      await client.query(
-        `
-          UPDATE workspaces
-          SET owner_user_id = $2
-          WHERE id = $1
-        `,
-        [workspaceId, secondOwnerId]
-      )
-
-      const ownerMemberships = await client.query<{ userId: string; role: string }>(
-        `
-          SELECT user_id AS "userId", role::text AS role
-          FROM workspace_members
-          WHERE workspace_id = $1
-          ORDER BY user_id ASC
-        `,
-        [workspaceId]
-      )
-
-      expect(ownerMemberships.rows.filter((row) => row.role === 'owner')).toEqual([
-        { userId: secondOwnerId, role: 'owner' }
-      ])
-      expect(
-        ownerMemberships.rows.find((row) => row.userId === firstOwnerId)?.role
-      ).toBe('admin')
     })
   })
 
@@ -132,7 +46,7 @@ describe('database triggers integration', () => {
     await sqlContext.withSchemaClient(async (client) => {
       const inviterId = randomUUID()
       const inviteeId = randomUUID()
-      const workspaceId = randomUUID()
+      const organizationId = randomUUID()
       const invitationId = randomUUID()
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
 
@@ -148,17 +62,25 @@ describe('database triggers integration', () => {
 
       await client.query(
         `
-          INSERT INTO workspaces (id, name, owner_user_id)
-          VALUES ($1, 'Invitation Trigger Workspace', $2)
+          INSERT INTO organizations (id, name)
+          VALUES ($1, 'Invitation Trigger Organization')
         `,
-        [workspaceId, inviterId]
+        [organizationId]
+      )
+
+      await client.query(
+        `
+          INSERT INTO org_members (organization_id, user_id, role)
+          VALUES ($1, $2, 'owner')
+        `,
+        [organizationId, inviterId]
       )
 
       await client.query(
         `
           INSERT INTO invitations (
             id,
-            workspace_id,
+            organization_id,
             email,
             role,
             status,
@@ -170,7 +92,7 @@ describe('database triggers integration', () => {
         `,
         [
           invitationId,
-          workspaceId,
+          organizationId,
           '  INVITEE@EXAMPLE.COM  ',
           inviterId,
           `trigger-token-${randomUUID()}`,

@@ -13,7 +13,7 @@ vi.mock('../axios', () => ({
   }
 }))
 
-const getTaskListParams = (
+const getOrganizationListParams = (
   page: number,
   overrides?: Partial<GetListParams>
 ): GetListParams => ({
@@ -25,9 +25,7 @@ const getTaskListParams = (
     field: 'createdAt',
     order: 'ASC'
   },
-  filter: {
-    workspaceId: 'workspace-1'
-  },
+  filter: {},
   ...(overrides ?? {})
 })
 
@@ -69,29 +67,13 @@ describe('react-admin dataProvider', () => {
     vi.clearAllMocks()
   })
 
-  it('returns empty tasks list when workspaceId filter is missing', async () => {
-    const getMock = vi.spyOn(api, 'get')
-
-    const result = await dataProvider.getList('tasks', {
-      pagination: { page: 1, perPage: 2 },
-      sort: { field: 'createdAt', order: 'ASC' },
-      filter: {}
-    })
-
-    expect(result).toEqual({
-      data: [],
-      total: 0
-    })
-    expect(getMock).not.toHaveBeenCalled()
-  })
-
   it('uses cached next cursor for sequential page requests', async () => {
     const getMock = vi.spyOn(api, 'get')
 
     getMock
       .mockResolvedValueOnce({
         data: {
-          data: [{ id: 'task-1' }],
+          data: [{ id: 'org-1' }],
           total: 3,
           nextCursor: 'cursor-page-2',
           prevCursor: null
@@ -99,15 +81,15 @@ describe('react-admin dataProvider', () => {
       })
       .mockResolvedValueOnce({
         data: {
-          data: [{ id: 'task-2' }],
+          data: [{ id: 'org-2' }],
           total: 3,
           nextCursor: null,
           prevCursor: 'cursor-page-2'
         }
       })
 
-    await dataProvider.getList('tasks', getTaskListParams(1))
-    await dataProvider.getList('tasks', getTaskListParams(2))
+    await dataProvider.getList('organizations', getOrganizationListParams(1))
+    await dataProvider.getList('organizations', getOrganizationListParams(2))
 
     const firstCursor = extractCursor(readCallConfig(getMock, 0))
     const secondCursor = extractCursor(readCallConfig(getMock, 1))
@@ -120,7 +102,7 @@ describe('react-admin dataProvider', () => {
     getMock
       .mockResolvedValueOnce({
         data: {
-          data: [{ id: 'task-1' }],
+          data: [{ id: 'org-1' }],
           total: 3,
           nextCursor: 'cursor-page-2',
           prevCursor: null
@@ -128,15 +110,15 @@ describe('react-admin dataProvider', () => {
       })
       .mockResolvedValueOnce({
         data: {
-          data: [{ id: 'task-3' }],
+          data: [{ id: 'org-3' }],
           total: 3,
           nextCursor: null,
           prevCursor: null
         }
       })
 
-    await dataProvider.getList('tasks', getTaskListParams(1))
-    await dataProvider.getList('tasks', getTaskListParams(2, { sort: { field: 'title', order: 'ASC' } }))
+    await dataProvider.getList('organizations', getOrganizationListParams(1))
+    await dataProvider.getList('organizations', getOrganizationListParams(2, { sort: { field: 'name', order: 'ASC' } }))
 
     const firstCursor = extractCursor(readCallConfig(getMock, 0))
     const secondCursor = extractCursor(readCallConfig(getMock, 1))
@@ -150,7 +132,7 @@ describe('react-admin dataProvider', () => {
     getMock
       .mockResolvedValueOnce({
         data: {
-          data: [{ id: 'task-1' }],
+          data: [{ id: 'org-1' }],
           total: 2,
           nextCursor: 'cursor-page-2',
           prevCursor: null
@@ -158,7 +140,7 @@ describe('react-admin dataProvider', () => {
       })
       .mockResolvedValueOnce({
         data: {
-          data: [{ id: 'task-2' }],
+          data: [{ id: 'org-2' }],
           total: 2,
           nextCursor: null,
           prevCursor: null
@@ -167,57 +149,38 @@ describe('react-admin dataProvider', () => {
 
     postMock.mockResolvedValueOnce({
       data: {
-        id: 'task-new'
+        id: 'org-new'
       }
     })
 
-    await dataProvider.getList('tasks', getTaskListParams(1))
-    await dataProvider.create('tasks', {
+    await dataProvider.getList('organizations', getOrganizationListParams(1))
+    await dataProvider.create('organizations', {
       data: {
-        workspaceId: 'workspace-1',
-        title: 'New task'
+        name: 'New organization'
       }
     })
-    await dataProvider.getList('tasks', getTaskListParams(2))
+    await dataProvider.getList('organizations', getOrganizationListParams(2))
 
     const firstCursor = extractCursor(readCallConfig(getMock, 0))
     const secondCursor = extractCursor(readCallConfig(getMock, 1))
     expect([firstCursor, secondCursor]).toEqual([undefined, undefined])
   })
 
-  it('fetches many records with one batch request', async () => {
+  it('fetches many organizations with one batch request', async () => {
     const postMock = vi.spyOn(api, 'post')
     postMock.mockResolvedValueOnce({
       data: {
-        data: [{ id: 'task-1' }, { id: 'task-2' }]
+        data: [{ id: 'org-1' }]
       }
     })
 
-    const result = await dataProvider.getMany('tasks', {
-      ids: ['task-1', 'task-2']
-    })
-
-    expect(result.data).toHaveLength(2)
-    expect(postMock).toHaveBeenCalledWith('/v1/tasks/batch/get-many', {
-      ids: ['task-1', 'task-2']
-    })
-  })
-
-  it('fetches many workspaces with one batch request', async () => {
-    const postMock = vi.spyOn(api, 'post')
-    postMock.mockResolvedValueOnce({
-      data: {
-        data: [{ id: 'workspace-1' }]
-      }
-    })
-
-    const result = await dataProvider.getMany('workspaces', {
-      ids: ['workspace-1']
+    const result = await dataProvider.getMany('organizations', {
+      ids: ['org-1']
     })
 
     expect(result.data).toHaveLength(1)
-    expect(postMock).toHaveBeenCalledWith('/v1/workspaces/batch/get-many', {
-      ids: ['workspace-1']
+    expect(postMock).toHaveBeenCalledWith('/v1/organizations/batch/get-many', {
+      ids: ['org-1']
     })
   })
 

@@ -25,17 +25,17 @@ apps/api/openapi.json:Generated OpenAPI spec (source of truth for API contract)
 
 ## Stack
 
-apps/api:Effect HttpApi server. Auth, workspaces, tasks, invitations. Generates its own OpenAPI spec.
-apps/web:Client-only Next.js SPA. No server code, no Effect, no Drizzle. Typed API clients only.
+apps/api:Effect HttpApi server. Auth, organizations, invitations. Generates its own OpenAPI spec.
+apps/web:Client-only Next.js SPA. Two route groups: (website) for public marketing (landing, blog, pricing, terms, privacy) and (application) for authenticated org/team dashboard. No server code, no Effect, no Drizzle. Config-driven content, backend-agnostic blog, JSON-LD structured data, breadcrumbs.
 apps/worker:Temporal worker. Deterministic workflows, activities handle side effects.
 apps/mobile:Expo React Native. Same API, same contracts as web.
 apps/docs:Fumadocs documentation site (port 3002).
 packages/core:DDD domain slices under packages/core/src/domains/<domain>/. Business logic lives here.
-packages/db:Drizzle schema, repositories, migrations, pgTAP tests. Only package that imports drizzle-orm.
+packages/infra/db:Drizzle schema, repositories, migrations, pgTAP tests. Only package that imports drizzle-orm.
 packages/contracts:Shared API schemas using effect/Schema. Single source of truth for validation.
-packages/auth:Password hashing and JWT. Thin on purpose.
-packages/logging:Structured JSON logger. console.* is lint-banned everywhere.
-packages/observability:OpenTelemetry bootstrap. Traces, metrics, logs via OTLP.
+packages/infra/auth:Password hashing and JWT. Thin on purpose.
+packages/infra/logging:Structured JSON logger. console.* is lint-banned everywhere.
+packages/infra/observability:OpenTelemetry bootstrap. Traces, metrics, logs via OTLP.
 packages/testkit:Integration harnesses, lock-guarded runners, DB reset helpers.
 packages/tooling:ESLint configs, domain invariant rules, scaffold CLI.
 
@@ -70,7 +70,7 @@ Grafana: http://localhost:3001
 
 Validation: effect/Schema only. Zod is banned.
 Logging: console.* is banned. Use @tx-agent-kit/logging.
-Persistence: only packages/db imports drizzle-orm.
+Persistence: only packages/infra/db imports drizzle-orm.
 Web boundary: apps/web never imports DB, Effect, or server modules. Every .tsx starts with 'use client'.
 Domain determinism: no Date.now, new Date, or Math.random in domain code. Inject via ports.
 Temporal determinism: no native timers, no infra imports inside workflows.
@@ -98,7 +98,7 @@ pnpm scaffold:crud --domain <name> --entity <name> --dry-run
 pnpm scaffold:crud --domain <name> --entity <name>
 Add contracts in packages/contracts with effect/Schema.
 Add domain logic in packages/core/src/domains/<name>/.
-Update packages/db/src/schema.ts + matching effect-schemas/ and factories/.
+Update packages/infra/db/src/schema.ts + matching effect-schemas/ and factories/.
 Expose routes in apps/api, run pnpm openapi:generate.
 Regenerate clients: pnpm api:client:generate.
 Validate: pnpm lint && pnpm type-check && pnpm test.
@@ -141,7 +141,38 @@ pnpm deploy:smoke:Health, auth, CRUD, idempotency verification.
 
 ## API reference
 
-Four endpoint groups: Auth (/v1/auth/*), Workspaces (/v1/workspaces/*), Tasks (/v1/tasks/*), Invitations (/v1/invitations/*).
+Three endpoint groups: Auth (/v1/auth/*), Organizations (/v1/organizations/*), Invitations (/v1/invitations/*).
+Team CRUD: /v1/teams/* for team management within organizations.
 Bearer JWT auth on all routes except sign-up, sign-in, and /health.
 Cursor-based pagination on list endpoints.
 Full spec: apps/api/openapi.json.
+
+
+## Web architecture
+
+Route groups:
+(website):Public marketing site (landing, blog, pricing, terms, privacy). Layout wraps WebsiteHeader + WebsiteFooter.
+(application):Authenticated app shell. Auth-guard layout checks token, redirects to /sign-in if missing.
+Auth pages:sign-in, sign-up, forgot-password, reset-password at app root with split-panel layout.
+
+Org/team routing:
+/org:Smart redirect (resolves first org + first team → /org/{orgId}/{teamId}).
+/org/{orgId}/workspaces:Team listing and creation within an org.
+/org/{orgId}/{teamId}:Team dashboard.
+
+Config-driven content:
+apps/web/config/index.ts:Company info, homepage (hero, features, FAQs, CTA), blog, dashboard nav. No Stripe price IDs.
+
+SEO infrastructure:
+apps/web/lib/seo.ts:buildTitle, buildDescription, Organization/WebPage/BreadcrumbList/FAQPage structured data.
+apps/web/lib/blog.ts:Backend-agnostic BlogDataSource interface. Pluggable blog backend.
+apps/web/lib/blog-seo.ts:BlogPosting and Blog JSON-LD builders.
+apps/web/components/Breadcrumbs.tsx:Breadcrumb navigation component.
+apps/web/components/StructuredData.tsx:JSON-LD script renderer.
+apps/web/app/sitemap.ts:All marketing page URLs.
+apps/web/app/robots.ts:Disallows authenticated routes.
+
+Permissions:
+Migration 0008 seeds admin/member roles with 17 permission actions.
+packages/contracts/src/literals.ts:permissionActions array + PermissionAction type.
+Admin gets all; member gets safe subset (excludes manage_organization, manage_billing, etc.).

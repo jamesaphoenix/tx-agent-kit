@@ -129,71 +129,36 @@ describe('clientApi.me', () => {
   })
 })
 
-describe('clientApi.listWorkspaces', () => {
-  it('returns workspaces list', async () => {
-    const response = { workspaces: [{ id: 'ws-1', name: 'Test Workspace' }] }
+describe('clientApi.listOrganizations', () => {
+  it('returns organizations list', async () => {
+    const response = { organizations: [{ id: 'o-1', name: 'Test Organization' }] }
     respondWith(200, response)
 
-    const result = await clientApi.listWorkspaces()
-    expect(result.workspaces).toHaveLength(1)
+    const result = await clientApi.listOrganizations()
+    expect(result.organizations).toHaveLength(1)
   })
 
   it('throws ApiClientError on failure', async () => {
     respondWithError(500, { error: { message: 'Server error' } })
 
-    await expect(clientApi.listWorkspaces()).rejects.toThrow(ApiClientError)
+    await expect(clientApi.listOrganizations()).rejects.toThrow(ApiClientError)
   })
 })
 
-describe('clientApi.createWorkspace', () => {
-  it('returns created workspace', async () => {
-    const workspace = { id: 'ws-1', name: 'New Workspace' }
-    respondWith(201, workspace)
+describe('clientApi.createOrganization', () => {
+  it('returns created organization', async () => {
+    const organization = { id: 'o-1', name: 'New Organization' }
+    respondWith(201, organization)
 
-    const result = await clientApi.createWorkspace({ name: 'New Workspace' })
-    expect(result.name).toBe('New Workspace')
+    const result = await clientApi.createOrganization({ name: 'New Organization' })
+    expect(result.name).toBe('New Organization')
   })
 
   it('throws ApiClientError on failure', async () => {
     respondWithError(400, { error: { message: 'Name too short' } })
 
     await expect(
-      clientApi.createWorkspace({ name: '' })
-    ).rejects.toThrow(ApiClientError)
-  })
-})
-
-describe('clientApi.listTasks', () => {
-  it('returns tasks list for a workspace', async () => {
-    const response = { tasks: [{ id: 't-1', title: 'Task 1', workspaceId: 'ws-1', status: 'pending' }] }
-    respondWith(200, response)
-
-    const result = await clientApi.listTasks('ws-1')
-    expect(result.tasks).toHaveLength(1)
-    expect(result.tasks[0].title).toBe('Task 1')
-  })
-
-  it('throws ApiClientError on failure', async () => {
-    respondWithError(500, { error: { message: 'Server error' } })
-
-    await expect(clientApi.listTasks('ws-1')).rejects.toThrow(ApiClientError)
-  })
-})
-
-describe('clientApi.createTask', () => {
-  it('returns created task', async () => {
-    const task = { id: 't-1', title: 'New Task', workspaceId: 'ws-1', status: 'pending' }
-    respondWith(201, task)
-
-    const result = await clientApi.createTask({ workspaceId: 'ws-1', title: 'New Task' })
-    expect(result.title).toBe('New Task')
-  })
-
-  it('throws ApiClientError on failure', async () => {
-    respondWithError(400, { error: { message: 'Title required' } })
-
-    await expect(
-      clientApi.createTask({ workspaceId: 'ws-1', title: '' })
+      clientApi.createOrganization({ name: '' })
     ).rejects.toThrow(ApiClientError)
   })
 })
@@ -216,10 +181,10 @@ describe('clientApi.listInvitations', () => {
 
 describe('clientApi.createInvitation', () => {
   it('returns created invitation', async () => {
-    const invitation = { id: 'inv-1', email: 'peer@co.com', role: 'member', workspaceId: 'ws-1', status: 'pending' }
+    const invitation = { id: 'inv-1', email: 'peer@co.com', role: 'member', organizationId: 'o-1', status: 'pending' }
     respondWith(201, invitation)
 
-    const result = await clientApi.createInvitation({ workspaceId: 'ws-1', email: 'peer@co.com', role: 'member' })
+    const result = await clientApi.createInvitation({ organizationId: 'o-1', email: 'peer@co.com', role: 'member' })
     expect(result.email).toBe('peer@co.com')
   })
 
@@ -227,7 +192,7 @@ describe('clientApi.createInvitation', () => {
     respondWithError(409, { error: { message: 'Already invited' } })
 
     await expect(
-      clientApi.createInvitation({ workspaceId: 'ws-1', email: 'peer@co.com', role: 'member' })
+      clientApi.createInvitation({ organizationId: 'o-1', email: 'peer@co.com', role: 'member' })
     ).rejects.toThrow(ApiClientError)
   })
 })

@@ -1,0 +1,19 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.146.1
+    restart: unless-stopped
+    environment:
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:?GOOGLE_CLOUD_PROJECT must be set}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      NODE_ENV: e2e
+      OTEL_SERVICE_NAMESPACE: tx-agent-kit
+    command:
+      - --config=/etc/otel-collector/otel-collector.gcp.yaml
+    volumes:
+      - ./monitoring/production/otel-collector.gcp.yaml:/etc/otel-collector/otel-collector.gcp.yaml:ro
+      - "${OTEL_COLLECTOR_GCP_CREDENTIALS_DIR:-./deploy/gcp-empty}:/var/secrets/google:ro"
+      - "${OTEL_COLLECTOR_GCLOUD_CONFIG_DIR:-./deploy/gcloud-empty}:/root/.config/gcloud:ro"
+    ports:
+      - '${OTEL_E2E_OTLP_GRPC_PORT:-14317}:4317'
+      - '${OTEL_E2E_OTLP_HTTP_PORT:-14318}:4318'
+      - '${OTEL_E2E_HEALTH_PORT:-14333}:13133'

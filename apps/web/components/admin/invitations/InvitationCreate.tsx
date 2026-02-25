@@ -5,7 +5,7 @@ import { Create, SelectInput, SimpleForm, TextInput } from 'react-admin'
 export const InvitationCreate = () => (
   <Create>
     <SimpleForm>
-      <TextInput source="workspaceId" required />
+      <TextInput source="organizationId" required />
       <TextInput source="email" type="email" required />
       <SelectInput
         source="role"

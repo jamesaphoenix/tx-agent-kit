@@ -1,10 +1,10 @@
 import {
   createOrganizationFactory,
+  createTeamFactory,
   createUserFactory,
-  createWorkspaceFactory,
   generateUniqueValue
 } from '@tx-agent-kit/db'
-import { authResponseSchema, workspaceSchema } from '@tx-agent-kit/contracts'
+import { authResponseSchema, organizationSchema } from '@tx-agent-kit/contracts'
 import * as Schema from 'effect/Schema'
 import { createTestCaseId } from './test-run.js'
 import type { SqlTestContext } from './sql-context.js'
@@ -45,15 +45,14 @@ export interface LoginUserOptions {
   password: string
 }
 
-export interface CreateTeamOptions {
+export interface CreateOrganizationOptions {
   token: string
   name?: string
 }
 
-export interface CreatedTeam {
+export interface CreatedOrganization {
   id: string
   name: string
-  ownerUserId: string
   createdAt: string
 }
 
@@ -72,7 +71,6 @@ export interface CreatedOrganizationAndTeam {
   team: {
     id: string
     name: string
-    ownerUserId: string
     organizationId: string | null
     createdAt: Date
   }
@@ -188,15 +186,15 @@ export const deleteUser = async (
 
 export const createTeam = async (
   context: ApiFactoryContext,
-  options: CreateTeamOptions
-): Promise<CreatedTeam> => {
-  const response = await fetch(toUrl(context, '/v1/workspaces'), {
+  options: CreateOrganizationOptions
+): Promise<CreatedOrganization> => {
+  const response = await fetch(toUrl(context, '/v1/organizations'), {
     method: 'POST',
-    headers: withJsonHeaders(context, 'create-team', {
+    headers: withJsonHeaders(context, 'create-organization', {
       authorization: `Bearer ${options.token}`
     }),
     body: JSON.stringify({
-      name: options.name ?? generateUniqueValue('Team')
+      name: options.name ?? generateUniqueValue('Organization')
     })
   })
 
@@ -205,7 +203,7 @@ export const createTeam = async (
     throw new Error(`createTeam failed (${response.status}): ${JSON.stringify(body)}`)
   }
 
-  return decodeWithSchema(workspaceSchema, body, 'createTeam')
+  return decodeWithSchema(organizationSchema, body, 'createTeam')
 }
 
 export const createOrganizationAndTeam = async (
@@ -233,8 +231,7 @@ export const createOrganizationAndTeam = async (
       throw new Error('Failed to create organization record')
     }
 
-    const teamSeed = createWorkspaceFactory({
-      ownerUserId: options.ownerUserId,
+    const teamSeed = createTeamFactory({
       organizationId: organization.id,
       name: options.teamName
     })
@@ -242,16 +239,15 @@ export const createOrganizationAndTeam = async (
     const teamResult = await client.query<{
       id: string
       name: string
-      ownerUserId: string
       organizationId: string | null
       createdAt: Date
     }>(
       `
-        INSERT INTO workspaces (id, name, owner_user_id, organization_id, created_at)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, name, owner_user_id AS "ownerUserId", organization_id AS "organizationId", created_at AS "createdAt"
+        INSERT INTO teams (id, name, organization_id, created_at)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, name, organization_id AS "organizationId", created_at AS "createdAt"
       `,
-      [teamSeed.id, teamSeed.name, teamSeed.ownerUserId, teamSeed.organizationId, teamSeed.createdAt]
+      [teamSeed.id, teamSeed.name, teamSeed.organizationId, teamSeed.createdAt]
     )
 
     const team = teamResult.rows[0]
