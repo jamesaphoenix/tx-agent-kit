@@ -30,54 +30,27 @@ The runtime `/openapi.json` powers `/docs` and reflects the running server. The 
 
 ## Endpoint groups
 
-The API is organized into four endpoint groups:
+The API is organized into tag pages generated directly from OpenAPI:
 
-### Auth (`/v1/auth/*`)
-
-Auth routes use the `custom` kind marker, meaning domain-specific operations rather than standard CRUD.
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/v1/auth/sign-up` | Register a new user and return a session |
-| `POST` | `/v1/auth/sign-in` | Authenticate and return a JWT |
-| `GET` | `/v1/auth/me` | Get the current authenticated user |
-| `DELETE` | `/v1/auth/me` | Delete the authenticated user |
-
-### Organizations (`/v1/organizations/*`)
-
-Organization routes use the `crud` kind marker and expose the full CRUD surface.
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/v1/organizations` | List organizations for the current user (paginated) |
-| `GET` | `/v1/organizations/:id` | Get a single organization by ID |
-| `POST` | `/v1/organizations/many` | Get multiple organizations by IDs |
-| `POST` | `/v1/organizations` | Create an organization |
-| `PATCH` | `/v1/organizations/:id` | Update an organization |
-| `DELETE` | `/v1/organizations/:id` | Remove an organization |
-
-### Invitations (`/v1/invitations/*`)
-
-Invitation routes include idempotent acceptance.
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/v1/invitations` | List invitations for the current user |
-| `GET` | `/v1/invitations/:id` | Get a single invitation |
-| `POST` | `/v1/invitations` | Create an invitation |
-| `PATCH` | `/v1/invitations/:id` | Update an invitation |
-| `DELETE` | `/v1/invitations/:id` | Remove an invitation |
-| `POST` | `/v1/invitations/accept/:token` | Accept an invitation (idempotent) |
+- [auth](./auth): password auth, Google sign-in, refresh, sign-out, and password reset endpoints
+- [organizations](./organizations): organization CRUD plus invitation lifecycle endpoints
+- [teams](./teams): team management endpoints
+- [billing](./billing): subscription/billing settings, checkout, portal, usage, and Stripe webhook endpoints
+- [permissions](./permissions): permission lookup endpoints
+- [health](./health): service health endpoint
 
 ## Authentication
 
-All endpoints except `/v1/auth/sign-up`, `/v1/auth/sign-in`, and `/health` require a Bearer JWT token in the `Authorization` header:
+Authentication requirements are shown per endpoint in generated pages. Protected endpoints include:
 
-```
-Authorization: Bearer <jwt-token>
-```
+- `GET /v1/auth/me`
+- `POST /v1/auth/sign-out`
+- `POST /v1/auth/sign-out-all`
+- `GET /v1/organizations`
+- `GET /v1/teams`
+- `PATCH /v1/organizations/{organizationId}/billing`
 
-Tokens are returned by the sign-up and sign-in endpoints.
+These endpoints require a Bearer token in `Authorization: Bearer <jwt-token>`.
 
 ## Health check
 

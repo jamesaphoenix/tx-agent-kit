@@ -157,13 +157,15 @@ function generateTagPage(
 ): string {
   const slug = tag.toLowerCase().replace(/\s+/g, '-');
   const lines: string[] = [];
+  const title = `${tag} Endpoints`;
+  const description = `API endpoints for the ${tag} resource group`;
 
   lines.push('---');
-  lines.push(`title: "${tag}" Endpoints`);
-  lines.push(`description: API endpoints for the ${tag} resource group`);
+  lines.push(`title: ${JSON.stringify(title)}`);
+  lines.push(`description: ${JSON.stringify(description)}`);
   lines.push('---');
   lines.push('');
-  lines.push(`# ${tag} Endpoints`);
+  lines.push(`# ${title}`);
   lines.push('');
 
   for (const endpoint of endpoints) {

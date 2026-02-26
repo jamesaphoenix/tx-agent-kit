@@ -1,0 +1,179 @@
+---
+title: "auth Endpoints"
+description: "API endpoints for the auth resource group"
+---
+
+# auth Endpoints
+
+## `POST /v1/auth/sign-up`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `201` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/auth/sign-in`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/auth/refresh`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/auth/sign-out`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/auth/sign-out-all`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/auth/google/start`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/auth/google/callback`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `code` | query | `string` | Yes | --- |
+| `state` | query | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/auth/forgot-password`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `202` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/auth/reset-password`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/auth/me`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `DELETE /v1/auth/me`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |

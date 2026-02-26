@@ -1,0 +1,113 @@
+---
+title: "teams Endpoints"
+description: "API endpoints for the teams resource group"
+---
+
+# teams Endpoints
+
+## `GET /v1/teams`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `organizationId` | query | `string` | Yes | --- |
+| `cursor` | query | `string` | No | --- |
+| `limit` | query | `string` | No | --- |
+| `sortBy` | query | `string` | No | --- |
+| `sortOrder` | query | `string` | No | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/teams`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `201` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/teams/{teamId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `PATCH /v1/teams/{teamId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `DELETE /v1/teams/{teamId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |

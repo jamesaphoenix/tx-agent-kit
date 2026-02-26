@@ -1,6 +1,6 @@
 ---
 title: API Server
-description: Effect HttpApi server powering auth, organizations, and invitations with OpenAPI spec generation.
+description: Effect HttpApi server powering auth, organizations, teams, billing/subscriptions, and permissions with OpenAPI spec generation.
 ---
 
 # API Server (`apps/api`)
@@ -19,44 +19,24 @@ Each route handler extracts the authenticated principal from the `Authorization`
 
 ## Route Groups
 
-The API exposes the following route groups:
+OpenAPI tags map directly to generated API reference pages:
 
-### Auth (`/v1/auth`)
+- **auth** (`/v1/auth/*`): password auth, refresh token rotation, Google OIDC start/callback, and password reset flows.
+- **organizations** (`/v1/organizations/*` plus `/v1/invitations/*`): org CRUD and invitation lifecycle.
+- **teams** (`/v1/teams/*`): team-level management.
+- **billing** (`/v1/organizations/{organizationId}/billing`, `/v1/billing/*`, `/v1/webhooks/stripe`): subscription state, checkout/portal session creation, usage summaries, and Stripe webhook synchronization.
+- **permissions** (`/v1/permissions`, `/v1/permissions/me`): role-permission map and current-user permission resolution.
+- **health** (`/health`): service health probe.
 
-Auth routes use the `custom` kind marker since they expose domain-specific operations rather than standard CRUD.
+For full request/response shapes, use the generated pages in `docs/api-reference/*` or runtime `/openapi.json`.
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v1/auth/sign-up` | POST | Register a new user and return a session |
-| `/v1/auth/sign-in` | POST | Authenticate and return a session |
-| `/v1/auth/me` | GET | Return the authenticated principal |
-| `/v1/auth/me` | DELETE | Delete the authenticated user |
+## Billing and Roles
 
-### Organizations (`/v1/organizations`)
+Billing authorization is role-gated:
 
-Organization routes use the `crud` kind marker and expose the full CRUD surface.
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v1/organizations` | GET | List organizations for the current user (paginated) |
-| `/v1/organizations/:id` | GET | Get a single organization by ID |
-| `/v1/organizations/many` | POST | Get multiple organizations by IDs |
-| `/v1/organizations` | POST | Create an organization |
-| `/v1/organizations/:id` | PATCH | Update an organization |
-| `/v1/organizations/:id` | DELETE | Remove an organization |
-
-### Invitations (`/v1/invitations`)
-
-Invitation endpoints are nested under the organizations group and include idempotent acceptance.
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v1/invitations` | GET | List invitations for the current user |
-| `/v1/invitations/:id` | GET | Get a single invitation |
-| `/v1/invitations` | POST | Create an invitation |
-| `/v1/invitations/:id` | PATCH | Update an invitation |
-| `/v1/invitations/:id` | DELETE | Remove an invitation |
-| `/v1/invitations/accept/:token` | POST | Accept an invitation (idempotent) |
+- `owner` and `admin` can manage billing (`PATCH /v1/organizations/{organizationId}/billing`, `POST /v1/billing/checkout`, `POST /v1/billing/portal`).
+- `member` cannot manage billing and receives `401` on management endpoints.
+- Subscription state is synced from Stripe webhooks (`/v1/webhooks/stripe`) into organization billing fields (`isSubscribed`, `subscriptionStatus`, `subscriptionPlan`).
 
 ## Kind Markers
 
