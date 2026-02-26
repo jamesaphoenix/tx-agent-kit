@@ -1,18 +1,32 @@
 import type {
   AuthPrincipal,
   AuthResponse,
+  BillingSettings,
+  CreateCheckoutSessionInput,
+  CreatePortalSessionInput,
   CreateOrganizationRequest,
   CreateTeamRequest,
   ForgotPasswordRequest,
   Invitation,
+  OrgMemberRole,
   Organization,
+  PermissionAction,
   ResetPasswordRequest,
   SignInRequest,
   SignUpRequest,
   Team,
-  UpdateOrganizationRequest
+  UpdateBillingSettingsInput,
+  UpdateOrganizationRequest,
+  UsageCategory,
+  UsageSummary
 } from '@tx-agent-kit/contracts'
-import { clearAuthToken, writeAuthToken } from './auth-token'
+import {
+  clearAuthToken,
+  clearRefreshToken,
+  readRefreshToken,
+  writeAuthToken,
+  writeRefreshToken
+} from './auth-token'
 import { api, getApiErrorMessage, getApiErrorStatus } from './axios'
 
 export class ApiClientError extends Error {
@@ -39,6 +53,12 @@ export interface PaginatedResponse<T> {
   total: number
   nextCursor: string | null
   prevCursor: string | null
+}
+
+export interface MyPermissionsResponse {
+  organizationId?: string
+  role?: OrgMemberRole
+  permissions: PermissionAction[]
 }
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
@@ -86,6 +106,7 @@ const fail = (error: unknown, fallback: string): never => {
 
 const persistAuthSession = (response: AuthResponse): void => {
   writeAuthToken(response.token)
+  writeRefreshToken(response.refreshToken)
 }
 
 const toListParams = (query: ListQuery | undefined): Record<string, string> => {
@@ -140,9 +161,31 @@ export const clientApi = {
     }
   },
 
-  signOut: (): Promise<void> => {
+  signOut: async (): Promise<void> => {
+    try {
+      await api.post('/v1/auth/sign-out')
+    } catch (error) {
+      void error
+    }
+
     clearAuthToken()
-    return Promise.resolve()
+    clearRefreshToken()
+  },
+
+  refreshSession: async (): Promise<void> => {
+    const refreshToken = readRefreshToken()
+    if (!refreshToken) {
+      throw new ApiClientError('No refresh token is available')
+    }
+
+    try {
+      const { data } = await api.post<AuthResponse>('/v1/auth/refresh', {
+        refreshToken
+      })
+      persistAuthSession(data)
+    } catch (error) {
+      return fail(error, 'Failed to refresh session')
+    }
   },
 
   me: async (): Promise<AuthPrincipal> => {
@@ -326,6 +369,84 @@ export const clientApi = {
       return data
     } catch (error) {
       return fail(error, 'Failed to delete team')
+    }
+  },
+
+  getBillingSettings: async (organizationId: string): Promise<BillingSettings> => {
+    try {
+      const { data } = await api.get<BillingSettings>(`/v1/organizations/${encodeURIComponent(organizationId)}/billing`)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to fetch billing settings')
+    }
+  },
+
+  updateBillingSettings: async (
+    organizationId: string,
+    input: UpdateBillingSettingsInput
+  ): Promise<BillingSettings> => {
+    try {
+      const { data } = await api.patch<BillingSettings>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/billing`,
+        input
+      )
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to update billing settings')
+    }
+  },
+
+  createCheckoutSession: async (input: CreateCheckoutSessionInput): Promise<{ id: string; url: string }> => {
+    try {
+      const { data } = await api.post<{ id: string; url: string }>('/v1/billing/checkout', input)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to create checkout session')
+    }
+  },
+
+  createPortalSession: async (input: CreatePortalSessionInput): Promise<{ id: string; url: string }> => {
+    try {
+      const { data } = await api.post<{ id: string; url: string }>('/v1/billing/portal', input)
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to create billing portal session')
+    }
+  },
+
+  getUsageSummary: async (
+    organizationId: string,
+    input: { category: UsageCategory; periodStart?: string; periodEnd?: string }
+  ): Promise<UsageSummary> => {
+    try {
+      const { data } = await api.get<UsageSummary>(`/v1/organizations/${encodeURIComponent(organizationId)}/usage`, {
+        params: {
+          category: input.category,
+          periodStart: input.periodStart,
+          periodEnd: input.periodEnd
+        }
+      })
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to fetch usage summary')
+    }
+  },
+
+  getPermissionMap: async (): Promise<Record<OrgMemberRole, ReadonlyArray<PermissionAction>>> => {
+    try {
+      const { data } = await api.get<Record<OrgMemberRole, ReadonlyArray<PermissionAction>>>('/v1/permissions')
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to fetch permission map')
+    }
+  },
+
+  getMyPermissions: async (): Promise<MyPermissionsResponse> => {
+    try {
+      const { data } = await api.get<MyPermissionsResponse>('/v1/permissions/me')
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to fetch resolved permissions')
     }
   }
 }

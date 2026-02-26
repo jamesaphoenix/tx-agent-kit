@@ -51,6 +51,7 @@ import type {
   OrganizationsUpdateInvitationBody,
   OrganizationsUpdateOrganization200,
   OrganizationsUpdateOrganizationBody,
+  TooManyRequests,
   Unauthorized
 } from '.././schemas';
 
@@ -89,7 +90,7 @@ export const getOrganizationsListOrganizationsQueryKey = (params?: Organizations
     }
 
     
-export const getOrganizationsListOrganizationsQueryOptions = <TData = Awaited<ReturnType<typeof organizationsListOrganizations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(params?: OrganizationsListOrganizationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListOrganizations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getOrganizationsListOrganizationsQueryOptions = <TData = Awaited<ReturnType<typeof organizationsListOrganizations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(params?: OrganizationsListOrganizationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListOrganizations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -108,10 +109,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type OrganizationsListOrganizationsQueryResult = NonNullable<Awaited<ReturnType<typeof organizationsListOrganizations>>>
-export type OrganizationsListOrganizationsQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+export type OrganizationsListOrganizationsQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
 
-export function useOrganizationsListOrganizations<TData = Awaited<ReturnType<typeof organizationsListOrganizations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsListOrganizations<TData = Awaited<ReturnType<typeof organizationsListOrganizations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params: undefined |  OrganizationsListOrganizationsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListOrganizations>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof organizationsListOrganizations>>,
@@ -121,7 +122,7 @@ export function useOrganizationsListOrganizations<TData = Awaited<ReturnType<typ
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOrganizationsListOrganizations<TData = Awaited<ReturnType<typeof organizationsListOrganizations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsListOrganizations<TData = Awaited<ReturnType<typeof organizationsListOrganizations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params?: OrganizationsListOrganizationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListOrganizations>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof organizationsListOrganizations>>,
@@ -131,12 +132,12 @@ export function useOrganizationsListOrganizations<TData = Awaited<ReturnType<typ
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOrganizationsListOrganizations<TData = Awaited<ReturnType<typeof organizationsListOrganizations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsListOrganizations<TData = Awaited<ReturnType<typeof organizationsListOrganizations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params?: OrganizationsListOrganizationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListOrganizations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useOrganizationsListOrganizations<TData = Awaited<ReturnType<typeof organizationsListOrganizations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsListOrganizations<TData = Awaited<ReturnType<typeof organizationsListOrganizations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params?: OrganizationsListOrganizationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListOrganizations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -167,7 +168,7 @@ export const organizationsCreateOrganization = (
   
 
 
-export const getOrganizationsCreateOrganizationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getOrganizationsCreateOrganizationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsCreateOrganization>>, TError,{data: OrganizationsCreateOrganizationBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof organizationsCreateOrganization>>, TError,{data: OrganizationsCreateOrganizationBody}, TContext> => {
 
@@ -196,9 +197,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type OrganizationsCreateOrganizationMutationResult = NonNullable<Awaited<ReturnType<typeof organizationsCreateOrganization>>>
     export type OrganizationsCreateOrganizationMutationBody = OrganizationsCreateOrganizationBody
-    export type OrganizationsCreateOrganizationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type OrganizationsCreateOrganizationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useOrganizationsCreateOrganization = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useOrganizationsCreateOrganization = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsCreateOrganization>>, TError,{data: OrganizationsCreateOrganizationBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof organizationsCreateOrganization>>,
@@ -230,7 +231,7 @@ export const getOrganizationsGetOrganizationQueryKey = (organizationId: string,)
     }
 
     
-export const getOrganizationsGetOrganizationQueryOptions = <TData = Awaited<ReturnType<typeof organizationsGetOrganization>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(organizationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetOrganization>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getOrganizationsGetOrganizationQueryOptions = <TData = Awaited<ReturnType<typeof organizationsGetOrganization>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(organizationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetOrganization>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -249,10 +250,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type OrganizationsGetOrganizationQueryResult = NonNullable<Awaited<ReturnType<typeof organizationsGetOrganization>>>
-export type OrganizationsGetOrganizationQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+export type OrganizationsGetOrganizationQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
 
-export function useOrganizationsGetOrganization<TData = Awaited<ReturnType<typeof organizationsGetOrganization>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsGetOrganization<TData = Awaited<ReturnType<typeof organizationsGetOrganization>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  organizationId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetOrganization>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof organizationsGetOrganization>>,
@@ -262,7 +263,7 @@ export function useOrganizationsGetOrganization<TData = Awaited<ReturnType<typeo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOrganizationsGetOrganization<TData = Awaited<ReturnType<typeof organizationsGetOrganization>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsGetOrganization<TData = Awaited<ReturnType<typeof organizationsGetOrganization>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  organizationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetOrganization>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof organizationsGetOrganization>>,
@@ -272,12 +273,12 @@ export function useOrganizationsGetOrganization<TData = Awaited<ReturnType<typeo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOrganizationsGetOrganization<TData = Awaited<ReturnType<typeof organizationsGetOrganization>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsGetOrganization<TData = Awaited<ReturnType<typeof organizationsGetOrganization>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  organizationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetOrganization>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useOrganizationsGetOrganization<TData = Awaited<ReturnType<typeof organizationsGetOrganization>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsGetOrganization<TData = Awaited<ReturnType<typeof organizationsGetOrganization>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  organizationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetOrganization>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -309,7 +310,7 @@ export const organizationsUpdateOrganization = (
   
 
 
-export const getOrganizationsUpdateOrganizationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getOrganizationsUpdateOrganizationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsUpdateOrganization>>, TError,{organizationId: string;data: OrganizationsUpdateOrganizationBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof organizationsUpdateOrganization>>, TError,{organizationId: string;data: OrganizationsUpdateOrganizationBody}, TContext> => {
 
@@ -338,9 +339,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type OrganizationsUpdateOrganizationMutationResult = NonNullable<Awaited<ReturnType<typeof organizationsUpdateOrganization>>>
     export type OrganizationsUpdateOrganizationMutationBody = OrganizationsUpdateOrganizationBody
-    export type OrganizationsUpdateOrganizationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type OrganizationsUpdateOrganizationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useOrganizationsUpdateOrganization = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useOrganizationsUpdateOrganization = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsUpdateOrganization>>, TError,{organizationId: string;data: OrganizationsUpdateOrganizationBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof organizationsUpdateOrganization>>,
@@ -364,7 +365,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   
 
 
-export const getOrganizationsRemoveOrganizationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getOrganizationsRemoveOrganizationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsRemoveOrganization>>, TError,{organizationId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof organizationsRemoveOrganization>>, TError,{organizationId: string}, TContext> => {
 
@@ -393,9 +394,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type OrganizationsRemoveOrganizationMutationResult = NonNullable<Awaited<ReturnType<typeof organizationsRemoveOrganization>>>
     
-    export type OrganizationsRemoveOrganizationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type OrganizationsRemoveOrganizationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useOrganizationsRemoveOrganization = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useOrganizationsRemoveOrganization = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsRemoveOrganization>>, TError,{organizationId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof organizationsRemoveOrganization>>,
@@ -421,7 +422,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   
 
 
-export const getOrganizationsGetManyOrganizationsMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getOrganizationsGetManyOrganizationsMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsGetManyOrganizations>>, TError,{data: OrganizationsGetManyOrganizationsBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof organizationsGetManyOrganizations>>, TError,{data: OrganizationsGetManyOrganizationsBody}, TContext> => {
 
@@ -450,9 +451,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type OrganizationsGetManyOrganizationsMutationResult = NonNullable<Awaited<ReturnType<typeof organizationsGetManyOrganizations>>>
     export type OrganizationsGetManyOrganizationsMutationBody = OrganizationsGetManyOrganizationsBody
-    export type OrganizationsGetManyOrganizationsMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type OrganizationsGetManyOrganizationsMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useOrganizationsGetManyOrganizations = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useOrganizationsGetManyOrganizations = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsGetManyOrganizations>>, TError,{data: OrganizationsGetManyOrganizationsBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof organizationsGetManyOrganizations>>,
@@ -485,7 +486,7 @@ export const getOrganizationsListInvitationsQueryKey = (params?: OrganizationsLi
     }
 
     
-export const getOrganizationsListInvitationsQueryOptions = <TData = Awaited<ReturnType<typeof organizationsListInvitations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(params?: OrganizationsListInvitationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListInvitations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getOrganizationsListInvitationsQueryOptions = <TData = Awaited<ReturnType<typeof organizationsListInvitations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(params?: OrganizationsListInvitationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListInvitations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -504,10 +505,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type OrganizationsListInvitationsQueryResult = NonNullable<Awaited<ReturnType<typeof organizationsListInvitations>>>
-export type OrganizationsListInvitationsQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+export type OrganizationsListInvitationsQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
 
-export function useOrganizationsListInvitations<TData = Awaited<ReturnType<typeof organizationsListInvitations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsListInvitations<TData = Awaited<ReturnType<typeof organizationsListInvitations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params: undefined |  OrganizationsListInvitationsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListInvitations>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof organizationsListInvitations>>,
@@ -517,7 +518,7 @@ export function useOrganizationsListInvitations<TData = Awaited<ReturnType<typeo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOrganizationsListInvitations<TData = Awaited<ReturnType<typeof organizationsListInvitations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsListInvitations<TData = Awaited<ReturnType<typeof organizationsListInvitations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params?: OrganizationsListInvitationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListInvitations>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof organizationsListInvitations>>,
@@ -527,12 +528,12 @@ export function useOrganizationsListInvitations<TData = Awaited<ReturnType<typeo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOrganizationsListInvitations<TData = Awaited<ReturnType<typeof organizationsListInvitations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsListInvitations<TData = Awaited<ReturnType<typeof organizationsListInvitations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params?: OrganizationsListInvitationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListInvitations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useOrganizationsListInvitations<TData = Awaited<ReturnType<typeof organizationsListInvitations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsListInvitations<TData = Awaited<ReturnType<typeof organizationsListInvitations>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params?: OrganizationsListInvitationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsListInvitations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -563,7 +564,7 @@ export const organizationsCreateInvitation = (
   
 
 
-export const getOrganizationsCreateInvitationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getOrganizationsCreateInvitationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsCreateInvitation>>, TError,{data: OrganizationsCreateInvitationBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof organizationsCreateInvitation>>, TError,{data: OrganizationsCreateInvitationBody}, TContext> => {
 
@@ -592,9 +593,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type OrganizationsCreateInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof organizationsCreateInvitation>>>
     export type OrganizationsCreateInvitationMutationBody = OrganizationsCreateInvitationBody
-    export type OrganizationsCreateInvitationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type OrganizationsCreateInvitationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useOrganizationsCreateInvitation = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useOrganizationsCreateInvitation = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsCreateInvitation>>, TError,{data: OrganizationsCreateInvitationBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof organizationsCreateInvitation>>,
@@ -626,7 +627,7 @@ export const getOrganizationsGetInvitationQueryKey = (invitationId: string,) => 
     }
 
     
-export const getOrganizationsGetInvitationQueryOptions = <TData = Awaited<ReturnType<typeof organizationsGetInvitation>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(invitationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetInvitation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getOrganizationsGetInvitationQueryOptions = <TData = Awaited<ReturnType<typeof organizationsGetInvitation>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(invitationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetInvitation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -645,10 +646,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type OrganizationsGetInvitationQueryResult = NonNullable<Awaited<ReturnType<typeof organizationsGetInvitation>>>
-export type OrganizationsGetInvitationQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+export type OrganizationsGetInvitationQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
 
-export function useOrganizationsGetInvitation<TData = Awaited<ReturnType<typeof organizationsGetInvitation>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsGetInvitation<TData = Awaited<ReturnType<typeof organizationsGetInvitation>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  invitationId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetInvitation>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof organizationsGetInvitation>>,
@@ -658,7 +659,7 @@ export function useOrganizationsGetInvitation<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOrganizationsGetInvitation<TData = Awaited<ReturnType<typeof organizationsGetInvitation>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsGetInvitation<TData = Awaited<ReturnType<typeof organizationsGetInvitation>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  invitationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetInvitation>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof organizationsGetInvitation>>,
@@ -668,12 +669,12 @@ export function useOrganizationsGetInvitation<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useOrganizationsGetInvitation<TData = Awaited<ReturnType<typeof organizationsGetInvitation>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsGetInvitation<TData = Awaited<ReturnType<typeof organizationsGetInvitation>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  invitationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetInvitation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useOrganizationsGetInvitation<TData = Awaited<ReturnType<typeof organizationsGetInvitation>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useOrganizationsGetInvitation<TData = Awaited<ReturnType<typeof organizationsGetInvitation>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  invitationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof organizationsGetInvitation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -705,7 +706,7 @@ export const organizationsUpdateInvitation = (
   
 
 
-export const getOrganizationsUpdateInvitationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getOrganizationsUpdateInvitationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsUpdateInvitation>>, TError,{invitationId: string;data: OrganizationsUpdateInvitationBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof organizationsUpdateInvitation>>, TError,{invitationId: string;data: OrganizationsUpdateInvitationBody}, TContext> => {
 
@@ -734,9 +735,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type OrganizationsUpdateInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof organizationsUpdateInvitation>>>
     export type OrganizationsUpdateInvitationMutationBody = OrganizationsUpdateInvitationBody
-    export type OrganizationsUpdateInvitationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type OrganizationsUpdateInvitationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useOrganizationsUpdateInvitation = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useOrganizationsUpdateInvitation = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsUpdateInvitation>>, TError,{invitationId: string;data: OrganizationsUpdateInvitationBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof organizationsUpdateInvitation>>,
@@ -760,7 +761,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   
 
 
-export const getOrganizationsRemoveInvitationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getOrganizationsRemoveInvitationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsRemoveInvitation>>, TError,{invitationId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof organizationsRemoveInvitation>>, TError,{invitationId: string}, TContext> => {
 
@@ -789,9 +790,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type OrganizationsRemoveInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof organizationsRemoveInvitation>>>
     
-    export type OrganizationsRemoveInvitationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type OrganizationsRemoveInvitationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useOrganizationsRemoveInvitation = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useOrganizationsRemoveInvitation = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsRemoveInvitation>>, TError,{invitationId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof organizationsRemoveInvitation>>,
@@ -817,7 +818,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   
 
 
-export const getOrganizationsGetManyInvitationsMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getOrganizationsGetManyInvitationsMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsGetManyInvitations>>, TError,{data: OrganizationsGetManyInvitationsBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof organizationsGetManyInvitations>>, TError,{data: OrganizationsGetManyInvitationsBody}, TContext> => {
 
@@ -846,9 +847,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type OrganizationsGetManyInvitationsMutationResult = NonNullable<Awaited<ReturnType<typeof organizationsGetManyInvitations>>>
     export type OrganizationsGetManyInvitationsMutationBody = OrganizationsGetManyInvitationsBody
-    export type OrganizationsGetManyInvitationsMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type OrganizationsGetManyInvitationsMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useOrganizationsGetManyInvitations = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useOrganizationsGetManyInvitations = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsGetManyInvitations>>, TError,{data: OrganizationsGetManyInvitationsBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof organizationsGetManyInvitations>>,
@@ -872,7 +873,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   
 
 
-export const getOrganizationsAcceptInvitationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getOrganizationsAcceptInvitationMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsAcceptInvitation>>, TError,{token: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof organizationsAcceptInvitation>>, TError,{token: string}, TContext> => {
 
@@ -901,9 +902,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type OrganizationsAcceptInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof organizationsAcceptInvitation>>>
     
-    export type OrganizationsAcceptInvitationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type OrganizationsAcceptInvitationMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useOrganizationsAcceptInvitation = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useOrganizationsAcceptInvitation = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizationsAcceptInvitation>>, TError,{token: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof organizationsAcceptInvitation>>,

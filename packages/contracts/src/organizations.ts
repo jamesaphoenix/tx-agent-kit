@@ -43,6 +43,7 @@ export const organizationSchema = Schema.Struct({
   stripeCustomerId: Schema.NullOr(Schema.String),
   stripeSubscriptionId: Schema.NullOr(Schema.String),
   stripePaymentMethodId: Schema.NullOr(Schema.String),
+  stripeMeteredSubscriptionItemId: Schema.NullOr(Schema.String),
   creditsBalance: Schema.Number,
   reservedCredits: Schema.Number,
   autoRechargeEnabled: Schema.Boolean,

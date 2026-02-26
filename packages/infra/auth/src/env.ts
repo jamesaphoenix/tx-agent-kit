@@ -1,11 +1,13 @@
 export interface AuthEnv {
   AUTH_SECRET: string
   AUTH_BCRYPT_ROUNDS: number
+  AUTH_ACCESS_TOKEN_TTL: string
 }
 
 const defaultBcryptRounds = 12
 const minBcryptRounds = 4
 const maxBcryptRounds = 15
+const defaultAccessTokenTtl = '15m'
 
 const parseBcryptRounds = (rawValue: string | undefined): number => {
   if (!rawValue) {
@@ -23,6 +25,7 @@ const parseBcryptRounds = (rawValue: string | undefined): number => {
 export const getAuthEnv = (): AuthEnv => {
   return {
     AUTH_SECRET: process.env.AUTH_SECRET ?? '',
-    AUTH_BCRYPT_ROUNDS: parseBcryptRounds(process.env.AUTH_BCRYPT_ROUNDS)
+    AUTH_BCRYPT_ROUNDS: parseBcryptRounds(process.env.AUTH_BCRYPT_ROUNDS),
+    AUTH_ACCESS_TOKEN_TTL: process.env.AUTH_ACCESS_TOKEN_TTL?.trim() || defaultAccessTokenTtl
   }
 }

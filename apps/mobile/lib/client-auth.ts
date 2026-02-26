@@ -1,4 +1,4 @@
-import { clearAuthToken, readAuthToken } from './auth-token'
+import { clearAuthToken, clearRefreshToken, readAuthToken } from './auth-token'
 import { ApiClientError } from './client-api'
 import { sessionStoreActions } from '../stores/session-store'
 
@@ -34,6 +34,7 @@ export const handleUnauthorizedApiError = async (
   }
 
   await clearAuthToken()
+  await clearRefreshToken()
   sessionStoreActions.clear()
   router.replace(buildSignInPath(nextPath))
   return true

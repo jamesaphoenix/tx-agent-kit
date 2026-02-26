@@ -28,6 +28,7 @@ export interface OrganizationRecord {
   stripeCustomerId: string | null
   stripeSubscriptionId: string | null
   stripePaymentMethodId: string | null
+  stripeMeteredSubscriptionItemId: string | null
   creditsBalance: number
   reservedCredits: number
   autoRechargeEnabled: boolean
@@ -72,6 +73,7 @@ export interface Organization {
   stripeCustomerId: string | null
   stripeSubscriptionId: string | null
   stripePaymentMethodId: string | null
+  stripeMeteredSubscriptionItemId: string | null
   creditsBalance: number
   reservedCredits: number
   autoRechargeEnabled: boolean
@@ -163,6 +165,7 @@ export const toOrganization = (row: OrganizationRecord): Organization => ({
   stripeCustomerId: row.stripeCustomerId,
   stripeSubscriptionId: row.stripeSubscriptionId,
   stripePaymentMethodId: row.stripePaymentMethodId,
+  stripeMeteredSubscriptionItemId: row.stripeMeteredSubscriptionItemId,
   creditsBalance: row.creditsBalance,
   reservedCredits: row.reservedCredits,
   autoRechargeEnabled: row.autoRechargeEnabled,

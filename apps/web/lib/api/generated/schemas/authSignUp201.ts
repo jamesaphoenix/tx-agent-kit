@@ -9,5 +9,6 @@ import type { AuthSignUp201User } from './authSignUp201User';
 
 export type AuthSignUp201 = {
   token: string;
+  refreshToken: string;
   user: AuthSignUp201User;
 };

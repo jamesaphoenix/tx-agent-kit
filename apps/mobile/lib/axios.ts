@@ -139,10 +139,12 @@ const attachAuthHeader = async (
   config: InternalAxiosRequestConfig
 ): Promise<InternalAxiosRequestConfig> => {
   const token = await readAuthToken()
+  const hasExplicitAuthorizationHeader =
+    config.headers.Authorization !== undefined && config.headers.Authorization !== null
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
-  } else {
+  } else if (!hasExplicitAuthorizationHeader) {
     delete config.headers.Authorization
   }
 

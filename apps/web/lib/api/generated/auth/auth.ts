@@ -28,11 +28,18 @@ import type {
   AuthDeleteMe200,
   AuthForgotPassword202,
   AuthForgotPasswordBody,
+  AuthGoogleCallback200,
+  AuthGoogleCallbackParams,
+  AuthGoogleStart200,
   AuthMe200,
+  AuthRefreshSession200,
+  AuthRefreshSessionBody,
   AuthResetPassword200,
   AuthResetPasswordBody,
   AuthSignIn200,
   AuthSignInBody,
+  AuthSignOut200,
+  AuthSignOutAll200,
   AuthSignUp201,
   AuthSignUpBody,
   BadRequest,
@@ -40,6 +47,7 @@ import type {
   HttpApiDecodeError,
   InternalError,
   NotFound,
+  TooManyRequests,
   Unauthorized
 } from '.././schemas';
 
@@ -71,7 +79,7 @@ export const authSignUp = (
   
 
 
-export const getAuthSignUpMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getAuthSignUpMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignUp>>, TError,{data: AuthSignUpBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof authSignUp>>, TError,{data: AuthSignUpBody}, TContext> => {
 
@@ -100,9 +108,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AuthSignUpMutationResult = NonNullable<Awaited<ReturnType<typeof authSignUp>>>
     export type AuthSignUpMutationBody = AuthSignUpBody
-    export type AuthSignUpMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type AuthSignUpMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useAuthSignUp = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useAuthSignUp = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignUp>>, TError,{data: AuthSignUpBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof authSignUp>>,
@@ -128,7 +136,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   
 
 
-export const getAuthSignInMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getAuthSignInMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignIn>>, TError,{data: AuthSignInBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof authSignIn>>, TError,{data: AuthSignInBody}, TContext> => {
 
@@ -157,9 +165,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AuthSignInMutationResult = NonNullable<Awaited<ReturnType<typeof authSignIn>>>
     export type AuthSignInMutationBody = AuthSignInBody
-    export type AuthSignInMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type AuthSignInMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useAuthSignIn = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useAuthSignIn = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignIn>>, TError,{data: AuthSignInBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof authSignIn>>,
@@ -169,7 +177,343 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getAuthSignInMutationOptions(options), queryClient);
     }
-    export const authForgotPassword = (
+    export const authRefreshSession = (
+    authRefreshSessionBody: AuthRefreshSessionBody,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<AuthRefreshSession200>(
+      {url: `/v1/auth/refresh`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: authRefreshSessionBody, signal
+    },
+      options);
+    }
+  
+
+
+export const getAuthRefreshSessionMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authRefreshSession>>, TError,{data: AuthRefreshSessionBody}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authRefreshSession>>, TError,{data: AuthRefreshSessionBody}, TContext> => {
+
+const mutationKey = ['authRefreshSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authRefreshSession>>, {data: AuthRefreshSessionBody}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authRefreshSession(data,requestOptions)
+        }
+
+
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthRefreshSessionMutationResult = NonNullable<Awaited<ReturnType<typeof authRefreshSession>>>
+    export type AuthRefreshSessionMutationBody = AuthRefreshSessionBody
+    export type AuthRefreshSessionMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
+
+    export const useAuthRefreshSession = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authRefreshSession>>, TError,{data: AuthRefreshSessionBody}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authRefreshSession>>,
+        TError,
+        {data: AuthRefreshSessionBody},
+        TContext
+      > => {
+      return useMutation(getAuthRefreshSessionMutationOptions(options), queryClient);
+    }
+    export const authSignOut = (
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<AuthSignOut200>(
+      {url: `/v1/auth/sign-out`, method: 'POST', signal
+    },
+      options);
+    }
+  
+
+
+export const getAuthSignOutMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignOut>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authSignOut>>, TError,void, TContext> => {
+
+const mutationKey = ['authSignOut'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSignOut>>, void> = () => {
+          
+
+          return  authSignOut(requestOptions)
+        }
+
+
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthSignOutMutationResult = NonNullable<Awaited<ReturnType<typeof authSignOut>>>
+    
+    export type AuthSignOutMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
+
+    export const useAuthSignOut = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignOut>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authSignOut>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAuthSignOutMutationOptions(options), queryClient);
+    }
+    export const authSignOutAll = (
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<AuthSignOutAll200>(
+      {url: `/v1/auth/sign-out-all`, method: 'POST', signal
+    },
+      options);
+    }
+  
+
+
+export const getAuthSignOutAllMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignOutAll>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof authSignOutAll>>, TError,void, TContext> => {
+
+const mutationKey = ['authSignOutAll'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSignOutAll>>, void> = () => {
+          
+
+          return  authSignOutAll(requestOptions)
+        }
+
+
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthSignOutAllMutationResult = NonNullable<Awaited<ReturnType<typeof authSignOutAll>>>
+    
+    export type AuthSignOutAllMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
+
+    export const useAuthSignOutAll = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignOutAll>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authSignOutAll>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAuthSignOutAllMutationOptions(options), queryClient);
+    }
+    export const authGoogleStart = (
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<AuthGoogleStart200>(
+      {url: `/v1/auth/google/start`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
+
+export const getAuthGoogleStartQueryKey = () => {
+    return [
+    `/v1/auth/google/start`
+    ] as const;
+    }
+
+    
+export const getAuthGoogleStartQueryOptions = <TData = Awaited<ReturnType<typeof authGoogleStart>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGoogleStart>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAuthGoogleStartQueryKey();
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authGoogleStart>>> = ({ signal }) => authGoogleStart(requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authGoogleStart>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AuthGoogleStartQueryResult = NonNullable<Awaited<ReturnType<typeof authGoogleStart>>>
+export type AuthGoogleStartQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
+
+
+export function useAuthGoogleStart<TData = Awaited<ReturnType<typeof authGoogleStart>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGoogleStart>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authGoogleStart>>,
+          TError,
+          Awaited<ReturnType<typeof authGoogleStart>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthGoogleStart<TData = Awaited<ReturnType<typeof authGoogleStart>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGoogleStart>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authGoogleStart>>,
+          TError,
+          Awaited<ReturnType<typeof authGoogleStart>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthGoogleStart<TData = Awaited<ReturnType<typeof authGoogleStart>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGoogleStart>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useAuthGoogleStart<TData = Awaited<ReturnType<typeof authGoogleStart>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGoogleStart>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAuthGoogleStartQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+export const authGoogleCallback = (
+    params: AuthGoogleCallbackParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<AuthGoogleCallback200>(
+      {url: `/v1/auth/google/callback`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
+
+
+
+export const getAuthGoogleCallbackQueryKey = (params?: AuthGoogleCallbackParams,) => {
+    return [
+    `/v1/auth/google/callback`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+    
+export const getAuthGoogleCallbackQueryOptions = <TData = Awaited<ReturnType<typeof authGoogleCallback>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(params: AuthGoogleCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGoogleCallback>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAuthGoogleCallbackQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authGoogleCallback>>> = ({ signal }) => authGoogleCallback(params, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authGoogleCallback>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AuthGoogleCallbackQueryResult = NonNullable<Awaited<ReturnType<typeof authGoogleCallback>>>
+export type AuthGoogleCallbackQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
+
+
+export function useAuthGoogleCallback<TData = Awaited<ReturnType<typeof authGoogleCallback>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
+ params: AuthGoogleCallbackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGoogleCallback>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authGoogleCallback>>,
+          TError,
+          Awaited<ReturnType<typeof authGoogleCallback>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthGoogleCallback<TData = Awaited<ReturnType<typeof authGoogleCallback>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
+ params: AuthGoogleCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGoogleCallback>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authGoogleCallback>>,
+          TError,
+          Awaited<ReturnType<typeof authGoogleCallback>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthGoogleCallback<TData = Awaited<ReturnType<typeof authGoogleCallback>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
+ params: AuthGoogleCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGoogleCallback>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useAuthGoogleCallback<TData = Awaited<ReturnType<typeof authGoogleCallback>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
+ params: AuthGoogleCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGoogleCallback>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAuthGoogleCallbackQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+export const authForgotPassword = (
     authForgotPasswordBody: AuthForgotPasswordBody,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
@@ -185,7 +529,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   
 
 
-export const getAuthForgotPasswordMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getAuthForgotPasswordMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authForgotPassword>>, TError,{data: AuthForgotPasswordBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof authForgotPassword>>, TError,{data: AuthForgotPasswordBody}, TContext> => {
 
@@ -214,9 +558,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AuthForgotPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof authForgotPassword>>>
     export type AuthForgotPasswordMutationBody = AuthForgotPasswordBody
-    export type AuthForgotPasswordMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type AuthForgotPasswordMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useAuthForgotPassword = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useAuthForgotPassword = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authForgotPassword>>, TError,{data: AuthForgotPasswordBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof authForgotPassword>>,
@@ -242,7 +586,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   
 
 
-export const getAuthResetPasswordMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getAuthResetPasswordMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authResetPassword>>, TError,{data: AuthResetPasswordBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof authResetPassword>>, TError,{data: AuthResetPasswordBody}, TContext> => {
 
@@ -271,9 +615,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AuthResetPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof authResetPassword>>>
     export type AuthResetPasswordMutationBody = AuthResetPasswordBody
-    export type AuthResetPasswordMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type AuthResetPasswordMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useAuthResetPassword = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useAuthResetPassword = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authResetPassword>>, TError,{data: AuthResetPasswordBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof authResetPassword>>,
@@ -305,7 +649,7 @@ export const getAuthMeQueryKey = () => {
     }
 
     
-export const getAuthMeQueryOptions = <TData = Awaited<ReturnType<typeof authMe>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authMe>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getAuthMeQueryOptions = <TData = Awaited<ReturnType<typeof authMe>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authMe>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -324,10 +668,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type AuthMeQueryResult = NonNullable<Awaited<ReturnType<typeof authMe>>>
-export type AuthMeQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+export type AuthMeQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
 
-export function useAuthMe<TData = Awaited<ReturnType<typeof authMe>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useAuthMe<TData = Awaited<ReturnType<typeof authMe>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authMe>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof authMe>>,
@@ -337,7 +681,7 @@ export function useAuthMe<TData = Awaited<ReturnType<typeof authMe>>, TError = E
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useAuthMe<TData = Awaited<ReturnType<typeof authMe>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useAuthMe<TData = Awaited<ReturnType<typeof authMe>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authMe>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof authMe>>,
@@ -347,12 +691,12 @@ export function useAuthMe<TData = Awaited<ReturnType<typeof authMe>>, TError = E
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useAuthMe<TData = Awaited<ReturnType<typeof authMe>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useAuthMe<TData = Awaited<ReturnType<typeof authMe>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authMe>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useAuthMe<TData = Awaited<ReturnType<typeof authMe>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useAuthMe<TData = Awaited<ReturnType<typeof authMe>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authMe>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -381,7 +725,7 @@ export const authDeleteMe = (
   
 
 
-export const getAuthDeleteMeMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getAuthDeleteMeMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authDeleteMe>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof authDeleteMe>>, TError,void, TContext> => {
 
@@ -410,9 +754,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AuthDeleteMeMutationResult = NonNullable<Awaited<ReturnType<typeof authDeleteMe>>>
     
-    export type AuthDeleteMeMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type AuthDeleteMeMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useAuthDeleteMe = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useAuthDeleteMe = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authDeleteMe>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof authDeleteMe>>,

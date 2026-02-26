@@ -65,7 +65,26 @@ if [[ -n "${DATABASE_URL:-}" ]]; then
     exit 1
   fi
 
-  if [[ "$db_host" != "localhost" && "$db_host" != "127.0.0.1" && "$db_host" != "::1" ]]; then
+  db_host_allowed=0
+  case "$db_host" in
+    localhost|127.0.0.1|::1|db|postgres|"${COMPOSE_PROJECT_NAME}-db"|"${COMPOSE_PROJECT_NAME}-postgres")
+      db_host_allowed=1
+      ;;
+  esac
+
+  if [[ "$db_host_allowed" -eq 0 && -n "${TX_AGENT_ALLOWED_DB_HOSTS:-}" ]]; then
+    IFS=',' read -r -a additional_db_hosts <<<"${TX_AGENT_ALLOWED_DB_HOSTS}"
+    for additional_db_host in "${additional_db_hosts[@]}"; do
+      trimmed_db_host="${additional_db_host#"${additional_db_host%%[![:space:]]*}"}"
+      trimmed_db_host="${trimmed_db_host%"${trimmed_db_host##*[![:space:]]}"}"
+      if [[ -n "$trimmed_db_host" && "$db_host" == "$trimmed_db_host" ]]; then
+        db_host_allowed=1
+        break
+      fi
+    done
+  fi
+
+  if [[ "$db_host_allowed" -eq 0 ]]; then
     echo "Refusing to reset non-local DATABASE_URL host '$db_host'."
     exit 1
   fi

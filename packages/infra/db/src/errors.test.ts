@@ -30,6 +30,18 @@ describe('db errors', () => {
     expect(error.message).toContain('organizations_name_unique')
   })
 
+  it('maps auth login identity unique violations to a specific db error code', () => {
+    const error = toDbError('Failed to link auth identity', {
+      code: '23505',
+      constraint: 'auth_login_identities_provider_subject_unique',
+      message: 'duplicate key value violates unique constraint "auth_login_identities_provider_subject_unique"'
+    })
+
+    expect(error.code).toBe('DB_AUTH_LOGIN_IDENTITY_UNIQUE_VIOLATION')
+    expect(error.constraint).toBe('auth_login_identities_provider_subject_unique')
+    expect(error.message).toContain('auth_login_identities_provider_subject_unique')
+  })
+
   it('falls back to query-failed for non-unique postgres errors', () => {
     const error = toDbError('Failed to create record', {
       code: '22001',

@@ -6,8 +6,10 @@ import { fileURLToPath } from 'node:url'
 const slotClaimDirRelativePath = '.vitest/web-integration/slot-claims'
 const slotClaimPidRegex = /^pid=(\d+)$/
 const staleClaimWithoutPidMs = 5_000
-const defaultSlotClaimWaitMs = 120_000
+const defaultSlotClaimWaitMs = 60_000
 const defaultSlotClaimPollMs = 100
+const maxAutoIntegrationWorkers = 6
+const maxAutoWebIntegrationWorkers = 4
 const workerSupportDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(workerSupportDir, '../../../..')
 
@@ -31,15 +33,19 @@ const resolveMaxWorkers = (): number => {
   }
 
   const explicitIntegrationWorkers = parseEnvWorkers(process.env.INTEGRATION_MAX_WORKERS)
-  if (explicitIntegrationWorkers !== null) {
-    return explicitIntegrationWorkers
+  const resolveAutoMaxWorkers = (): number => {
+    try {
+      return Math.max(1, availableParallelism())
+    } catch {
+      return Math.max(1, cpus().length)
+    }
   }
 
-  try {
-    return Math.max(1, availableParallelism())
-  } catch {
-    return Math.max(1, cpus().length)
-  }
+  const integrationWorkers =
+    explicitIntegrationWorkers ??
+    Math.min(resolveAutoMaxWorkers(), maxAutoIntegrationWorkers)
+
+  return Math.min(integrationWorkers, maxAutoWebIntegrationWorkers)
 }
 
 const resolveSlotClaimDir = (): string => {

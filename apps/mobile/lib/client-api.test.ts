@@ -55,7 +55,7 @@ const respondWithError = (status: number, data: unknown) => {
 
 describe('clientApi.signIn', () => {
   it('persists auth token from response', async () => {
-    respondWith(200, { token: 'jwt-sign-in-token' })
+    respondWith(200, { token: 'jwt-sign-in-token', refreshToken: 'refresh-sign-in-token' })
 
     await clientApi.signIn({ email: 'test@example.com', password: 'password123' })
 
@@ -74,7 +74,7 @@ describe('clientApi.signIn', () => {
 
 describe('clientApi.signUp', () => {
   it('persists auth token from response', async () => {
-    respondWith(200, { token: 'jwt-sign-up-token' })
+    respondWith(200, { token: 'jwt-sign-up-token', refreshToken: 'refresh-sign-up-token' })
 
     await clientApi.signUp({ email: 'test@example.com', password: 'password123', name: 'Test' })
 

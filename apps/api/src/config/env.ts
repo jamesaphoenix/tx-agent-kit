@@ -9,9 +9,19 @@ const requiredApiEnvShape = {
   API_CORS_ORIGIN: Schema.String,
   AUTH_RATE_LIMIT_WINDOW_MS: Schema.optional(Schema.String),
   AUTH_RATE_LIMIT_MAX_REQUESTS: Schema.optional(Schema.String),
+  AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: Schema.optional(Schema.String),
   RESEND_API_KEY: Schema.optional(Schema.String),
   RESEND_FROM_EMAIL: Schema.optional(Schema.String),
-  WEB_BASE_URL: Schema.optional(Schema.String)
+  WEB_BASE_URL: Schema.optional(Schema.String),
+  GOOGLE_OIDC_ISSUER_URL: Schema.optional(Schema.String),
+  GOOGLE_OIDC_CLIENT_ID: Schema.optional(Schema.String),
+  GOOGLE_OIDC_CLIENT_SECRET: Schema.optional(Schema.String),
+  GOOGLE_OIDC_CALLBACK_URL: Schema.optional(Schema.String),
+  STRIPE_SECRET_KEY: Schema.optional(Schema.String),
+  STRIPE_WEBHOOK_SECRET: Schema.optional(Schema.String),
+  STRIPE_PRO_PRICE_ID: Schema.optional(Schema.String),
+  STRIPE_PRO_METERED_PRICE_ID: Schema.optional(Schema.String),
+  SUBSCRIPTION_GUARD_ENABLED: Schema.optional(Schema.String)
 } as const
 
 export const requiredApiEnvKeys = [
@@ -68,6 +78,36 @@ const assertApiEnvInvariants = (env: ApiEnv): ApiEnv => {
     }
   }
 
+  const stripeConfigured =
+    typeof env.STRIPE_SECRET_KEY === 'string' && env.STRIPE_SECRET_KEY.length > 0
+  const hasProPriceId =
+    typeof env.STRIPE_PRO_PRICE_ID === 'string' && env.STRIPE_PRO_PRICE_ID.length > 0
+  const hasMeteredPriceId =
+    typeof env.STRIPE_PRO_METERED_PRICE_ID === 'string' && env.STRIPE_PRO_METERED_PRICE_ID.length > 0
+
+  if (stripeConfigured && (!hasProPriceId || !hasMeteredPriceId)) {
+    throw new Error('STRIPE_PRO_PRICE_ID and STRIPE_PRO_METERED_PRICE_ID are required when Stripe is configured.')
+  }
+
+  const googleOidcValues = [
+    env.GOOGLE_OIDC_ISSUER_URL,
+    env.GOOGLE_OIDC_CLIENT_ID,
+    env.GOOGLE_OIDC_CLIENT_SECRET,
+    env.GOOGLE_OIDC_CALLBACK_URL
+  ]
+  const configuredGoogleOidcValues = googleOidcValues.filter(
+    (value) => typeof value === 'string' && value.length > 0
+  )
+  if (configuredGoogleOidcValues.length > 0 && configuredGoogleOidcValues.length < googleOidcValues.length) {
+    throw new Error(
+      'GOOGLE_OIDC_ISSUER_URL, GOOGLE_OIDC_CLIENT_ID, GOOGLE_OIDC_CLIENT_SECRET, and GOOGLE_OIDC_CALLBACK_URL must be configured together.'
+    )
+  }
+
+  if (env.NODE_ENV === 'production' && configuredGoogleOidcValues.length < googleOidcValues.length) {
+    throw new Error('Google OIDC variables are required in production.')
+  }
+
   return env
 }
 
@@ -76,14 +116,64 @@ export const getApiEnv = (): ApiEnv =>
 
 export interface AuthRateLimitConfig {
   windowMs: number
-  maxRequests: number
+  maxIpRequests: number
+  maxIdentifierRequests: number
 }
 
 export const getAuthRateLimitConfig = (): AuthRateLimitConfig => {
   const env = getApiEnv()
+  const maxIpRequests = parsePositiveInt(env.AUTH_RATE_LIMIT_MAX_REQUESTS, 15)
+  const maxIdentifierRequests = parsePositiveInt(
+    env.AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS,
+    maxIpRequests
+  )
 
   return {
     windowMs: parsePositiveInt(env.AUTH_RATE_LIMIT_WINDOW_MS, 60_000),
-    maxRequests: parsePositiveInt(env.AUTH_RATE_LIMIT_MAX_REQUESTS, 15)
+    maxIpRequests,
+    maxIdentifierRequests
   }
+}
+
+export interface GoogleOidcConfig {
+  issuerUrl: string
+  clientId: string
+  clientSecret: string
+  callbackUrl: string
+}
+
+export const getGoogleOidcConfig = (): GoogleOidcConfig | null => {
+  const env = getApiEnv()
+
+  if (
+    !env.GOOGLE_OIDC_ISSUER_URL ||
+    !env.GOOGLE_OIDC_CLIENT_ID ||
+    !env.GOOGLE_OIDC_CLIENT_SECRET ||
+    !env.GOOGLE_OIDC_CALLBACK_URL
+  ) {
+    return null
+  }
+
+  return {
+    issuerUrl: env.GOOGLE_OIDC_ISSUER_URL,
+    clientId: env.GOOGLE_OIDC_CLIENT_ID,
+    clientSecret: env.GOOGLE_OIDC_CLIENT_SECRET,
+    callbackUrl: env.GOOGLE_OIDC_CALLBACK_URL
+  }
+}
+
+export const getSubscriptionGuardEnabled = (): boolean => {
+  const env = getApiEnv()
+  const rawValue = env.SUBSCRIPTION_GUARD_ENABLED
+
+  if (rawValue === undefined) {
+    return true
+  }
+
+  const normalized = rawValue.trim().toLowerCase()
+  if (normalized === 'false' || normalized === '0') {
+    return false
+  }
+
+  return true
 }

@@ -1,11 +1,20 @@
 import type {
+  CreditLedgerRowShape,
   InvitationRowShape,
   OrganizationRowShape,
+  SubscriptionEventRowShape,
   TeamMemberRowShape,
   TeamRowShape,
+  UsageRecordRowShape,
   UserRowShape
 } from '@tx-agent-kit/db'
 import type { AuthUserRecord } from '../domains/auth/domain/auth-domain.js'
+import type {
+  BillingSettingsRecord,
+  CreditLedgerEntryRecord,
+  SubscriptionEventRecord,
+  UsageRecordRecord
+} from '../domains/billing/domain/billing-domain.js'
 import type {
   InvitationRecord,
   OrganizationRecord,
@@ -48,6 +57,7 @@ const toOrganizationRecordBase = toRecord<OrganizationRowShape, readonly [
   'stripeCustomerId',
   'stripeSubscriptionId',
   'stripePaymentMethodId',
+  'stripeMeteredSubscriptionItemId',
   'creditsBalance',
   'reservedCredits',
   'autoRechargeEnabled',
@@ -64,7 +74,7 @@ const toOrganizationRecordBase = toRecord<OrganizationRowShape, readonly [
 ]>([
   'id', 'name',
   'billingEmail', 'onboardingData',
-  'stripeCustomerId', 'stripeSubscriptionId', 'stripePaymentMethodId',
+  'stripeCustomerId', 'stripeSubscriptionId', 'stripePaymentMethodId', 'stripeMeteredSubscriptionItemId',
   'creditsBalance', 'reservedCredits',
   'autoRechargeEnabled', 'autoRechargeThreshold', 'autoRechargeAmount',
   'isSubscribed', 'subscriptionStatus', 'subscriptionPlan',
@@ -147,3 +157,119 @@ const toTeamMemberRecordBase = toRecord<TeamMemberRowShape, readonly [
 ]>(['id', 'teamId', 'userId', 'roleId', 'createdAt', 'updatedAt'] as const)
 
 export const toTeamMemberRecord = (row: TeamMemberRowShape): TeamMemberRecord => toTeamMemberRecordBase(row)
+
+const toBillingSettingsRecordBase = toRecord<OrganizationRowShape, readonly [
+  'id',
+  'billingEmail',
+  'stripeCustomerId',
+  'stripeSubscriptionId',
+  'stripePaymentMethodId',
+  'stripeMeteredSubscriptionItemId',
+  'creditsBalance',
+  'reservedCredits',
+  'autoRechargeEnabled',
+  'autoRechargeThreshold',
+  'autoRechargeAmount',
+  'isSubscribed',
+  'subscriptionStatus',
+  'subscriptionPlan',
+  'subscriptionStartedAt',
+  'subscriptionEndsAt',
+  'subscriptionCurrentPeriodEnd'
+]>([
+  'id',
+  'billingEmail',
+  'stripeCustomerId',
+  'stripeSubscriptionId',
+  'stripePaymentMethodId',
+  'stripeMeteredSubscriptionItemId',
+  'creditsBalance',
+  'reservedCredits',
+  'autoRechargeEnabled',
+  'autoRechargeThreshold',
+  'autoRechargeAmount',
+  'isSubscribed',
+  'subscriptionStatus',
+  'subscriptionPlan',
+  'subscriptionStartedAt',
+  'subscriptionEndsAt',
+  'subscriptionCurrentPeriodEnd'
+] as const)
+
+export const toBillingSettingsRecord = (row: OrganizationRowShape): BillingSettingsRecord => toBillingSettingsRecordBase(row)
+
+const toUsageRecordBase = toRecord<UsageRecordRowShape, readonly [
+  'id',
+  'organizationId',
+  'category',
+  'quantity',
+  'unitCostDecimillicents',
+  'totalCostDecimillicents',
+  'referenceId',
+  'stripeUsageRecordId',
+  'metadata',
+  'recordedAt',
+  'createdAt'
+]>([
+  'id',
+  'organizationId',
+  'category',
+  'quantity',
+  'unitCostDecimillicents',
+  'totalCostDecimillicents',
+  'referenceId',
+  'stripeUsageRecordId',
+  'metadata',
+  'recordedAt',
+  'createdAt'
+] as const)
+
+export const toUsageRecordRecord = (row: UsageRecordRowShape): UsageRecordRecord => toUsageRecordBase(row)
+
+const toSubscriptionEventRecordBase = toRecord<SubscriptionEventRowShape, readonly [
+  'id',
+  'stripeEventId',
+  'eventType',
+  'organizationId',
+  'payload',
+  'processedAt',
+  'createdAt'
+]>([
+  'id',
+  'stripeEventId',
+  'eventType',
+  'organizationId',
+  'payload',
+  'processedAt',
+  'createdAt'
+] as const)
+
+export const toSubscriptionEventRecord = (
+  row: SubscriptionEventRowShape
+): SubscriptionEventRecord => toSubscriptionEventRecordBase(row)
+
+const toCreditLedgerEntryRecordBase = toRecord<CreditLedgerRowShape, readonly [
+  'id',
+  'organizationId',
+  'amount',
+  'entryType',
+  'reason',
+  'referenceId',
+  'balanceAfter',
+  'metadata',
+  'createdAt'
+]>([
+  'id',
+  'organizationId',
+  'amount',
+  'entryType',
+  'reason',
+  'referenceId',
+  'balanceAfter',
+  'metadata',
+  'createdAt'
+] as const)
+
+export const toCreditLedgerEntryRecord = (
+  row: CreditLedgerRowShape
+): CreditLedgerEntryRecord => toCreditLedgerEntryRecordBase(row)

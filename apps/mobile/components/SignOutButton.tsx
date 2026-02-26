@@ -18,6 +18,8 @@ export function SignOutButton() {
       onPress={() => {
         void (async () => {
           setPending(true)
+          sessionStoreActions.clear()
+          router.replace('/sign-in')
           try {
             await clientApi.signOut()
             notify.info('Signed out')
@@ -25,9 +27,7 @@ export function SignOutButton() {
             log.error('Sign out failed', err)
             notify.error('Sign out failed')
           } finally {
-            sessionStoreActions.clear()
             setPending(false)
-            router.replace('/sign-in')
           }
         })()
       }}

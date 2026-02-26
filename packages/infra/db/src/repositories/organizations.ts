@@ -111,6 +111,7 @@ export const organizationsRepository = {
                     stripeCustomerId: organizations.stripeCustomerId,
                     stripeSubscriptionId: organizations.stripeSubscriptionId,
                     stripePaymentMethodId: organizations.stripePaymentMethodId,
+                    stripeMeteredSubscriptionItemId: organizations.stripeMeteredSubscriptionItemId,
                     creditsBalance: organizations.creditsBalance,
                     reservedCredits: organizations.reservedCredits,
                     autoRechargeEnabled: organizations.autoRechargeEnabled,
@@ -161,6 +162,7 @@ export const organizationsRepository = {
                   stripeCustomerId: organizations.stripeCustomerId,
                   stripeSubscriptionId: organizations.stripeSubscriptionId,
                   stripePaymentMethodId: organizations.stripePaymentMethodId,
+                  stripeMeteredSubscriptionItemId: organizations.stripeMeteredSubscriptionItemId,
                   creditsBalance: organizations.creditsBalance,
                   reservedCredits: organizations.reservedCredits,
                   autoRechargeEnabled: organizations.autoRechargeEnabled,
@@ -224,6 +226,7 @@ export const organizationsRepository = {
             stripeCustomerId: organizations.stripeCustomerId,
             stripeSubscriptionId: organizations.stripeSubscriptionId,
             stripePaymentMethodId: organizations.stripePaymentMethodId,
+            stripeMeteredSubscriptionItemId: organizations.stripeMeteredSubscriptionItemId,
             creditsBalance: organizations.creditsBalance,
             reservedCredits: organizations.reservedCredits,
             autoRechargeEnabled: organizations.autoRechargeEnabled,
@@ -264,6 +267,7 @@ export const organizationsRepository = {
             stripeCustomerId: organizations.stripeCustomerId,
             stripeSubscriptionId: organizations.stripeSubscriptionId,
             stripePaymentMethodId: organizations.stripePaymentMethodId,
+            stripeMeteredSubscriptionItemId: organizations.stripeMeteredSubscriptionItemId,
             creditsBalance: organizations.creditsBalance,
             reservedCredits: organizations.reservedCredits,
             autoRechargeEnabled: organizations.autoRechargeEnabled,
@@ -355,6 +359,7 @@ export const organizationsRepository = {
               stripeCustomerId: organizations.stripeCustomerId,
               stripeSubscriptionId: organizations.stripeSubscriptionId,
               stripePaymentMethodId: organizations.stripePaymentMethodId,
+              stripeMeteredSubscriptionItemId: organizations.stripeMeteredSubscriptionItemId,
               creditsBalance: organizations.creditsBalance,
               reservedCredits: organizations.reservedCredits,
               autoRechargeEnabled: organizations.autoRechargeEnabled,
@@ -446,6 +451,31 @@ export const organizationsRepository = {
         return yield* decodeNullableOrgMember(rows[0] ?? null)
       })
     ).pipe(Effect.mapError((error) => toDbError('Failed to get member role', error))),
+
+  getPrimaryMembershipForUser: (userId: string) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const rows = yield* db
+          .select({
+            id: orgMembers.id,
+            organizationId: orgMembers.organizationId,
+            userId: orgMembers.userId,
+            roleId: orgMembers.roleId,
+            role: orgMembers.role,
+            membershipType: orgMembers.membershipType,
+            createdAt: orgMembers.createdAt,
+            updatedAt: orgMembers.updatedAt
+          })
+          .from(orgMembers)
+          .where(eq(orgMembers.userId, userId))
+          .orderBy(desc(orgMembers.createdAt), desc(orgMembers.id))
+          .limit(1)
+          .execute()
+
+        return yield* decodeNullableOrgMember(rows[0] ?? null)
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to get primary org membership for user', error))),
 
   getMemberRolesForUser: (userId: string, organizationIds: ReadonlyArray<string>) =>
     provideDB(

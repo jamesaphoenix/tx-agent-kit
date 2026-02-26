@@ -16,6 +16,7 @@ export type OrganizationsListOrganizations200DataItem = {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   stripePaymentMethodId: string | null;
+  stripeMeteredSubscriptionItemId: string | null;
   creditsBalance: number;
   reservedCredits: number;
   autoRechargeEnabled: boolean;

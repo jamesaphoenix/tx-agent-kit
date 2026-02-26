@@ -12,7 +12,8 @@ describe('getAuthEnv', () => {
 
     expect(getAuthEnv()).toEqual({
       AUTH_SECRET: '',
-      AUTH_BCRYPT_ROUNDS: 12
+      AUTH_BCRYPT_ROUNDS: 12,
+      AUTH_ACCESS_TOKEN_TTL: '15m'
     })
   })
 
@@ -22,7 +23,8 @@ describe('getAuthEnv', () => {
 
     expect(getAuthEnv()).toEqual({
       AUTH_SECRET: 'secret',
-      AUTH_BCRYPT_ROUNDS: 15
+      AUTH_BCRYPT_ROUNDS: 15,
+      AUTH_ACCESS_TOKEN_TTL: '15m'
     })
   })
 

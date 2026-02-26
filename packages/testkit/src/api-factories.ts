@@ -23,6 +23,7 @@ export interface FactoryUser {
 
 export interface FactoryAuthResponse {
   token: string
+  refreshToken: string
   user: FactoryUser
 }
 

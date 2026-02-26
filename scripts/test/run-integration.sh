@@ -174,11 +174,17 @@ if [[ "${INTEGRATION_SKIP_INFRA_ENSURE:-0}" != "1" ]]; then
 
 else
   echo "Skipping infra ensure bootstrap (INTEGRATION_SKIP_INFRA_ENSURE=1)."
-  echo "Observability health validation remains mandatory."
+  if [[ "${INTEGRATION_SKIP_OBSERVABILITY:-0}" != "1" ]]; then
+    echo "Observability health validation remains mandatory."
+  fi
 fi
 
-echo "Verifying observability infrastructure health..."
-pnpm test:infra:observability
+if [[ "${INTEGRATION_SKIP_OBSERVABILITY:-0}" != "1" ]]; then
+  echo "Verifying observability infrastructure health..."
+  pnpm test:infra:observability
+else
+  echo "Skipping observability health validation (INTEGRATION_SKIP_OBSERVABILITY=1)."
+fi
 
 echo "Running integration tests..."
 if [[ ${#PASSTHROUGH_ARGS[@]} -gt 0 ]]; then

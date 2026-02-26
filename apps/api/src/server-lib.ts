@@ -2,8 +2,17 @@ import { HttpApiBuilder, HttpApiSwagger } from '@effect/platform'
 import { NodeHttpServer, NodeRuntime } from '@effect/platform-node'
 import {
   AuthServiceLive,
+  AuthLoginAuditPortLive,
+  AuthLoginIdentityPortLive,
+  AuthLoginRefreshTokenPortLive,
+  AuthLoginSessionPortLive,
   AuthUsersPortLive,
+  AuthOrganizationMembershipPortLive,
   AuthOrganizationOwnershipPortLive,
+  BillingGuardPort,
+  BillingServiceLive,
+  BillingStorePortLive,
+  ClockPortLive,
   PasswordResetTokenPortLive,
   PasswordHasherPortLive,
   SessionTokenPortLive,
@@ -11,24 +20,30 @@ import {
   OrganizationServiceLive,
   OrganizationStorePortLive,
   OrganizationUsersPortLive,
+  SubscriptionEventStorePortLive,
   TeamServiceLive,
   TeamStorePortLive,
-  TeamOrganizationMembershipPortLive
+  TeamOrganizationMembershipPortLive,
+  UsageStorePortLive
 } from '@tx-agent-kit/core'
 import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
-import { Layer } from 'effect'
+import { Effect, Layer } from 'effect'
 import { createServer } from 'node:http'
 import { TxAgentApi } from './api.js'
-import { getApiEnv } from './config/env.js'
+import { getApiEnv, getSubscriptionGuardEnabled } from './config/env.js'
 import { authRateLimitMiddleware } from './middleware/auth-rate-limit.js'
 import { bodyLimitMiddleware } from './middleware/body-limit.js'
 import { getCorsConfig } from './middleware/cors.js'
 import { InvitationEmailPortLive } from './adapters/invitation-email.js'
 import { PasswordResetEmailPortLive } from './adapters/password-reset-email.js'
+import { GoogleOidcPortLive } from './adapters/google-oidc.js'
+import { StripePortLive } from './adapters/stripe.js'
 import { AuthLive } from './routes/auth.js'
+import { BillingLive } from './routes/billing.js'
 import { HealthLive } from './routes/health.js'
 import { OrganizationsLive } from './routes/organizations.js'
+import { PermissionsLive } from './routes/permissions.js'
 import { TeamsLive } from './routes/teams.js'
 
 const logger = createLogger('tx-agent-kit-api').child('server')
@@ -37,7 +52,9 @@ const ApiLive = HttpApiBuilder.api(TxAgentApi).pipe(
   Layer.provide(HealthLive),
   Layer.provide(AuthLive),
   Layer.provide(OrganizationsLive),
-  Layer.provide(TeamsLive)
+  Layer.provide(TeamsLive),
+  Layer.provide(BillingLive),
+  Layer.provide(PermissionsLive)
 )
 
 const MiddlewareLive = Layer.mergeAll(
@@ -48,26 +65,43 @@ const MiddlewareLive = Layer.mergeAll(
   HttpApiSwagger.layer({ path: '/docs' })
 )
 
+const BillingGuardPortLive = Layer.succeed(BillingGuardPort, {
+  isEnabled: () => Effect.succeed(getSubscriptionGuardEnabled())
+})
+
 const PortDependenciesLive = Layer.mergeAll(
   AuthUsersPortLive,
+  AuthLoginSessionPortLive,
+  AuthLoginRefreshTokenPortLive,
+  AuthLoginIdentityPortLive,
+  AuthLoginAuditPortLive,
+  AuthOrganizationMembershipPortLive,
   AuthOrganizationOwnershipPortLive,
   PasswordResetTokenPortLive,
   InvitationEmailPortLive,
   PasswordResetEmailPortLive,
+  GoogleOidcPortLive,
   PasswordHasherPortLive,
   SessionTokenPortLive,
   OrganizationStorePortLive,
   OrganizationInvitationStorePortLive,
   OrganizationUsersPortLive,
+  BillingStorePortLive,
+  UsageStorePortLive,
+  SubscriptionEventStorePortLive,
+  StripePortLive,
+  BillingGuardPortLive,
+  ClockPortLive,
   TeamStorePortLive,
   TeamOrganizationMembershipPortLive
 )
 
 const ServiceDependenciesLive = Layer.mergeAll(
   AuthServiceLive,
+  BillingServiceLive,
   OrganizationServiceLive,
   TeamServiceLive
-).pipe(Layer.provide(PortDependenciesLive))
+)
 
 const ApiWithDependenciesLive = ApiLive.pipe(
   Layer.provide(ServiceDependenciesLive),

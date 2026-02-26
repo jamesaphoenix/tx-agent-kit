@@ -20,6 +20,7 @@ const toApiOrganization = (organization: {
   stripeCustomerId: string | null
   stripeSubscriptionId: string | null
   stripePaymentMethodId: string | null
+  stripeMeteredSubscriptionItemId: string | null
   creditsBalance: number
   reservedCredits: number
   autoRechargeEnabled: boolean
@@ -41,6 +42,7 @@ const toApiOrganization = (organization: {
   stripeCustomerId: organization.stripeCustomerId,
   stripeSubscriptionId: organization.stripeSubscriptionId,
   stripePaymentMethodId: organization.stripePaymentMethodId,
+  stripeMeteredSubscriptionItemId: organization.stripeMeteredSubscriptionItemId,
   creditsBalance: organization.creditsBalance,
   reservedCredits: organization.reservedCredits,
   autoRechargeEnabled: organization.autoRechargeEnabled,

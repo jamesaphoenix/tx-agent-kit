@@ -1,3 +1,5 @@
+import type { PermissionAction } from '@tx-agent-kit/contracts'
+
 export interface AuthUserRecord {
   id: string
   email: string
@@ -34,22 +36,47 @@ export interface ResetPasswordCommand {
   password: string
 }
 
+export interface RefreshSessionCommand {
+  refreshToken: string
+}
+
+export interface StartGoogleAuthCommand {
+  ipAddress?: string
+}
+
+export interface CompleteGoogleAuthCommand {
+  code: string
+  state: string
+  ipAddress?: string
+  userAgent?: string
+}
+
 export interface AuthSession {
   token: string
+  refreshToken: string
   user: AuthUser
+}
+
+export interface GoogleAuthStartResult {
+  authorizationUrl: string
+  state: string
+  expiresAt: Date
 }
 
 export interface AuthPrincipal {
   userId: string
   email: string
+  sessionId?: string
   organizationId?: string
   roles: ReadonlyArray<string>
+  permissions?: ReadonlyArray<PermissionAction>
 }
 
 export interface AuthSessionTokenPayload {
   sub: string
   email: string
   pwd: number
+  sid: string
   iat?: number
 }
 
@@ -71,8 +98,17 @@ export const toAuthUser = (row: AuthUserRecord): AuthUser => ({
   createdAt: row.createdAt
 })
 
-export const toAuthPrincipal = (payload: Pick<AuthSessionTokenPayload, 'sub' | 'email'>): AuthPrincipal => ({
+export const toAuthPrincipal = (
+  payload: Pick<AuthSessionTokenPayload, 'sub' | 'email' | 'sid'> & {
+    organizationId?: string
+    role?: string
+    permissions?: ReadonlyArray<PermissionAction>
+  }
+): AuthPrincipal => ({
   userId: payload.sub,
   email: payload.email,
-  roles: ['member']
+  sessionId: payload.sid,
+  organizationId: payload.organizationId,
+  roles: payload.role ? [payload.role] : ['member'],
+  permissions: payload.permissions ? [...payload.permissions] : undefined
 })

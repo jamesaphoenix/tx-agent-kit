@@ -92,7 +92,7 @@
 - Override web suite workers with `WEB_INTEGRATION_MAX_WORKERS=<n>` (defaults to `INTEGRATION_MAX_WORKERS`).
 - For faster local iteration, skip pgTAP during integration setup with `pnpm test:integration --skip-pgtap` (keep pgTAP enabled in CI).
 - Skip infra bootstrap when already warm: `INTEGRATION_SKIP_INFRA_ENSURE=1 pnpm test:integration`.
-- Observability health validation is still mandatory during integration runs (skip bootstrap does not skip health checks).
+- Observability health validation runs by default; skip when debugging unrelated failures with `INTEGRATION_SKIP_OBSERVABILITY=1 pnpm test:integration`.
 - Validate resolved integration runner wiring without executing tests: `INTEGRATION_DRY_RUN=1 pnpm test:integration -- --filter api --dry-run`.
 - Observability timing knobs: `OBSERVABILITY_RETRY_ATTEMPTS`, `OBSERVABILITY_RETRY_SLEEP_SECONDS`, `OBSERVABILITY_CURL_CONNECT_TIMEOUT_SECONDS`, `OBSERVABILITY_CURL_MAX_TIME_SECONDS`.
 - Web integration keeps one API+DB harness per worker slot warm across files and performs per-test resets.

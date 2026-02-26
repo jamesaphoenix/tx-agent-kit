@@ -27,6 +27,7 @@ import type {
   HttpApiDecodeError,
   InternalError,
   NotFound,
+  TooManyRequests,
   Unauthorized
 } from '.././schemas';
 
@@ -64,7 +65,7 @@ export const getHealthHealthQueryKey = () => {
     }
 
     
-export const getHealthHealthQueryOptions = <TData = Awaited<ReturnType<typeof healthHealth>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getHealthHealthQueryOptions = <TData = Awaited<ReturnType<typeof healthHealth>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -83,10 +84,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type HealthHealthQueryResult = NonNullable<Awaited<ReturnType<typeof healthHealth>>>
-export type HealthHealthQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+export type HealthHealthQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
 
-export function useHealthHealth<TData = Awaited<ReturnType<typeof healthHealth>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useHealthHealth<TData = Awaited<ReturnType<typeof healthHealth>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthHealth>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof healthHealth>>,
@@ -96,7 +97,7 @@ export function useHealthHealth<TData = Awaited<ReturnType<typeof healthHealth>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useHealthHealth<TData = Awaited<ReturnType<typeof healthHealth>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useHealthHealth<TData = Awaited<ReturnType<typeof healthHealth>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthHealth>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof healthHealth>>,
@@ -106,12 +107,12 @@ export function useHealthHealth<TData = Awaited<ReturnType<typeof healthHealth>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useHealthHealth<TData = Awaited<ReturnType<typeof healthHealth>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useHealthHealth<TData = Awaited<ReturnType<typeof healthHealth>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useHealthHealth<TData = Awaited<ReturnType<typeof healthHealth>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useHealthHealth<TData = Awaited<ReturnType<typeof healthHealth>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

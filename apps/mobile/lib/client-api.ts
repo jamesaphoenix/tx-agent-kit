@@ -6,7 +6,14 @@ import type {
   SignInRequest,
   SignUpRequest
 } from '@tx-agent-kit/contracts'
-import { clearAuthToken, writeAuthToken } from './auth-token'
+import {
+  clearAuthToken,
+  clearRefreshToken,
+  readAuthToken,
+  readRefreshToken,
+  writeAuthToken,
+  writeRefreshToken
+} from './auth-token'
 import { api, getApiErrorMessage, getApiErrorStatus } from './axios'
 
 export class ApiClientError extends Error {
@@ -26,6 +33,7 @@ const fail = (error: unknown, fallback: string): never => {
 
 const persistAuthSession = async (response: AuthResponse): Promise<void> => {
   await writeAuthToken(response.token)
+  await writeRefreshToken(response.refreshToken)
 }
 
 export const clientApi = {
@@ -48,7 +56,39 @@ export const clientApi = {
   },
 
   signOut: async (): Promise<void> => {
+    const token = await readAuthToken()
     await clearAuthToken()
+    await clearRefreshToken()
+
+    if (!token) {
+      return
+    }
+
+    try {
+      await api.post('/v1/auth/sign-out', undefined, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+    } catch (error) {
+      void error
+    }
+  },
+
+  refreshSession: async (): Promise<void> => {
+    const refreshToken = await readRefreshToken()
+    if (!refreshToken) {
+      throw new ApiClientError('No refresh token is available')
+    }
+
+    try {
+      const { data } = await api.post<AuthResponse>('/v1/auth/refresh', {
+        refreshToken
+      })
+      await persistAuthSession(data)
+    } catch (error) {
+      return fail(error, 'Failed to refresh session')
+    }
   },
 
   me: async (): Promise<AuthPrincipal> => {

@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { readAuthToken, writeAuthToken, clearAuthToken } from './auth-token'
+import {
+  clearAuthToken,
+  clearRefreshToken,
+  readAuthToken,
+  readRefreshToken,
+  writeAuthToken,
+  writeRefreshToken
+} from './auth-token'
 
 const mockStore: Record<string, string> = {}
 
@@ -38,5 +45,12 @@ describe('auth-token', () => {
     await clearAuthToken()
     const token = await readAuthToken()
     expect(token).toBeNull()
+  })
+
+  it('writes and clears refresh tokens', async () => {
+    await writeRefreshToken('refresh-token')
+    expect(await readRefreshToken()).toBe('refresh-token')
+    await clearRefreshToken()
+    expect(await readRefreshToken()).toBeNull()
   })
 })

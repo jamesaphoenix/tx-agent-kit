@@ -9,6 +9,7 @@ export const toApiAuthUser = (user: AuthUser) => ({
 
 export const toApiAuthSession = (session: AuthSession) => ({
   token: session.token,
+  refreshToken: session.refreshToken,
   user: toApiAuthUser(session.user)
 })
 
@@ -16,5 +17,6 @@ export const toApiAuthPrincipal = (principal: AuthPrincipal) => ({
   userId: principal.userId,
   email: principal.email,
   organizationId: principal.organizationId,
-  roles: [...principal.roles]
+  roles: [...principal.roles],
+  permissions: principal.permissions ? [...principal.permissions] : undefined
 })

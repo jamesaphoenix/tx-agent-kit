@@ -13,6 +13,7 @@ export interface SessionTokenPayload extends JWTPayload {
   sub: string
   email: string
   pwd: number
+  sid: string
 }
 
 const encoder = new TextEncoder()
@@ -39,15 +40,15 @@ export const verifyPassword = (plain: string, hash: string): Effect.Effect<boole
   })
 
 export const signSessionToken = (
-  payload: Pick<SessionTokenPayload, 'sub' | 'email' | 'pwd'>
+  payload: Pick<SessionTokenPayload, 'sub' | 'email' | 'pwd' | 'sid'>
 ): Effect.Effect<string, AuthError> =>
   Effect.tryPromise({
     try: async () =>
-      new SignJWT({ email: payload.email, pwd: payload.pwd })
+      new SignJWT({ email: payload.email, pwd: payload.pwd, sid: payload.sid })
         .setProtectedHeader({ alg: 'HS256' })
         .setSubject(payload.sub)
         .setIssuedAt()
-        .setExpirationTime('7d')
+        .setExpirationTime(getAuthEnv().AUTH_ACCESS_TOKEN_TTL)
         .sign(getSecret()),
     catch: () => new AuthError({ message: 'Failed to sign session token' })
   })
@@ -58,14 +59,16 @@ export const verifySessionToken = (token: string): Effect.Effect<SessionTokenPay
       const { payload } = await jwtVerify(token, getSecret())
       const email = payload.email
       const pwd = payload.pwd
-      if (typeof payload.sub !== 'string' || typeof email !== 'string' || typeof pwd !== 'number') {
+      const sid = payload.sid
+      if (typeof payload.sub !== 'string' || typeof email !== 'string' || typeof pwd !== 'number' || typeof sid !== 'string') {
         throw new Error('Invalid token payload')
       }
       return {
         ...payload,
         sub: payload.sub,
         email,
-        pwd
+        pwd,
+        sid
       } as SessionTokenPayload
     },
     catch: () => new AuthError({ message: 'Invalid session token' })

@@ -12,6 +12,7 @@ export interface CreateOrganizationFactoryOptions {
   stripeCustomerId?: string | null
   stripeSubscriptionId?: string | null
   stripePaymentMethodId?: string | null
+  stripeMeteredSubscriptionItemId?: string | null
   creditsBalance?: number
   reservedCredits?: number
   autoRechargeEnabled?: boolean
@@ -38,6 +39,7 @@ export const createOrganizationFactory = (
     stripeCustomerId: options.stripeCustomerId ?? null,
     stripeSubscriptionId: options.stripeSubscriptionId ?? null,
     stripePaymentMethodId: options.stripePaymentMethodId ?? null,
+    stripeMeteredSubscriptionItemId: options.stripeMeteredSubscriptionItemId ?? null,
     creditsBalance: options.creditsBalance ?? 0,
     reservedCredits: options.reservedCredits ?? 0,
     autoRechargeEnabled: options.autoRechargeEnabled ?? false,

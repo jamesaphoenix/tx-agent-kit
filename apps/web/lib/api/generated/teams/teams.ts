@@ -38,6 +38,7 @@ import type {
   TeamsRemoveTeam200,
   TeamsUpdateTeam200,
   TeamsUpdateTeamBody,
+  TooManyRequests,
   Unauthorized
 } from '.././schemas';
 
@@ -76,7 +77,7 @@ export const getTeamsListTeamsQueryKey = (params?: TeamsListTeamsParams,) => {
     }
 
     
-export const getTeamsListTeamsQueryOptions = <TData = Awaited<ReturnType<typeof teamsListTeams>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(params: TeamsListTeamsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsListTeams>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getTeamsListTeamsQueryOptions = <TData = Awaited<ReturnType<typeof teamsListTeams>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(params: TeamsListTeamsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsListTeams>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -95,10 +96,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type TeamsListTeamsQueryResult = NonNullable<Awaited<ReturnType<typeof teamsListTeams>>>
-export type TeamsListTeamsQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+export type TeamsListTeamsQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
 
-export function useTeamsListTeams<TData = Awaited<ReturnType<typeof teamsListTeams>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useTeamsListTeams<TData = Awaited<ReturnType<typeof teamsListTeams>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params: TeamsListTeamsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsListTeams>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof teamsListTeams>>,
@@ -108,7 +109,7 @@ export function useTeamsListTeams<TData = Awaited<ReturnType<typeof teamsListTea
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useTeamsListTeams<TData = Awaited<ReturnType<typeof teamsListTeams>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useTeamsListTeams<TData = Awaited<ReturnType<typeof teamsListTeams>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params: TeamsListTeamsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsListTeams>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof teamsListTeams>>,
@@ -118,12 +119,12 @@ export function useTeamsListTeams<TData = Awaited<ReturnType<typeof teamsListTea
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useTeamsListTeams<TData = Awaited<ReturnType<typeof teamsListTeams>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useTeamsListTeams<TData = Awaited<ReturnType<typeof teamsListTeams>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params: TeamsListTeamsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsListTeams>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useTeamsListTeams<TData = Awaited<ReturnType<typeof teamsListTeams>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useTeamsListTeams<TData = Awaited<ReturnType<typeof teamsListTeams>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  params: TeamsListTeamsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsListTeams>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -154,7 +155,7 @@ export const teamsCreateTeam = (
   
 
 
-export const getTeamsCreateTeamMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getTeamsCreateTeamMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teamsCreateTeam>>, TError,{data: TeamsCreateTeamBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof teamsCreateTeam>>, TError,{data: TeamsCreateTeamBody}, TContext> => {
 
@@ -183,9 +184,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type TeamsCreateTeamMutationResult = NonNullable<Awaited<ReturnType<typeof teamsCreateTeam>>>
     export type TeamsCreateTeamMutationBody = TeamsCreateTeamBody
-    export type TeamsCreateTeamMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type TeamsCreateTeamMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useTeamsCreateTeam = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useTeamsCreateTeam = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teamsCreateTeam>>, TError,{data: TeamsCreateTeamBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof teamsCreateTeam>>,
@@ -217,7 +218,7 @@ export const getTeamsGetTeamQueryKey = (teamId: string,) => {
     }
 
     
-export const getTeamsGetTeamQueryOptions = <TData = Awaited<ReturnType<typeof teamsGetTeam>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(teamId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsGetTeam>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getTeamsGetTeamQueryOptions = <TData = Awaited<ReturnType<typeof teamsGetTeam>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(teamId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsGetTeam>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -236,10 +237,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type TeamsGetTeamQueryResult = NonNullable<Awaited<ReturnType<typeof teamsGetTeam>>>
-export type TeamsGetTeamQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+export type TeamsGetTeamQueryError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
 
-export function useTeamsGetTeam<TData = Awaited<ReturnType<typeof teamsGetTeam>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useTeamsGetTeam<TData = Awaited<ReturnType<typeof teamsGetTeam>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  teamId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsGetTeam>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof teamsGetTeam>>,
@@ -249,7 +250,7 @@ export function useTeamsGetTeam<TData = Awaited<ReturnType<typeof teamsGetTeam>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useTeamsGetTeam<TData = Awaited<ReturnType<typeof teamsGetTeam>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useTeamsGetTeam<TData = Awaited<ReturnType<typeof teamsGetTeam>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  teamId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsGetTeam>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof teamsGetTeam>>,
@@ -259,12 +260,12 @@ export function useTeamsGetTeam<TData = Awaited<ReturnType<typeof teamsGetTeam>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useTeamsGetTeam<TData = Awaited<ReturnType<typeof teamsGetTeam>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useTeamsGetTeam<TData = Awaited<ReturnType<typeof teamsGetTeam>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  teamId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsGetTeam>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useTeamsGetTeam<TData = Awaited<ReturnType<typeof teamsGetTeam>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>>(
+export function useTeamsGetTeam<TData = Awaited<ReturnType<typeof teamsGetTeam>>, TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>>(
  teamId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof teamsGetTeam>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -296,7 +297,7 @@ export const teamsUpdateTeam = (
   
 
 
-export const getTeamsUpdateTeamMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getTeamsUpdateTeamMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teamsUpdateTeam>>, TError,{teamId: string;data: TeamsUpdateTeamBody}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof teamsUpdateTeam>>, TError,{teamId: string;data: TeamsUpdateTeamBody}, TContext> => {
 
@@ -325,9 +326,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type TeamsUpdateTeamMutationResult = NonNullable<Awaited<ReturnType<typeof teamsUpdateTeam>>>
     export type TeamsUpdateTeamMutationBody = TeamsUpdateTeamBody
-    export type TeamsUpdateTeamMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type TeamsUpdateTeamMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useTeamsUpdateTeam = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useTeamsUpdateTeam = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teamsUpdateTeam>>, TError,{teamId: string;data: TeamsUpdateTeamBody}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof teamsUpdateTeam>>,
@@ -351,7 +352,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   
 
 
-export const getTeamsRemoveTeamMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+export const getTeamsRemoveTeamMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teamsRemoveTeam>>, TError,{teamId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof teamsRemoveTeam>>, TError,{teamId: string}, TContext> => {
 
@@ -380,9 +381,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type TeamsRemoveTeamMutationResult = NonNullable<Awaited<ReturnType<typeof teamsRemoveTeam>>>
     
-    export type TeamsRemoveTeamMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>
+    export type TeamsRemoveTeamMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>
 
-    export const useTeamsRemoveTeam = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | InternalError>,
+    export const useTeamsRemoveTeam = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | NotFound | Conflict | TooManyRequests | InternalError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teamsRemoveTeam>>, TError,{teamId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof teamsRemoveTeam>>,

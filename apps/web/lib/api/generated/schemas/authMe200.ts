@@ -5,10 +5,12 @@
  * Contract for apps/api. Domain behavior is modeled as closed invariants at API boundaries.
  * OpenAPI spec version: 0.1.0
  */
+import type { AuthMe200PermissionsItem } from './authMe200PermissionsItem';
 
 export type AuthMe200 = {
   userId: string;
   email: string;
   organizationId?: string;
   roles: string[];
+  permissions?: AuthMe200PermissionsItem[];
 };

@@ -1,5 +1,6 @@
 import * as Schema from 'effect/Schema'
 import { emailSchema } from './common.js'
+import { permissionActions } from './literals.js'
 
 export const userSchema = Schema.Struct({
   id: Schema.UUID,
@@ -12,7 +13,8 @@ export const authPrincipalSchema = Schema.Struct({
   userId: Schema.UUID,
   email: emailSchema,
   organizationId: Schema.optional(Schema.UUID),
-  roles: Schema.Array(Schema.String)
+  roles: Schema.Array(Schema.String),
+  permissions: Schema.optional(Schema.Array(Schema.Literal(...permissionActions)))
 })
 
 export const signUpRequestSchema = Schema.Struct({
@@ -45,7 +47,33 @@ export const resetPasswordResponseSchema = Schema.Struct({
 
 export const authResponseSchema = Schema.Struct({
   token: Schema.String,
+  refreshToken: Schema.String,
   user: userSchema
+})
+
+export const refreshSessionRequestSchema = Schema.Struct({
+  refreshToken: Schema.String.pipe(Schema.minLength(1))
+})
+
+export const refreshSessionResponseSchema = authResponseSchema
+
+export const signOutResponseSchema = Schema.Struct({
+  revoked: Schema.Boolean
+})
+
+export const signOutAllResponseSchema = Schema.Struct({
+  revokedSessions: Schema.Number
+})
+
+export const googleAuthStartResponseSchema = Schema.Struct({
+  authorizationUrl: Schema.String,
+  state: Schema.String,
+  expiresAt: Schema.String
+})
+
+export const googleAuthCallbackRequestSchema = Schema.Struct({
+  code: Schema.String.pipe(Schema.minLength(1)),
+  state: Schema.String.pipe(Schema.minLength(1))
 })
 
 export type User = Schema.Schema.Type<typeof userSchema>
@@ -57,3 +85,9 @@ export type ForgotPasswordResponse = Schema.Schema.Type<typeof forgotPasswordRes
 export type ResetPasswordRequest = Schema.Schema.Type<typeof resetPasswordRequestSchema>
 export type ResetPasswordResponse = Schema.Schema.Type<typeof resetPasswordResponseSchema>
 export type AuthResponse = Schema.Schema.Type<typeof authResponseSchema>
+export type RefreshSessionRequest = Schema.Schema.Type<typeof refreshSessionRequestSchema>
+export type RefreshSessionResponse = Schema.Schema.Type<typeof refreshSessionResponseSchema>
+export type SignOutResponse = Schema.Schema.Type<typeof signOutResponseSchema>
+export type SignOutAllResponse = Schema.Schema.Type<typeof signOutAllResponseSchema>
+export type GoogleAuthStartResponse = Schema.Schema.Type<typeof googleAuthStartResponseSchema>
+export type GoogleAuthCallbackRequest = Schema.Schema.Type<typeof googleAuthCallbackRequestSchema>

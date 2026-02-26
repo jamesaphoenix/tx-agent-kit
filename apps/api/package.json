@@ -21,13 +21,16 @@
     "@tx-agent-kit/core": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
     "@tx-agent-kit/observability": "workspace:*",
-    "effect": "^3.19.16"
+    "effect": "^3.19.16",
+    "openid-client": "^5.7.1",
+    "stripe": "^19.2.0"
   },
   "devDependencies": {
     "@tx-agent-kit/auth": "workspace:*",
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
     "@types/supertest": "^6.0.3",
+    "jose": "^6.1.0",
     "supertest": "^7.1.4"
   }
 }

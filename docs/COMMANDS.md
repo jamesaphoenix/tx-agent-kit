@@ -21,6 +21,7 @@
 - `pnpm test`: workspace unit tests.
 - `pnpm test:integration`: single Vitest workspace integration run with global setup (infra + DB reset + pgTAP once).
 - `INTEGRATION_SKIP_INFRA_ENSURE=1 pnpm test:integration`: skip infra bootstrap when stack is already healthy (observability health check still runs).
+- `INTEGRATION_SKIP_OBSERVABILITY=1 pnpm test:integration`: skip observability health preflight when debugging unrelated integration failures.
 - `INTEGRATION_DRY_RUN=1 pnpm test:integration -- --filter api --dry-run`: print resolved runner config without executing tests.
 - `pnpm test:boilerplate`: run the parallel-worktree boilerplate meta-test lane (shared integration harness preflight + dedicated boilerplate suite).
 - `BOILERPLATE_DRY_RUN=1 pnpm test:boilerplate -- --dry-run`: print resolved boilerplate runner wiring without executing tests.
@@ -36,6 +37,7 @@
 - `pnpm type-check:quiet`
 - `pnpm test:quiet`
 - `pnpm test:integration:quiet`
+- `INTEGRATION_SKIP_OBSERVABILITY=1 pnpm test:integration:quiet`: skip observability health preflight in quiet mode.
 - `pnpm test:boilerplate:quiet`
 - Integration workspace runners use a shared lock (`/tmp/tx-agent-kit-integration.lock`) with PID-aware stale-lock reaping.
 - `TEST_MAX_WORKERS=8 pnpm test`: cap workspace unit-test workers (defaults to host CPU parallelism).

@@ -19,6 +19,11 @@ const userEmailUniqueConstraints = new Set([
   'users_email_key'
 ])
 
+const authLoginIdentityUniqueConstraints = new Set([
+  'auth_login_identities_provider_subject_unique',
+  'auth_login_identities_user_provider_unique'
+])
+
 const getConstraintName = (error: PostgresErrorLike | null): string | undefined =>
   typeof error?.constraint === 'string' && error.constraint.length > 0
     ? error.constraint
@@ -27,6 +32,10 @@ const getConstraintName = (error: PostgresErrorLike | null): string | undefined 
 const getUniqueViolationCode = (constraint: string | undefined): string => {
   if (constraint && userEmailUniqueConstraints.has(constraint)) {
     return 'DB_USER_EMAIL_UNIQUE_VIOLATION'
+  }
+
+  if (constraint && authLoginIdentityUniqueConstraints.has(constraint)) {
+    return 'DB_AUTH_LOGIN_IDENTITY_UNIQUE_VIOLATION'
   }
 
   return 'DB_UNIQUE_VIOLATION'

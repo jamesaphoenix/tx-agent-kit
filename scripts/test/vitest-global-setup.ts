@@ -8,7 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(scriptDir, '../..')
 
-const defaultLockTimeoutSeconds = 1800
+const defaultLockTimeoutSeconds = 600
 const defaultMissingPidGraceSeconds = 15
 const maxAutoIntegrationWorkers = 6
 const maxAutoWebIntegrationWorkers = 4
@@ -151,6 +151,41 @@ const acquireIntegrationLock = async (
 const releaseIntegrationLock = (lockDir: string): void => {
   rmSync(resolve(lockDir, 'pid'), { force: true })
   rmSync(lockDir, { recursive: true, force: true })
+}
+
+const resolveSignalExitCode = (signal: NodeJS.Signals): number => {
+  if (signal === 'SIGINT') {
+    return 130
+  }
+
+  if (signal === 'SIGTERM') {
+    return 143
+  }
+
+  return 1
+}
+
+const registerLockReleaseSignalHandlers = (
+  releaseLock: () => void
+): (() => void) => {
+  const signals: ReadonlyArray<NodeJS.Signals> = ['SIGINT', 'SIGTERM']
+  const handlers = new Map<NodeJS.Signals, () => void>()
+
+  for (const signal of signals) {
+    const handler = () => {
+      releaseLock()
+      process.exit(resolveSignalExitCode(signal))
+    }
+
+    handlers.set(signal, handler)
+    process.once(signal, handler)
+  }
+
+  return () => {
+    for (const [signal, handler] of handlers.entries()) {
+      process.off(signal, handler)
+    }
+  }
 }
 
 const readProcessCommandLine = (pid: number): string | undefined => {
@@ -318,6 +353,17 @@ const runGlobalIntegrationSetup = (): void => {
 export default async () => {
   process.env.AUTH_BCRYPT_ROUNDS ??= '4'
 
+  let lockHeld = false
+  const releaseLock = (): void => {
+    if (!lockHeld) {
+      return
+    }
+
+    releaseIntegrationLock(integrationLockDir)
+    lockHeld = false
+  }
+  const unregisterSignalHandlers = registerLockReleaseSignalHandlers(releaseLock)
+
   const timeoutSeconds = parsePositiveInt(
     process.env.INTEGRATION_LOCK_TIMEOUT_SECONDS,
     defaultLockTimeoutSeconds
@@ -328,13 +374,15 @@ export default async () => {
   )
 
   await acquireIntegrationLock(integrationLockDir, timeoutSeconds, missingPidGraceSeconds)
+  lockHeld = true
 
   try {
     await cleanupPersistentWebHarnessProcesses()
     await cleanupPersistentWebHarnessSchemas()
     runGlobalIntegrationSetup()
   } catch (error) {
-    releaseIntegrationLock(integrationLockDir)
+    unregisterSignalHandlers()
+    releaseLock()
     throw error
   }
 
@@ -343,7 +391,8 @@ export default async () => {
       await cleanupPersistentWebHarnessProcesses()
       await cleanupPersistentWebHarnessSchemas()
     } finally {
-      releaseIntegrationLock(integrationLockDir)
+      unregisterSignalHandlers()
+      releaseLock()
     }
   }
 }

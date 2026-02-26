@@ -1,14 +1,28 @@
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from '@effect/platform'
 import {
+  billingSettingsSchema,
+  createCheckoutSessionSchema,
+  createPortalSessionSchema,
   forgotPasswordRequestSchema,
   forgotPasswordResponseSchema,
+  googleAuthStartResponseSchema,
   invitationAssignableRoles,
   invitationStatuses,
+  orgMemberRoles,
   organizationOnboardingDataSchema,
+  permissionActions,
+  refreshSessionRequestSchema,
+  refreshSessionResponseSchema,
+  rolePermissionMapSchema,
   resetPasswordRequestSchema,
   resetPasswordResponseSchema,
+  signOutAllResponseSchema,
+  signOutResponseSchema,
   sortOrders,
-  subscriptionStatuses
+  subscriptionStatuses,
+  updateBillingSettingsSchema,
+  usageCategories,
+  usageSummarySchema
 } from '@tx-agent-kit/contracts'
 import * as Schema from 'effect/Schema'
 
@@ -25,6 +39,10 @@ export class NotFound extends Schema.TaggedError<NotFound>()('NotFound', {
 }) {}
 
 export class Conflict extends Schema.TaggedError<Conflict>()('Conflict', {
+  message: Schema.String
+}) {}
+
+export class TooManyRequests extends Schema.TaggedError<TooManyRequests>()('TooManyRequests', {
   message: Schema.String
 }) {}
 
@@ -71,6 +89,7 @@ const AuthUser = Schema.Struct({
 
 const AuthResponse = Schema.Struct({
   token: Schema.String,
+  refreshToken: Schema.String,
   user: AuthUser
 })
 
@@ -78,7 +97,8 @@ const PrincipalResponse = Schema.Struct({
   userId: Schema.String,
   email: Schema.String,
   organizationId: Schema.optional(Schema.String),
-  roles: Schema.Array(Schema.String)
+  roles: Schema.Array(Schema.String),
+  permissions: Schema.optional(Schema.Array(Schema.Literal(...permissionActions)))
 })
 
 const DeleteMeResponse = Schema.Struct({
@@ -104,6 +124,21 @@ const ResetPasswordBody = resetPasswordRequestSchema
 
 const ResetPasswordResponse = resetPasswordResponseSchema
 
+const RefreshSessionBody = refreshSessionRequestSchema
+
+const RefreshSessionResponse = refreshSessionResponseSchema
+
+const SignOutResponse = signOutResponseSchema
+
+const SignOutAllResponse = signOutAllResponseSchema
+
+const GoogleAuthStartResponse = googleAuthStartResponseSchema
+
+const GoogleAuthCallbackParams = Schema.Struct({
+  code: Schema.String,
+  state: Schema.String
+})
+
 const Organization = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -112,6 +147,7 @@ const Organization = Schema.Struct({
   stripeCustomerId: Schema.NullOr(Schema.String),
   stripeSubscriptionId: Schema.NullOr(Schema.String),
   stripePaymentMethodId: Schema.NullOr(Schema.String),
+  stripeMeteredSubscriptionItemId: Schema.NullOr(Schema.String),
   creditsBalance: Schema.Number,
   reservedCredits: Schema.Number,
   autoRechargeEnabled: Schema.Boolean,
@@ -234,6 +270,41 @@ const HealthResponse = Schema.Struct({
   service: Schema.String
 })
 
+const BillingSettings = billingSettingsSchema
+
+const UpdateBillingSettingsBody = updateBillingSettingsSchema
+
+const CheckoutSessionBody = createCheckoutSessionSchema
+
+const PortalSessionBody = createPortalSessionSchema
+
+const SessionUrlResponse = Schema.Struct({
+  id: Schema.String,
+  url: Schema.String
+})
+
+const UsageQueryParams = Schema.Struct({
+  category: Schema.Literal(...usageCategories),
+  periodStart: Schema.optional(Schema.String),
+  periodEnd: Schema.optional(Schema.String)
+})
+
+const UsageSummaryResponse = usageSummarySchema
+
+const StripeWebhookResponse = Schema.Struct({
+  processed: Schema.Boolean,
+  idempotent: Schema.Boolean,
+  eventId: Schema.String
+})
+
+const PermissionMapResponse = rolePermissionMapSchema
+
+const MyPermissionsResponse = Schema.Struct({
+  organizationId: Schema.optional(Schema.String),
+  role: Schema.optional(Schema.Literal(...orgMemberRoles)),
+  permissions: Schema.Array(Schema.Literal(...permissionActions))
+})
+
 const DeletedResponse = Schema.Struct({
   deleted: Schema.Boolean
 })
@@ -244,6 +315,15 @@ export const HealthGroup = HttpApiGroup.make('health')
 export const AuthGroup = HttpApiGroup.make('auth')
   .add(HttpApiEndpoint.post('signUp', '/v1/auth/sign-up').setPayload(SignUpBody).addSuccess(AuthResponse, { status: 201 }))
   .add(HttpApiEndpoint.post('signIn', '/v1/auth/sign-in').setPayload(SignInBody).addSuccess(AuthResponse))
+  .add(HttpApiEndpoint.post('refreshSession', '/v1/auth/refresh').setPayload(RefreshSessionBody).addSuccess(RefreshSessionResponse))
+  .add(HttpApiEndpoint.post('signOut', '/v1/auth/sign-out').addSuccess(SignOutResponse))
+  .add(HttpApiEndpoint.post('signOutAll', '/v1/auth/sign-out-all').addSuccess(SignOutAllResponse))
+  .add(HttpApiEndpoint.get('googleStart', '/v1/auth/google/start').addSuccess(GoogleAuthStartResponse))
+  .add(
+    HttpApiEndpoint.get('googleCallback', '/v1/auth/google/callback')
+      .setUrlParams(GoogleAuthCallbackParams)
+      .addSuccess(AuthResponse)
+  )
   .add(
     HttpApiEndpoint.post('forgotPassword', '/v1/auth/forgot-password')
       .setPayload(ForgotPasswordBody)
@@ -329,13 +409,56 @@ export const TeamsGroup = HttpApiGroup.make('teams')
       .addSuccess(DeletedResponse)
   )
 
+export const BillingGroup = HttpApiGroup.make('billing')
+  .add(
+    HttpApiEndpoint.get('getBillingSettings')`/v1/organizations/${OrganizationIdParam}/billing`
+      .addSuccess(BillingSettings)
+  )
+  .add(
+    HttpApiEndpoint.patch('updateBillingSettings')`/v1/organizations/${OrganizationIdParam}/billing`
+      .setPayload(UpdateBillingSettingsBody)
+      .addSuccess(BillingSettings)
+  )
+  .add(
+    HttpApiEndpoint.post('createCheckoutSession', '/v1/billing/checkout')
+      .setPayload(CheckoutSessionBody)
+      .addSuccess(SessionUrlResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('createPortalSession', '/v1/billing/portal')
+      .setPayload(PortalSessionBody)
+      .addSuccess(SessionUrlResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getUsageSummary')`/v1/organizations/${OrganizationIdParam}/usage`
+      .setUrlParams(UsageQueryParams)
+      .addSuccess(UsageSummaryResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('stripeWebhook', '/v1/webhooks/stripe')
+      .addSuccess(StripeWebhookResponse)
+  )
+
+export const PermissionsGroup = HttpApiGroup.make('permissions')
+  .add(
+    HttpApiEndpoint.get('getPermissionMap', '/v1/permissions')
+      .addSuccess(PermissionMapResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getMyPermissions', '/v1/permissions/me')
+      .addSuccess(MyPermissionsResponse)
+  )
+
 export class TxAgentApi extends HttpApi.make('tx-agent-kit')
   .addError(BadRequest, { status: 400 })
   .addError(Unauthorized, { status: 401 })
   .addError(NotFound, { status: 404 })
   .addError(Conflict, { status: 409 })
+  .addError(TooManyRequests, { status: 429 })
   .addError(InternalError, { status: 500 })
   .add(HealthGroup)
   .add(AuthGroup)
   .add(OrganizationsGroup)
-  .add(TeamsGroup) {}
+  .add(TeamsGroup)
+  .add(BillingGroup)
+  .add(PermissionsGroup) {}
