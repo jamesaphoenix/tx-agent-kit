@@ -229,3 +229,33 @@ Repositories outside `domain-events.ts` must not use inline `.insert(domainEvent
 | Failure | Direct `.insert(domainEvents).values(...)` usage outside the exempted file |
 
 This rule ensures that domain events are always written through a single, auditable code path with consistent validation and transactional guarantees.
+
+### Rule 13 - Exhaustive Switch Default
+
+Every `switch (event.eventType)` dispatcher in `apps/worker/src/workflows*.ts` must include a `default:` case. This prevents silent drops when a new event type is registered but the dispatcher is not updated.
+
+| Check | Detail |
+|-------|--------|
+| Scanned files | `apps/worker/src/workflows*.ts` (non-test) |
+| Pattern | `switch` blocks dispatching on `event.eventType` |
+| Failure | Missing `default:` case in event dispatcher |
+
+## Migration Naming Convention
+
+Migration files in `packages/infra/db/drizzle/migrations/` must follow the naming pattern `NNNN_descriptive_name.sql` where `NNNN` is a zero-padded four-digit prefix and the remainder uses lowercase with underscores.
+
+| Check | Detail |
+|-------|--------|
+| Pattern | `^\d{4}_[a-z][a-z0-9_]*\.sql$` |
+| Duplicate prefix detection | No two files may share the same numeric prefix (historical exceptions: `0008`, `0010`) |
+| Failure | File name does not match convention, or duplicate prefix detected |
+
+## Test File Vitest Import
+
+Every `.test.ts` and `.integration.test.ts` file must reference vitest. This catches stale or empty test files that would silently pass without exercising any assertions.
+
+| Check | Detail |
+|-------|--------|
+| Scanned files | All `*.test.ts` and `*.integration.test.ts` files |
+| Required markers | At least one of: `vitest`, `describe`, `it(`, `test(`, `expect(`, `vi.` |
+| Failure | Test file with no vitest markers |

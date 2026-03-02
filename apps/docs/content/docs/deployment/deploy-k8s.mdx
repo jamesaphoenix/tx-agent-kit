@@ -9,10 +9,10 @@ Kubernetes deploys use a single chart (`deploy/k8s/chart`) with target-specific 
 
 | Target | Namespace | Release | Values file |
 |--------|-----------|---------|-------------|
-| `mac-staging` | `tx-staging` | `<domain>-staging` | `deploy/k8s/chart/values.mac-staging.yaml` |
-| `mac-prod` | `tx-prod` | `<domain>-prod` | `deploy/k8s/chart/values.mac-prod.yaml` |
-| `gke-staging` | `<domain>-loadtest` (default) | `<domain>-loadtest` | `deploy/k8s/chart/values.gke.staging.yaml` |
-| `gke-prod` | `<domain>-loadtest` (default) | `<domain>-loadtest` | `deploy/k8s/chart/values.gke.prod.yaml` |
+| `mac-staging` | `tx-staging` | `tx-agent-kit-staging` | `deploy/k8s/chart/values.mac-staging.yaml` |
+| `mac-prod` | `tx-prod` | `tx-agent-kit-prod` | `deploy/k8s/chart/values.mac-prod.yaml` |
+| `gke-staging` | `tx-agent-kit-loadtest` (default) | `tx-agent-kit-loadtest` | `deploy/k8s/chart/values.gke.staging.yaml` |
+| `gke-prod` | `tx-agent-kit-loadtest` (default) | `tx-agent-kit-loadtest` | `deploy/k8s/chart/values.gke.prod.yaml` |
 
 ## Commands
 

@@ -1,9 +1,9 @@
 ---
-title: Why <domain> is Different
+title: Why tx-agent-kit is Different
 description: How this kit differs from typical boilerplates by encoding taste in mechanical checks
 ---
 
-Most starter kits and boilerplates give you a file structure and some example code. `<domain>` gives you an **architecture enforcement system** that happens to also include a file structure and example code.
+Most starter kits and boilerplates give you a file structure and some example code. `tx-agent-kit` gives you an **architecture enforcement system** that happens to also include a file structure and example code.
 
 ## The problem with boilerplates
 
@@ -22,9 +22,9 @@ It says "put components here, put services there." But nothing prevents you from
 
 Within a few weeks of active development, the original structure is eroded. Shortcuts accumulate. Conventions drift. The architecture diagram on the README no longer matches reality.
 
-## The `<domain>` approach
+## The tx-agent-kit approach
 
-`<domain>` takes every architectural decision and asks: **can we enforce this mechanically?**
+`tx-agent-kit` takes every architectural decision and asks: **can we enforce this mechanically?**
 
 | Decision | Enforcement |
 |----------|-------------|
@@ -33,7 +33,7 @@ Within a few weeks of active development, the original structure is eroded. Shor
 | All web files are client components | Structural check: every `.tsx` in `apps/web/app` starts with `'use client'` |
 | Port files do not export interfaces | AST-level structural invariant check |
 | Only one file reads localStorage | ESLint restriction + structural check |
-| No `console.*` in source | Lint ban; use `@<domain>/logging` instead |
+| No `console.*` in source | Lint ban; use `@tx-agent-kit/logging` instead |
 | No `process.env` in domain/services | Structural invariant: env reads only in dedicated env modules |
 | No `as any` in source | Lint rule across all source modules |
 
@@ -45,7 +45,7 @@ Every codebase has "taste": the implicit conventions that experienced engineers 
 
 In a traditional project, this taste lives in people's heads. New team members learn it through osmosis and correction. AI agents never learn it because they cannot observe code reviews.
 
-`<domain>` **encodes taste in code**. The ESLint config at `packages/tooling/eslint-config/domain-invariants.js` contains dozens of rules that express architectural decisions. The script at `scripts/lint/enforce-domain-invariants.mjs` performs structural checks that ESLint cannot express. Together, they form a machine-readable specification of "how we do things here."
+`tx-agent-kit` **encodes taste in code**. The ESLint config at `packages/tooling/eslint-config/domain-invariants.js` contains dozens of rules that express architectural decisions. The script at `scripts/lint/enforce-domain-invariants.mjs` performs structural checks that ESLint cannot express. Together, they form a machine-readable specification of "how we do things here."
 
 ## Benefits beyond agents
 
@@ -53,7 +53,7 @@ This approach pays dividends even without AI agents. New developers get immediat
 
 ## The scaffold CLI
 
-Beyond enforcement, `<domain>` provides a scaffold CLI that generates correct-by-construction code:
+Beyond enforcement, `tx-agent-kit` provides a scaffold CLI that generates correct-by-construction code:
 
 ```bash
 pnpm scaffold:crud --domain billing --entity invoice --dry-run

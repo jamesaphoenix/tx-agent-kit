@@ -1,9 +1,9 @@
 ---
 title: Architecture Overview
-description: High-level architecture of the <domain> monorepo
+description: High-level architecture of the tx-agent-kit monorepo
 ---
 
-`<domain>` is a pnpm monorepo organized into two top-level directories: `apps/` for deployable applications and `packages/` for shared libraries.
+`tx-agent-kit` is a pnpm monorepo organized into two top-level directories: `apps/` for deployable applications and `packages/` for shared libraries.
 
 ## Applications
 
@@ -39,7 +39,7 @@ Shared packages provide domain logic, infrastructure, and tooling:
 
 2. **Schema as the contract layer.** `effect/Schema` is the single validation library across the entire stack. No zod, no joi, no yup. Contracts in `packages/contracts` are shared between the API and its consumers.
 
-3. **DDD in packages/core.** Domain logic lives in `packages/core/src/domains/<domain>/` following the domain-driven design pattern. Persistence implementations live in `packages/infra/db/src/repositories/`.
+3. **DDD in packages/core.** Domain logic lives in `packages/core/src/domains/{domain}/` following the domain-driven design pattern. Persistence implementations live in `packages/infra/db/src/repositories/`.
 
 4. **Inward-only dependencies.** Domain code never depends on infrastructure. The dependency arrow always points inward, from concrete to abstract.
 

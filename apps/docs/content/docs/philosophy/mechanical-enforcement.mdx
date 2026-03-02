@@ -3,17 +3,25 @@ title: Mechanical Enforcement
 description: "Why architectural decisions are enforced in code: ESLint rules, structural checks, and shell invariants"
 ---
 
-The central principle of `<domain>` is: **if it is important, enforce it in code.** Conventions that exist only in documentation are conventions that will be violated.
+The central principle of `tx-agent-kit` is: **if it is important, enforce it in code.** Conventions that exist only in documentation are conventions that will be violated.
 
 ## Three layers of enforcement
 
-`<domain>` uses three complementary enforcement layers, each catching a different class of violations:
+`tx-agent-kit` uses three complementary enforcement layers, each catching a different class of violations:
 
 ### 1. ESLint rules
 
 ESLint catches import violations, banned APIs, and naming conventions at the file level. These rules run in the editor (instant feedback) and in CI (gate on merge).
 
-The domain invariants live in `packages/tooling/eslint-config/domain-invariants.js`:
+The base preset is `strictTypeChecked` from `typescript-eslint`, which provides ~20 stricter rules beyond `recommended` (unnecessary conditions, exhaustive error typing, safer template expressions, etc.).
+
+ESLint rules are split across config files in `packages/tooling/eslint-config/`:
+
+- `base.js` - `strictTypeChecked` preset and project-wide rule overrides
+- `domain-invariants.js` - Architecture and DDD layer boundary rules
+- `code-quality.js` - General code quality rules (nested ternaries, require, void)
+- `effect-consistency.js` - Effect-specific patterns (ban `new Promise`)
+- `type-safety.js` - Exhaustive switch checks, nullish coalescing, optional chain, consistent type exports
 
 ```js
 // Example: ban drizzle-orm imports outside packages/infra/db
@@ -33,11 +41,25 @@ The following table summarizes the key rules enforced via ESLint:
 |------|-----------------|
 | No `drizzle-orm` imports outside `packages/infra/db` | Direct DB access from app or domain code |
 | No `effect` imports from `apps/web` | Effect dependencies leaking into the web client |
-| No `console.*` in source modules | Unstructured logging; use `@<domain>/logging` instead |
+| No `console.*` in source modules | Unstructured logging; use `@tx-agent-kit/logging` instead |
 | No `process.env` in domain/services code | Environment coupling in business logic |
 | No `as any` assertions in source modules | Unsafe type coercions bypassing the type system |
 | No `@ts-ignore` or `eslint-disable` directives in source | Suppressed warnings hiding real issues |
 | No default exports in domain layer files | Inconsistent import naming across consumers |
+| No nested ternaries | Unreadable conditional chains; use `if/else` or `&&` chains |
+| No `new Promise()` in core/API source | Raw promise constructors; use `Effect.promise`/`Effect.tryPromise` |
+| No `require()` in TypeScript | CommonJS imports; use ESM `import` |
+| No floating `void` expressions | Error swallowing; use `await`, `.catch()`, or `Effect.runFork` |
+| No relative cross-package imports | Traversal imports; use `@tx-agent-kit/*` aliases |
+| Explicit return types on port functions | Missing contracts on exported port boundaries |
+| No `instanceof` in domain layer | Runtime type checks; use discriminated unions with `_tag` |
+| No `Object.assign` in domain layer | Mutation; use object spread `{ ...obj }` |
+| Exhaustive switch statements on unions/enums | Missing cases in discriminated union handling |
+| Prefer `??` over `\|\|` for nullish checks | Falsy-but-valid values (`0`, `''`, `false`) coerced away |
+| Prefer optional chain `a?.b` | Verbose manual null checks `a && a.b` |
+| Consistent type exports (`export type`) | Type-only exports missing the `type` keyword |
+| No unnecessary conditions | Dead code branches; conditions always true/false |
+| No switch fallthrough | Missing `break`/`return` in switch cases (TypeScript compiler) |
 
 ### 2. Structural invariant checks
 

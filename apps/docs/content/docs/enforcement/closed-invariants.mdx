@@ -9,7 +9,7 @@ This is the complete list of mechanically enforced invariants. Each invariant is
 
 | Invariant | Description |
 |-----------|-------------|
-| API-first web | `apps/web` never imports `@<domain>/db` or `drizzle-orm` |
+| API-first web | `apps/web` never imports `@tx-agent-kit/db` or `drizzle-orm` |
 | Web runtime simplicity | `apps/web` must not import `effect`/`effect/*` |
 | Client-only runtime | No `apps/web/app/api`, no proxy/middleware, no `next/server`/`next/headers` |
 | Client component contract | All `.tsx` under `app/` and `components/` start with `'use client'` |
@@ -29,7 +29,7 @@ This is the complete list of mechanically enforced invariants. Each invariant is
 
 | Invariant | Description |
 |-----------|-------------|
-| Logging discipline | `console.*` is banned; use `@<domain>/logging` |
+| Logging discipline | `console.*` is banned; use `@tx-agent-kit/logging` |
 | Drizzle isolation | Only `packages/infra/db` imports `drizzle-orm` |
 | Schema-first boundaries | Validation uses `effect/Schema` only (Zod banned) |
 

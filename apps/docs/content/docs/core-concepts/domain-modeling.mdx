@@ -138,7 +138,7 @@ The domain layer has strict exclusions:
 | HTTP calls | Infrastructure concern. Belongs in `adapters/` |
 | `Date.now()` / `new Date()` | Non-deterministic. Inject time as parameter |
 | `Math.random()` | Non-deterministic. Inject via ports |
-| `console.log` | Side effect. Use `@<domain>/logging` in outer layers |
+| `console.log` | Side effect. Use `@tx-agent-kit/logging` in outer layers |
 | `process.env` | Configuration. Use typed env modules |
 | Effect services | Domain should be plain TypeScript; Effect is for orchestration |
 | Default exports | Convention. Named exports only |

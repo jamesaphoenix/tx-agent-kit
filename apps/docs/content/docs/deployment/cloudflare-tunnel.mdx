@@ -20,7 +20,7 @@ Optional local-dev variables:
 - `DEV_CLOUDFLARE_TUNNEL_URL` (defaults to `http://127.0.0.1:${API_PORT}`)
 - `DEV_CLOUDFLARE_TUNNEL_TOKEN` (named tunnel mode; if set, URL mode is skipped)
 - `DEV_CLOUDFLARE_TUNNEL_LOG_FILE` (default `.data/cloudflared/dev-tunnel.log`)
-- `DEV_CLOUDFLARE_TUNNEL_LOCK_DIR` (default `/tmp/<domain>-dev-tunnel.lock`)
+- `DEV_CLOUDFLARE_TUNNEL_LOCK_DIR` (default `/tmp/tx-agent-kit-dev-tunnel.lock`)
 - `DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS` (default `120`)
 - `DEV_CLOUDFLARE_TUNNEL_MISSING_PID_GRACE_SECONDS` (default `15`)
 
@@ -67,13 +67,13 @@ pnpm deploy:tunnel:check all
 
 ## Routing model
 
-- `api-dev.<domain>` routes to your dev API upstream (default `http://127.0.0.1:4000`).
-- `api-staging.<domain>` routes to Mac staging API service.
-- `api.<domain>` routes to Mac prod API service.
+- `api-dev.your-domain.com` routes to your dev API upstream (default `http://127.0.0.1:4000`).
+- `api-staging.your-domain.com` routes to Mac staging API service.
+- `api.your-domain.com` routes to Mac prod API service.
 - Deploy scripts run tunnel reconciliation/check before smoke tests for Mac Kubernetes deploys.
 
-## Example host plan (`<domain>`)
+## Example host plan
 
-- `api-dev.<domain>` -> `CLOUDFLARE_TUNNEL_HOST_DEV`
-- `api-staging.<domain>` -> `CLOUDFLARE_TUNNEL_HOST_STAGING`
-- `api.<domain>` -> `CLOUDFLARE_TUNNEL_HOST_PROD`
+- `api-dev.your-domain.com` -> `CLOUDFLARE_TUNNEL_HOST_DEV`
+- `api-staging.your-domain.com` -> `CLOUDFLARE_TUNNEL_HOST_STAGING`
+- `api.your-domain.com` -> `CLOUDFLARE_TUNNEL_HOST_PROD`

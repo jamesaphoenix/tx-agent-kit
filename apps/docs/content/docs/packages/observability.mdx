@@ -10,10 +10,10 @@ The observability package provides OpenTelemetry (OTEL) bootstrap helpers that c
 ## Usage
 
 ```typescript
-import { startTelemetry, stopTelemetry } from '@<domain>/observability'
+import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
 
 // On startup
-await startTelemetry('<domain>-api')
+await startTelemetry('tx-agent-kit-api')
 
 // On shutdown
 await stopTelemetry()
@@ -57,10 +57,10 @@ Configuration is centralized in `packages/infra/observability/src/env.ts`:
 The package exports a smoke test helper for verifying the telemetry pipeline:
 
 ```typescript
-import { emitNodeTelemetrySmoke } from '@<domain>/observability'
+import { emitNodeTelemetrySmoke } from '@tx-agent-kit/observability'
 
 // Emits a test span and increments the startup counter
-emitNodeTelemetrySmoke('<domain>-api')
+emitNodeTelemetrySmoke('tx-agent-kit-api')
 ```
 
 ## Integration Testing

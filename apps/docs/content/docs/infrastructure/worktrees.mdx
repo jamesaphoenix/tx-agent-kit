@@ -3,7 +3,7 @@ title: Git Worktrees
 description: Parallel development with deterministic port allocation and isolated database schemas
 ---
 
-`<domain>` supports parallel development through git worktrees. Each worktree gets deterministic port assignments and an isolated database schema, while sharing the same Docker infrastructure containers.
+`tx-agent-kit` supports parallel development through git worktrees. Each worktree gets deterministic port assignments and an isolated database schema, while sharing the same Docker infrastructure containers.
 
 ## How it works
 
@@ -55,7 +55,7 @@ The setup script writes the following keys to the worktree `.env`:
 | `API_PORT` | `4142` |
 | `MOBILE_PORT` | `8223` |
 | `WORKER_INSPECT_PORT` | `9371` |
-| `TEMPORAL_TASK_QUEUE` | `<domain>-feature-auth` |
+| `TEMPORAL_TASK_QUEUE` | `tx-agent-kit-feature-auth` |
 | `API_BASE_URL` | `http://localhost:4142` |
 | `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:4142` |
 | `EXPO_PUBLIC_API_BASE_URL` | `http://localhost:4142` |
@@ -66,14 +66,14 @@ The setup script writes the following keys to the worktree `.env`:
 
 ## Shared infrastructure
 
-All worktrees share the same Docker containers. The `docker-compose.yml` project name is pinned to `<domain>`, so `pnpm infra:ensure` from any worktree connects to the same running services.
+All worktrees share the same Docker containers. The `docker-compose.yml` project name is pinned to `tx-agent-kit`, so `pnpm infra:ensure` from any worktree connects to the same running services.
 
 ### Isolated per worktree
 
 | Resource | Isolation mechanism |
 |----------|-------------------|
 | Database schema | Each worktree gets its own PostgreSQL schema within `<domain_identifier>` |
-| Temporal task queue | Each worktree uses a unique queue name (`<domain>-<name>`), preventing workers from competing for the same workflows |
+| Temporal task queue | Each worktree uses a unique queue name (`tx-agent-kit-{name}`), preventing workers from competing for the same workflows |
 | Application ports | Each worktree binds to different host ports, allowing simultaneous dev servers |
 
 ### Shared across worktrees

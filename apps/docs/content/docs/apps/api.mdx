@@ -5,7 +5,7 @@ description: Effect HttpApi server powering auth, organizations, teams, billing/
 
 # API Server (`apps/api`)
 
-The API server is the backbone of `<domain>`. It is built on [Effect HttpApi](https://effect.website/docs/platform/http-api) and exposes a fully typed, schema-validated REST API. The server runs on port **4000** by default.
+The API server is the backbone of `tx-agent-kit`. It is built on [Effect HttpApi](https://effect.website/docs/platform/http-api) and exposes a fully typed, schema-validated REST API. The server runs on port **4000** by default.
 
 ## Architecture
 
@@ -48,7 +48,7 @@ Sensitive auth paths are protected by an in-memory rate limiter that enforces tw
 | `AUTH_RATE_LIMIT_MAX_REQUESTS` | `15` | Maximum requests per IP per window. |
 | `AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS` | Same as IP limit | Maximum requests per identifier (email) per window. |
 
-The set of rate-limited paths is defined centrally in `@<domain>/contracts` (`authRateLimitedPaths`).
+The set of rate-limited paths is defined centrally in `@tx-agent-kit/contracts` (`authRateLimitedPaths`).
 
 ### Proxy trust
 
@@ -168,7 +168,7 @@ Runtime environment variables are read exclusively through `apps/api/src/config/
 The API integration suite lives at `apps/api/src/api.integration.test.ts` and uses the standardized harness:
 
 ```typescript
-import { createDbAuthContext } from '@<domain>/testkit'
+import { createDbAuthContext } from '@tx-agent-kit/testkit'
 
 const ctx = createDbAuthContext({
   apiCwd: resolve(dirname(fileURLToPath(import.meta.url)), '..')

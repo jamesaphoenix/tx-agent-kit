@@ -17,10 +17,10 @@ Contracts are imported by the API routes for request validation and by the domai
 
 ```typescript
 // Used in domain layer
-import { type SubscriptionStatus, subscriptionStatuses } from '@<domain>/contracts'
+import { type SubscriptionStatus, subscriptionStatuses } from '@tx-agent-kit/contracts'
 
 // Used in API route validation
-import { createOrganizationRequestSchema } from '@<domain>/contracts'
+import { createOrganizationRequestSchema } from '@tx-agent-kit/contracts'
 ```
 
 ## Schema-First Boundaries
@@ -52,7 +52,7 @@ Domain event types are registered centrally in `packages/contracts/src/literals.
 Every domain event must have its type string listed in `domainEventTypes` before it can be written to the outbox. The aggregate type must also appear in `domainEventAggregateTypes`. These arrays are the canonical registry consumed by the domain layer, the outbox repository, and structural enforcement scripts.
 
 ```typescript
-import { domainEventTypes, domainEventAggregateTypes, domainEventStatuses } from '@<domain>/contracts'
+import { domainEventTypes, domainEventAggregateTypes, domainEventStatuses } from '@tx-agent-kit/contracts'
 ```
 
 `domainEventStatuses` defines the allowed lifecycle states for outbox events: `pending` | `processing` | `published` | `failed`.

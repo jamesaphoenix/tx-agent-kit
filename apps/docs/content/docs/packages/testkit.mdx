@@ -12,7 +12,7 @@ The testkit package provides shared test infrastructure used across all integrat
 The primary test harness used by API, web, and worker integration suites:
 
 ```typescript
-import { createDbAuthContext } from '@<domain>/testkit'
+import { createDbAuthContext } from '@tx-agent-kit/testkit'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -31,8 +31,8 @@ Integration test runners use file locks to prevent concurrent execution from clo
 
 | Lock File | Purpose |
 |-----------|---------|
-| `/tmp/<domain>-db-reset.lock` | Guards database reset operations |
-| `/tmp/<domain>-integration.lock` | Guards full integration suite execution |
+| `/tmp/tx-agent-kit-db-reset.lock` | Guards database reset operations |
+| `/tmp/tx-agent-kit-integration.lock` | Guards full integration suite execution |
 
 This prevents two parallel agent sessions or CI jobs from running integration tests against the same database simultaneously.
 

@@ -14,7 +14,7 @@ The auth package provides low-level authentication primitives: password hashing 
 Secure password hashing using industry-standard algorithms. Provides hash and verify functions:
 
 ```typescript
-import { hashPassword, verifyPassword } from '@<domain>/auth'
+import { hashPassword, verifyPassword } from '@tx-agent-kit/auth'
 
 const hashed = await hashPassword(plaintext)
 const isValid = await verifyPassword(plaintext, hashed)
@@ -25,7 +25,7 @@ const isValid = await verifyPassword(plaintext, hashed)
 Token generation and verification for session management:
 
 ```typescript
-import { signToken, verifyToken } from '@<domain>/auth'
+import { signToken, verifyToken } from '@tx-agent-kit/auth'
 
 const token = await signToken({ userId: user.id })
 const payload = await verifyToken(token)

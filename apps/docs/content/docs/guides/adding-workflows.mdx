@@ -21,11 +21,11 @@ Activities are normal async functions registered with the worker. They handle al
 
 ```typescript
 // apps/worker/src/activities.ts
-import { createLogger } from '@<domain>/logging'
-import { domainEventsRepository } from '@<domain>/db'
+import { createLogger } from '@tx-agent-kit/logging'
+import { domainEventsRepository } from '@tx-agent-kit/db'
 import { Effect } from 'effect'
 
-const logger = createLogger('<domain>-worker-activities')
+const logger = createLogger('tx-agent-kit-worker-activities')
 
 export const activities = {
   fetchUnprocessedEvents: async (batchSize: number): Promise<ReadonlyArray<SerializedDomainEvent>> => {
@@ -309,9 +309,9 @@ Each schedule follows a **describe/update-or-create** pattern with `ScheduleOver
 // apps/worker/src/schedules.ts
 import type { Client } from '@temporalio/client'
 import { isGrpcServiceError, ScheduleOverlapPolicy } from '@temporalio/client'
-import { createLogger } from '@<domain>/logging'
+import { createLogger } from '@tx-agent-kit/logging'
 
-const logger = createLogger('<domain>-worker-schedules')
+const logger = createLogger('tx-agent-kit-worker-schedules')
 const GRPC_STATUS_NOT_FOUND = 5
 const GRPC_STATUS_ALREADY_EXISTS = 6
 

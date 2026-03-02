@@ -1,9 +1,9 @@
 ---
 title: Logging
-description: Structured JSON logging via @<domain>/logging with OTEL log record emission
+description: Structured JSON logging via @tx-agent-kit/logging with OTEL log record emission
 ---
 
-All logging in `<domain>` goes through the `@<domain>/logging` package. Direct `console.*` calls are banned by ESLint across all source modules.
+All logging in `tx-agent-kit` goes through the `@tx-agent-kit/logging` package. Direct `console.*` calls are banned by ESLint across all source modules.
 
 ## Why structured logging
 
@@ -12,7 +12,7 @@ Structured logs are machine-parseable JSON objects rather than free-form strings
 ## Creating a logger
 
 ```typescript
-import { createLogger } from '@<domain>/logging'
+import { createLogger } from '@tx-agent-kit/logging'
 
 const logger = createLogger('my-service')
 
@@ -78,7 +78,7 @@ The logging package provides higher-level utilities for common patterns.
 ### `logError`
 
 ```typescript
-import { logError } from '@<domain>/logging'
+import { logError } from '@tx-agent-kit/logging'
 
 try {
   await riskyOperation()
@@ -90,7 +90,7 @@ try {
 ### `logPerformance` and `createPerfLogger`
 
 ```typescript
-import { createPerfLogger } from '@<domain>/logging'
+import { createPerfLogger } from '@tx-agent-kit/logging'
 
 const perf = createPerfLogger(logger, 'database.query', { table: 'organizations' })
 const result = await db.query(...)
@@ -101,7 +101,7 @@ perf.end({ rowCount: result.length })
 ### `logStateChange`
 
 ```typescript
-import { logStateChange } from '@<domain>/logging'
+import { logStateChange } from '@tx-agent-kit/logging'
 
 logStateChange(logger, 'pending', 'processing', { taskId })
 // Logs: "State changed from pending to processing"
@@ -110,7 +110,7 @@ logStateChange(logger, 'pending', 'processing', { taskId })
 ### `logProgress`
 
 ```typescript
-import { logProgress } from '@<domain>/logging'
+import { logProgress } from '@tx-agent-kit/logging'
 
 logProgress(logger, 50, 'Processing batch', { batchId })
 // Logs: "Progress: 50% - Processing batch"
@@ -127,7 +127,7 @@ When `OTEL_LOGS_EXPORTER=otlp` is set (the default), logs flow through the OTEL 
 A default logger is exported for convenience, using the `SERVICE_NAME` environment variable:
 
 ```typescript
-import { defaultLogger } from '@<domain>/logging'
+import { defaultLogger } from '@tx-agent-kit/logging'
 
 defaultLogger.info('Application-wide log')
 ```

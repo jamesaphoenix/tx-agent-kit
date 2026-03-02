@@ -28,8 +28,8 @@ The script builds two container images:
 
 | Image | Source | Base |
 |-------|--------|------|
-| `<domain>-api` | `apps/api` | Node.js 22 Alpine |
-| `<domain>-worker` | `apps/worker` | Node.js 22 Alpine |
+| `tx-agent-kit-api` | `apps/api` | Node.js 22 Alpine |
+| `tx-agent-kit-worker` | `apps/worker` | Node.js 22 Alpine |
 
 Both images are built from the monorepo root using multi-stage Dockerfiles. The build context includes the full monorepo to resolve internal package dependencies via pnpm workspaces.
 
@@ -38,8 +38,8 @@ Both images are built from the monorepo root using multi-stage Dockerfiles. The 
 Images are tagged with the current git commit SHA:
 
 ```
-<domain>-api:a1b2c3d
-<domain>-worker:a1b2c3d
+tx-agent-kit-api:a1b2c3d
+tx-agent-kit-worker:a1b2c3d
 ```
 
 ## Pushing and pinning digests
@@ -53,8 +53,8 @@ When `PUSH_IMAGES=1` is set, the script:
 The artifact file looks like:
 
 ```bash
-API_IMAGE=registry.example.com/<domain>-api@sha256:abc123...
-WORKER_IMAGE=registry.example.com/<domain>-worker@sha256:def456...
+API_IMAGE=registry.example.com/tx-agent-kit-api@sha256:abc123...
+WORKER_IMAGE=registry.example.com/tx-agent-kit-worker@sha256:def456...
 ```
 
 ## Using artifacts in deployment

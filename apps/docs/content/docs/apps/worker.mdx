@@ -5,7 +5,7 @@ description: Temporal worker for durable workflow execution with strict determin
 
 # Worker (`apps/worker`)
 
-The worker application connects to Temporal and executes durable workflows and activities. It runs as a long-lived process that polls the `<domain>` task queue.
+The worker application connects to Temporal and executes durable workflows and activities. It runs as a long-lived process that polls the `tx-agent-kit` task queue.
 
 ## Architecture
 
@@ -106,7 +106,7 @@ Environment variables are centralized in `apps/worker/src/config/env.ts`:
 | `TEMPORAL_RUNTIME_MODE` | Runtime mode (`cli` or `cloud`) |
 | `TEMPORAL_ADDRESS` | Temporal server address |
 | `TEMPORAL_NAMESPACE` | Temporal namespace |
-| `TEMPORAL_TASK_QUEUE` | Task queue name (default: `<domain>`) |
+| `TEMPORAL_TASK_QUEUE` | Task queue name (default: `tx-agent-kit`) |
 | `TEMPORAL_API_KEY` | Required when runtime mode is `cloud` |
 | `TEMPORAL_TLS_ENABLED` | Must be `true` when runtime mode is `cloud` |
 | `TEMPORAL_TLS_SERVER_NAME` | Optional TLS SNI override for cloud/private endpoints |
@@ -139,10 +139,10 @@ PEM values in env vars may use literal `\n` escape sequences; the config module 
 
 ## Observability
 
-The worker initializes OpenTelemetry on startup via `@<domain>/observability`:
+The worker initializes OpenTelemetry on startup via `@tx-agent-kit/observability`:
 
 ```typescript
-await startTelemetry('<domain>-worker')
+await startTelemetry('tx-agent-kit-worker')
 ```
 
 This exports traces, metrics, and logs to the configured OTEL collector endpoint.

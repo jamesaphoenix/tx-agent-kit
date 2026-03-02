@@ -41,7 +41,7 @@ The schema definition lives in `packages/infra/db/src/schema.ts`. When you chang
 
 ```bash
 # Generate a migration from schema changes
-pnpm --filter @<domain>/db db:generate
+pnpm --filter @tx-agent-kit/db db:generate
 
 # Apply the migration locally
 pnpm db:migrate

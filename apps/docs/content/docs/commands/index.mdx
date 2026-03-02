@@ -116,7 +116,7 @@ The quiet variants run the same checks as the full variants; they only differ in
 
 ## Integration test locking
 
-Integration tests are guarded by a file lock at `/tmp/<domain>-integration.lock`. This prevents overlapping integration test runs from clobbering each other's database state. If a previous run was interrupted, the lock file is automatically cleaned up by the next run.
+Integration tests are guarded by a file lock at `/tmp/tx-agent-kit-integration.lock`. This prevents overlapping integration test runs from clobbering each other's database state. If a previous run was interrupted, the lock file is automatically cleaned up by the next run.
 
 ## CLI tool
 

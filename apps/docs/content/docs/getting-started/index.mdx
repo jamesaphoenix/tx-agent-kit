@@ -1,13 +1,13 @@
 ---
 title: Getting Started
-description: Prerequisites and quick overview for setting up <domain>
+description: Prerequisites and quick overview for setting up tx-agent-kit
 ---
 
-This section walks you through setting up `<domain>` for local development, from prerequisites to running your first domain scaffold.
+This section walks you through setting up `tx-agent-kit` for local development, from prerequisites to running your first domain scaffold.
 
 ## Opinionated stack
 
-`<domain>` is deliberately opinionated. It picks one tool per concern and enforces that choice mechanically through linters, structural checks, and shell invariants. This means the prerequisites are non-negotiable: you need the exact toolchain below, not alternatives.
+`tx-agent-kit` is deliberately opinionated. It picks one tool per concern and enforces that choice mechanically through linters, structural checks, and shell invariants. This means the prerequisites are non-negotiable: you need the exact toolchain below, not alternatives.
 
 | Concern | Choice | Why |
 |---------|--------|-----|
@@ -51,10 +51,10 @@ temporal version    # Temporal CLI (any recent version)
 
 ## Quick overview
 
-`<domain>` is a pnpm monorepo with four applications and several shared packages:
+`tx-agent-kit` is a pnpm monorepo with four applications and several shared packages:
 
 ```
-<domain>/
+tx-agent-kit/
   apps/
     api/        # Effect HttpApi server (port 4000)
     web/        # Next.js client-only SPA (port 3000)
