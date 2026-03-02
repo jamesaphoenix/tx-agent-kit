@@ -81,8 +81,6 @@ jobs:
         with:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
-        with:
-          version: 10
       - name: Configure Artifact Registry auth
         run: |
           set -euo pipefail
@@ -122,8 +120,6 @@ jobs:
         with:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
-        with:
-          version: 10
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
         with:
@@ -179,8 +175,6 @@ jobs:
         with:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
-        with:
-          version: 10
       - name: Download image artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -280,8 +274,6 @@ jobs:
         with:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
-        with:
-          version: 10
       - name: Download image artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -377,8 +369,6 @@ jobs:
         with:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
-        with:
-          version: 10
       - name: Reconcile Flux staging
         run: pnpm deploy:gitops:reconcile mac-staging
       - name: Check staging status
@@ -401,8 +391,6 @@ jobs:
         with:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
-        with:
-          version: 10
       - name: Reconcile Flux prod
         run: pnpm deploy:gitops:reconcile mac-prod
       - name: Check prod status
@@ -426,8 +414,6 @@ jobs:
         with:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
-        with:
-          version: 10
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
         with:

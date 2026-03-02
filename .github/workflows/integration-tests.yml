@@ -51,8 +51,6 @@ jobs:
         with:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
-        with:
-          version: 10
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Configure local env files
@@ -72,8 +70,6 @@ jobs:
         with:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
-        with:
-          version: 10
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Configure local env files
