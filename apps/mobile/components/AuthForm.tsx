@@ -13,6 +13,7 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const actionLabel = mode === 'sign-up' ? 'Create account' : 'Sign in'
 
   const onSubmit = async () => {
     if (pending) return
@@ -84,10 +85,10 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
         disabled={pending}
         style={[buttonStyle, pending && { opacity: 0.6 }]}
         accessibilityRole="button"
-        accessibilityLabel={mode === 'sign-up' ? 'Create account' : 'Sign in'}
+        accessibilityLabel={actionLabel}
       >
         <Text style={buttonTextStyle}>
-          {pending ? 'Working...' : mode === 'sign-up' ? 'Create account' : 'Sign in'}
+          {pending ? 'Working...' : actionLabel}
         </Text>
       </TouchableOpacity>
     </View>

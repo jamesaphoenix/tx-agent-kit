@@ -60,7 +60,7 @@ export class DB extends Context.Tag('@tx-agent-kit/db/DB')<DB, DbClient>() {}
 export const DBLive = Layer.scoped(DB, makeDb)
 const DBRuntimeLive = Layer.provide(DBLive, PgClientLive)
 
-export const dbClientEffect: Effect.Effect<DbClient, unknown, never> = Effect.gen(function* () {
+export const dbClientEffect: Effect.Effect<DbClient, unknown> = Effect.gen(function* () {
   return yield* DB
 }).pipe(Effect.provide(DBRuntimeLive))
 

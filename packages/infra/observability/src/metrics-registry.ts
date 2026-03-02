@@ -1,4 +1,4 @@
-import type { Attributes, Counter, Histogram, Meter } from '@opentelemetry/api'
+import type { Counter, Histogram, Meter } from '@opentelemetry/api'
 
 export const httpClientRequestCountMetricName =
   'tx_agent_kit_client_http_request_total'
@@ -7,12 +7,12 @@ export const httpClientRequestDurationMetricName =
 export const nodeServiceStartupMetricName = 'tx_agent_kit_node_service_startup_total'
 
 export interface HttpClientMetrics {
-  readonly requestCounter: Counter<Attributes>
-  readonly requestDurationHistogram: Histogram<Attributes>
+  readonly requestCounter: Counter
+  readonly requestDurationHistogram: Histogram
 }
 
 export interface NodeServiceMetrics {
-  readonly startupCounter: Counter<Attributes>
+  readonly startupCounter: Counter
 }
 
 export interface HttpClientMeter {

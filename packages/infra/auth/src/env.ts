@@ -26,6 +26,6 @@ export const getAuthEnv = (): AuthEnv => {
   return {
     AUTH_SECRET: process.env.AUTH_SECRET ?? '',
     AUTH_BCRYPT_ROUNDS: parseBcryptRounds(process.env.AUTH_BCRYPT_ROUNDS),
-    AUTH_ACCESS_TOKEN_TTL: process.env.AUTH_ACCESS_TOKEN_TTL?.trim() || defaultAccessTokenTtl
+    AUTH_ACCESS_TOKEN_TTL: process.env.AUTH_ACCESS_TOKEN_TTL?.trim() ?? defaultAccessTokenTtl
   }
 }

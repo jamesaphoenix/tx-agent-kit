@@ -5,11 +5,9 @@ import {
   count,
   desc,
   eq,
-  gt,
   gte,
   inArray,
   lt,
-  or,
   sql,
   type SQL
 } from 'drizzle-orm'
@@ -22,7 +20,7 @@ import {
 } from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
-import { buildCursorPage } from '../pagination.js'
+import { buildCursorCondition, buildCursorPage } from '../pagination.js'
 import { invitationRowSchema, type InvitationRowShape } from '../effect-schemas/invitations.js'
 import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
 import { invitations, orgMembers } from '../schema.js'
@@ -59,8 +57,8 @@ const isInvitationStatus = (value: string): value is InvitationStatus =>
 const isInvitationRole = (value: string): value is InvitationRole =>
   orgMemberRoles.some((role) => role === value)
 
-const buildListWhere = (inviteeUserId: string, params: ListParams): SQL<unknown> => {
-  const predicates: Array<SQL<unknown>> = [eq(invitations.inviteeUserId, inviteeUserId)]
+const buildListWhere = (inviteeUserId: string, params: ListParams): SQL => {
+  const predicates: Array<SQL> = [eq(invitations.inviteeUserId, inviteeUserId)]
 
   const status = params.filter.status
   if (status && isInvitationStatus(status)) {
@@ -104,17 +102,7 @@ export const invitationsRepository = {
           runPage: (cursor, limitPlusOne) =>
             Effect.gen(function* () {
               if (sortBy === 'expiresAt') {
-                const cursorWhere = cursor
-                  ? sortOrder === 'asc'
-                    ? or(
-                        gt(invitations.expiresAt, new Date(cursor.sortValue)),
-                        and(eq(invitations.expiresAt, new Date(cursor.sortValue)), gt(invitations.id, cursor.id))
-                      )
-                    : or(
-                        lt(invitations.expiresAt, new Date(cursor.sortValue)),
-                        and(eq(invitations.expiresAt, new Date(cursor.sortValue)), lt(invitations.id, cursor.id))
-                      )
-                  : undefined
+                const cursorWhere = buildCursorCondition(cursor, sortOrder, invitations.expiresAt, cursor ? new Date(cursor.sortValue) : new Date(), invitations.id)
 
                 const rows = yield* db
                   .select({
@@ -143,17 +131,7 @@ export const invitationsRepository = {
                 )
               }
 
-              const cursorWhere = cursor
-                ? sortOrder === 'asc'
-                  ? or(
-                      gt(invitations.createdAt, new Date(cursor.sortValue)),
-                      and(eq(invitations.createdAt, new Date(cursor.sortValue)), gt(invitations.id, cursor.id))
-                    )
-                  : or(
-                      lt(invitations.createdAt, new Date(cursor.sortValue)),
-                      and(eq(invitations.createdAt, new Date(cursor.sortValue)), lt(invitations.id, cursor.id))
-                    )
-                : undefined
+              const cursorWhere = buildCursorCondition(cursor, sortOrder, invitations.createdAt, cursor ? new Date(cursor.sortValue) : new Date(), invitations.id)
 
               const rows = yield* db
                 .select({

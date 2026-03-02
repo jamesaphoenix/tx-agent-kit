@@ -71,7 +71,10 @@ export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
         setOrganizations(response.data)
 
         if (!orgId) {
-          setOrganizationSelection((current) => current || response.data[0]?.id || '')
+          setOrganizationSelection((current) => {
+            if (current) return current
+            return response.data[0]?.id ?? ''
+          })
         }
       } catch {
         if (!cancelled) {

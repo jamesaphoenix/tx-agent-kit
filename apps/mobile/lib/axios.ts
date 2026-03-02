@@ -193,7 +193,7 @@ export const getApiErrorMessage = (error: unknown, fallback: string): string => 
     return error.message || fallback
   }
 
-  return payload.error?.message ?? payload.message ?? error.message ?? fallback
+  return payload.error?.message ?? payload.message ?? error.message
 }
 
 export type ApiAxiosRequestConfig = AxiosRequestConfig

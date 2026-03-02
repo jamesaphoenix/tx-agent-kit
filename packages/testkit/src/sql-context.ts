@@ -55,7 +55,7 @@ const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
   return Object.fromEntries(
     Object.entries(headers).map(([key, value]) => [
       key,
-      Array.isArray(value) ? value.join(',') : String(value)
+      Array.isArray(value) ? value.join(',') : value
     ])
   )
 }
@@ -63,7 +63,7 @@ const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
 const resolveRepoRoot = (start = process.cwd()): string => {
   let current = resolve(start)
 
-  while (true) {
+  for (;;) {
     const migrationDir = resolve(current, migrationsRelativePath)
     const workspaceFile = resolve(current, 'pnpm-workspace.yaml')
 

@@ -131,17 +131,15 @@ export const main = (): void => {
   const layer = makeServerLive({ port, host })
   logger.info('Starting API server.', { host, port })
 
-  void (async () => {
-    try {
-      await startTelemetry('tx-agent-kit-api')
-    } catch (error) {
-      logger.error(
-        'Failed to initialize OpenTelemetry.',
-        { host, port },
-        error instanceof Error ? error : new Error(String(error))
-      )
-    }
-  })()
+  try {
+    startTelemetry('tx-agent-kit-api')
+  } catch (error) {
+    logger.error(
+      'Failed to initialize OpenTelemetry.',
+      { host, port },
+      error instanceof Error ? error : new Error(String(error))
+    )
+  }
 
   let shuttingDown = false
   const shutdown = (signal: string) => {

@@ -103,7 +103,7 @@ export const systemSettingsRepository = {
           .limit(1)
           .execute()
 
-        if (!rows[0] || !rows[0].value) {
+        if (!rows[0]?.value) {
           return {} as RetentionSettings
         }
 

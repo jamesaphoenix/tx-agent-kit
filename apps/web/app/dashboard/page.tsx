@@ -85,14 +85,16 @@ export default function DashboardPage() {
       <div className="dashboard-shell-grid">
         <section className="card stack">
           <h2>Current organization</h2>
-          {firstOrganization ? (
+          {firstOrganization && (
             <>
               <p><strong>{firstOrganization.name}</strong></p>
               <p className="muted">Status: {firstOrganization.subscriptionStatus}</p>
             </>
-          ) : loading ? (
+          )}
+          {!firstOrganization && loading && (
             <p className="muted">Loading organizations...</p>
-          ) : (
+          )}
+          {!firstOrganization && !loading && (
             <p className="muted">Create an organization to get started.</p>
           )}
         </section>

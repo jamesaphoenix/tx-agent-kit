@@ -59,7 +59,7 @@ const toFilterParams = (filter: Record<string, unknown>): Record<string, string>
     }
 
     if (typeof value === 'number' || typeof value === 'boolean') {
-      params[`filter[${key}]`] = `${value}`
+      params[`filter[${key}]`] = String(value)
     }
   }
 

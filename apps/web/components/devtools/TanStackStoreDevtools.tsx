@@ -133,7 +133,7 @@ const cloneSnapshot = <TState,>(snapshot: TState): TState => {
 export const formatStoreSnapshot = (snapshot: unknown): string => {
   try {
     const serialized = JSON.stringify(snapshot, null, 2)
-    return serialized ?? 'null'
+    return serialized
   } catch {
     return '[unserializable snapshot]'
   }

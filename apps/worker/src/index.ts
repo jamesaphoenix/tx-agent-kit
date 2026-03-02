@@ -31,7 +31,7 @@ async function run(env: WorkerEnv): Promise<void> {
     ? workflowJsPath
     : path.join(sourceDir, 'workflows.ts')
 
-  await startTelemetry('tx-agent-kit-worker')
+  startTelemetry('tx-agent-kit-worker')
 
   const connOpts = resolveWorkerTemporalConnectionOptions(env)
 
@@ -55,18 +55,22 @@ async function run(env: WorkerEnv): Promise<void> {
     })
 
     let clientConnection: Connection | undefined
+    let tlsConfig: Record<string, unknown> = {}
+    if (typeof connOpts.tls === 'object') {
+      tlsConfig = {
+        tls: {
+          serverNameOverride: connOpts.tls.serverNameOverride,
+          serverRootCACertificate: connOpts.tls.serverRootCACertificate,
+          clientCertPair: connOpts.tls.clientCertPair
+        }
+      }
+    } else if (connOpts.tls === true) {
+      tlsConfig = { tls: true }
+    }
     try {
       clientConnection = await Connection.connect({
         address: connOpts.address,
-        ...(typeof connOpts.tls === 'object'
-          ? {
-              tls: {
-                serverNameOverride: connOpts.tls.serverNameOverride,
-                serverRootCACertificate: connOpts.tls.serverRootCACertificate,
-                clientCertPair: connOpts.tls.clientCertPair
-              }
-            }
-          : connOpts.tls === true ? { tls: true } : {}),
+        ...tlsConfig,
         ...(connOpts.apiKey
           ? {
               metadata: { 'temporal-namespace': env.TEMPORAL_NAMESPACE },

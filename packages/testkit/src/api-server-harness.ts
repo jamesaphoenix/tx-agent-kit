@@ -145,7 +145,7 @@ export const createApiServerHarness = (
   }
 
   const start = async (): Promise<void> => {
-    if (processRef && processRef.exitCode === null) {
+    if (processRef?.exitCode === null) {
       return
     }
 
@@ -220,7 +220,7 @@ export const createApiServerHarness = (
     }
 
     const active = processRef
-    if (!active || active.exitCode !== null) {
+    if (active?.exitCode !== null) {
       processRef = undefined
       removePidFile()
       return
@@ -229,7 +229,7 @@ export const createApiServerHarness = (
     active.kill('SIGTERM')
     const exitedAfterTerm = await waitForExit(active, 5_000)
 
-    if (!exitedAfterTerm && active.exitCode === null) {
+    if (!exitedAfterTerm) {
       active.kill('SIGKILL')
       await waitForExit(active, 2_000)
     }

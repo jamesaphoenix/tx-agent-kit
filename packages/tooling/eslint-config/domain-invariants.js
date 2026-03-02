@@ -1143,5 +1143,94 @@ export const domainInvariantConfig = [
         }]
       }]
     }
+  },
+
+  // ── Rule: Ban relative imports crossing package boundaries ──────────
+  // Cross-package imports must use @tx-agent-kit/* aliases.
+  // Relative paths bypass TypeScript project references and create fragile coupling.
+  {
+    files: ['packages/**/src/**/*.{ts,tsx}', 'apps/**/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/packages/core/**',
+                '**/packages/infra/**',
+                '**/packages/contracts/**',
+                '**/packages/temporal-client/**',
+                '**/packages/testkit/**',
+                '**/apps/api/**',
+                '**/apps/web/**',
+                '**/apps/worker/**',
+                '**/apps/mobile/**'
+              ],
+              message:
+                'Use @tx-agent-kit/* package aliases instead of relative cross-package imports.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+
+  // ── Rule: Enforce explicit return types on exported port functions ───
+  // Ports are API contracts. Inferred return types can silently change.
+  {
+    files: ['packages/core/src/domains/*/ports/**/*.ts'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': [
+        'error',
+        {
+          allowExpressions: true,
+          allowTypedFunctionExpressions: true,
+          allowHigherOrderFunctions: true
+        }
+      ]
+    }
+  },
+
+  // ── Rule: Ban instanceof in domain layer ────────────────────────────
+  // Domain code should use discriminated unions (_tag) instead of instanceof.
+  // Keeps domain logic serializable and testable.
+  {
+    files: [
+      'packages/core/src/domains/*/domain/**/*.ts',
+      'apps/**/src/domains/*/domain/**/*.ts'
+    ],
+    ignores: ['**/*.test.ts', '**/*.integration.test.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'BinaryExpression[operator="instanceof"]',
+          message:
+            'Use discriminated unions (_tag) instead of instanceof in domain layer. Keeps domain logic serializable and testable.'
+        }
+      ]
+    }
+  },
+
+  // ── Rule: Ban Object.assign mutation in domain layer ────────────────
+  // Domain entities should be immutable. Use spread { ...obj, ...overrides }.
+  {
+    files: [
+      'packages/core/src/domains/*/domain/**/*.ts',
+      'apps/**/src/domains/*/domain/**/*.ts'
+    ],
+    ignores: ['**/*.test.ts', '**/*.integration.test.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'CallExpression[callee.object.name="Object"][callee.property.name="assign"]',
+          message:
+            'Use object spread { ...obj, ...overrides } instead of Object.assign in domain layer. Domain entities should be immutable.'
+        }
+      ]
+    }
   }
 ]

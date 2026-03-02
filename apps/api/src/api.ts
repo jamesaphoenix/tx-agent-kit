@@ -67,6 +67,7 @@ export const mapCoreError = (error: unknown): BadRequest | Unauthorized | NotFou
         return new NotFound({ message })
       case 'CONFLICT':
         return new Conflict({ message })
+      case undefined:
       default:
         apiLogger.error('Unmapped core error code fell through to 500', { tag: e._tag, code: e.code, message: e.message })
         return new InternalError({ message: 'Internal server error' })

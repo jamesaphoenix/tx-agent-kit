@@ -211,7 +211,6 @@ export const cleanupPersistentWebIntegrationHarnesses = async (
 
   for (const workerSlot of knownSlots) {
     const pidFilePath = resolveWebIntegrationPidFilePath(workerSlot)
-    let shouldCleanupSchema = true
 
     if (existsSync(pidFilePath)) {
       const parsedPid = Number.parseInt(readFileSync(pidFilePath, 'utf8').trim(), 10)
@@ -221,14 +220,12 @@ export const cleanupPersistentWebIntegrationHarnesses = async (
           process.stderr.write(
             `Skipping stop for unexpected pid ${parsedPid} in ${pidFilePath}; preserving schema cleanup safety\n`
           )
-          shouldCleanupSchema = false
           continue
         }
         if (processClassification === 'unknown') {
           process.stderr.write(
             `Could not classify pid ${parsedPid} in ${pidFilePath}; preserving pid marker and skipping schema cleanup\n`
           )
-          shouldCleanupSchema = false
           continue
         }
 
@@ -237,7 +234,6 @@ export const cleanupPersistentWebIntegrationHarnesses = async (
           process.stderr.write(
             `Failed to stop web integration API process pid=${parsedPid} slot=${workerSlot}; skipping schema cleanup\n`
           )
-          shouldCleanupSchema = false
           continue
         }
 
@@ -245,10 +241,6 @@ export const cleanupPersistentWebIntegrationHarnesses = async (
       } else {
         rmSync(pidFilePath, { force: true })
       }
-    }
-
-    if (!shouldCleanupSchema) {
-      continue
     }
 
     try {

@@ -346,13 +346,16 @@ export default function InvitationsPage() {
 
       <section className="card stack">
         <h2>Invitation history</h2>
-        {loading && invitations.length === 0 ? (
+        {loading && invitations.length === 0 && (
           <p className="muted">Loading...</p>
-        ) : pastInvitations.length === 0 && pendingInvitations.length === 0 ? (
+        )}
+        {!(loading && invitations.length === 0) && pastInvitations.length === 0 && pendingInvitations.length === 0 && (
           <p className="muted">No invitations yet.</p>
-        ) : pastInvitations.length === 0 ? (
+        )}
+        {!(loading && invitations.length === 0) && pastInvitations.length === 0 && pendingInvitations.length > 0 && (
           <p className="muted">No past invitations.</p>
-        ) : (
+        )}
+        {pastInvitations.length > 0 && (
           <div className="invitation-list">
             {pastInvitations.map((inv) => (
               <div key={inv.id} className="invitation-card invitation-card--past">

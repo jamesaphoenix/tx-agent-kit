@@ -187,7 +187,7 @@ export const AuthLoginRefreshTokenPortLive = Layer.succeed(AuthLoginRefreshToken
       }
 
       const existing = yield* authLoginRefreshTokensRepository.findByTokenHash(tokenHash)
-      if (existing && existing.usedAt) {
+      if (existing?.usedAt) {
         yield* authLoginRefreshTokensRepository.revokeActiveForSession(existing.sessionId).pipe(Effect.asVoid)
         yield* authLoginSessionsRepository.revokeById(existing.sessionId).pipe(Effect.asVoid)
       }

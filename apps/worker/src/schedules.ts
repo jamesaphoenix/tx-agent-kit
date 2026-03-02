@@ -2,10 +2,11 @@ import type { Client } from '@temporalio/client'
 import { isGrpcServiceError, ScheduleOverlapPolicy } from '@temporalio/client'
 import { createLogger } from '@tx-agent-kit/logging'
 
-const logger = createLogger('tx-agent-kit-worker-schedules')
+/** gRPC status codes used by Temporal schedule operations */
+const GRPC_NOT_FOUND = 5
+const GRPC_ALREADY_EXISTS = 6
 
-const GRPC_STATUS_NOT_FOUND = 5
-const GRPC_STATUS_ALREADY_EXISTS = 6
+const logger = createLogger('tx-agent-kit-worker-schedules')
 const OUTBOX_POLLER_SCHEDULE_ID = 'outbox-poller-schedule'
 const STUCK_EVENTS_RESET_SCHEDULE_ID = 'stuck-events-reset-schedule'
 const PRUNE_PUBLISHED_SCHEDULE_ID = 'prune-published-events-schedule'
@@ -39,7 +40,7 @@ export async function ensureOutboxPollerSchedule(
     logger.info('Updated outbox poller schedule.', { intervalSeconds, batchSize })
   } catch (error: unknown) {
     const isNotFound =
-      isGrpcServiceError(error) && Number(error.code) === GRPC_STATUS_NOT_FOUND
+      isGrpcServiceError(error) && (error.code as number) === GRPC_NOT_FOUND
 
     if (!isNotFound) {
       throw error
@@ -64,7 +65,7 @@ export async function ensureOutboxPollerSchedule(
       logger.info('Created outbox poller schedule.', { intervalSeconds, batchSize })
     } catch (createError: unknown) {
       const isAlreadyExists =
-        isGrpcServiceError(createError) && Number(createError.code) === GRPC_STATUS_ALREADY_EXISTS
+        isGrpcServiceError(createError) && (createError.code as number) === GRPC_ALREADY_EXISTS
 
       if (!isAlreadyExists) {
         throw createError
@@ -104,7 +105,7 @@ export async function ensureStuckEventsResetSchedule(
     logger.info('Updated stuck events reset schedule.', { intervalSeconds, stuckThresholdMinutes })
   } catch (error: unknown) {
     const isNotFound =
-      isGrpcServiceError(error) && Number(error.code) === GRPC_STATUS_NOT_FOUND
+      isGrpcServiceError(error) && (error.code as number) === GRPC_NOT_FOUND
 
     if (!isNotFound) {
       throw error
@@ -129,7 +130,7 @@ export async function ensureStuckEventsResetSchedule(
       logger.info('Created stuck events reset schedule.', { intervalSeconds, stuckThresholdMinutes })
     } catch (createError: unknown) {
       const isAlreadyExists =
-        isGrpcServiceError(createError) && Number(createError.code) === GRPC_STATUS_ALREADY_EXISTS
+        isGrpcServiceError(createError) && (createError.code as number) === GRPC_ALREADY_EXISTS
 
       if (!isAlreadyExists) {
         throw createError
@@ -169,7 +170,7 @@ export async function ensurePrunePublishedSchedule(
     logger.info('Updated prune published events schedule.', { intervalHours, retentionDays })
   } catch (error: unknown) {
     const isNotFound =
-      isGrpcServiceError(error) && Number(error.code) === GRPC_STATUS_NOT_FOUND
+      isGrpcServiceError(error) && (error.code as number) === GRPC_NOT_FOUND
 
     if (!isNotFound) {
       throw error
@@ -194,7 +195,7 @@ export async function ensurePrunePublishedSchedule(
       logger.info('Created prune published events schedule.', { intervalHours, retentionDays })
     } catch (createError: unknown) {
       const isAlreadyExists =
-        isGrpcServiceError(createError) && Number(createError.code) === GRPC_STATUS_ALREADY_EXISTS
+        isGrpcServiceError(createError) && (createError.code as number) === GRPC_ALREADY_EXISTS
 
       if (!isAlreadyExists) {
         throw createError

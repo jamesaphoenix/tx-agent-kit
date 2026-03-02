@@ -4,15 +4,12 @@ import {
   count,
   desc,
   eq,
-  gt,
-  lt,
-  or,
   sql,
   type SQL
 } from 'drizzle-orm'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
-import { buildCursorPage } from '../pagination.js'
+import { buildCursorCondition, buildCursorPage } from '../pagination.js'
 import { teamRowSchema, type TeamRowShape } from '../effect-schemas/teams.js'
 import { teamMemberRowSchema, type TeamMemberRowShape } from '../effect-schemas/team-members.js'
 import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
@@ -64,7 +61,7 @@ export const teamsRepository = {
         const db = yield* DB
         const sortBy = params.sortBy
         const sortOrder = params.sortOrder
-        const baseWhere: SQL<unknown> = eq(teams.organizationId, organizationId)
+        const baseWhere: SQL = eq(teams.organizationId, organizationId)
 
         const page = yield* buildCursorPage<TeamRowShape>({
           cursor: params.cursor,
@@ -86,17 +83,7 @@ export const teamsRepository = {
           runPage: (cursor, limitPlusOne) =>
             Effect.gen(function* () {
               if (sortBy === 'name') {
-                const cursorWhere = cursor
-                  ? sortOrder === 'asc'
-                    ? or(
-                        gt(teams.name, cursor.sortValue),
-                        and(eq(teams.name, cursor.sortValue), gt(teams.id, cursor.id))
-                      )
-                    : or(
-                        lt(teams.name, cursor.sortValue),
-                        and(eq(teams.name, cursor.sortValue), lt(teams.id, cursor.id))
-                      )
-                  : undefined
+                const cursorWhere = buildCursorCondition(cursor, sortOrder, teams.name, cursor?.sortValue ?? '', teams.id)
 
                 const rows = yield* db
                   .select({
@@ -122,17 +109,7 @@ export const teamsRepository = {
                 )
               }
 
-              const cursorWhere = cursor
-                ? sortOrder === 'asc'
-                  ? or(
-                      gt(teams.createdAt, new Date(cursor.sortValue)),
-                      and(eq(teams.createdAt, new Date(cursor.sortValue)), gt(teams.id, cursor.id))
-                    )
-                  : or(
-                      lt(teams.createdAt, new Date(cursor.sortValue)),
-                      and(eq(teams.createdAt, new Date(cursor.sortValue)), lt(teams.id, cursor.id))
-                    )
-                : undefined
+              const cursorWhere = buildCursorCondition(cursor, sortOrder, teams.createdAt, cursor ? new Date(cursor.sortValue) : new Date(), teams.id)
 
               const rows = yield* db
                 .select({

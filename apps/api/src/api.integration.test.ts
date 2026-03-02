@@ -210,7 +210,7 @@ const createOidcTestProvider = async (input: {
           }
 
           const codeRecord = authorizationCodes.get(code)
-          if (!codeRecord || codeRecord.redirectUri !== redirectUri || codeRecord.clientId !== requestedClientId) {
+          if (codeRecord?.redirectUri !== redirectUri || codeRecord.clientId !== requestedClientId) {
             sendJson(response, 400, { error: 'invalid_grant' })
             return
           }
@@ -304,12 +304,18 @@ const dbAuthContext = createDbAuthContext({
 let factoryContext: ApiFactoryContext | undefined
 let oidcTestProvider: OidcTestProvider | undefined
 
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 const requestJson = async <T>(path: string, caseName: string, init?: RequestInit): Promise<{ response: Response; body: T }> => {
+  const existingHeaders: Record<string, string> = {}
+  if (init?.headers) {
+    const h = new Headers(init.headers)
+    h.forEach((value, key) => { existingHeaders[key] = value })
+  }
   const response = await fetch(`${dbAuthContext.baseUrl}${path}`, {
     ...init,
     headers: dbAuthContext.testContext.headersForCase(caseName, {
       'content-type': 'application/json',
-      ...(init?.headers ?? {})
+      ...existingHeaders
     })
   })
 
@@ -4601,7 +4607,7 @@ describe('api integration', () => {
     )
 
     const rawCount = membershipResult.rows[0]?.membership_count
-    const memberCount = typeof rawCount === 'number' ? rawCount : Number.parseInt(String(rawCount ?? '0'), 10)
+    const memberCount = typeof rawCount === 'number' ? rawCount : Number.parseInt(rawCount ?? '0', 10)
     expect(memberCount).toBe(1)
   })
 

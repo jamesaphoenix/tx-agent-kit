@@ -7,7 +7,8 @@ import { sessionStoreActions } from '../../stores/session-store'
 
 export function AuthBootstrapProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
-    let active = true
+    const guard = { active: true }
+    const isActive = (): boolean => guard.active
 
     const bootstrap = async () => {
       const token = await readAuthToken()
@@ -20,7 +21,7 @@ export function AuthBootstrapProvider({ children }: { children: ReactNode }) {
       try {
         const principal = await clientApi.me()
 
-        if (!active) {
+        if (!isActive()) {
           return
         }
 
@@ -28,7 +29,7 @@ export function AuthBootstrapProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         log.error('Auth bootstrap failed', err)
 
-        if (!active) {
+        if (!isActive()) {
           return
         }
 
@@ -39,7 +40,7 @@ export function AuthBootstrapProvider({ children }: { children: ReactNode }) {
           await clearAuthToken()
         }
 
-        if (!active) {
+        if (!isActive()) {
           return
         }
 
@@ -50,7 +51,7 @@ export function AuthBootstrapProvider({ children }: { children: ReactNode }) {
     void bootstrap()
 
     return () => {
-      active = false
+      guard.active = false
     }
   }, [])
 

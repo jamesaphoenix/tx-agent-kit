@@ -183,7 +183,7 @@ describe.sequential('CLI workflows integration', () => {
     expect(duplicateName.exitCode).toBe(1)
     expect(duplicateName.stderr).toContain('Duplicate option: --name')
 
-    const oversizedTableIdentifier = `${'a'.repeat(64)}`
+    const oversizedTableIdentifier = 'a'.repeat(64)
     const oversizedTable = runCommand(
       process.execPath,
       [

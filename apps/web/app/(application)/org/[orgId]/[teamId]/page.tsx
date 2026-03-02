@@ -81,26 +81,28 @@ export default function TeamDashboardPage() {
       <div className="dashboard-shell-grid">
         <section className="card stack">
           <h2>Organization</h2>
-          {state.organization ? (
+          {state.organization && (
             <>
               <p><strong>{state.organization.name}</strong></p>
               <p className="muted">Status: {state.organization.subscriptionStatus}</p>
             </>
-          ) : loading ? (
+          )}
+          {!state.organization && loading && (
             <p className="muted">Loading organization...</p>
-          ) : null}
+          )}
         </section>
 
         <section className="card stack">
           <h2>Team</h2>
-          {state.team ? (
+          {state.team && (
             <>
               <p><strong>{state.team.name}</strong></p>
               {state.team.website && <p className="muted">{state.team.website}</p>}
             </>
-          ) : loading ? (
+          )}
+          {!state.team && loading && (
             <p className="muted">Loading team...</p>
-          ) : null}
+          )}
         </section>
       </div>
     </DashboardShell>

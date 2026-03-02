@@ -16,7 +16,7 @@ Examples:
 const findRepoRoot = (startDir: string): string => {
   let current = resolve(startDir)
 
-  while (true) {
+  for (;;) {
     const packageJsonPath = resolve(current, 'package.json')
     if (existsSync(packageJsonPath)) {
       try {
@@ -62,7 +62,7 @@ const main = async (): Promise<void> => {
   process.stdout.write(`${summary}\n`)
 }
 
-void main().catch((error) => {
+void main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error)
   process.stderr.write(`${message}\n`)
   process.exit(1)

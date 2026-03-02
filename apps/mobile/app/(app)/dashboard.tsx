@@ -74,7 +74,7 @@ export default function DashboardScreen() {
     }, [load])
   )
 
-  const firstOrganization = state.organizations[0]
+  const hasOrganizations = state.organizations.length > 0
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 16 }}>
@@ -101,11 +101,13 @@ export default function DashboardScreen() {
 
       <View style={cardStyle}>
         <Text style={{ fontSize: 18, fontWeight: '600' }}>Current organization</Text>
-        {firstOrganization ? (
-          <Text style={{ marginTop: 4 }}>{firstOrganization.name}</Text>
-        ) : loading ? (
+        {hasOrganizations && (
+          <Text style={{ marginTop: 4 }}>{state.organizations[0].name}</Text>
+        )}
+        {!hasOrganizations && loading && (
           <Text style={{ color: '#6b7280' }}>Loading organizations...</Text>
-        ) : (
+        )}
+        {!hasOrganizations && !loading && (
           <Text style={{ color: '#6b7280' }}>Create an organization to get started.</Text>
         )}
       </View>

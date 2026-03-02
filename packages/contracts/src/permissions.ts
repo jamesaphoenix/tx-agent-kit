@@ -22,7 +22,7 @@ export const rolePermissionMap: Record<OrgMemberRole, ReadonlyArray<PermissionAc
 }
 
 export const getPermissionsForRole = (role: OrgMemberRole): ReadonlyArray<PermissionAction> =>
-  rolePermissionMap[role] ?? []
+  rolePermissionMap[role]
 
 export const rolePermissionMapSchema = Schema.Record({
   key: orgMemberRoleSchema,

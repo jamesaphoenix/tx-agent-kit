@@ -34,7 +34,7 @@ const listenTcpServerAtPort = async (port: number): Promise<NetServer> =>
 const listenHttpServer = async (
   onRequest: (
     request: IncomingMessage,
-    response: ServerResponse<IncomingMessage>
+    response: ServerResponse
   ) => void
 ): Promise<HttpServer> =>
   new Promise((resolve, reject) => {

@@ -57,7 +57,7 @@ const isMacPlatform = (): boolean => {
     return false
   }
 
-  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
+  return /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent)
 }
 
 const withAsChild = (
@@ -130,23 +130,15 @@ export const SidebarProvider = ({
       return undefined
     }
 
-    const onChange = (event: MediaQueryListEvent | MediaQueryList) => {
+    const onChange = (event: MediaQueryListEvent) => {
       setIsMobile(event.matches)
     }
 
     setIsMobile(mediaQuery.matches)
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', onChange as (event: MediaQueryListEvent) => void)
-    } else if (typeof mediaQuery.addListener === 'function') {
-      mediaQuery.addListener(onChange as (event: MediaQueryListEvent) => void)
-    }
+    mediaQuery.addEventListener('change', onChange)
 
     return () => {
-      if (typeof mediaQuery.removeEventListener === 'function') {
-        mediaQuery.removeEventListener('change', onChange as (event: MediaQueryListEvent) => void)
-      } else if (typeof mediaQuery.removeListener === 'function') {
-        mediaQuery.removeListener(onChange as (event: MediaQueryListEvent) => void)
-      }
+      mediaQuery.removeEventListener('change', onChange)
     }
   }, [])
 

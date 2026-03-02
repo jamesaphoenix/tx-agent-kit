@@ -37,7 +37,7 @@ export const getWebEnv = (): WebEnv => {
       defaultOtelEndpoint,
     NODE_ENV:
       process.env.NEXT_PUBLIC_NODE_ENV ??
-      process.env.NODE_ENV ??
+      (process.env.NODE_ENV as string | undefined) ??
       defaultNodeEnv,
     SITE_URL:
       process.env.NEXT_PUBLIC_SITE_URL ??

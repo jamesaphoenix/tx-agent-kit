@@ -16,7 +16,7 @@ const envKeys = [
 
 const clearEnvOverrides = (): void => {
   for (const envKey of envKeys) {
-    delete mutableProcessEnv[envKey]
+    Reflect.deleteProperty(mutableProcessEnv, envKey)
   }
 }
 

@@ -60,7 +60,7 @@ vi.mock('@opentelemetry/api', () => ({
   metrics: {
     getMeter: metricsGetMeterMock
   },
-  DiagConsoleLogger: class MockDiagConsoleLogger {},
+  DiagConsoleLogger: class MockDiagConsoleLogger { readonly _mock = true },
   DiagLogLevel: {
     DEBUG: 'DEBUG'
   }
@@ -107,7 +107,7 @@ describe('telemetry lifecycle', () => {
   it('starts OpenTelemetry with expected OTLP endpoints and service metadata', async () => {
     const telemetryModule = await import('./index.js')
 
-    await telemetryModule.startTelemetry('tx-agent-kit-test-service')
+    telemetryModule.startTelemetry('tx-agent-kit-test-service')
 
     expect(diagSetLoggerMock).toHaveBeenCalledTimes(1)
     expect(getObservabilityEnvMock).toHaveBeenCalledTimes(1)
@@ -149,8 +149,8 @@ describe('telemetry lifecycle', () => {
   it('is idempotent on repeated start and can restart after stop', async () => {
     const telemetryModule = await import('./index.js')
 
-    await telemetryModule.startTelemetry('tx-agent-kit-test-service')
-    await telemetryModule.startTelemetry('tx-agent-kit-test-service')
+    telemetryModule.startTelemetry('tx-agent-kit-test-service')
+    telemetryModule.startTelemetry('tx-agent-kit-test-service')
 
     expect(nodeSdkConstructorMock).toHaveBeenCalledTimes(1)
     expect(sdkStartMock).toHaveBeenCalledTimes(1)
@@ -158,7 +158,7 @@ describe('telemetry lifecycle', () => {
     await telemetryModule.stopTelemetry()
     expect(sdkShutdownMock).toHaveBeenCalledTimes(1)
 
-    await telemetryModule.startTelemetry('tx-agent-kit-test-service')
+    telemetryModule.startTelemetry('tx-agent-kit-test-service')
     expect(nodeSdkConstructorMock).toHaveBeenCalledTimes(2)
     expect(sdkStartMock).toHaveBeenCalledTimes(2)
 
@@ -176,7 +176,7 @@ describe('telemetry lifecycle', () => {
 
     const telemetryModule = await import('./index.js')
 
-    await telemetryModule.startTelemetry('tx-agent-kit-test-service')
+    telemetryModule.startTelemetry('tx-agent-kit-test-service')
 
     expect(otlpLogExporterConstructorMock).not.toHaveBeenCalled()
     expect(batchLogRecordProcessorConstructorMock).not.toHaveBeenCalled()

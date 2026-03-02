@@ -80,7 +80,7 @@ export default function BlogListingPage() {
         </div>
       )}
 
-      {loading ? (
+      {loading && (
         <div className="blog-loading">
           <div className="blog-skeleton-grid">
             {[1, 2, 3].map((i) => (
@@ -88,7 +88,8 @@ export default function BlogListingPage() {
             ))}
           </div>
         </div>
-      ) : articles.length === 0 ? (
+      )}
+      {!loading && articles.length === 0 && (
         <div className="blog-empty">
           <div className="blog-empty-icon" aria-hidden="true">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zM7 7h10M7 12h10M7 17h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -96,7 +97,8 @@ export default function BlogListingPage() {
           <h2>No articles yet</h2>
           <p>Connect a blog data source to start publishing.</p>
         </div>
-      ) : (
+      )}
+      {!loading && articles.length > 0 && (
         <div className="blog-grid">
           {articles.map((article) => (
             <Link

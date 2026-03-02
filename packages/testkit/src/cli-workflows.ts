@@ -118,8 +118,8 @@ export const runCommand = (
 
   return {
     exitCode: result.status ?? 1,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? ''
+    stdout: result.stdout,
+    stderr: result.stderr
   }
 }
 

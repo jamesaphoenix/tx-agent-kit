@@ -44,8 +44,8 @@ const buildListWhere = (input: {
   category?: UsageCategory
   recordedAfter?: Date
   recordedBefore?: Date
-}): SQL<unknown> => {
-  const predicates: Array<SQL<unknown>> = [eq(usageRecords.organizationId, input.organizationId)]
+}): SQL => {
+  const predicates: Array<SQL> = [eq(usageRecords.organizationId, input.organizationId)]
 
   if (input.category) {
     predicates.push(eq(usageRecords.category, input.category))

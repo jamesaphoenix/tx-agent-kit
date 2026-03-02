@@ -329,6 +329,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@grpc/grpc-js':
+        specifier: ^1.14.3
+        version: 1.14.3
       '@sentry/node':
         specifier: ^10.40.0
         version: 10.40.0

@@ -1,8 +1,11 @@
 import { baseConfig } from './packages/tooling/eslint-config/base.js'
 import { boundariesConfig } from './packages/tooling/eslint-config/boundaries.js'
+import { codeQualityConfig } from './packages/tooling/eslint-config/code-quality.js'
 import { domainInvariantConfig } from './packages/tooling/eslint-config/domain-invariants.js'
+import { effectConsistencyConfig } from './packages/tooling/eslint-config/effect-consistency.js'
 import { promiseConfig } from './packages/tooling/eslint-config/promise.js'
 import { testingConfig } from './packages/tooling/eslint-config/testing.js'
+import { typeSafetyConfig } from './packages/tooling/eslint-config/type-safety.js'
 
 export default [
   {
@@ -23,9 +26,12 @@ export default [
   },
   ...baseConfig,
   ...domainInvariantConfig,
+  ...codeQualityConfig,
+  ...effectConsistencyConfig,
   ...promiseConfig,
   ...testingConfig,
   ...boundariesConfig,
+  ...typeSafetyConfig,
   {
     files: ['apps/mobile/**/*.test.ts', 'apps/mobile/**/*.test.tsx'],
     rules: {

@@ -4,17 +4,14 @@ import {
   count,
   desc,
   eq,
-  gt,
   inArray,
-  lt,
-  or,
   sql,
   type SQL
 } from 'drizzle-orm'
 import { type DomainEventAggregateType, type DomainEventType, type OrgMemberRole } from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
-import { buildCursorPage } from '../pagination.js'
+import { buildCursorCondition, buildCursorPage } from '../pagination.js'
 import { organizationRowSchema, type OrganizationRowShape } from '../effect-schemas/organizations.js'
 import { orgMemberRowSchema, type OrgMemberRowShape } from '../effect-schemas/org-members.js'
 import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
@@ -59,7 +56,7 @@ const parseCountValue = (value: unknown): number => {
   return Number.isNaN(parsed) ? 0 : parsed
 }
 
-const buildListWhere = (userId: string): SQL<unknown> =>
+const buildListWhere = (userId: string): SQL =>
   eq(orgMembers.userId, userId)
 
 export const organizationsRepository = {
@@ -92,17 +89,7 @@ export const organizationsRepository = {
           runPage: (cursor, limitPlusOne) =>
             Effect.gen(function* () {
               if (sortBy === 'name') {
-                const cursorWhere = cursor
-                  ? sortOrder === 'asc'
-                    ? or(
-                        gt(organizations.name, cursor.sortValue),
-                        and(eq(organizations.name, cursor.sortValue), gt(organizations.id, cursor.id))
-                      )
-                    : or(
-                        lt(organizations.name, cursor.sortValue),
-                        and(eq(organizations.name, cursor.sortValue), lt(organizations.id, cursor.id))
-                      )
-                  : undefined
+                const cursorWhere = buildCursorCondition(cursor, sortOrder, organizations.name, cursor?.sortValue ?? '', organizations.id)
 
                 const rows = yield* db
                   .select({
@@ -143,17 +130,7 @@ export const organizationsRepository = {
                 )
               }
 
-              const cursorWhere = cursor
-                ? sortOrder === 'asc'
-                  ? or(
-                      gt(organizations.createdAt, new Date(cursor.sortValue)),
-                      and(eq(organizations.createdAt, new Date(cursor.sortValue)), gt(organizations.id, cursor.id))
-                    )
-                  : or(
-                      lt(organizations.createdAt, new Date(cursor.sortValue)),
-                      and(eq(organizations.createdAt, new Date(cursor.sortValue)), lt(organizations.id, cursor.id))
-                    )
-                : undefined
+              const cursorWhere = buildCursorCondition(cursor, sortOrder, organizations.createdAt, cursor ? new Date(cursor.sortValue) : new Date(), organizations.id)
 
               const rows = yield* db
                 .select({

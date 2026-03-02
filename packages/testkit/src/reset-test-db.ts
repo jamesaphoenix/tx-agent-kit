@@ -27,8 +27,8 @@ export const runResetTestDb = (env: NodeJS.ProcessEnv): ResetTestDbRunResult => 
 
   return {
     exitCode: result.status ?? 1,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? ''
+    stdout: result.stdout,
+    stderr: result.stderr
   }
 }
 

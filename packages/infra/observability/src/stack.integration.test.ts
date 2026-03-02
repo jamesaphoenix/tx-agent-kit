@@ -168,10 +168,10 @@ const startApiHarness = async (
     stdio: ['ignore', 'pipe', 'pipe']
   })
 
-  processRef.stdout?.on('data', (chunk: unknown) => {
+  processRef.stdout.on('data', (chunk: unknown) => {
     appendOutputChunk(chunk)
   })
-  processRef.stderr?.on('data', (chunk: unknown) => {
+  processRef.stderr.on('data', (chunk: unknown) => {
     appendOutputChunk(chunk)
   })
 
@@ -251,7 +251,7 @@ const readWebSignUpMetricSample = async (
     '{__name__="tx_agent_kit_client_http_request_total",job="tx-agent-kit/tx-agent-kit-web",url_path="/v1/auth/sign-up",http_request_method="POST",http_response_status_code="201"}'
   )
   const sampleValue = Number.parseFloat(series[0]?.value?.[1] ?? '0')
-  const sampleTimestamp = Number(series[0]?.value?.[0] ?? 0)
+  const sampleTimestamp = series[0]?.value?.[0] ?? 0
 
   return {
     value: Number.isFinite(sampleValue) ? sampleValue : 0,

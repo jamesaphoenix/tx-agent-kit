@@ -13,6 +13,7 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const actionLabel = mode === 'sign-up' ? 'Create account' : 'Sign in'
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -100,7 +101,7 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
       </div>
 
       <button className="auth-submit" type="submit" disabled={pending}>
-        {pending ? 'Working...' : mode === 'sign-up' ? 'Create account' : 'Sign in'}
+        {pending ? 'Working...' : actionLabel}
       </button>
     </form>
   )

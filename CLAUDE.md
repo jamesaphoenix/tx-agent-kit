@@ -66,6 +66,22 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
 - Event type strings must follow `<aggregate>.<past-tense-verb>` convention (lowercase, dot-separated).
 - `usage_records` and `credit_ledger` must never have retention policies; they are financial audit trails. Metered usage continues reporting to Stripe during `past_due` status (by design — Stripe needs accurate usage to calculate recovery invoices).
 - Tables with retention policies must be listed in `retentionTableNames` (`packages/contracts/src/literals.ts`) and seeded in the `retention_settings` migration.
+- No nested ternary expressions; use `if/else`, `&&` chains, or extracted variables.
+- No `new Promise()` constructor in `packages/core` or `apps/api` source; use `Effect.promise`/`Effect.tryPromise`.
+- No `require()` calls in TypeScript source; use ESM `import`.
+- No floating `void` expressions in source modules (except designated runtime boundaries); use `await`, `.catch()`, or `Effect.runFork`.
+- No relative imports that cross package boundaries; use `@tx-agent-kit/*` aliases.
+- Exported functions in port files must have explicit return type annotations.
+- No `instanceof` in domain layer code; use discriminated unions with `_tag` fields.
+- No `Object.assign` in domain layer code; use object spread.
+- Migration files must match `NNNN_descriptive_name.sql` naming convention with unique numeric prefixes.
+- Every test file must reference vitest (describe/it/test/expect/vi markers).
+- Event dispatcher switch statements in workflows must include a `default:` case.
+- No switch fallthrough without explicit `break`/`return` (`noFallthroughCasesInSwitch` enabled).
+- Prefer `??` over `||` for nullish checks; `||` coerces falsy values like `0`, `''`, `false`. String `||` is excluded (`ignorePrimitives: { string: true }`) since `'' || fallback` is often intentional.
+- Prefer optional chain `a?.b` over manual `a && a.b`.
+- Switch statements on union/enum types must be exhaustive (all cases handled).
+- Use `export type` for type-only exports (`consistent-type-exports` enforced).
 
 ## DDD Construction Pattern
 For each domain, create:
@@ -120,7 +136,12 @@ When adding a table in `packages/infra/db/src/schema.ts`:
 - If kind is `custom`, do not expose full CRUD surface.
 
 ## Mechanical Enforcement
-- ESLint restrictions live in `packages/tooling/eslint-config/domain-invariants.js`.
+- ESLint restrictions live in `packages/tooling/eslint-config/`:
+  - `base.js` — `strictTypeChecked` preset + project-wide overrides
+  - `domain-invariants.js` — architecture and DDD layer boundary rules
+  - `code-quality.js` — general code quality (nested ternaries, require, void)
+  - `effect-consistency.js` — Effect-specific patterns (ban `new Promise`)
+  - `type-safety.js` — exhaustive switches, nullish coalescing, optional chain, type exports
 - Structural checks live in dedicated scripts under `scripts/lint/`:
   - `enforce-domain-invariants.mjs`
   - `enforce-web-client-contracts.mjs`

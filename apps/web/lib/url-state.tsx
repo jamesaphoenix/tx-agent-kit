@@ -41,8 +41,7 @@ export interface BrowserLocationState {
 }
 
 export const readBrowserLocationState = (): BrowserLocationState => {
-  const location = globalThis.location
-  if (!location) {
+  if (typeof window === 'undefined') {
     return {
       pathname: '/',
       search: '',
@@ -51,9 +50,9 @@ export const readBrowserLocationState = (): BrowserLocationState => {
   }
 
   return {
-    pathname: location.pathname || '/',
-    search: location.search || '',
-    origin: location.origin || 'http://localhost'
+    pathname: globalThis.location.pathname || '/',
+    search: globalThis.location.search || '',
+    origin: globalThis.location.origin || 'http://localhost'
   }
 }
 

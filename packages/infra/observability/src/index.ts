@@ -28,7 +28,7 @@ const BatchLogRecordProcessorCtor = BatchLogRecordProcessor as new (
   exporter: OTLPLogExporter
 ) => BatchLogRecordProcessor
 
-export const startTelemetry = async (serviceName: string): Promise<void> => {
+export const startTelemetry = (serviceName: string): void => {
   if (telemetrySdk) {
     return
   }
@@ -67,7 +67,7 @@ export const startTelemetry = async (serviceName: string): Promise<void> => {
     })
   })
 
-  await Promise.resolve(telemetrySdk.start())
+  telemetrySdk.start()
 }
 
 export const stopTelemetry = async (): Promise<void> => {

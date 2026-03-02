@@ -57,8 +57,8 @@ export const runStartDevServices = (
 
   return {
     exitCode: result.status ?? 1,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
+    stdout: result.stdout,
+    stderr: result.stderr,
     durationMs
   }
 }
@@ -79,10 +79,10 @@ export const runStartDevServicesAsync = (
     let stderr = ''
     let timedOut = false
 
-    childProcess.stdout?.on('data', (chunk: Buffer | string) => {
+    childProcess.stdout.on('data', (chunk: Buffer | string) => {
       stdout += chunk.toString()
     })
-    childProcess.stderr?.on('data', (chunk: Buffer | string) => {
+    childProcess.stderr.on('data', (chunk: Buffer | string) => {
       stderr += chunk.toString()
     })
 

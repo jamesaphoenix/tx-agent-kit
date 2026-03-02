@@ -1,6 +1,27 @@
 import { decodeCursor, encodeCursor, type CursorPayload, type SortOrder } from '@tx-agent-kit/contracts'
+import { and, eq, gt, lt, or, type Column, type SQL } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { dbQueryFailed, type DbError } from './errors.js'
+
+/**
+ * Build a cursor-based WHERE condition for keyset pagination.
+ * Eliminates the nested ternary pattern: `cursor ? sortOrder === 'asc' ? ... : ... : undefined`
+ */
+export const buildCursorCondition = (
+  cursor: CursorPayload | null,
+  sortOrder: SortOrder,
+  sortColumn: Column,
+  sortValue: Date | string,
+  idColumn: Column
+): SQL | undefined => {
+  if (!cursor) return undefined
+
+  const cmp = sortOrder === 'asc' ? gt : lt
+  return or(
+    cmp(sortColumn, sortValue),
+    and(eq(sortColumn, sortValue), gt(idColumn, cursor.id))
+  )
+}
 
 export interface CursorPage<T> {
   readonly data: ReadonlyArray<T>

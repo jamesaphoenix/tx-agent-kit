@@ -107,8 +107,8 @@ const validateWorkerEnv = (env: WorkerEnv): void => {
   }
 
   const tlsMaterialConfigured = Boolean(
-    env.TEMPORAL_TLS_SERVER_NAME ||
-      env.TEMPORAL_TLS_CA_CERT_PEM ||
+    env.TEMPORAL_TLS_SERVER_NAME ??
+      env.TEMPORAL_TLS_CA_CERT_PEM ??
       (hasClientCert && hasClientKey)
   )
 

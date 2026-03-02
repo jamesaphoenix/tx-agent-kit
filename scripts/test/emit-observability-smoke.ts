@@ -27,7 +27,7 @@ const emitNodeSmokeSignals = async (
   const smokeLogMarker = process.env.OTEL_SMOKE_LOG_MARKER ?? defaultSmokeLogMarker
   process.env.OTEL_EXPORTER_OTLP_ENDPOINT = otlpEndpoint
 
-  await startTelemetry(serviceName)
+  startTelemetry(serviceName)
   emitNodeTelemetrySmoke(serviceName)
   createLogger(serviceName).info(smokeLogMarker, {
     'smoke.service': serviceName,

@@ -174,13 +174,13 @@ export class StripePort extends Context.Tag('StripePort')<
 export class BillingGuardPort extends Context.Tag('BillingGuardPort')<
   BillingGuardPort,
   {
-    isEnabled: () => Effect.Effect<boolean, never>
+    isEnabled: () => Effect.Effect<boolean>
   }
 >() {}
 
 export class ClockPort extends Context.Tag('ClockPort')<
   ClockPort,
   {
-    now: () => Effect.Effect<Date, never>
+    now: () => Effect.Effect<Date>
   }
 >() {}

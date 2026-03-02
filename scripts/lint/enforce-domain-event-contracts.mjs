@@ -341,6 +341,40 @@ for (const filePath of rule12RepoFiles) {
   }
 }
 
+// ─── Rule 13: Exhaustive switch default in workflow dispatchers ──────
+// The event dispatcher switch must include a default: case that handles
+// unknown event types. Without it, new types silently pass through.
+for (const wfPath of workflowFiles) {
+  const wfSource = readUtf8(wfPath)
+  const relativePath = toPosix(relative(repoRoot, wfPath))
+
+  // Find switch blocks that dispatch on event.eventType
+  const switchMatches = [...wfSource.matchAll(/switch\s*\(\s*event\.eventType\s*\)/g)]
+  for (const switchMatch of switchMatches) {
+    // Extract the switch block using brace balancing
+    let depth = 0
+    let i = switchMatch.index + switchMatch[0].length
+    // Skip to opening brace
+    while (i < wfSource.length && wfSource[i] !== '{') i++
+    if (i >= wfSource.length) continue
+    depth = 1
+    i++
+    const blockStart = i
+    while (i < wfSource.length && depth > 0) {
+      if (wfSource[i] === '{') depth++
+      else if (wfSource[i] === '}') depth--
+      i++
+    }
+    const switchBlock = wfSource.slice(blockStart, i - 1)
+
+    if (!/\bdefault\s*:/u.test(switchBlock)) {
+      fail(
+        `Event dispatcher switch in \`${relativePath}\` is missing a \`default:\` case. Add a default handler that marks unknown event types as failed.`
+      )
+    }
+  }
+}
+
 // ─── Report ─────────────────────────────────────────────────────────
 if (errors.length > 0) {
   console.error('Domain event contract check failed:\n')

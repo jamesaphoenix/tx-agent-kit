@@ -41,8 +41,8 @@ interface ClientTelemetryState {
   readonly deploymentEnvironment: string
   readonly tracerProvider: BasicTracerProvider
   readonly meterProvider: MeterProvider
-  readonly requestCounter: Counter<Attributes>
-  readonly requestDurationHistogram: Histogram<Attributes>
+  readonly requestCounter: Counter
+  readonly requestDurationHistogram: Histogram
   readonly tracer: Tracer
 }
 

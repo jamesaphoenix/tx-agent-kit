@@ -2024,6 +2024,99 @@ const enforceRpcPlacement = () => {
 
 enforceRpcPlacement()
 
+// ── Migration file naming convention ──────────────────────────────────
+const enforceMigrationNamingConvention = () => {
+  const migrationsDir = resolve(repoRoot, 'packages/infra/db/drizzle/migrations')
+  if (!existsSync(migrationsDir) || !statSync(migrationsDir).isDirectory()) {
+    return
+  }
+
+  const migrationFiles = readdirSync(migrationsDir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+
+  const migrationNameRegex = /^\d{4}_[a-z][a-z0-9_]*\.sql$/
+  for (const file of migrationFiles) {
+    if (!migrationNameRegex.test(file)) {
+      fail(
+        `Migration file \`${file}\` does not match the naming convention \`NNNN_snake_case_description.sql\`.`
+      )
+    }
+  }
+
+  // Check for duplicate prefixes (new migrations only — prefixes > 0026 are post-historical)
+  const prefixes = migrationFiles.map((f) => f.slice(0, 4))
+  const knownDuplicatePrefixes = new Set(['0008', '0010'])
+  const seen = new Set()
+  for (let i = 0; i < prefixes.length; i++) {
+    const prefix = prefixes[i]
+    if (knownDuplicatePrefixes.has(prefix)) {
+      seen.add(prefix)
+      continue
+    }
+    if (seen.has(prefix)) {
+      fail(
+        `Duplicate migration prefix \`${prefix}\` found: \`${migrationFiles[i]}\`. Each migration must have a unique sequential prefix.`
+      )
+    }
+    seen.add(prefix)
+  }
+}
+
+enforceMigrationNamingConvention()
+
+// ── Test files must reference vitest ──────────────────────────────────
+const enforceTestFilesImportVitest = () => {
+  const roots = [
+    resolve(repoRoot, 'apps'),
+    resolve(repoRoot, 'packages')
+  ]
+
+  const vitestMarkers = [
+    'from \'vitest\'',
+    'from "vitest"',
+    'vi.',
+    'describe(',
+    'it(',
+    'test(',
+    'expect(',
+    'beforeAll(',
+    'beforeEach(',
+    'afterAll(',
+    'afterEach('
+  ]
+
+  for (const root of roots) {
+    if (!existsSync(root) || !statSync(root).isDirectory()) {
+      continue
+    }
+
+    const testFiles = listFilesRecursively(root).filter((filePath) => {
+      const normalized = toPosix(relative(repoRoot, filePath))
+      if (!/\.(test|integration\.test)\.(ts|tsx)$/u.test(normalized)) {
+        return false
+      }
+      if (normalized.includes('/node_modules/') || normalized.includes('/.next/') || normalized.includes('/dist/')) {
+        return false
+      }
+      return true
+    })
+
+    for (const testFile of testFiles) {
+      const source = readUtf8(testFile)
+      const hasVitestMarker = vitestMarkers.some((marker) => source.includes(marker))
+
+      if (!hasVitestMarker) {
+        fail(
+          `Test file \`${toPosix(relative(repoRoot, testFile))}\` does not appear to use vitest (no describe/it/test/expect/vi found). Ensure it is a real test file with assertions.`
+        )
+      }
+    }
+  }
+}
+
+enforceTestFilesImportVitest()
+
 if (errors.length > 0) {
   console.error('Domain invariant check failed:\n')
   for (const error of errors) {

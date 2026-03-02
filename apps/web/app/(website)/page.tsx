@@ -1,11 +1,12 @@
 'use client'
 
+import type React from 'react'
 import Link from 'next/link'
 import { config } from '../../config'
 import { StructuredData } from '../../components/StructuredData'
 import { buildOrganizationStructuredData, buildFAQStructuredData } from '../../lib/seo'
 
-const featureIcons: Record<string, JSX.Element> = {
+const featureIcons: Record<string, React.JSX.Element> = {
   'Temporal Workflows': <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 12h16M14 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   'Effect + Schema': <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   'Structured Observability': <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>,

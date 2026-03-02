@@ -240,6 +240,8 @@ export const StripePortLive = Layer.succeed(StripePort, {
         return { id: `usage_${randomUUID()}` }
       }
 
+      const stripeKey = env.STRIPE_SECRET_KEY
+
       return yield* Effect.tryPromise({
         try: async () => {
           const body = new URLSearchParams()
@@ -252,7 +254,7 @@ export const StripePortLive = Layer.succeed(StripePort, {
             {
               method: 'POST',
               headers: {
-                Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+                Authorization: `Bearer ${stripeKey}`,
                 'Content-Type': 'application/x-www-form-urlencoded',
                 ...(input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : {})
               },

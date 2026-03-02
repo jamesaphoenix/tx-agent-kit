@@ -44,8 +44,8 @@ export const runCommand = (
     if (error.code === 'ETIMEDOUT') {
       return {
         exitCode: 124,
-        stdout: result.stdout ?? '',
-        stderr: `${result.stderr ?? ''}\n${error.message}`.trim()
+        stdout: result.stdout,
+        stderr: `${result.stderr}\n${error.message}`.trim()
       }
     }
 
@@ -54,8 +54,8 @@ export const runCommand = (
 
   return {
     exitCode: result.status ?? 1,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? ''
+    stdout: result.stdout,
+    stderr: result.stderr
   }
 }
 
@@ -199,11 +199,11 @@ export const probeLongRunningCommand = (
     let timedOut = false
     let resolved = false
 
-    child.stdout?.on('data', (chunk: Buffer | string) => {
+    child.stdout.on('data', (chunk: Buffer | string) => {
       stdout += chunk.toString()
     })
 
-    child.stderr?.on('data', (chunk: Buffer | string) => {
+    child.stderr.on('data', (chunk: Buffer | string) => {
       stderr += chunk.toString()
     })
 
@@ -332,12 +332,12 @@ export const probeLongRunningCommandUntilReady = (
       resolve(result)
     }
 
-    child.stdout?.on('data', (chunk: Buffer | string) => {
+    child.stdout.on('data', (chunk: Buffer | string) => {
       stdout += chunk.toString()
       maybeMarkReady()
     })
 
-    child.stderr?.on('data', (chunk: Buffer | string) => {
+    child.stderr.on('data', (chunk: Buffer | string) => {
       stderr += chunk.toString()
       maybeMarkReady()
     })

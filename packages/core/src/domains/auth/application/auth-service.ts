@@ -581,10 +581,6 @@ export const AuthServiceLive = Layer.effect(
           }
         }
 
-        if (!user) {
-          return yield* Effect.fail(badRequest('Google login failed'))
-        }
-
         const session = yield* buildSession(user, 'google', {
           ipAddress: input.ipAddress,
           userAgent: input.userAgent
@@ -750,7 +746,7 @@ export const AuthServiceLive = Layer.effect(
           Effect.mapError(() => unauthorized('Invalid token'))
         )
 
-        if (!activeSession || activeSession.userId !== payload.sub) {
+        if (activeSession?.userId !== payload.sub) {
           return yield* Effect.fail(unauthorized('Invalid token'))
         }
 
