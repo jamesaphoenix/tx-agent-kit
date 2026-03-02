@@ -18,6 +18,7 @@ export interface CreateSqlTestContextOptions {
   baseDatabaseUrl?: string
   schemaPrefix?: string
   repoRoot?: string
+  resetStrategy?: 'per-test' | 'deferred'
 }
 
 export interface SqlTestContext {
@@ -26,8 +27,10 @@ export interface SqlTestContext {
   baseDatabaseUrl: string
   schemaDatabaseUrl: string
   repoRoot: string
+  resetStrategy: 'per-test' | 'deferred'
   setup: () => Promise<void>
   reset: () => Promise<void>
+  flushReset: () => Promise<void>
   teardown: () => Promise<void>
   withSchemaClient: <A>(callback: (client: Client) => Promise<A>) => Promise<A>
   headersForCase: (caseName: string, headers?: HeadersInit) => Record<string, string>
@@ -37,7 +40,7 @@ export interface SqlTestContext {
 const migrationsRelativePath = 'packages/infra/db/drizzle/migrations'
 const localDatabaseHosts = new Set(['localhost', '127.0.0.1', '::1'])
 
-const quoteIdentifier = (value: string): string => `"${value.replace(/"/g, '""')}"`
+const quoteIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
 
 const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
   if (!headers) {
@@ -178,6 +181,7 @@ export const createSqlTestContext = (
 ): SqlTestContext => {
   const testRunId = options.testRunId ?? createTestRunId()
   const schemaName = buildSchemaName(testRunId, options.schemaPrefix ?? 'test')
+  const resetStrategy = options.resetStrategy ?? 'per-test'
   const testkitEnv = getTestkitEnv()
   const baseDatabaseUrl = options.baseDatabaseUrl ?? testkitEnv.DATABASE_URL ?? defaultTestDatabaseUrl
   const allowUnsafeDatabaseUrl = testkitEnv.TESTKIT_ALLOW_UNSAFE_DATABASE_URL === 'true'
@@ -233,7 +237,7 @@ export const createSqlTestContext = (
     await reset()
   }
 
-  const reset = async (): Promise<void> => {
+  const performReset = async (): Promise<void> => {
     await withSchemaClient(async (client) => {
       // Fail fast on lock contention instead of hanging integration suites.
       await client.query(`SET lock_timeout TO '5s'`)
@@ -260,6 +264,17 @@ export const createSqlTestContext = (
 
       await seedIfPresent(client, tableNames)
     })
+  }
+
+  const reset = async (): Promise<void> => {
+    if (resetStrategy === 'deferred') {
+      return
+    }
+    await performReset()
+  }
+
+  const flushReset = async (): Promise<void> => {
+    await performReset()
   }
 
   const teardown = async (): Promise<void> => {
@@ -298,8 +313,10 @@ export const createSqlTestContext = (
     baseDatabaseUrl,
     schemaDatabaseUrl,
     repoRoot,
+    resetStrategy,
     setup,
     reset,
+    flushReset,
     teardown,
     withSchemaClient,
     headersForCase,

@@ -4,7 +4,7 @@ import {
   createUserFactory,
   generateUniqueValue
 } from '@tx-agent-kit/db'
-import { authResponseSchema, organizationSchema } from '@tx-agent-kit/contracts'
+import { authResponseSchema, invitationSchema, organizationSchema } from '@tx-agent-kit/contracts'
 import * as Schema from 'effect/Schema'
 import { createTestCaseId } from './test-run.js'
 import type { SqlTestContext } from './sql-context.js'
@@ -261,6 +261,106 @@ export const createOrganizationAndTeam = async (
       team
     }
   })
+}
+
+export interface CreateInvitationOptions {
+  token: string
+  organizationId: string
+  email: string
+  role?: 'admin' | 'member'
+}
+
+export interface CreatedInvitation {
+  id: string
+  organizationId: string
+  email: string
+  role: string
+  status: string
+  invitedByUserId: string
+  token: string
+  expiresAt: string
+  createdAt: string
+}
+
+export const createInvitation = async (
+  context: ApiFactoryContext,
+  options: CreateInvitationOptions
+): Promise<CreatedInvitation> => {
+  const response = await fetch(toUrl(context, '/v1/invitations'), {
+    method: 'POST',
+    headers: withJsonHeaders(context, 'create-invitation', {
+      authorization: `Bearer ${options.token}`
+    }),
+    body: JSON.stringify({
+      organizationId: options.organizationId,
+      email: options.email,
+      role: options.role ?? 'member'
+    })
+  })
+
+  const body = await parseJsonOrThrow(response)
+  if (response.status !== 201) {
+    throw new Error(`createInvitation failed (${response.status}): ${JSON.stringify(body)}`)
+  }
+
+  return decodeWithSchema(invitationSchema, body, 'createInvitation')
+}
+
+export const createUserWithOrg = async (
+  context: ApiFactoryContext,
+  options?: {
+    user?: CreateUserOptions
+    organization?: { name?: string }
+  }
+): Promise<{ user: CreatedUserSession; org: CreatedOrganization; token: string }> => {
+  const user = await createUser(context, options?.user)
+  const org = await createTeam(context, {
+    token: user.token,
+    name: options?.organization?.name
+  })
+
+  return { user, org, token: user.token }
+}
+
+export const createUserWithOrgAndInvitation = async (
+  context: ApiFactoryContext,
+  options?: {
+    owner?: CreateUserOptions
+    invitee?: CreateUserOptions
+    organization?: { name?: string }
+    invitation?: { role?: 'admin' | 'member' }
+  }
+): Promise<{
+  owner: CreatedUserSession
+  invitee: CreatedUserSession
+  org: CreatedOrganization
+  invitation: CreatedInvitation
+  ownerToken: string
+  inviteeToken: string
+}> => {
+  const owner = await createUser(context, options?.owner)
+  const org = await createTeam(context, {
+    token: owner.token,
+    name: options?.organization?.name
+  })
+
+  const invitee = await createUser(context, options?.invitee)
+
+  const invitation = await createInvitation(context, {
+    token: owner.token,
+    organizationId: org.id,
+    email: invitee.credentials.email,
+    role: options?.invitation?.role
+  })
+
+  return {
+    owner,
+    invitee,
+    org,
+    invitation,
+    ownerToken: owner.token,
+    inviteeToken: invitee.token
+  }
 }
 
 export const withTestHeaders = (

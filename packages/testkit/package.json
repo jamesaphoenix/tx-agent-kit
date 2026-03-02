@@ -11,7 +11,8 @@
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run -c vitest.config.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts",
-    "test:boilerplate": "vitest run -c vitest.boilerplate.config.ts"
+    "test:boilerplate": "vitest run -c vitest.boilerplate.config.ts",
+    "generate:api": "orval --config ./orval.config.ts"
   },
   "dependencies": {
     "@tx-agent-kit/contracts": "workspace:*",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*",
-    "@types/pg": "^8.15.5"
+    "@types/pg": "^8.15.5",
+    "orval": "^7.9.0"
   }
 }
