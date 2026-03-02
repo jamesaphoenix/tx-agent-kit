@@ -37,7 +37,7 @@ pnpm test:integration:quiet    # Minimal output (preferred for agents)
 | Convention | `<file>.integration.test.ts` or `<file>.integration.test.tsx` |
 | Orchestration | Single workspace run via `vitest.integration.workspace.ts` |
 | Global setup | `scripts/test/vitest-global-setup.ts` |
-| Lock guard | `/tmp/tx-agent-kit-integration.lock` prevents concurrent runs |
+| Lock guard | `/tmp/<domain>-integration.lock` prevents concurrent runs |
 | Parallelism | Host CPU count by default (`INTEGRATION_MAX_WORKERS` to override) |
 
 ### pgTAP Tests

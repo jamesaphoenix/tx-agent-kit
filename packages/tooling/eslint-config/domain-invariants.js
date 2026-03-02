@@ -1116,5 +1116,32 @@ export const domainInvariantConfig = [
     rules: {
       'no-console': 'off'
     }
+  },
+  {
+    files: ['packages/core/**/application/**/*.{ts,tsx}', 'packages/core/**/services/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['**/repositories/domain-events*', '@tx-agent-kit/db'],
+          message: 'Service layer must not import domain events repository directly. Use port methods (e.g., createWithEvent) to write events transactionally.'
+        }]
+      }]
+    }
+  },
+  {
+    files: ['apps/api/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [
+          { name: '@temporalio/client', message: 'API must not import Temporal client. Write to the outbox table; the worker processes events.' },
+          { name: '@temporalio/workflow', message: 'API must not import Temporal workflows.' },
+          { name: '@temporalio/worker', message: 'API must not import Temporal worker.' }
+        ],
+        patterns: [{
+          group: ['@temporalio/*'],
+          message: 'API must not depend on Temporal. Events flow through the outbox pattern: API → domain_events table → worker.'
+        }]
+      }]
+    }
   }
 ]

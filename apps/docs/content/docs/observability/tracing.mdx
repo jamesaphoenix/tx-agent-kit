@@ -3,19 +3,19 @@ title: Tracing
 description: Distributed tracing with OpenTelemetry, exported to Jaeger locally and Cloud Trace in production
 ---
 
-tx-agent-kit uses OpenTelemetry for distributed tracing. The `@tx-agent-kit/observability` package bootstraps the trace provider, and all spans are exported via OTLP to the collector.
+<domain> uses OpenTelemetry for distributed tracing. The `@<domain>/observability` package bootstraps the trace provider, and all spans are exported via OTLP to the collector.
 
 ## How tracing works
 
 Each application (API, Worker) initializes the OpenTelemetry Node SDK at startup:
 
 ```typescript
-import { startTelemetry } from '@tx-agent-kit/observability'
+import { startTelemetry } from '@<domain>/observability'
 
 await startTelemetry('api')
 ```
 
-This registers a `NodeSDK` instance with an `OTLPTraceExporter` pointing at `OTEL_EXPORTER_OTLP_ENDPOINT/v1/traces`, a resource with `service.name` and `deployment.environment` attributes, and automatic span context propagation.
+This registers a `NodeSDK` instance with an `OTLPTraceExporter` pointing at `OTEL_EXPORTER_OTLP_ENDPOINT/v1/traces`, a resource with `service.name` and `deployment.environment.name` attributes, and automatic span context propagation.
 
 ## Creating spans
 
@@ -78,7 +78,7 @@ In staging and production, the OTEL Collector is configured with `OTEL_COLLECTOR
 The observability package provides a smoke test function:
 
 ```typescript
-import { emitNodeTelemetrySmoke } from '@tx-agent-kit/observability'
+import { emitNodeTelemetrySmoke } from '@<domain>/observability'
 
 emitNodeTelemetrySmoke('api')
 ```
@@ -90,7 +90,7 @@ This creates a test span (`observability.smoke.node`) and increments a startup c
 Always shut down the telemetry SDK gracefully to flush pending spans:
 
 ```typescript
-import { stopTelemetry } from '@tx-agent-kit/observability'
+import { stopTelemetry } from '@<domain>/observability'
 
 process.on('SIGTERM', async () => {
   await stopTelemetry()

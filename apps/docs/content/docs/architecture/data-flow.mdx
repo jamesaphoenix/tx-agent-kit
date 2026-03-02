@@ -3,7 +3,7 @@ title: Data Flow
 description: End-to-end data flow from client applications through the API to the database and worker
 ---
 
-This page traces the end-to-end data flow through tx-agent-kit, from a user action in the browser to the database and back.
+This page traces the end-to-end data flow through <domain>, from a user action in the browser to the database and back.
 
 ## Overview
 
@@ -87,30 +87,72 @@ The repository returns domain record types, not Drizzle row types. The mapping b
 
 The result flows back through every layer in reverse. The repository returns a domain record to the application service, which passes the result to the route handler. The route handler serializes the response using the `effect/Schema` contract, and the API sends the JSON response to the client. Finally, the client receives typed data through the generated API hooks.
 
-### 6. Background work (optional)
+### 6. Background work (domain events outbox)
 
-Some operations trigger background workflows via Temporal:
+Some operations produce side effects that must happen asynchronously. Instead of importing `@temporalio/*` from the API (which is a hard architectural constraint), the API writes a **domain event** transactionally alongside the business data into the `domain_events` outbox table:
 
 ```typescript
-// API route starts a workflow
-yield* temporalClient.workflow.start(processInvoiceWorkflow, {
-  workflowId: `invoice-${invoiceId}`,
-  args: [{ invoiceId }],
+// Application service writes the record and event in one transaction
+const org = yield* organizationService.createWithEvent({
+  name: payload.name,
 })
+// The domain_events row is committed atomically with the organization row
 ```
 
-The Temporal worker picks up the workflow and executes activities:
+The Temporal worker polls the outbox table on a 5-second schedule, atomically claims a batch of pending events, and dispatches child workflows to handle them:
 
 ```typescript
-// Worker activity calls domain services
-export const sendInvoiceEmail = async (invoiceId: string) => {
-  const invoice = await invoiceService.findById(invoiceId)
-  await emailAdapter.send(invoice)
-  await invoiceService.markAsSent(invoiceId)
+// Worker atomically claims pending events (FOR UPDATE SKIP LOCKED)
+// This SQL transitions matching rows from 'pending' to 'processing' in one statement
+const events = await fetchUnprocessedEvents(batchSize)
+
+for (const event of events) {
+  // Dispatch a non-blocking child workflow per event type
+  await startChild(handleOrganizationCreated, {
+    workflowId: `organization-created-${event.id}`,  // deterministic for idempotency
+    parentClosePolicy: 'ABANDON',
+    args: [event],
+  })
 }
+
+// Mark all dispatched events as 'published' in a single batch
+await markEventsPublished(dispatchedIds)
 ```
 
-Workflows are deterministic and durable. They survive worker restarts and can be replayed.
+If a child workflow was already started (e.g., from a previous poller run), Temporal returns `WorkflowExecutionAlreadyStartedError`, which the poller treats as a success — the event is still marked `published`.
+
+### Event state machine
+
+Events move through four states:
+
+```
+pending  →  processing  →  published
+                        ↘  failed (with failure_reason)
+processing  →  pending     (stuck event reset after threshold)
+```
+
+- **pending**: Written by the API transaction, waiting for the poller to claim it.
+- **processing**: Claimed by the poller via `FOR UPDATE SKIP LOCKED`. If the worker crashes during dispatch, the `resetStuckEventsWorkflow` (every 120s) resets these back to `pending`.
+- **published**: Successfully dispatched to a child workflow.
+- **failed**: Dispatch or validation failed. The failure reason is recorded for debugging.
+
+### Temporal schedules
+
+The worker registers three Temporal schedules at startup:
+
+| Schedule | Interval | Purpose |
+|----------|----------|---------|
+| Outbox poller | Every 5 seconds | Claims pending events, dispatches child workflows |
+| Stuck events reset | Every 120 seconds | Resets `processing` rows older than the threshold back to `pending` |
+| Prune published events | Every 24 hours | Deletes `published` and `failed` rows older than the retention window |
+
+All schedules use `ScheduleOverlapPolicy.SKIP` — overlapping runs are not queued.
+
+### Retention
+
+Published and failed events are pruned daily by `prunePublishedEventsWorkflow`. The retention period is controlled by `OUTBOX_PRUNE_RETENTION_DAYS` (default: 30). The `domain_events` table is listed in the `retentionTableNames` contract registry. Financial audit trail tables (`usage_records`, `credit_ledger`) are intentionally excluded from all retention policies.
+
+This outbox pattern guarantees that domain events are never lost (they share a transaction with the business write), the API remains decoupled from Temporal (no `@temporalio/*` imports), and events are processed at least once with durable retry semantics.
 
 ## Strict boundaries
 
@@ -121,7 +163,7 @@ The data flow enforces strict boundaries between layers:
 | Client to API | HTTP only. No shared process, no direct DB access. |
 | API to Core | Effect services. Domain logic has no knowledge of HTTP. |
 | Core to DB | Port interfaces. Domain defines the contract, DB implements it. |
-| API to Worker | Temporal client. Async, durable, decoupled. |
+| API to Worker | Domain events outbox table. Async, durable, decoupled. The API never imports `@temporalio/*`. |
 
 These boundaries mean you can replace the web frontend without touching the API, switch databases without changing domain logic, scale the worker independently of the API, and test each layer in isolation.
 

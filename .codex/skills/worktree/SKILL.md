@@ -1,6 +1,6 @@
 ---
 name: worktree
-description: Use git worktrees to isolate parallel agent tasks in tx-agent-kit.
+description: Use git worktrees to isolate parallel agent tasks in this repository.
 metadata:
   short-description: Git worktree workflow
 ---

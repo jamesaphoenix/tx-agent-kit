@@ -1,0 +1,79 @@
+---
+title: Cloudflare Tunnel
+description: Expose Mac-hosted k3s API endpoints through Cloudflare tunnel
+---
+
+Mac-hosted API environments are exposed over the internet through host-level `cloudflared`.
+
+## Local development tunnel (`pnpm dev`)
+
+You can expose the local API server during development without running Kubernetes tunnel scripts:
+
+```bash
+DEV_CLOUDFLARE_TUNNEL_ENABLED=true pnpm dev
+```
+
+`pnpm dev` will start `cloudflared` automatically and stop it when dev processes exit.
+
+Optional local-dev variables:
+
+- `DEV_CLOUDFLARE_TUNNEL_URL` (defaults to `http://127.0.0.1:${API_PORT}`)
+- `DEV_CLOUDFLARE_TUNNEL_TOKEN` (named tunnel mode; if set, URL mode is skipped)
+- `DEV_CLOUDFLARE_TUNNEL_LOG_FILE` (default `.data/cloudflared/dev-tunnel.log`)
+- `DEV_CLOUDFLARE_TUNNEL_LOCK_DIR` (default `/tmp/<domain>-dev-tunnel.lock`)
+- `DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS` (default `120`)
+- `DEV_CLOUDFLARE_TUNNEL_MISSING_PID_GRACE_SECONDS` (default `15`)
+
+Only one worktree can own dev tunnel startup at a time. If another worktree already owns the lock, `pnpm dev` skips tunnel startup and continues local dev processes.
+
+Check lock ownership/status:
+
+```bash
+pnpm dev:tunnel:status
+```
+
+## Reconcile and health check
+
+```bash
+pnpm deploy:tunnel:reconcile dev
+pnpm deploy:tunnel:reconcile staging
+pnpm deploy:tunnel:reconcile prod
+pnpm deploy:tunnel:reconcile both
+pnpm deploy:tunnel:reconcile all
+
+pnpm deploy:tunnel:check dev
+pnpm deploy:tunnel:check staging
+pnpm deploy:tunnel:check prod
+pnpm deploy:tunnel:check both
+pnpm deploy:tunnel:check all
+```
+
+## Required environment variables
+
+- `CLOUDFLARE_TUNNEL_ID`
+- `CLOUDFLARE_TUNNEL_CREDENTIALS_FILE`
+- `CLOUDFLARE_TUNNEL_HOST_DEV` (required when reconciling/checking `dev` or `all`)
+- `CLOUDFLARE_TUNNEL_HOST_STAGING`
+- `CLOUDFLARE_TUNNEL_HOST_PROD`
+
+## Optional environment variables
+
+- `CLOUDFLARE_TUNNEL_UPSTREAM_DEV` (default `http://127.0.0.1:4000`)
+- `CLOUDFLARE_TUNNEL_UPSTREAM_STAGING` (default `http://127.0.0.1:32080`)
+- `CLOUDFLARE_TUNNEL_UPSTREAM_PROD` (default `http://127.0.0.1:32081`)
+- `CLOUDFLARE_TUNNEL_CONFIG_PATH`
+- `CLOUDFLARED_RESTART_COMMAND`
+- `CLOUDFLARE_TUNNEL_MANAGE_DNS=1`
+
+## Routing model
+
+- `api-dev.<domain>` routes to your dev API upstream (default `http://127.0.0.1:4000`).
+- `api-staging.<domain>` routes to Mac staging API service.
+- `api.<domain>` routes to Mac prod API service.
+- Deploy scripts run tunnel reconciliation/check before smoke tests for Mac Kubernetes deploys.
+
+## Example host plan (`<domain>`)
+
+- `api-dev.<domain>` -> `CLOUDFLARE_TUNNEL_HOST_DEV`
+- `api-staging.<domain>` -> `CLOUDFLARE_TUNNEL_HOST_STAGING`
+- `api.<domain>` -> `CLOUDFLARE_TUNNEL_HOST_PROD`

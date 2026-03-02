@@ -1,6 +1,6 @@
 ---
 name: golden-path-crud
-description: Generate tx-agent-kit CRUD layers using the repository scaffold and invariants.
+description: Generate this repository CRUD layers using the repository scaffold and invariants.
 metadata:
   short-description: Scaffold CRUD domain slices
 ---

@@ -1,4 +1,12 @@
 {
   "title": "Deployment",
-  "pages": ["index", "build-images", "migrations", "deploy-compose", "smoke-tests"]
+  "pages": [
+    "index",
+    "build-images",
+    "migrations",
+    "deploy-compose",
+    "deploy-k8s",
+    "cloudflare-tunnel",
+    "smoke-tests"
+  ]
 }

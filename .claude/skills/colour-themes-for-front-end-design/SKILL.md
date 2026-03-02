@@ -1,10 +1,10 @@
 # colour-themes-for-front-end-design
 
-Colour palette, typography, spacing, and visual language for tx-agent-kit web + mobile frontends.
+Colour palette, typography, spacing, and visual language for this repository web + mobile frontends.
 
 ## Brand Identity
 
-tx-agent-kit is an **agent-first execution platform**. The visual language should communicate:
+this repository is an **agent-first execution platform**. The visual language should communicate:
 - **Precision** — clean lines, deliberate spacing, sharp typography
 - **Trust** — subdued, confident palette; no gimmicks
 - **Depth** — layered surfaces, soft shadows, subtle gradients that create visual hierarchy

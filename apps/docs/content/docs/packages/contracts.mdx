@@ -17,10 +17,10 @@ Contracts are imported by the API routes for request validation and by the domai
 
 ```typescript
 // Used in domain layer
-import { type SubscriptionStatus, subscriptionStatuses } from '@tx-agent-kit/contracts'
+import { type SubscriptionStatus, subscriptionStatuses } from '@<domain>/contracts'
 
 // Used in API route validation
-import { createOrganizationRequestSchema } from '@tx-agent-kit/contracts'
+import { createOrganizationRequestSchema } from '@<domain>/contracts'
 ```
 
 ## Schema-First Boundaries
@@ -39,3 +39,52 @@ export const subscriptionStatuses = ['active', 'inactive', 'trialing', 'past_due
 ## Governance
 
 `effect/Schema` is the only validation library allowed; Zod imports will fail lint checks. Contract types are consumed by `packages/core` domain layers through re-exports. The API server's `openapi.json` is generated from these contract definitions, ensuring the spec always matches the runtime validation.
+
+## Domain Event Contracts
+
+Domain event types are registered centrally in `packages/contracts/src/literals.ts`. Two arrays govern the event system:
+
+| Export | Purpose |
+|--------|---------|
+| `domainEventTypes` | Registered event type strings following the `<aggregate>.<past-tense-verb>` convention (e.g., `organization.created`) |
+| `domainEventAggregateTypes` | Registered aggregate types that can emit domain events |
+
+Every domain event must have its type string listed in `domainEventTypes` before it can be written to the outbox. The aggregate type must also appear in `domainEventAggregateTypes`. These arrays are the canonical registry consumed by the domain layer, the outbox repository, and structural enforcement scripts.
+
+```typescript
+import { domainEventTypes, domainEventAggregateTypes, domainEventStatuses } from '@<domain>/contracts'
+```
+
+`domainEventStatuses` defines the allowed lifecycle states for outbox events: `pending` | `processing` | `published` | `failed`.
+
+### Naming Derivation
+
+The enforcement script `scripts/lint/enforce-domain-event-contracts.mjs` derives payload type names from the event type string using dot-split PascalCase conversion:
+
+| Event Type | Interface Expected | Schema Expected |
+|------------|--------------------|-----------------|
+| `organization.created` | `OrganizationCreatedEventPayload` | `OrganizationCreatedEventPayloadSchema` |
+| `billing.subscription_updated` | `BillingSubscriptionUpdatedEventPayload` | `BillingSubscriptionUpdatedEventPayloadSchema` |
+
+Each segment is PascalCased individually, then concatenated. This convention is enforced at lint time — adding a new event type requires creating both the interface and schema with the derived names.
+
+## Data Retention Contracts
+
+The contracts package also defines which tables are subject to automated retention policies:
+
+```typescript
+export const retentionTableNames = [
+  'auth_login_sessions',
+  'auth_refresh_tokens',
+  'auth_oidc_states',
+  'auth_password_reset_tokens',
+  'auth_login_audit_events',
+  'subscription_events',
+  'domain_events',
+  'invitations',
+] as const
+
+export type RetentionTableName = (typeof retentionTableNames)[number]
+```
+
+Every table in `retentionTableNames` must have a corresponding entry in the `retention_settings` seed within the migration files. The structural enforcement script `scripts/lint/enforce-domain-event-contracts.mjs` validates this parity at lint time.

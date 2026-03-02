@@ -1,4 +1,4 @@
-# tx-agent-kit
+# <domain>
 
 Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.
 
@@ -41,7 +41,7 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
 - Domain layer files must use named exports only (no default exports).
 - Source hygiene: TODO/FIXME/HACK comments are disallowed in source modules.
 - Domain determinism: no direct `Date.now`, `new Date`, or `Math.random` in domain-layer code; inject via ports.
-- Use `@tx-agent-kit/logging` for structured logs (`console.*` is lint-banned).
+- Use `@<domain>/logging` for structured logs (`console.*` is lint-banned).
 - MCP servers are started via project wrappers in `scripts/mcp/*` (configured by `.mcp.json`), not ad hoc commands.
 - Domain/services/routes/workflows must not read `process.env` directly; use typed config modules/layers.
 - Web runtime env reads are centralized in `apps/web/lib/env.ts`; worker runtime env reads are centralized in `apps/worker/src/config/env.ts`.
@@ -59,26 +59,32 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
   - API coverage includes `/v1/auth/sign-up`, `/v1/auth/sign-in`, `/v1/auth/me`, `/v1/organizations`, `/v1/invitations`, plus invitation idempotency.
   - Web coverage includes `AuthForm`, `CreateOrganizationForm`, `CreateInvitationForm`, `AcceptInvitationForm`, and `SignOutButton` integration suites.
   - Mobile coverage includes `AuthForm`, `CreateOrganizationForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `AuthBootstrapProvider` component test suites, plus `env`, `auth-token`, `axios`, `client-api`, `client-auth`, `url-state`, and `session-store` unit test suites.
+- Domain event types must be registered in `packages/contracts/src/literals.ts` (`domainEventTypes`).
+- Each event type must have a typed `*EventPayload` interface in the domain's `domain/*-events.ts` and a matching `*EventPayloadSchema` in `packages/temporal-client/`.
+- Domain events must be written transactionally via `*WithEvent` port methods; direct outbox repository access from service/application layers is banned.
+- `apps/api/` must not import `@temporalio/*`; events flow through the outbox table only.
+- Event type strings must follow `<aggregate>.<past-tense-verb>` convention (lowercase, dot-separated).
+- `usage_records` and `credit_ledger` must never have retention policies; they are financial audit trails. Metered usage continues reporting to Stripe during `past_due` status (by design — Stripe needs accurate usage to calculate recovery invoices).
+- Tables with retention policies must be listed in `retentionTableNames` (`packages/contracts/src/literals.ts`) and seeded in the `retention_settings` migration.
 
 ## DDD Construction Pattern
 For each domain, create:
 
 ```txt
 packages/core/src/domains/<domain>/
-  domain/         # entities/value objects/pure rules
+  domain/         # entities/value objects/pure rules + domain event payloads
   ports/          # interfaces/capability contracts
-  repositories/   # persistence implementations
-  services/       # use-case orchestration
-  runtime/        # layer wiring (optional)
+  application/    # use-case orchestration
   adapters/       # external system adapters (optional)
+  runtime/        # layer wiring (optional)
   ui/             # presentation-facing layer (optional)
 ```
 
 Dependency direction must stay inward:
 - `domain` imports only `domain`.
 - `ports` imports `domain|ports`.
-- `repositories|adapters` import `domain|ports|self`.
-- `services` import `domain|ports|repositories|adapters|self`.
+- `application` imports `domain|ports|application|self`.
+- `adapters` import `domain|ports|adapters|self`.
 - `runtime|ui` may import outer orchestration layers.
 
 ## Required Workflow For New Features
@@ -122,6 +128,7 @@ When adding a table in `packages/infra/db/src/schema.ts`:
   - `enforce-source-type-safety.mjs`
   - `enforce-compose-runtime-contracts.mjs`
   - `enforce-tsconfig-alignment.mjs`
+  - `enforce-domain-event-contracts.mjs`
 - Shell checks live in `scripts/check-shell-invariants.sh`.
 - `pnpm lint` executes ESLint + structural invariants + shell invariants.
 
@@ -129,7 +136,7 @@ When adding a table in `packages/infra/db/src/schema.ts`:
 - Use `pnpm env:configure` to seed `.env` idempotently.
 - Use `pnpm infra:ensure` to start shared local infrastructure across worktrees.
 - Use `pnpm test:integration` for integration suites (idempotent DB reset + no container teardown).
-- Integration runners are lock-guarded (`/tmp/tx-agent-kit-integration.lock`) to prevent overlapping commands from clobbering each other.
+- Integration runners are lock-guarded (`/tmp/<domain>-integration.lock`) to prevent overlapping commands from clobbering each other.
 - Use `pnpm test:db:pgtap` to validate database trigger contracts (included by integration quiet/full scripts).
 - Prefer quiet runners first to reduce context bloat:
   - `pnpm lint:quiet`

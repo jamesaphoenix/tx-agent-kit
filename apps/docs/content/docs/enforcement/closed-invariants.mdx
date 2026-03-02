@@ -9,7 +9,7 @@ This is the complete list of mechanically enforced invariants. Each invariant is
 
 | Invariant | Description |
 |-----------|-------------|
-| API-first web | `apps/web` never imports `@tx-agent-kit/db` or `drizzle-orm` |
+| API-first web | `apps/web` never imports `@<domain>/db` or `drizzle-orm` |
 | Web runtime simplicity | `apps/web` must not import `effect`/`effect/*` |
 | Client-only runtime | No `apps/web/app/api`, no proxy/middleware, no `next/server`/`next/headers` |
 | Client component contract | All `.tsx` under `app/` and `components/` start with `'use client'` |
@@ -29,7 +29,7 @@ This is the complete list of mechanically enforced invariants. Each invariant is
 
 | Invariant | Description |
 |-----------|-------------|
-| Logging discipline | `console.*` is banned; use `@tx-agent-kit/logging` |
+| Logging discipline | `console.*` is banned; use `@<domain>/logging` |
 | Drizzle isolation | Only `packages/infra/db` imports `drizzle-orm` |
 | Schema-first boundaries | Validation uses `effect/Schema` only (Zod banned) |
 
@@ -60,6 +60,23 @@ This is the complete list of mechanically enforced invariants. Each invariant is
 |-----------|-------------|
 | Workflow determinism | No native timer calls in workflows |
 | No infra imports | Workflows must not import database clients or I/O modules |
+| API Temporal ban | `apps/api/` must not import `@temporalio/*`; events flow via the outbox only |
+
+## Domain Events
+
+| Invariant | Description |
+|-----------|-------------|
+| Event type registry | All event type strings used in code must be registered in `domainEventTypes` in `packages/contracts/src/literals.ts` |
+| Payload interface parity | Each registered event type must have `export interface <Type>EventPayload` in the domain's `domain/*-events.ts` |
+| Payload schema parity | Each registered event type must have `export const <Type>EventPayloadSchema` in `packages/temporal-client/src/types/` |
+| Transactional write | Domain event inserts in repositories must be inside a `db.transaction()` block |
+| Handler completeness | Every registered event type must have a `case '...'` handler in `apps/worker/src/workflows*.ts` |
+| Idempotent workflow dispatch | Every `startChild`/`executeChild` call must include a `workflowId` containing `event.id` |
+| No payload `as` casts | `.payload as <Type>` is forbidden in worker files; use Schema decode |
+| Naming convention | Event type strings must match `^[a-z][a-z_]*\.[a-z][a-z_]*$` |
+| Retention settings parity | Every table in `retentionTableNames` must have a seed entry in the `retention_settings` migration |
+| Insert helper enforcement | Inline `.insert(domainEvents).values(...)` outside `repositories/domain-events.ts` is banned; use `insertDomainEventInTransaction` |
+| Port-level write contract | Direct outbox repository access from service/application layers is banned; use `*WithEvent` port methods |
 
 ## Environment
 

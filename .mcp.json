@@ -15,10 +15,6 @@
     "supabase": {
       "type": "stdio",
       "command": "./scripts/mcp/supabase.sh"
-    },
-    "playwright": {
-      "type": "stdio",
-      "command": "./scripts/mcp/playwright.sh"
     }
   }
 }

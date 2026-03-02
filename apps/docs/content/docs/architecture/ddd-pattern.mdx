@@ -1,9 +1,9 @@
 ---
 title: DDD Construction Pattern
-description: How domain-driven design is implemented in tx-agent-kit
+description: How domain-driven design is implemented in <domain>
 ---
 
-tx-agent-kit implements domain-driven design (DDD) with a specific construction pattern that separates concerns into well-defined layers. This pattern is enforced mechanically, not just documented.
+<domain> implements domain-driven design (DDD) with a specific construction pattern that separates concerns into well-defined layers. This pattern is enforced mechanically, not just documented.
 
 ## Directory structure
 
@@ -110,7 +110,7 @@ Concrete repository implementations live in the database package, not inside the
 ```typescript
 // packages/infra/db/src/repositories/invoice.repository.ts
 
-import type { InvoiceRepositoryPort } from "@tx-agent-kit/core/domains/billing/ports/invoice-repository.port.js"
+import type { InvoiceRepositoryPort } from "@<domain>/core/domains/billing/ports/invoice-repository.port.js"
 
 export const makeInvoiceRepository = (db: DrizzleClient): InvoiceRepositoryPort => ({
   findById: (id) => Effect.tryPromise(() =>
@@ -132,4 +132,4 @@ The structural invariant checks enforce these prohibitions:
 | No `services/` directory inside `packages/core/src/domains/` | Use `application/` instead for consistency |
 | No imports from `drizzle-orm`, `pg`, or database-specific packages | Core must remain infrastructure-free |
 | No `process.env` reads | Use typed config modules |
-| No `console.*` calls | Use `@tx-agent-kit/logging` |
+| No `console.*` calls | Use `@<domain>/logging` |

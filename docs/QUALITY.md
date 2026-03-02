@@ -1,7 +1,7 @@
 # Quality
 
 - Enforce package boundaries with ESLint.
-- Enforce structured logging with `no-console` + `@tx-agent-kit/logging`.
+- Enforce structured logging with `no-console` + `@<domain>/logging`.
 - Keep tests idempotent and deterministic.
 - Run unit tests via `pnpm test`.
 - Run integration tests against Docker infra via `pnpm test:integration`.
@@ -10,16 +10,16 @@
 - Integration suites run with host-CPU parallelism by default (`INTEGRATION_MAX_WORKERS` to override).
 - Web integration can be independently capped with `WEB_INTEGRATION_MAX_WORKERS` and continues to use pool-slot isolated API ports/schemas.
 - Web integration harnesses keep one API process per pool slot warm across test files; resets happen per test case.
-- Integration DB reset is lock-guarded (`/tmp/tx-agent-kit-db-reset.lock`) to avoid concurrent local test clobbering.
-- Full integration runners are lock-guarded (`/tmp/tx-agent-kit-integration.lock`) to prevent concurrent suite interference.
+- Integration DB reset is lock-guarded (`/tmp/<domain>-db-reset.lock`) to avoid concurrent local test clobbering.
+- Full integration runners are lock-guarded (`/tmp/<domain>-integration.lock`) to prevent concurrent suite interference.
 - Run database contract suites via `pnpm test:db:pgtap`.
 - API integration harness is standardized via `createDbAuthContext(...)` (no manual process spawning in API integration suites).
 - API harness callers must resolve `apiCwd` via `fileURLToPath(import.meta.url)` (never `process.cwd()`), so root-workspace integration runs stay deterministic.
-- Run invariant checks via `pnpm lint` (`eslint` + `scripts/lint/enforce-domain-invariants.mjs` + `scripts/lint/enforce-web-client-contracts.mjs` + `scripts/lint/enforce-route-kind-contracts.mjs` + `scripts/lint/enforce-source-type-safety.mjs` + `scripts/lint/enforce-compose-runtime-contracts.mjs` + `scripts/lint/enforce-tsconfig-alignment.mjs` + shell invariants).
+- Run invariant checks via `pnpm lint` (`eslint` + `scripts/lint/enforce-domain-invariants.mjs` + `scripts/lint/enforce-web-client-contracts.mjs` + `scripts/lint/enforce-route-kind-contracts.mjs` + `scripts/lint/enforce-source-type-safety.mjs` + `scripts/lint/enforce-compose-runtime-contracts.mjs` + `scripts/lint/enforce-tsconfig-alignment.mjs` + `scripts/lint/enforce-domain-event-contracts.mjs` + shell invariants).
 
 ## Domain Invariants
 
-- API-first web: `apps/web` never imports `@tx-agent-kit/db` or `drizzle-orm`.
+- API-first web: `apps/web` never imports `@<domain>/db` or `drizzle-orm`.
 - Web runtime simplicity: `apps/web` must not import `effect`/`effect/*`; keep Effect runtime logic in API/core/worker layers.
 - Client-only web runtime: no `apps/web/app/api`, no web proxy/middleware runtime files, and no `next/server`/`next/headers` imports.
 - Client component contract: all `apps/web/app/**/*.tsx` and `apps/web/components/**/*.tsx` start with `'use client'`.
@@ -29,7 +29,7 @@
 - Web notifications contract: `sonner` usage is centralized in `apps/web/lib/notify.tsx`.
 - Web browser API contract: direct `window.location` access is forbidden; use URL-state wrappers.
 - Web transport discipline: direct `fetch` in `apps/web` is forbidden; use typed clients.
-- Logging discipline: `console.*` is banned; use `@tx-agent-kit/logging`.
+- Logging discipline: `console.*` is banned; use `@<domain>/logging`.
 - Drizzle isolation: only `packages/infra/db` imports `drizzle-orm`.
 - Schema-first boundaries: domain request/response validation is done with `effect/Schema` (zod is banned).
 - Table schema parity: each database table has a corresponding Effect schema under `packages/infra/db/src/effect-schemas/`.
@@ -62,6 +62,20 @@
   - Worker integration suite must cover idempotent `activities.processOperation(...)` behavior against SQL (`alreadyProcessed: false -> true`).
 - Trigger contract governance: each SQL `CREATE TRIGGER` in DB migrations must be referenced by pgTAP suites in `packages/infra/db/pgtap/*.sql`.
 - Integration orchestration governance: root workspace config (`vitest.integration.workspace.ts`) and root global setup (`scripts/test/vitest-global-setup.ts`) are required; package-level integration configs (api/testkit/worker) must not define infra-level `globalSetup`.
+
+## Domain Event Invariants
+
+- Event type registry: all dot-separated event types used in `eventType:`, `case`, or `=== '...'` patterns must be registered in `domainEventTypes` in `packages/contracts/src/literals.ts`.
+- Event payload interface parity: each registered event type must have `export interface <Type>EventPayload` in `packages/core/src/domains/<aggregate>/domain/*-events.ts`.
+- Event payload schema parity: each registered event type must have `export const <Type>EventPayloadSchema` in `packages/temporal-client/src/types/*.ts`.
+- Transactional write enforcement: domain event inserts in repositories must be inside a `db.transaction()` or use a `trx` handle.
+- Handler completeness: every registered event type must have a `case '...'` in `apps/worker/src/workflows*.ts`.
+- Idempotent workflow IDs: every `startChild`/`executeChild` call must include a `workflowId` property containing `event.id`.
+- No payload `as` casts: `.payload as <Type>` is forbidden in worker source; use Schema decode.
+- Event type naming convention: strings must match `^[a-z][a-z_]*\.[a-z][a-z_]*$`.
+- Retention settings completeness: every table in `retentionTableNames` must appear in the `retention_settings` migration seed.
+- Domain event insert helper: inline `.insert(domainEvents).values(...)` outside `repositories/domain-events.ts` is banned; use `insertDomainEventInTransaction`.
+- Naming derivation: the enforcement script derives names via dot-split PascalCase (e.g., `organization.created` → `OrganizationCreatedEventPayload` / `OrganizationCreatedEventPayloadSchema`).
 
 ## Web Route Group Governance
 

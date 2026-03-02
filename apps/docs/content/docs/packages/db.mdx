@@ -13,6 +13,7 @@ The database package is the only package that may import `drizzle-orm`. It manag
 packages/infra/db/
   src/
     schema.ts              # Drizzle table definitions
+    json-schema.ts         # JSON/JSONB type helpers shared by effect-schemas
     effect-schemas/        # One Effect schema per table
     factories/             # One test factory per table
     repositories/          # Concrete persistence implementations
@@ -83,6 +84,68 @@ Concrete persistence implementations live in `src/repositories/`. These are the 
 ```
 
 Repository implementations satisfy the abstract port contracts defined in `packages/core/src/domains/*/ports/`.
+
+## Domain Event Transaction Helper
+
+Repositories that write domain events as part of a business operation must use the shared `insertDomainEventInTransaction` helper exported from `repositories/domain-events.ts`. The helper accepts a transaction handle and an event input, auto-incrementing the per-aggregate `sequenceNumber`:
+
+```typescript
+import { insertDomainEventInTransaction } from './domain-events.js'
+
+// Inside a transaction:
+yield* insertDomainEventInTransaction(trx, {
+  eventType: input.event.eventType,
+  aggregateType: input.event.aggregateType,
+  aggregateId: org.id,
+  payload: input.event.payload,
+  correlationId: input.event.correlationId ?? null
+})
+```
+
+Inline `.insert(domainEvents).values(...)` calls in any repository file other than `domain-events.ts` are banned. This is enforced by the structural lint rule **Rule 12** in `scripts/lint/enforce-domain-event-contracts.mjs`.
+
+## System Settings
+
+The `system_settings` table stores application-wide configuration as typed JSONB values. It was introduced in migration `0027_system_settings.sql`:
+
+```typescript
+export const systemSettings = pgTable('system_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').$type<JsonObject>().notNull(),
+  description: text('description'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+})
+```
+
+The `systemSettingsRepository` in `src/repositories/system-settings.ts` provides three methods:
+
+| Method | Description |
+|--------|-------------|
+| `get(key)` | Fetch a single setting by primary key. Returns `null` when absent. |
+| `upsert(key, value, description?)` | Insert or update a setting using `ON CONFLICT DO UPDATE`. |
+| `getRetentionSettings()` | Typed convenience method that reads the `retention_settings` key and validates each entry has `enabled` (boolean) and `retention_days` (number). Returns an empty record when the key is missing or malformed. |
+
+## Data Retention
+
+Several repositories expose `prune*` methods that delete rows older than a given threshold. These methods are designed to be called from scheduled Temporal workflows or maintenance scripts:
+
+| Repository | Method | What it prunes |
+|------------|--------|----------------|
+| `authLoginSessionsRepository` | `pruneAuditEvents(olderThan)` | Auth audit event rows with `created_at` before the threshold. |
+| `invitationsRepository` | `pruneTerminal(olderThan)` | Invitations in terminal states (`accepted`, `revoked`, `expired`) with `created_at` before the threshold. |
+| `domainEventsRepository` | `prunePublished(olderThan)` | Domain events in `published` or `failed` status whose completion timestamp is before the threshold. |
+
+Retention thresholds are configured via the `retention_settings` key in the `system_settings` table. Each entry maps a logical table name to an `enabled` flag and a `retention_days` number:
+
+```json
+{
+  "audit_events": { "enabled": true, "retention_days": 90 },
+  "invitations": { "enabled": true, "retention_days": 180 },
+  "domain_events": { "enabled": true, "retention_days": 30 }
+}
+```
+
+Use `systemSettingsRepository.getRetentionSettings()` to read the current configuration.
 
 ## Migrations
 

@@ -1,9 +1,9 @@
 ---
 title: Deployment Overview
-description: Container-based deployment model for staging and production environments
+description: Compose and Kubernetes deployment model for staging and production environments
 ---
 
-tx-agent-kit deploys staging and production environments using immutable container images managed through Docker Compose. The deployment pipeline is fully scriptable and secrets-free in the repository.
+<domain> deploys staging and production environments with immutable container images. Compose remains available, and Kubernetes supports Mac Studio `k3s` (staging/prod) plus optional GKE deploys from the same artifact.
 
 ## Deployment model
 
@@ -11,16 +11,16 @@ The deployment workflow has four stages:
 
 1. Build images: build and optionally push container images for `api` and `worker`.
 2. Run migrations: apply database schema changes to the target environment.
-3. Deploy with Compose: render secrets, pull images, start services, run smoke checks.
+3. Deploy runtime target: Compose or Kubernetes (Mac `k3s` / optional GKE).
 4. Smoke tests: verify critical API flows are working in the deployed environment.
 
 ## What gets deployed
 
 | Component | Deployment method |
 |-----------|------------------|
-| **API** | Container image via Docker Compose |
-| **Worker** | Container image via Docker Compose |
-| **OTEL Collector** | Container via Docker Compose |
+| **API** | Container image via Compose or Helm |
+| **Worker** | Container image via Compose or Helm |
+| **OTEL Collector** | Compose service or Helm workload |
 | **Web** | Deployed separately (e.g., Vercel, static hosting) |
 | **Mobile** | Deployed separately (e.g., EAS, App Store) |
 
@@ -38,7 +38,7 @@ Both staging and production environments share the same configuration structure:
 
 | Variable | Source |
 |----------|--------|
-| `DATABASE_URL` | 1Password (`op://octospark-services/<env>/DATABASE_URL`) |
+| `DATABASE_URL` | 1Password (`op://<project-vault>/<env>/DATABASE_URL`) |
 | `AUTH_SECRET` | 1Password |
 | `TEMPORAL_ADDRESS` | 1Password |
 | `API_CORS_ORIGIN` | 1Password |
@@ -59,15 +59,29 @@ PUSH_IMAGES=1 pnpm deploy:build-images
 pnpm deploy:migrate:staging
 pnpm deploy:migrate:prod
 
-# Deploy to staging
+# Deploy to staging via Compose
 pnpm deploy:staging
 
-# Deploy to production
+# Deploy to production via Compose
 pnpm deploy:prod
+
+# Deploy Mac k3s staging/prod
+pnpm deploy:k8s:mac:staging deploy/artifacts/images-<sha>.env
+pnpm deploy:k8s:mac:prod deploy/artifacts/images-<sha>.env
+
+# Dedicated Mac k3s staging verification lane (separate from standard integration suites)
+pnpm deploy:k8s:verify:staging deploy/artifacts/images-<sha>.env
+
+# Optional GKE deploy from the same artifact
+pnpm deploy:k8s:gke deploy/artifacts/images-<sha>.env
 
 # Run smoke tests against a deployed environment
 API_BASE_URL=https://api.example.com pnpm deploy:smoke
 ```
+
+## Assumptions and Defaults
+
+- Mac Studio runner has `k3s`, `kubectl`, `helm`, `op`, and `cloudflared`.
 
 ## Related pages
 
@@ -76,4 +90,6 @@ API_BASE_URL=https://api.example.com pnpm deploy:smoke
 | [Build Images](/docs/deployment/build-images) | Image build and push pipeline |
 | [Migrations](/docs/deployment/migrations) | Database migration workflow |
 | [Deploy with Compose](/docs/deployment/deploy-compose) | Full deployment process |
+| [Deploy with Kubernetes](/docs/deployment/deploy-k8s) | Mac `k3s` and optional GKE release flow |
+| [Cloudflare Tunnel](/docs/deployment/cloudflare-tunnel) | Mac-hosted API internet exposure through cloudflared |
 | [Smoke Tests](/docs/deployment/smoke-tests) | Post-deployment verification |

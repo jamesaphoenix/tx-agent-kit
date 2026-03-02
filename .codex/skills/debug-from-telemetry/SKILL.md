@@ -1,6 +1,6 @@
 ---
 name: debug-from-telemetry
-description: Debug failures by correlating traces, logs, and metrics in tx-agent-kit.
+description: Debug failures by correlating traces, logs, and metrics in this repository.
 metadata:
   short-description: Trace and telemetry debugging
 ---

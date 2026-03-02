@@ -30,7 +30,7 @@ The database URL is read via `op read`:
 
 ```bash
 # Resolved at runtime, never stored in files
-DATABASE_URL=$(op read "op://octospark-services/staging/DATABASE_URL")
+DATABASE_URL=$(op read "op://<project-vault>/staging/DATABASE_URL")
 ```
 
 ## Migration files
@@ -41,7 +41,7 @@ The schema definition lives in `packages/infra/db/src/schema.ts`. When you chang
 
 ```bash
 # Generate a migration from schema changes
-pnpm --filter @tx-agent-kit/db db:generate
+pnpm --filter @<domain>/db db:generate
 
 # Apply the migration locally
 pnpm db:migrate
@@ -63,7 +63,7 @@ Migrations run in a transaction by default, so a failure rolls back cleanly with
 
 ## Local development
 
-For local development, `pnpm db:migrate` reads `DATABASE_URL` from the `.env` file (typically `postgres://postgres:postgres@localhost:5432/tx_agent_kit`). In worktrees, the URL includes a schema search path to isolate data.
+For local development, `pnpm db:migrate` reads `DATABASE_URL` from the `.env` file (typically `postgres://postgres:postgres@localhost:5432/<domain_identifier>`). In worktrees, the URL includes a schema search path to isolate data.
 
 To reset the local test database:
 

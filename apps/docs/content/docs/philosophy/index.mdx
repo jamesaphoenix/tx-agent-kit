@@ -1,9 +1,9 @@
 ---
 title: Agent-First Engineering
-description: The thesis behind tx-agent-kit. Agents implement, humans steer
+description: The thesis behind <domain>. Agents implement, humans steer
 ---
 
-tx-agent-kit is built on a specific thesis about how software gets built in the age of capable AI agents. This is not a philosophical abstraction. It is a concrete operating model that shapes every decision in the repository.
+<domain> is built on a specific thesis about how software gets built in the age of capable AI agents. This is not a philosophical abstraction. It is a concrete operating model that shapes every decision in the repository.
 
 ## The thesis
 
@@ -18,11 +18,11 @@ Humans are better at steering. Agents are better at implementing. The best resul
 
 This approach is inspired by OpenAI's Harness Engineering post (February 2026), which argued that the role of the engineer is shifting from writing code to building the harness: the scaffolding of docs, linters, tests, and scripts that enable agents to operate effectively.
 
-tx-agent-kit takes this idea and makes it concrete. The repository is designed from the ground up to be the harness: every architectural constraint is mechanically enforced, every convention is encoded in a check, and every workflow is documented in the repo itself.
+<domain> takes this idea and makes it concrete. The repository is designed from the ground up to be the harness: every architectural constraint is mechanically enforced, every convention is encoded in a check, and every workflow is documented in the repo itself.
 
 ## What this means in practice
 
-When you work with tx-agent-kit, the workflow looks like this:
+When you work with <domain>, the workflow looks like this:
 
 1. **You define intent.** Write acceptance criteria, describe the domain, specify the behavior.
 2. **The agent implements.** It reads `CLAUDE.md`, follows the DDD construction pattern, runs the scaffold CLI, writes the code.

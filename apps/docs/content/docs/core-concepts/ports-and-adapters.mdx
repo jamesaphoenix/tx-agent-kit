@@ -3,7 +3,7 @@ title: Ports and Adapters
 description: How abstract interfaces decouple domain logic from infrastructure implementations
 ---
 
-The ports and adapters pattern (also known as hexagonal architecture) is central to tx-agent-kit's design. Ports define abstract capability contracts. Adapters implement those contracts with concrete infrastructure.
+The ports and adapters pattern (also known as hexagonal architecture) is central to <domain>'s design. Ports define abstract capability contracts. Adapters implement those contracts with concrete infrastructure.
 
 ## Ports: defining contracts
 
@@ -29,7 +29,7 @@ export type CreateOrganizationInput = {
 
 ### Port rules
 
-Ports in tx-agent-kit follow strict conventions enforced by structural invariant checks.
+Ports in <domain> follow strict conventions enforced by structural invariant checks.
 
 Port files must use `export type` instead of `export interface`. This is a mechanical enforcement. The structural invariant script checks for `export interface` in any file under `ports/` and fails the build if found.
 
@@ -51,14 +51,14 @@ Ports import only `domain/` and `ports/`. A port file cannot import from `applic
 
 ## Adapters: concrete implementations
 
-Adapters implement port contracts using specific technologies. In tx-agent-kit, the primary adapters are Drizzle-based repository implementations in `packages/infra/db/src/repositories/`:
+Adapters implement port contracts using specific technologies. In <domain>, the primary adapters are Drizzle-based repository implementations in `packages/infra/db/src/repositories/`:
 
 ```typescript
 // packages/infra/db/src/repositories/organizations.ts
 
 import { eq } from "drizzle-orm"
 import { organizations } from "../schema.js"
-import type { OrganizationRepositoryPort } from "@tx-agent-kit/core/domains/organization/ports/organization-repository.port.js"
+import type { OrganizationRepositoryPort } from "@<domain>/core/domains/organization/ports/organization-repository.port.js"
 
 export const makeOrganizationRepository = (db: DrizzleClient): OrganizationRepositoryPort => ({
   findById: (id) =>
@@ -88,7 +88,7 @@ export const makeOrganizationRepository = (db: DrizzleClient): OrganizationRepos
 
 ### Why adapters live in packages/infra/db
 
-In many hexagonal architecture implementations, adapters live next to the domain. tx-agent-kit takes a different approach: **persistence adapters live in `packages/infra/db/src/repositories/`**.
+In many hexagonal architecture implementations, adapters live next to the domain. <domain> takes a different approach: **persistence adapters live in `packages/infra/db/src/repositories/`**.
 
 This decision is deliberate. First, `packages/core` stays free of `drizzle-orm`. If repositories lived in core, core would need a dependency on the database library. Second, all database code is colocated: schema, migrations, repositories, effect-schemas, and factories all live together in `packages/infra/db`. Third, the structural invariant enforces it. The check script verifies that `packages/core/src/domains/*/repositories/` does not exist.
 
@@ -98,8 +98,8 @@ The connection between abstract ports and concrete adapters happens through Effe
 
 ```typescript
 // apps/api - layer wiring
-import { OrganizationRepository } from "@tx-agent-kit/core/domains/organization/ports/organization-repository.port.js"
-import { makeOrganizationRepository } from "@tx-agent-kit/db/repositories/organizations.js"
+import { OrganizationRepository } from "@<domain>/core/domains/organization/ports/organization-repository.port.js"
+import { makeOrganizationRepository } from "@<domain>/db/repositories/organizations.js"
 
 const OrganizationRepositoryLive = Layer.succeed(
   OrganizationRepository,

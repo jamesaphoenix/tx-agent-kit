@@ -3,11 +3,11 @@ title: Metrics
 description: Application metrics via OpenTelemetry SDK with Prometheus and Cloud Monitoring backends
 ---
 
-tx-agent-kit collects application metrics using the OpenTelemetry SDK. Metrics are exported via OTLP to the collector, which routes them to Prometheus locally or GCP Cloud Monitoring in production.
+<domain> collects application metrics using the OpenTelemetry SDK. Metrics are exported via OTLP to the collector, which routes them to Prometheus locally or GCP Cloud Monitoring in production.
 
 ## How metrics work
 
-The `@tx-agent-kit/observability` package initializes a `PeriodicExportingMetricReader` that pushes metrics every 5 seconds:
+The `@<domain>/observability` package initializes a `PeriodicExportingMetricReader` that pushes metrics every 5 seconds:
 
 ```typescript
 metricReader: new PeriodicExportingMetricReader({
@@ -56,7 +56,7 @@ activeConnections.add(-1) // connection closed
 The observability package provides a metrics registry with baseline instruments:
 
 ```typescript
-import { getOrCreateNodeServiceMetrics } from '@tx-agent-kit/observability'
+import { getOrCreateNodeServiceMetrics } from '@<domain>/observability'
 
 const meter = metrics.getMeter('api')
 const { startupCounter } = getOrCreateNodeServiceMetrics(meter)

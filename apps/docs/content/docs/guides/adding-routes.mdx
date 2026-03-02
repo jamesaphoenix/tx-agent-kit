@@ -26,7 +26,7 @@ A `crud` route follows a predictable pattern. Using organizations as an example:
 ```typescript
 // apps/api/src/routes/organizations.ts
 import { HttpApiBuilder, HttpServerRequest } from '@effect/platform'
-import { principalFromAuthorization, OrganizationService } from '@tx-agent-kit/core'
+import { principalFromAuthorization, OrganizationService } from '@<domain>/core'
 import { Effect } from 'effect'
 import { TxAgentApi, mapCoreError } from '../api.js'
 

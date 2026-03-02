@@ -9,6 +9,13 @@
 - `web` and `mobile` are not deployed through these Compose files.
   - `web` is configured via `NEXT_PUBLIC_API_BASE_URL` at its own runtime/platform.
   - `mobile` is built per environment and consumes `API_BASE_URL` from Expo config.
+- Kubernetes deploys use one Helm chart with three target overlays:
+  - Mac Studio `k3s` staging (`tx-staging` namespace, `<domain>-staging` release)
+  - Mac Studio `k3s` prod (`tx-prod` namespace, `<domain>-prod` release)
+  - Optional GKE load/cost test (`<domain>-loadtest` namespace by default)
+
+## Assumptions and Defaults
+- Mac Studio runner has `k3s`, `kubectl`, `helm`, `op`, and `cloudflared`.
 
 ## Secrets and Env Policy
 - Secrets are sourced from 1Password CLI (`op`) via env templates:
@@ -46,6 +53,8 @@ Artifact output:
 - `deploy/artifacts/images-<git-sha>.env`
 - Contains `API_IMAGE` and `WORKER_IMAGE`
 - When pushed, references are digest-pinned (`repo@sha256:...`).
+- Default registry path is Google Artifact Registry:
+  - `${ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPOSITORY}/api|worker`
 
 ## Run Migrations
 Run migrations against staging/prod DB URL (resolved from 1Password):
@@ -76,6 +85,92 @@ The deploy script:
 3. Runs `docker compose pull` and `up -d --remove-orphans`
 4. Runs smoke checks when `RUN_SMOKE=1` (default)
 
+## Deploy Kubernetes (Mac `k3s` + Optional GKE)
+Deploy from the same image artifact used by Compose:
+
+```bash
+pnpm deploy:k8s:mac:staging deploy/artifacts/images-<git-sha>.env
+pnpm deploy:k8s:mac:prod deploy/artifacts/images-<git-sha>.env
+pnpm deploy:k8s:gke deploy/artifacts/images-<git-sha>.env
+pnpm deploy:k8s:verify:staging deploy/artifacts/images-<git-sha>.env
+```
+
+Behavior:
+1. Render env from `op inject` (`deploy/env/<env>.env.template`).
+2. Render Helm runtime values from the env + image artifact.
+3. `helm upgrade --install` into the target context/namespace/release.
+4. Wait for rollout (`api`, `worker`, optional `otel-collector`).
+5. For Mac targets, reconcile/check Cloudflare tunnel host routing.
+6. Run smoke checks against `API_EXTERNAL_BASE_URL` when configured.
+
+Mac tunnel-check controls for deploy scripts:
+- `RUN_TUNNEL_RECONCILE=0` skips tunnel reconcile/check.
+- `RUN_TUNNEL_CHECK=0` reconciles tunnel but skips health check.
+- `RUN_TUNNEL_CHECK_SOFT_FAIL=1` keeps deploy green when tunnel health check fails.
+
+Status and rollback:
+
+```bash
+pnpm deploy:k8s:status mac-staging
+pnpm deploy:k8s:status mac-prod
+pnpm deploy:k8s:status gke
+pnpm deploy:k8s:rollback mac-staging <revision>
+pnpm deploy:k8s:rollback mac-prod <revision>
+pnpm deploy:k8s:rollback gke <revision>
+```
+
+## Cloudflare Tunnel for Mac-hosted API
+Cloudflare tunnel is managed at the Mac host level (outside Kubernetes pods).
+
+```bash
+pnpm deploy:tunnel:reconcile staging
+pnpm deploy:tunnel:reconcile prod
+pnpm deploy:tunnel:reconcile dev
+pnpm deploy:tunnel:reconcile both
+pnpm deploy:tunnel:reconcile all
+pnpm deploy:tunnel:check staging
+pnpm deploy:tunnel:check prod
+pnpm deploy:tunnel:check dev
+pnpm deploy:tunnel:check both
+pnpm deploy:tunnel:check all
+```
+
+Required env variables on the Mac runner:
+- `CLOUDFLARE_TUNNEL_ID`
+- `CLOUDFLARE_TUNNEL_CREDENTIALS_FILE`
+- `CLOUDFLARE_TUNNEL_HOST_DEV` (required when reconciling/checking `dev` or `all`)
+- `CLOUDFLARE_TUNNEL_HOST_STAGING`
+- `CLOUDFLARE_TUNNEL_HOST_PROD`
+
+Optional controls:
+- `CLOUDFLARE_TUNNEL_UPSTREAM_DEV` (default `http://127.0.0.1:4000`)
+- `CLOUDFLARE_TUNNEL_UPSTREAM_STAGING` (default `http://127.0.0.1:32080`)
+- `CLOUDFLARE_TUNNEL_UPSTREAM_PROD` (default `http://127.0.0.1:32081`)
+- `CLOUDFLARE_TUNNEL_CONFIG_PATH`
+- `CLOUDFLARED_RESTART_COMMAND`
+- `CLOUDFLARE_TUNNEL_MANAGE_DNS=1`
+
+Suggested host mapping for `<domain>`:
+- `api-dev.<domain>` -> dev upstream
+- `api-staging.<domain>` -> staging upstream
+- `api.<domain>` -> prod upstream
+
+## GitHub Actions Release Workflow
+- Workflow: `.github/workflows/release-k8s.yml`
+- Build jobs:
+  - `build_images_locally`
+  - `build_images_google_cloud`
+- Deploy jobs:
+  - `deploy_k3s_staging`
+  - `deploy_k3s_prod`
+  - `deploy_gke` (optional, includes OTEL + setup/teardown validation)
+- Dedicated staging verification workflow (separate from standard integration suite):
+  - `.github/workflows/verify-k3s-staging.yml`
+  - Job: `verify_k3s_staging`
+- Non-interactive 1Password support for GitHub Actions:
+  - Set `OP_SERVICE_ACCOUNT_TOKEN` as an Actions secret.
+  - Deploy jobs use this token when runner-level interactive `op` sign-in is unavailable.
+
 ## Observability Routing
 - `api` and `worker` export traces/metrics/logs to OTEL collector (`OTEL_EXPORTER_OTLP_ENDPOINT`).
 - `api` and `worker` connect to Temporal using env-driven settings:
@@ -84,6 +179,10 @@ The deploy script:
   - `TEMPORAL_NAMESPACE`
   - `TEMPORAL_API_KEY`
   - `TEMPORAL_TLS_ENABLED=true`
+  - Optional TLS material for namespace-specific cert auth:
+    - `TEMPORAL_TLS_CA_CERT_PEM`
+    - `TEMPORAL_TLS_CLIENT_CERT_PEM`
+    - `TEMPORAL_TLS_CLIENT_KEY_PEM`
 - Collector routes signals based on `OTEL_COLLECTOR_BACKEND`:
   - `gcp`: Cloud Trace + Cloud Monitoring + Cloud Logging.
   - `oss`: Jaeger + Prometheus OTLP receiver + Loki OTLP endpoint.
@@ -106,6 +205,7 @@ These commands are explicit/manual and not part of normal `test`/`test:integrati
 
 ```bash
 RUN_GCP_E2E=1 GCP_BILLING_ACCOUNT_ID=<billing-account-id> pnpm test:gcp:e2e
+RUN_GCP_E2E=1 GCP_BILLING_ACCOUNT_ID=<billing-account-id> pnpm test:gcp:e2e:gke
 ```
 
 The E2E workflow:
@@ -116,6 +216,17 @@ The E2E workflow:
 5. Emits smoke traces/metrics/logs and validates all three signals in GCP.
 6. Deletes the toy project by default (set `KEEP_GCP_TOY_PROJECT=1` to keep it).
 
+Optional GKE extension (enabled via `pnpm test:gcp:e2e:gke`):
+1. Creates a temporary GKE cluster by default (`GKE_E2E_CREATE_CLUSTER=1`).
+2. Builds/pushes images into the toy project Artifact Registry.
+3. Deploys the chart to GKE (`pnpm deploy:k8s:gke`), validates status, then tears down.
+4. Cleanup controls:
+   - `KEEP_GKE_DEPLOYMENT=1` to keep the Helm release.
+   - `KEEP_GKE_CLUSTER=1` to keep the cluster.
+   - `KEEP_GCP_TOY_PROJECT=1` to keep the toy project.
+5. Cleanup is strict:
+   - GKE release uninstall, cluster delete, and toy-project teardown fail the command when cleanup fails.
+
 ## Worktree Strategy
 - Worktrees share infra containers.
 - Worktree-local app ports are deterministic via `pnpm worktree:ports <name>` and `scripts/worktree/setup.sh`.
@@ -124,4 +235,4 @@ The E2E workflow:
   - `API_BASE_URL`
   - `NEXT_PUBLIC_API_BASE_URL`
   - `EXPO_PUBLIC_API_BASE_URL`
-  - `TEMPORAL_TASK_QUEUE` (`tx-agent-kit-<worktree-name>`)
+  - `TEMPORAL_TASK_QUEUE` (`<domain>-<worktree-name>`)

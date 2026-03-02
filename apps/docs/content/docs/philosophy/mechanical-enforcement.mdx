@@ -3,11 +3,11 @@ title: Mechanical Enforcement
 description: "Why architectural decisions are enforced in code: ESLint rules, structural checks, and shell invariants"
 ---
 
-The central principle of tx-agent-kit is: **if it is important, enforce it in code.** Conventions that exist only in documentation are conventions that will be violated.
+The central principle of <domain> is: **if it is important, enforce it in code.** Conventions that exist only in documentation are conventions that will be violated.
 
 ## Three layers of enforcement
 
-tx-agent-kit uses three complementary enforcement layers, each catching a different class of violations:
+<domain> uses three complementary enforcement layers, each catching a different class of violations:
 
 ### 1. ESLint rules
 
@@ -33,7 +33,7 @@ The following table summarizes the key rules enforced via ESLint:
 |------|-----------------|
 | No `drizzle-orm` imports outside `packages/infra/db` | Direct DB access from app or domain code |
 | No `effect` imports from `apps/web` | Effect dependencies leaking into the web client |
-| No `console.*` in source modules | Unstructured logging; use `@tx-agent-kit/logging` instead |
+| No `console.*` in source modules | Unstructured logging; use `@<domain>/logging` instead |
 | No `process.env` in domain/services code | Environment coupling in business logic |
 | No `as any` assertions in source modules | Unsafe type coercions bypassing the type system |
 | No `@ts-ignore` or `eslint-disable` directives in source | Suppressed warnings hiding real issues |

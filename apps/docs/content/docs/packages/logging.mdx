@@ -10,7 +10,7 @@ The logging package provides structured JSON logging with automatic OpenTelemetr
 ## Usage
 
 ```typescript
-import { createLogger } from '@tx-agent-kit/logging'
+import { createLogger } from '@<domain>/logging'
 
 const logger = createLogger('my-service')
 
@@ -26,7 +26,7 @@ Every log entry is emitted as a JSON line to stdout and simultaneously as an Ope
 {
   "timestamp": "2026-02-23T10:30:00.000Z",
   "level": "info",
-  "service": "tx-agent-kit-api",
+  "service": "<domain>-api",
   "message": "Server started",
   "context": {
     "port": 4000

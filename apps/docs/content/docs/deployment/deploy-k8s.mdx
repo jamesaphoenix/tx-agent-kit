@@ -1,0 +1,60 @@
+---
+title: Deploy with Kubernetes
+description: Helm-based deployment to Mac Studio k3s staging/prod and optional GKE
+---
+
+Kubernetes deploys use a single chart (`deploy/k8s/chart`) with target-specific values overlays.
+
+## Targets
+
+| Target | Namespace | Release | Values file |
+|--------|-----------|---------|-------------|
+| `mac-staging` | `tx-staging` | `<domain>-staging` | `deploy/k8s/chart/values.mac-staging.yaml` |
+| `mac-prod` | `tx-prod` | `<domain>-prod` | `deploy/k8s/chart/values.mac-prod.yaml` |
+| `gke-staging` | `<domain>-loadtest` (default) | `<domain>-loadtest` | `deploy/k8s/chart/values.gke.staging.yaml` |
+| `gke-prod` | `<domain>-loadtest` (default) | `<domain>-loadtest` | `deploy/k8s/chart/values.gke.prod.yaml` |
+
+## Commands
+
+```bash
+# Deploy Mac k3s staging/prod
+pnpm deploy:k8s:mac:staging deploy/artifacts/images-<sha>.env
+pnpm deploy:k8s:mac:prod deploy/artifacts/images-<sha>.env
+
+# Dedicated Mac staging verification lane (not part of default integration suites)
+pnpm deploy:k8s:verify:staging deploy/artifacts/images-<sha>.env
+
+# Optional GKE deployment from the same artifact
+pnpm deploy:k8s:gke deploy/artifacts/images-<sha>.env
+```
+
+## What the deploy script does
+
+1. Renders environment values from 1Password templates with `op inject`.
+2. Combines rendered env + image artifact into Helm runtime values.
+3. Runs `helm upgrade --install` for the selected target.
+4. Waits for rollout status of `api`, `worker`, and optional collector.
+5. For Mac targets, reconciles and checks Cloudflare tunnel routing.
+6. Runs smoke checks against `API_EXTERNAL_BASE_URL` when configured.
+
+Optional tunnel-check controls for deploy scripts:
+
+- `RUN_TUNNEL_RECONCILE=0` skips tunnel reconcile/check.
+- `RUN_TUNNEL_CHECK=0` reconciles tunnel but skips health checks.
+- `RUN_TUNNEL_CHECK_SOFT_FAIL=1` keeps deploy green when tunnel health checks fail.
+
+## Status and rollback
+
+```bash
+pnpm deploy:k8s:status mac-staging
+pnpm deploy:k8s:status mac-prod
+pnpm deploy:k8s:status gke
+
+pnpm deploy:k8s:rollback mac-staging <revision>
+pnpm deploy:k8s:rollback mac-prod <revision>
+pnpm deploy:k8s:rollback gke <revision>
+```
+
+## Assumptions and Defaults
+
+- Mac Studio runner has `k3s`, `kubectl`, `helm`, `op`, and `cloudflared`.

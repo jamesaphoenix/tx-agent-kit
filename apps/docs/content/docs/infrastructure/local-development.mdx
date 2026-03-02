@@ -34,13 +34,19 @@ This script copies `.env.example` to `.env` (if it does not exist) and upserts a
 |-----|---------------|
 | `NODE_ENV` | `development` |
 | `API_PORT` | `4000` |
-| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/tx_agent_kit` |
+| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/<domain_identifier>` |
 | `AUTH_SECRET` | `local-dev-auth-secret-123456` |
 | `API_CORS_ORIGIN` | `http://localhost:3000` |
 | `API_BASE_URL` | `http://localhost:4000` |
+| `DEV_CLOUDFLARE_TUNNEL_ENABLED` | `false` |
+| `DEV_CLOUDFLARE_TUNNEL_URL` | optional (defaults to `http://127.0.0.1:${API_PORT}`) |
+| `DEV_CLOUDFLARE_TUNNEL_LOG_FILE` | `.data/cloudflared/dev-tunnel.log` |
+| `DEV_CLOUDFLARE_TUNNEL_LOCK_DIR` | `/tmp/<domain>-dev-tunnel.lock` |
+| `DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS` | `120` |
+| `DEV_CLOUDFLARE_TUNNEL_MISSING_PID_GRACE_SECONDS` | `15` |
 | `TEMPORAL_RUNTIME_MODE` | `cli` |
 | `TEMPORAL_ADDRESS` | `localhost:7233` |
-| `TEMPORAL_TASK_QUEUE` | `tx-agent-kit` |
+| `TEMPORAL_TASK_QUEUE` | `<domain>` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` |
 
 The script is idempotent. Running it again updates existing keys without duplicating them.
@@ -97,6 +103,29 @@ pnpm dev:mobile:web # Expo web preview (intentional browser target)
 ```
 
 `pnpm dev:mobile` runs Expo/Metro on `MOBILE_PORT` (default `8081`). Open the actual app using iOS Simulator, Android Emulator, or Expo Go. `http://localhost:8081` is the Metro/web endpoint and is usually not the best native mobile UX.
+
+To expose your local API via Cloudflare tunnel while developing, set:
+
+```bash
+DEV_CLOUDFLARE_TUNNEL_ENABLED=true
+```
+
+Optional settings:
+
+- `DEV_CLOUDFLARE_TUNNEL_URL` (defaults to `http://127.0.0.1:${API_PORT}`)
+- `DEV_CLOUDFLARE_TUNNEL_LOG_FILE`
+- `DEV_CLOUDFLARE_TUNNEL_TOKEN` (for named tunnel mode)
+- `DEV_CLOUDFLARE_TUNNEL_LOCK_DIR`
+- `DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS`
+- `DEV_CLOUDFLARE_TUNNEL_MISSING_PID_GRACE_SECONDS`
+
+Tunnel ownership is lock-guarded across worktrees. If another worktree already owns the lock, `pnpm dev` continues but skips tunnel startup in the current worktree.
+
+Check current lock owner/status:
+
+```bash
+pnpm dev:tunnel:status
+```
 
 If you specifically want browser preview, run `pnpm dev:mobile:web` so Expo serves the app intentionally for web.
 

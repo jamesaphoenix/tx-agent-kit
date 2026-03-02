@@ -5,7 +5,7 @@ description: Effect HttpApi server powering auth, organizations, teams, billing/
 
 # API Server (`apps/api`)
 
-The API server is the backbone of tx-agent-kit. It is built on [Effect HttpApi](https://effect.website/docs/platform/http-api) and exposes a fully typed, schema-validated REST API. The server runs on port **4000** by default.
+The API server is the backbone of <domain>. It is built on [Effect HttpApi](https://effect.website/docs/platform/http-api) and exposes a fully typed, schema-validated REST API. The server runs on port **4000** by default.
 
 ## Architecture
 
@@ -38,6 +38,41 @@ Billing authorization is role-gated:
 - `member` cannot manage billing and receives `401` on management endpoints.
 - Subscription state is synced from Stripe webhooks (`/v1/webhooks/stripe`) into organization billing fields (`isSubscribed`, `subscriptionStatus`, `subscriptionPlan`).
 
+## Rate Limiting
+
+Sensitive auth paths are protected by an in-memory rate limiter that enforces two independent limits per sliding window: one keyed by client IP address and one keyed by the authentication identifier (email address). Both must pass for a request to proceed.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUTH_RATE_LIMIT_WINDOW_MS` | `60000` | Sliding window duration in milliseconds. |
+| `AUTH_RATE_LIMIT_MAX_REQUESTS` | `15` | Maximum requests per IP per window. |
+| `AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS` | Same as IP limit | Maximum requests per identifier (email) per window. |
+
+The set of rate-limited paths is defined centrally in `@<domain>/contracts` (`authRateLimitedPaths`).
+
+### Proxy trust
+
+When the API runs behind a load balancer or reverse proxy, client IPs arrive in the `X-Forwarded-For` header rather than the socket address. Set `TRUST_PROXY=true` (or `1`) to extract the leftmost IP from that header. The default is `false`, which uses the direct socket address.
+
+### 429 response shape
+
+When a client exceeds either limit the API returns HTTP 429 with a `Retry-After` header (seconds) and the following body:
+
+```json
+{
+  "error": {
+    "code": "TOO_MANY_REQUESTS",
+    "message": "Too many authentication attempts. Please try again later."
+  }
+}
+```
+
+## Domain Events
+
+The API writes domain events transactionally using `*WithEvent` port methods. Each mutation that produces a domain event inserts the event row inside the same database transaction as the business write, guaranteeing at-least-once delivery semantics via the outbox pattern.
+
+The API never imports `@temporalio/*` directly. Events reach the worker exclusively through the outbox table, which the worker polls and processes. This keeps the API deployment free of Temporal SDK dependencies and ensures that event publication cannot fail independently of the business write.
+
 ## Kind Markers
 
 Every route file declares an explicit kind marker that must match the corresponding repository port kind:
@@ -69,16 +104,71 @@ When the API server is running (default `http://localhost:4000`), runtime docs a
 
 Both runtime endpoints come from the same Effect HttpApi definitions. The generated `apps/api/openapi.json` remains the repo artifact used by downstream generation workflows (including `pnpm docs:api:generate`).
 
+## Security Headers
+
+Every API response carries a fixed set of security headers applied by `securityHeadersMiddleware` in `apps/api/src/middleware/security-headers.ts`:
+
+| Header | Value |
+|--------|-------|
+| `strict-transport-security` | `max-age=63072000; includeSubDomains` |
+| `x-content-type-options` | `nosniff` |
+| `x-frame-options` | `DENY` |
+| `referrer-policy` | `strict-origin-when-cross-origin` |
+| `permissions-policy` | `camera=(), microphone=(), geolocation=()` |
+| `x-download-options` | `noopen` |
+| `x-permitted-cross-domain-policies` | `none` |
+| `cache-control` | `no-store` |
+
+No configuration is required; headers are always applied on all responses including error paths.
+
 ## Config and Environment
 
-Runtime environment variables are read exclusively through `apps/api/src/config/env.ts`. Direct `process.env` access is forbidden in route and service modules.
+Runtime environment variables are read exclusively through `apps/api/src/config/env.ts`. Direct `process.env` access is forbidden in route and service modules. The module caches parsed config on first call; `resetApiEnvCache()` is exported for use in tests.
+
+### Required variables
+
+| Variable | Description |
+|----------|-------------|
+| `NODE_ENV` | Runtime environment (`development`, `staging`, `production`) |
+| `API_PORT` | Port the server listens on (default: `4000`) |
+| `API_HOST` | Host the server binds to |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `AUTH_SECRET` | Secret key for JWT signing (min 32 chars; cannot be the default placeholder in production) |
+| `API_CORS_ORIGIN` | Allowed CORS origin (must not be `*` in production or staging) |
+
+### Optional variables and group invariants
+
+| Variable | Description |
+|----------|-------------|
+| `TRUST_PROXY` | Set to `true` or `1` to extract client IP from `X-Forwarded-For` (default: `false`) |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | Sliding window in ms (default: `60000`) |
+| `AUTH_RATE_LIMIT_MAX_REQUESTS` | Max requests per IP per window (default: `15`) |
+| `AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS` | Max requests per identifier per window (default: same as IP limit) |
+| `SUBSCRIPTION_GUARD_ENABLED` | Set to `false` or `0` to disable subscription enforcement (default: `true`) |
+| `RESEND_API_KEY` | Resend API key for transactional email |
+| `RESEND_FROM_EMAIL` | Sender email address |
+| `WEB_BASE_URL` | Dashboard base URL included in outgoing emails |
+| `GOOGLE_OIDC_ISSUER_URL` | Google OIDC issuer URL |
+| `GOOGLE_OIDC_CLIENT_ID` | Google OIDC client ID |
+| `GOOGLE_OIDC_CLIENT_SECRET` | Google OIDC client secret |
+| `GOOGLE_OIDC_CALLBACK_URL` | Google OIDC redirect callback URL |
+| `STRIPE_SECRET_KEY` | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
+| `STRIPE_PRO_PRICE_ID` | Stripe pro plan price ID |
+| `STRIPE_PRO_METERED_PRICE_ID` | Stripe metered price ID |
+
+**Group invariants enforced at startup:**
+- `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `WEB_BASE_URL` must all be set together. In production, all three are required.
+- All four `GOOGLE_OIDC_*` variables must be configured together. In production they are required.
+- `STRIPE_PRO_PRICE_ID` and `STRIPE_PRO_METERED_PRICE_ID` are required whenever `STRIPE_SECRET_KEY` is set.
+- `STRIPE_WEBHOOK_SECRET` is required in production/staging when Stripe is configured.
 
 ## Integration Testing
 
 The API integration suite lives at `apps/api/src/api.integration.test.ts` and uses the standardized harness:
 
 ```typescript
-import { createDbAuthContext } from '@tx-agent-kit/testkit'
+import { createDbAuthContext } from '@<domain>/testkit'
 
 const ctx = createDbAuthContext({
   apiCwd: resolve(dirname(fileURLToPath(import.meta.url)), '..')

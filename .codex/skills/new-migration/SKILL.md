@@ -1,6 +1,6 @@
 ---
 name: new-migration
-description: Create additive Postgres migrations for tx-agent-kit database changes.
+description: Create additive Postgres migrations for this repository database changes.
 metadata:
   short-description: Database migration workflow
 ---

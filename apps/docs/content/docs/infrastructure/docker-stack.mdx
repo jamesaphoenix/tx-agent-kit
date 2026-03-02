@@ -3,7 +3,7 @@ title: Docker Stack
 description: Docker Compose services for PostgreSQL, Redis, and the observability stack
 ---
 
-All shared infrastructure runs through `docker-compose.yml` under the `infra` profile. The Docker Compose project name is pinned to `tx-agent-kit` to allow sharing across multiple git worktrees.
+All shared infrastructure runs through `docker-compose.yml` under the `infra` profile. The Docker Compose project name is pinned to `<domain>` to allow sharing across multiple git worktrees.
 
 ## Services
 
@@ -13,9 +13,9 @@ All shared infrastructure runs through `docker-compose.yml` under the `infra` pr
 |----------|-------|
 | Image | `postgres:16` (custom Dockerfile with pgTAP extension) |
 | Port | 5432 |
-| Database | `tx_agent_kit` |
+| Database | `<domain_identifier>` |
 | Credentials | `postgres` / `postgres` |
-| Health check | `pg_isready -U postgres -d tx_agent_kit` |
+| Health check | `pg_isready -U postgres -d <domain_identifier>` |
 
 The application database stores all domain data. Worktrees use separate PostgreSQL schemas within the same database instance, so a single container serves all parallel branches.
 
@@ -99,9 +99,9 @@ The `infra:ensure` script checks health of every service before returning. If Do
 
 ## Compose project name
 
-The Docker Compose project is pinned to `tx-agent-kit` regardless of which directory the command runs from. This ensures all worktrees share the same infrastructure containers, avoiding duplicate service instances.
+The Docker Compose project is pinned to `<domain>` regardless of which directory the command runs from. This ensures all worktrees share the same infrastructure containers, avoiding duplicate service instances.
 
 ```bash
 # This is set automatically by the startup script
-COMPOSE_PROJECT_NAME=tx-agent-kit
+COMPOSE_PROJECT_NAME=<domain>
 ```

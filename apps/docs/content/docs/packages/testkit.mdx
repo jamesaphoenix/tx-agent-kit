@@ -12,7 +12,7 @@ The testkit package provides shared test infrastructure used across all integrat
 The primary test harness used by API, web, and worker integration suites:
 
 ```typescript
-import { createDbAuthContext } from '@tx-agent-kit/testkit'
+import { createDbAuthContext } from '@<domain>/testkit'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -31,8 +31,8 @@ Integration test runners use file locks to prevent concurrent execution from clo
 
 | Lock File | Purpose |
 |-----------|---------|
-| `/tmp/tx-agent-kit-db-reset.lock` | Guards database reset operations |
-| `/tmp/tx-agent-kit-integration.lock` | Guards full integration suite execution |
+| `/tmp/<domain>-db-reset.lock` | Guards database reset operations |
+| `/tmp/<domain>-integration.lock` | Guards full integration suite execution |
 
 This prevents two parallel agent sessions or CI jobs from running integration tests against the same database simultaneously.
 
@@ -61,4 +61,4 @@ Individual project configs must not define `globalSetup`, `maxWorkers: 1`, or `f
 
 ## Utilities
 
-Beyond the core harness, the testkit ships several specialized modules. **CLI workflow helpers** (`cli-workflows.ts`) wrap shell commands so integration tests can exercise `pnpm scaffold:crud` and other CLI entry points end-to-end. **Command entrypoint verification** (`command-entrypoints.ts`) asserts that every registered pnpm script resolves to a real executable, catching dead scripts before they reach CI. **Deploy smoke runners** (`deploy-smoke.ts`) provide the same health/auth/CRUD smoke sequence used by `pnpm deploy:smoke`, but callable from Vitest so you can run smoke tests as part of the integration suite. **Dev service startup helpers** (`start-dev-services.ts`) manage the lifecycle of API/worker/web processes inside tests, including health-check polling and graceful teardown. **Worktree setup helpers** (`worktree-setup.ts`) verify that `scripts/worktree/setup.sh` correctly derives isolated ports and env files for a given worktree name.
+Beyond the core harness, the testkit ships several specialized modules. **Domain events outbox helpers** (`domain-events-outbox.ts`) provide a raw-SQL query layer for the outbox integration suite, including `claimPendingEventsForProcessing` (atomic `FOR UPDATE SKIP LOCKED` batch claim), `markProcessingEventsPublished`, `markProcessingEventFailed`, `resetStuckProcessingEvents`, `prunePublishedAndFailedEvents`, and `insertDomainEventDirect` (test-only raw insert with auto-incrementing `sequence_number`). The accompanying `domain-events-outbox.integration.test.ts` covers 18 scenarios including full event lifecycle, concurrent poller isolation, idempotency of all state transitions, stuck-event reset, and prune boundary conditions. **CLI workflow helpers** (`cli-workflows.ts`) wrap shell commands so integration tests can exercise `pnpm scaffold:crud` and other CLI entry points end-to-end. **Command entrypoint verification** (`command-entrypoints.ts`) asserts that every registered pnpm script resolves to a real executable, catching dead scripts before they reach CI. **Deploy smoke runners** (`deploy-smoke.ts`) provide the same health/auth/CRUD smoke sequence used by `pnpm deploy:smoke`, but callable from Vitest so you can run smoke tests as part of the integration suite. **Dev service startup helpers** (`start-dev-services.ts`) manage the lifecycle of API/worker/web processes inside tests, including health-check polling and graceful teardown. **Worktree setup helpers** (`worktree-setup.ts`) verify that `scripts/worktree/setup.sh` correctly derives isolated ports and env files for a given worktree name.

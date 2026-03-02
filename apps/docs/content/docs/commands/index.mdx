@@ -9,12 +9,13 @@ All commands are run from the monorepo root via `pnpm`. This is the complete ref
 
 | Command | Description |
 |---------|-------------|
-| `pnpm dev` | Start all app dev servers in parallel (web, api, worker, mobile) |
+| `pnpm dev` | Start all app dev servers in parallel (web, api, worker, mobile); when `DEV_CLOUDFLARE_TUNNEL_ENABLED=true`, starts a local Cloudflare tunnel and stops it on shutdown (lock-guarded across worktrees) |
 | `pnpm dev:web` | Start Next.js web app only |
 | `pnpm dev:api` | Start Effect HTTP API server only |
 | `pnpm dev:worker` | Start Temporal worker only |
 | `pnpm dev:mobile` | Start Expo React Native dev server only |
 | `pnpm dev:mobile:web` | Start intentional Expo web preview on the mobile dev port |
+| `pnpm dev:tunnel:status` | Show local dev tunnel lock ownership/status and owner metadata |
 | `pnpm dev:open` | Open local app + dashboard URLs in Brave (fallback: Google Chrome) |
 | `pnpm dev:docs` | Start Fumadocs documentation site |
 | `pnpm env:configure` | Seed `.env` file with local development defaults (idempotent) |
@@ -42,6 +43,9 @@ All commands are run from the monorepo root via `pnpm`. This is the complete ref
 | `pnpm test:run-silent` | Run tests fully silently |
 | `pnpm test:integration` | Run integration tests (resets test DB, lock-guarded) |
 | `pnpm test:integration:quiet` | Run integration tests with reduced output |
+| `pnpm test:integration:live:k3s` | Opt-in live Mac `k3s` staging deployment integration (real infra, no mocks) |
+| `pnpm test:integration:live:tunnel` | Opt-in live Cloudflare tunnel reconcile/check integration (real infra, no mocks) |
+| `pnpm test:integration:live:deploy` | Run both live deploy integrations |
 | `pnpm test:db:pgtap` | Run pgTAP database trigger tests |
 | `pnpm test:infra:observability` | Verify observability infrastructure is working |
 | `pnpm build` | Build all packages and apps |
@@ -66,10 +70,19 @@ All commands are run from the monorepo root via `pnpm`. This is the complete ref
 | `pnpm deploy:migrate:prod` | Run DB migrations against production (secrets from 1Password) |
 | `pnpm deploy:staging` | Deploy to staging via Docker Compose (renders secrets, pulls images, smoke tests) |
 | `pnpm deploy:prod` | Deploy to production via Docker Compose |
+| `pnpm deploy:k8s:mac:staging` | Deploy to Mac Studio `k3s` staging namespace/release from image artifact |
+| `pnpm deploy:k8s:mac:prod` | Deploy to Mac Studio `k3s` prod namespace/release from image artifact |
+| `pnpm deploy:k8s:gke` | Deploy to optional GKE target from the same image artifact |
+| `pnpm deploy:k8s:verify:staging` | Dedicated Mac `k3s` staging deploy verification (separate from standard integration suites) |
+| `pnpm deploy:k8s:status` | Show Helm + Kubernetes status for `mac-staging`, `mac-prod`, or `gke` |
+| `pnpm deploy:k8s:rollback` | Roll back Helm release for `mac-staging`, `mac-prod`, or `gke` |
+| `pnpm deploy:tunnel:reconcile` | Render/validate Cloudflare tunnel routing config for Mac-hosted API exposure |
+| `pnpm deploy:tunnel:check` | Verify Cloudflare tunnel `/health` checks for dev/staging/prod hostnames |
 | `pnpm deploy:smoke` | Run smoke tests against a deployed API (`API_BASE_URL` required) |
 | `pnpm deploy:gcp:toy:bootstrap` | Bootstrap a toy GCP project for E2E testing |
 | `pnpm deploy:gcp:toy:teardown` | Tear down the toy GCP project |
 | `pnpm test:gcp:e2e` | Run GCP end-to-end tests |
+| `pnpm test:gcp:e2e:gke` | Run OTEL GCP E2E plus optional GKE deploy/setup/teardown validation |
 
 ## MCP Servers
 
@@ -79,7 +92,7 @@ All commands are run from the monorepo root via `pnpm`. This is the complete ref
 | `pnpm mcp:jaeger` | Start Jaeger MCP server (trace search, service discovery) |
 | `pnpm mcp:context7` | Start Context7 MCP server (library documentation lookup) |
 | `pnpm mcp:supabase` | Start Supabase MCP server (database access) |
-| `pnpm mcp:playwright` | Start Playwright MCP server (browser automation) |
+| `pnpm playwright:auth:bootstrap` | Bootstrap authenticated Playwright storage state via real auth API |
 
 MCP servers are started via wrapper scripts in `scripts/mcp/` and configured in `.mcp.json`. They provide programmatic access to infrastructure tools for AI agents.
 
@@ -103,7 +116,7 @@ The quiet variants run the same checks as the full variants; they only differ in
 
 ## Integration test locking
 
-Integration tests are guarded by a file lock at `/tmp/tx-agent-kit-integration.lock`. This prevents overlapping integration test runs from clobbering each other's database state. If a previous run was interrupted, the lock file is automatically cleaned up by the next run.
+Integration tests are guarded by a file lock at `/tmp/<domain>-integration.lock`. This prevents overlapping integration test runs from clobbering each other's database state. If a previous run was interrupted, the lock file is automatically cleaned up by the next run.
 
 ## CLI tool
 

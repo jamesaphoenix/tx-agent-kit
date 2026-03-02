@@ -1,15 +1,15 @@
 ---
 title: Local Setup
-description: Step-by-step guide to setting up tx-agent-kit for local development
+description: Step-by-step guide to setting up <domain> for local development
 ---
 
-This guide walks through every step to get tx-agent-kit running on your local machine.
+This guide walks through every step to get <domain> running on your local machine.
 
 ## 1. Clone the repository
 
 ```bash
-git clone <your-repo-url> tx-agent-kit
-cd tx-agent-kit
+git clone <your-repo-url> <domain>
+cd <domain>
 ```
 
 ## 2. Install dependencies
@@ -117,7 +117,7 @@ For integration tests (which require running infrastructure):
 pnpm test:integration
 ```
 
-Integration tests are lock-guarded (`/tmp/tx-agent-kit-integration.lock`) to prevent overlapping runs from clobbering each other.
+Integration tests are lock-guarded (`/tmp/<domain>-integration.lock`) to prevent overlapping runs from clobbering each other.
 
 ## Quiet runners
 

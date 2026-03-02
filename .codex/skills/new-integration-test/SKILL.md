@@ -1,6 +1,6 @@
 ---
 name: new-integration-test
-description: Write tx-agent-kit integration tests against Docker-backed infrastructure.
+description: Write this repository integration tests against Docker-backed infrastructure.
 metadata:
   short-description: Integration test workflow
 ---
