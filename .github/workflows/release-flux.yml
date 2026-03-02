@@ -176,7 +176,7 @@ jobs:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
       - name: Download image artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
         with:
           name: ${{ needs.build_images_locally.outputs.artifact_name }}
           path: deploy/artifacts
@@ -275,7 +275,7 @@ jobs:
           node-version: 22
       - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
       - name: Download image artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
         with:
           name: ${{ needs.build_images_google_cloud.outputs.artifact_name }}
           path: deploy/artifacts
