@@ -58,6 +58,26 @@ const toApiOrganization = (organization: {
   updatedAt: organization.updatedAt.toISOString()
 })
 
+const toApiInvitationSummary = (invitation: {
+  id: string
+  organizationId: string
+  email: string
+  role: OrgMemberRole
+  status: InvitationStatus
+  invitedByUserId: string
+  expiresAt: Date
+  createdAt: Date
+}) => ({
+  id: invitation.id,
+  organizationId: invitation.organizationId,
+  email: invitation.email,
+  role: invitation.role === 'owner' ? 'admin' as const : invitation.role,
+  status: invitation.status,
+  invitedByUserId: invitation.invitedByUserId,
+  expiresAt: invitation.expiresAt.toISOString(),
+  createdAt: invitation.createdAt.toISOString()
+})
+
 const toApiInvitation = (invitation: {
   id: string
   organizationId: string
@@ -69,15 +89,8 @@ const toApiInvitation = (invitation: {
   expiresAt: Date
   createdAt: Date
 }) => ({
-  id: invitation.id,
-  organizationId: invitation.organizationId,
-  email: invitation.email,
-  role: invitation.role === 'owner' ? 'admin' as const : invitation.role,
-  status: invitation.status,
-  invitedByUserId: invitation.invitedByUserId,
-  token: invitation.token,
-  expiresAt: invitation.expiresAt.toISOString(),
-  createdAt: invitation.createdAt.toISOString()
+  ...toApiInvitationSummary(invitation),
+  token: invitation.token
 })
 
 export const OrganizationsLive = HttpApiBuilder.group(TxAgentApi, 'organizations', (handlers) =>
@@ -133,7 +146,7 @@ export const OrganizationsLive = HttpApiBuilder.group(TxAgentApi, 'organizations
         const request = yield* HttpServerRequest.HttpServerRequest
         const principal = yield* principalFromAuthorization(request.headers.authorization).pipe(Effect.mapError(mapCoreError))
         const service = yield* OrganizationService
-        const organization = yield* service.createForUser(principal.userId, payload).pipe(Effect.mapError(mapCoreError))
+        const organization = yield* service.createForUser(principal.userId, payload, { email: principal.email }).pipe(Effect.mapError(mapCoreError))
         return toApiOrganization(organization)
       })
     )
@@ -215,7 +228,7 @@ export const OrganizationsLive = HttpApiBuilder.group(TxAgentApi, 'organizations
         const principal = yield* principalFromAuthorization(request.headers.authorization).pipe(Effect.mapError(mapCoreError))
         const service = yield* OrganizationService
         const invitation = yield* service.updateInvitationById(principal, path.invitationId, payload).pipe(Effect.mapError(mapCoreError))
-        return toApiInvitation(invitation)
+        return toApiInvitationSummary(invitation)
       })
     )
     .handle('removeInvitation', ({ path }) =>

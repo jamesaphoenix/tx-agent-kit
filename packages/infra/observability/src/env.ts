@@ -1,4 +1,4 @@
-const defaultOtelEndpoint = 'http://localhost:4318'
+const defaultOtelEndpoint = 'http://localhost:4320'
 const defaultClientOtelEndpoint = 'http://localhost:4320'
 const defaultNodeEnv = 'development'
 

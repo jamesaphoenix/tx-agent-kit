@@ -21,8 +21,8 @@ const encoder = new TextEncoder()
 const getSecret = (): Uint8Array => {
   const env = getAuthEnv()
   const secret = env.AUTH_SECRET
-  if (!secret || secret.length < 16) {
-    throw new Error('AUTH_SECRET must be configured and at least 16 chars')
+  if (!secret || secret.length < 32) {
+    throw new Error('AUTH_SECRET must be configured and at least 32 characters (256 bits)')
   }
   return encoder.encode(secret)
 }

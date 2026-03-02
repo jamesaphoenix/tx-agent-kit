@@ -54,6 +54,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) =>
     .handle('signUp', ({ payload }) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
+        yield* enforceIdentifierRateLimit('/v1/auth/sign-up', payload.email)
         const authService = yield* AuthService
         const session = yield* authService.signUp(payload, toAuthRequestContext(request))
         return toApiAuthSession(session)
@@ -130,6 +131,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) =>
     .handle('resetPassword', ({ payload }) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
+        yield* enforceIdentifierRateLimit('/v1/auth/reset-password', payload.token)
         const authService = yield* AuthService
         return yield* authService.resetPassword(payload, toAuthRequestContext(request))
       }).pipe(Effect.mapError(mapAuthError))

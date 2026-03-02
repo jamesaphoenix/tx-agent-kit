@@ -1,9 +1,11 @@
 import { HttpMiddleware, HttpServerRequest, HttpServerResponse } from '@effect/platform'
 import { authRateLimitedPaths } from '@tx-agent-kit/contracts'
 import { Effect, Option } from 'effect'
-import { getAuthRateLimitConfig } from '../config/env.js'
+import { getAuthRateLimitConfig, getTrustProxy } from '../config/env.js'
 
 const rateLimitedPaths = new Set<string>(authRateLimitedPaths)
+
+const MAX_BUCKETS = 50_000
 
 const ipAttemptsByBucket = new Map<string, number[]>()
 const identifierAttemptsByBucket = new Map<string, number[]>()
@@ -38,16 +40,15 @@ const consumeRateLimitBucket = (
   maxRequests: number,
   nowMs: number
 ): { limited: boolean } => {
+  if (buckets.size >= MAX_BUCKETS && !buckets.has(bucketKey)) {
+    return { limited: true }
+  }
+
   const currentAttempts = buckets.get(bucketKey) ?? []
   const recentAttempts = filterToWindow(currentAttempts, windowMs, nowMs)
 
   if (recentAttempts.length >= maxRequests) {
-    if (recentAttempts.length === 0) {
-      buckets.delete(bucketKey)
-    } else {
-      buckets.set(bucketKey, recentAttempts)
-    }
-
+    buckets.set(bucketKey, recentAttempts)
     return { limited: true }
   }
 
@@ -58,12 +59,14 @@ const consumeRateLimitBucket = (
 }
 
 export const toClientIpAddress = (request: HttpServerRequest.HttpServerRequest): string => {
-  const forwardedFor = request.headers['x-forwarded-for']
-  if (typeof forwardedFor === 'string') {
-    const [first] = forwardedFor.split(',')
-    const candidate = first?.trim()
-    if (candidate) {
-      return candidate
+  if (getTrustProxy()) {
+    const forwarded = request.headers['x-forwarded-for']
+    if (forwarded) {
+      const ips = forwarded.split(',').map((s) => s.trim()).filter(Boolean)
+      const clientIp = ips[0]
+      if (clientIp) {
+        return clientIp
+      }
     }
   }
 

@@ -41,13 +41,13 @@ const authRateLimitWindowMs = parsePositiveInt(
 )
 const authRateLimitMaxRequests = parsePositiveInt(
   process.env.API_AUTH_RATE_LIMIT_MAX_REQUESTS,
-  15
+  200
 )
 const authRateLimitIdentifierMaxRequests = parsePositiveInt(
   process.env.API_AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS,
   authRateLimitMaxRequests
 )
-const integrationAuthSecret = 'integration-auth-secret-12345'
+const integrationAuthSecret = 'integration-auth-secret-minimum-32-chars'
 process.env.AUTH_SECRET = integrationAuthSecret
 process.env.AUTH_RATE_LIMIT_WINDOW_MS = String(authRateLimitWindowMs)
 process.env.AUTH_RATE_LIMIT_MAX_REQUESTS = String(authRateLimitMaxRequests)
@@ -1533,7 +1533,7 @@ describe('api integration', () => {
       }
     )
 
-    expect([401, 403]).toContain(memberUpdateOrganization.response.status)
+    expect(memberUpdateOrganization.response.status).toBe(401)
 
     const memberDeleteOrganization = await requestJson<{ message: string }>(
       `/v1/organizations/${organization.id}`,
@@ -1546,7 +1546,7 @@ describe('api integration', () => {
       }
     )
 
-    expect([401, 403]).toContain(memberDeleteOrganization.response.status)
+    expect(memberDeleteOrganization.response.status).toBe(401)
   })
 
   it('returns bad request for invalid list query params', async () => {
@@ -2466,10 +2466,7 @@ describe('api integration', () => {
       }
     )
 
-    expect([200, 401]).toContain(forgedList.response.status)
-    if (forgedList.response.status === 200) {
-      expect(forgedList.body.data).toHaveLength(0)
-    }
+    expect(forgedList.response.status).toBe(401)
 
     const forgedAccept = await requestJson<{ message?: string }>(
       `/v1/invitations/${invitationToken}/accept`,
@@ -2482,7 +2479,7 @@ describe('api integration', () => {
       }
     )
 
-    expect([401, 404]).toContain(forgedAccept.response.status)
+    expect(forgedAccept.response.status).toBe(401)
 
     const inviteeAccept = await requestJson<{ accepted: boolean }>(
       `/v1/invitations/${invitationToken}/accept`,
@@ -3748,5 +3745,1647 @@ describe('api integration', () => {
     expect(usageSummary.response.status).toBe(200)
     expect(usageSummary.body.totalQuantity).toBe(10)
     expect(usageSummary.body.totalCostDecimillicents).toBe(1_000_000)
+  })
+
+  it('processes invoice.payment_succeeded webhook and promotes subscription from past_due to active', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'invoice-success-owner@example.com',
+      password: 'invoice-success-pass-12345',
+      name: 'Invoice Success Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Invoice Success Team'
+    })
+
+    const setupPayload = {
+      id: 'evt_invoice_setup_1',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_invoice_test_1',
+          customer: 'cus_invoice_test_1',
+          status: 'past_due',
+          start_date: Math.floor(Date.now() / 1000) - 100,
+          current_period_end: Math.floor(Date.now() / 1000) + 86_400,
+          metadata: { organizationId: organization.id },
+          items: { data: [] }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'invoice-setup-webhook', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(setupPayload)
+    })
+
+    const settingsBefore = await requestJson<{ subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-before-invoice-success',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(settingsBefore.body.subscriptionStatus).toBe('past_due')
+
+    const invoicePayload = {
+      id: 'evt_invoice_paid_1',
+      type: 'invoice.payment_succeeded',
+      data: {
+        object: {
+          id: 'in_paid_1',
+          customer: 'cus_invoice_test_1',
+          subscription: 'sub_invoice_test_1',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    const result = await requestJson<{ processed: boolean; idempotent: boolean }>(
+      '/v1/webhooks/stripe',
+      'invoice-payment-succeeded',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'integration-signature' },
+        body: JSON.stringify(invoicePayload)
+      }
+    )
+
+    expect(result.response.status).toBe(200)
+    expect(result.body.processed).toBe(true)
+
+    const settingsAfter = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-invoice-success',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(settingsAfter.body.isSubscribed).toBe(true)
+    expect(settingsAfter.body.subscriptionStatus).toBe('active')
+  })
+
+  it('processes customer.subscription.deleted webhook and marks subscription as canceled', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'sub-deleted-owner@example.com',
+      password: 'sub-deleted-pass-12345',
+      name: 'Sub Deleted Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Sub Deleted Team'
+    })
+
+    const activatePayload = {
+      id: 'evt_activate_for_delete_1',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_to_delete_1',
+          customer: 'cus_to_delete_1',
+          status: 'active',
+          start_date: Math.floor(Date.now() / 1000) - 100,
+          current_period_end: Math.floor(Date.now() / 1000) + 86_400,
+          metadata: { organizationId: organization.id },
+          items: { data: [] }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'activate-for-delete', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(activatePayload)
+    })
+
+    const deletePayload = {
+      id: 'evt_sub_deleted_1',
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          id: 'sub_to_delete_1',
+          customer: 'cus_to_delete_1',
+          status: 'canceled',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    const result = await requestJson<{ processed: boolean }>(
+      '/v1/webhooks/stripe',
+      'sub-deleted-webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'integration-signature' },
+        body: JSON.stringify(deletePayload)
+      }
+    )
+
+    expect(result.response.status).toBe(200)
+    expect(result.body.processed).toBe(true)
+
+    const settingsAfter = await requestJson<{
+      isSubscribed: boolean
+      subscriptionStatus: string
+      stripeSubscriptionId: string | null
+      stripeMeteredSubscriptionItemId: string | null
+    }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-sub-deleted',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(settingsAfter.body.isSubscribed).toBe(false)
+    expect(settingsAfter.body.subscriptionStatus).toBe('canceled')
+    expect(settingsAfter.body.stripeSubscriptionId).toBeNull()
+    expect(settingsAfter.body.stripeMeteredSubscriptionItemId).toBeNull()
+  })
+
+  it('processes invoice.payment_failed webhook and marks subscription as past_due', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'payment-failed-owner@example.com',
+      password: 'payment-failed-pass-12345',
+      name: 'Payment Failed Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Payment Failed Team'
+    })
+
+    const activatePayload = {
+      id: 'evt_activate_for_fail_1',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_to_fail_1',
+          customer: 'cus_to_fail_1',
+          status: 'active',
+          start_date: Math.floor(Date.now() / 1000) - 100,
+          current_period_end: Math.floor(Date.now() / 1000) + 86_400,
+          metadata: { organizationId: organization.id },
+          items: { data: [] }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'activate-for-fail', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(activatePayload)
+    })
+
+    const failPayload = {
+      id: 'evt_payment_failed_1',
+      type: 'invoice.payment_failed',
+      data: {
+        object: {
+          id: 'in_failed_1',
+          customer: 'cus_to_fail_1',
+          subscription: 'sub_to_fail_1',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    const result = await requestJson<{ processed: boolean }>(
+      '/v1/webhooks/stripe',
+      'payment-failed-webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'integration-signature' },
+        body: JSON.stringify(failPayload)
+      }
+    )
+
+    expect(result.response.status).toBe(200)
+    expect(result.body.processed).toBe(true)
+
+    const settingsAfter = await requestJson<{ subscriptionStatus: string; isSubscribed: boolean }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-payment-failed',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(settingsAfter.body.subscriptionStatus).toBe('past_due')
+    expect(settingsAfter.body.isSubscribed).toBe(true)
+  })
+
+  it('invoice.payment_succeeded does not resurrect a canceled subscription', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'no-resurrect-owner@example.com',
+      password: 'no-resurrect-pass-12345',
+      name: 'No Resurrect Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'No Resurrect Team'
+    })
+
+    const cancelPayload = {
+      id: 'evt_cancel_for_no_resurrect',
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          id: 'sub_no_resurrect_1',
+          customer: 'cus_no_resurrect_1',
+          status: 'canceled',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'cancel-for-no-resurrect', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(cancelPayload)
+    })
+
+    const invoicePayload = {
+      id: 'evt_resurrect_attempt',
+      type: 'invoice.payment_succeeded',
+      data: {
+        object: {
+          id: 'in_resurrect_1',
+          customer: 'cus_no_resurrect_1',
+          subscription: 'sub_no_resurrect_1',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'resurrect-attempt', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(invoicePayload)
+    })
+
+    const settings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-no-resurrect',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(settings.body.isSubscribed).toBe(false)
+    expect(settings.body.subscriptionStatus).toBe('canceled')
+  })
+
+  it('processes checkout.session.completed and persists stripe customer and subscription ids', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'checkout-complete-owner@example.com',
+      password: 'checkout-complete-pass-12345',
+      name: 'Checkout Complete Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Checkout Complete Team'
+    })
+
+    const settingsBefore = await requestJson<{
+      stripeCustomerId: string | null
+      stripeSubscriptionId: string | null
+      stripePaymentMethodId: string | null
+    }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-before-checkout-complete',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(settingsBefore.body.stripeCustomerId).toBeNull()
+    expect(settingsBefore.body.stripeSubscriptionId).toBeNull()
+
+    const checkoutPayload = {
+      id: 'evt_checkout_complete_1',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_checkout_1',
+          customer: 'cus_checkout_1',
+          subscription: 'sub_checkout_1',
+          payment_method: 'pm_checkout_1',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    const result = await requestJson<{ processed: boolean }>(
+      '/v1/webhooks/stripe',
+      'checkout-session-completed',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'integration-signature' },
+        body: JSON.stringify(checkoutPayload)
+      }
+    )
+
+    expect(result.response.status).toBe(200)
+    expect(result.body.processed).toBe(true)
+
+    const settingsAfter = await requestJson<{
+      stripeCustomerId: string | null
+      stripeSubscriptionId: string | null
+      stripePaymentMethodId: string | null
+    }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-checkout-complete',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(settingsAfter.body.stripeCustomerId).toBe('cus_checkout_1')
+    expect(settingsAfter.body.stripeSubscriptionId).toBe('sub_checkout_1')
+    expect(settingsAfter.body.stripePaymentMethodId).toBe('pm_checkout_1')
+  })
+
+  it('processes customer.subscription.created and initializes subscription state', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'sub-created-owner@example.com',
+      password: 'sub-created-pass-12345',
+      name: 'Sub Created Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Sub Created Team'
+    })
+
+    const createdPayload = {
+      id: 'evt_sub_created_1',
+      type: 'customer.subscription.created',
+      data: {
+        object: {
+          id: 'sub_created_1',
+          customer: 'cus_created_1',
+          status: 'trialing',
+          start_date: Math.floor(Date.now() / 1000) - 60,
+          current_period_end: Math.floor(Date.now() / 1000) + 86_400 * 14,
+          metadata: { organizationId: organization.id },
+          items: {
+            data: [
+              { id: 'si_created_metered_1', price: { recurring: { usage_type: 'metered' } } }
+            ]
+          }
+        }
+      }
+    }
+
+    const result = await requestJson<{ processed: boolean }>(
+      '/v1/webhooks/stripe',
+      'subscription-created-webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'integration-signature' },
+        body: JSON.stringify(createdPayload)
+      }
+    )
+
+    expect(result.response.status).toBe(200)
+    expect(result.body.processed).toBe(true)
+
+    const settingsAfter = await requestJson<{
+      isSubscribed: boolean
+      subscriptionStatus: string
+      stripeSubscriptionId: string | null
+      stripeMeteredSubscriptionItemId: string | null
+    }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-sub-created',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(settingsAfter.body.isSubscribed).toBe(true)
+    expect(settingsAfter.body.subscriptionStatus).toBe('trialing')
+    expect(settingsAfter.body.stripeSubscriptionId).toBe('sub_created_1')
+    expect(settingsAfter.body.stripeMeteredSubscriptionItemId).toBe('si_created_metered_1')
+  })
+
+  it('supports team CRUD lifecycle within an organization', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'team-crud-owner@example.com',
+      password: 'team-crud-pass-12345',
+      name: 'Team CRUD Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Team CRUD Organization'
+    })
+
+    const created = await requestJson<{
+      id: string
+      organizationId: string
+      name: string
+      website: string | null
+      createdAt: string
+      updatedAt: string
+    }>(
+      '/v1/teams',
+      'team-crud-create',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        },
+        body: JSON.stringify({
+          organizationId: organization.id,
+          name: 'Engineering Team'
+        })
+      }
+    )
+
+    expect(created.response.status).toBe(201)
+    expect(created.body.name).toBe('Engineering Team')
+    expect(created.body.organizationId).toBe(organization.id)
+    expect(created.body.website).toBeNull()
+    expect(created.body.createdAt).toBeTruthy()
+
+    const fetched = await requestJson<{
+      id: string
+      name: string
+      organizationId: string
+    }>(
+      `/v1/teams/${created.body.id}`,
+      'team-crud-get',
+      {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        }
+      }
+    )
+
+    expect(fetched.response.status).toBe(200)
+    expect(fetched.body.id).toBe(created.body.id)
+    expect(fetched.body.name).toBe('Engineering Team')
+
+    const updated = await requestJson<{
+      id: string
+      name: string
+    }>(
+      `/v1/teams/${created.body.id}`,
+      'team-crud-update',
+      {
+        method: 'PATCH',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        },
+        body: JSON.stringify({
+          name: 'Platform Team'
+        })
+      }
+    )
+
+    expect(updated.response.status).toBe(200)
+    expect(updated.body.name).toBe('Platform Team')
+
+    const listed = await requestJson<{
+      data: Array<{ id: string; name: string }>
+      total: number
+    }>(
+      `/v1/teams?organizationId=${organization.id}`,
+      'team-crud-list',
+      {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        }
+      }
+    )
+
+    expect(listed.response.status).toBe(200)
+    expect(listed.body.total).toBe(1)
+    expect(listed.body.data[0]?.name).toBe('Platform Team')
+
+    const deleted = await requestJson<{ deleted: boolean }>(
+      `/v1/teams/${created.body.id}`,
+      'team-crud-delete',
+      {
+        method: 'DELETE',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        }
+      }
+    )
+
+    expect(deleted.response.status).toBe(200)
+    expect(deleted.body.deleted).toBe(true)
+
+    const listedAfterDelete = await requestJson<{
+      data: Array<{ id: string }>
+      total: number
+    }>(
+      `/v1/teams?organizationId=${organization.id}`,
+      'team-crud-list-after-delete',
+      {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        }
+      }
+    )
+
+    expect(listedAfterDelete.response.status).toBe(200)
+    expect(listedAfterDelete.body.total).toBe(0)
+  })
+
+  it('rejects team operations without auth token', async () => {
+    const listWithoutAuth = await requestJson<{ message: string }>(
+      '/v1/teams?organizationId=00000000-0000-0000-0000-000000000000',
+      'team-unauthorized-list',
+      {
+        method: 'GET'
+      }
+    )
+
+    expect(listWithoutAuth.response.status).toBe(401)
+
+    const createWithoutAuth = await requestJson<{ message: string }>(
+      '/v1/teams',
+      'team-unauthorized-create',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          organizationId: '00000000-0000-0000-0000-000000000000',
+          name: 'Unauthorized Team'
+        })
+      }
+    )
+
+    expect(createWithoutAuth.response.status).toBe(401)
+  })
+
+  it('isolates team visibility between organizations', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const ownerA = await createUser(factoryContext, {
+      email: 'team-isolation-owner-a@example.com',
+      password: 'team-isolation-pass-12345',
+      name: 'Team Isolation Owner A'
+    })
+
+    const ownerB = await createUser(factoryContext, {
+      email: 'team-isolation-owner-b@example.com',
+      password: 'team-isolation-pass-12345',
+      name: 'Team Isolation Owner B'
+    })
+
+    const orgA = await createTeam(factoryContext, {
+      token: ownerA.token,
+      name: 'Team Isolation Org A'
+    })
+
+    const orgB = await createTeam(factoryContext, {
+      token: ownerB.token,
+      name: 'Team Isolation Org B'
+    })
+
+    const teamA = await requestJson<{ id: string; name: string }>(
+      '/v1/teams',
+      'team-isolation-create-a',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${ownerA.token}`
+        },
+        body: JSON.stringify({
+          organizationId: orgA.id,
+          name: 'Team Alpha'
+        })
+      }
+    )
+
+    expect(teamA.response.status).toBe(201)
+
+    const teamB = await requestJson<{ id: string; name: string }>(
+      '/v1/teams',
+      'team-isolation-create-b',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${ownerB.token}`
+        },
+        body: JSON.stringify({
+          organizationId: orgB.id,
+          name: 'Team Beta'
+        })
+      }
+    )
+
+    expect(teamB.response.status).toBe(201)
+
+    const orgATeams = await requestJson<{
+      data: Array<{ id: string; name: string }>
+      total: number
+    }>(
+      `/v1/teams?organizationId=${orgA.id}`,
+      'team-isolation-list-a',
+      {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${ownerA.token}`
+        }
+      }
+    )
+
+    expect(orgATeams.response.status).toBe(200)
+    expect(orgATeams.body.total).toBe(1)
+    expect(orgATeams.body.data[0]?.name).toBe('Team Alpha')
+
+    const orgBTeams = await requestJson<{
+      data: Array<{ id: string; name: string }>
+      total: number
+    }>(
+      `/v1/teams?organizationId=${orgB.id}`,
+      'team-isolation-list-b',
+      {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${ownerB.token}`
+        }
+      }
+    )
+
+    expect(orgBTeams.response.status).toBe(200)
+    expect(orgBTeams.body.total).toBe(1)
+    expect(orgBTeams.body.data[0]?.name).toBe('Team Beta')
+  })
+
+  it('rejects team mutation by a user from a different organization', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const ownerA = await createUser(factoryContext, {
+      email: 'cross-org-team-owner-a@example.com',
+      password: 'cross-org-pass-12345',
+      name: 'Cross Org Team Owner A'
+    })
+
+    const ownerB = await createUser(factoryContext, {
+      email: 'cross-org-team-owner-b@example.com',
+      password: 'cross-org-pass-12345',
+      name: 'Cross Org Team Owner B'
+    })
+
+    const orgA = await createTeam(factoryContext, {
+      token: ownerA.token,
+      name: 'Cross Org Team Org A'
+    })
+
+    await createTeam(factoryContext, {
+      token: ownerB.token,
+      name: 'Cross Org Team Org B'
+    })
+
+    const teamA = await requestJson<{ id: string; name: string }>(
+      '/v1/teams',
+      'cross-org-team-create-a',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${ownerA.token}`
+        },
+        body: JSON.stringify({
+          organizationId: orgA.id,
+          name: 'Team Owned By Org A'
+        })
+      }
+    )
+
+    expect(teamA.response.status).toBe(201)
+
+    const crossOrgUpdate = await requestJson<{ message: string }>(
+      `/v1/teams/${teamA.body.id}`,
+      'cross-org-team-update-forbidden',
+      {
+        method: 'PATCH',
+        headers: {
+          authorization: `Bearer ${ownerB.token}`
+        },
+        body: JSON.stringify({
+          name: 'Hijacked Team Name'
+        })
+      }
+    )
+
+    expect(crossOrgUpdate.response.status).toBe(401)
+
+    const crossOrgDelete = await requestJson<{ message: string }>(
+      `/v1/teams/${teamA.body.id}`,
+      'cross-org-team-delete-forbidden',
+      {
+        method: 'DELETE',
+        headers: {
+          authorization: `Bearer ${ownerB.token}`
+        }
+      }
+    )
+
+    expect(crossOrgDelete.response.status).toBe(401)
+
+    const teamStillExists = await requestJson<{ id: string; name: string }>(
+      `/v1/teams/${teamA.body.id}`,
+      'cross-org-team-verify-unchanged',
+      {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${ownerA.token}`
+        }
+      }
+    )
+
+    expect(teamStillExists.response.status).toBe(200)
+    expect(teamStillExists.body.name).toBe('Team Owned By Org A')
+  })
+
+  it('handles concurrent invitation acceptance without duplicate memberships', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'concurrent-accept-owner@example.com',
+      password: 'concurrent-pass-12345',
+      name: 'Concurrent Accept Owner'
+    })
+
+    const invitee = await createUser(factoryContext, {
+      email: 'concurrent-accept-invitee@example.com',
+      password: 'concurrent-pass-12345',
+      name: 'Concurrent Accept Invitee'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Concurrent Accept Organization'
+    })
+
+    const createdInvitation = await requestJson<{ token: string }>(
+      '/v1/invitations',
+      'create-concurrent-accept-invitation',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        },
+        body: JSON.stringify({
+          organizationId: organization.id,
+          email: invitee.user.email,
+          role: 'member'
+        })
+      }
+    )
+
+    expect(createdInvitation.response.status).toBe(201)
+
+    const [resultA, resultB] = await Promise.all([
+      requestJson<{ accepted: boolean }>(
+        `/v1/invitations/${createdInvitation.body.token}/accept`,
+        'concurrent-accept-a',
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${invitee.token}`
+          }
+        }
+      ),
+      requestJson<{ accepted: boolean }>(
+        `/v1/invitations/${createdInvitation.body.token}/accept`,
+        'concurrent-accept-b',
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${invitee.token}`
+          }
+        }
+      )
+    ])
+
+    const statuses = [resultA.response.status, resultB.response.status].sort()
+    expect(statuses).toEqual([200, 404])
+
+    const membershipResult = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      client.query<{ membership_count: string | number }>(
+        `
+          SELECT COUNT(*)::int AS membership_count
+          FROM org_members
+          WHERE organization_id = $1
+            AND user_id = $2
+        `,
+        [organization.id, invitee.user.id]
+      )
+    )
+
+    const rawCount = membershipResult.rows[0]?.membership_count
+    const memberCount = typeof rawCount === 'number' ? rawCount : Number.parseInt(String(rawCount ?? '0'), 10)
+    expect(memberCount).toBe(1)
+  })
+
+  it('rejects organization mutation by an owner of a different organization', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const ownerA = await createUser(factoryContext, {
+      email: 'cross-org-mutation-owner-a@example.com',
+      password: 'cross-org-mutation-12345',
+      name: 'Cross Org Mutation Owner A'
+    })
+
+    const ownerB = await createUser(factoryContext, {
+      email: 'cross-org-mutation-owner-b@example.com',
+      password: 'cross-org-mutation-12345',
+      name: 'Cross Org Mutation Owner B'
+    })
+
+    const orgA = await createTeam(factoryContext, {
+      token: ownerA.token,
+      name: 'Cross Org Mutation Target'
+    })
+
+    await createTeam(factoryContext, {
+      token: ownerB.token,
+      name: 'Cross Org Mutation Attacker Org'
+    })
+
+    const crossOrgUpdate = await requestJson<{ message: string }>(
+      `/v1/organizations/${orgA.id}`,
+      'cross-org-mutation-update-forbidden',
+      {
+        method: 'PATCH',
+        headers: {
+          authorization: `Bearer ${ownerB.token}`
+        },
+        body: JSON.stringify({
+          name: 'Hijacked Organization'
+        })
+      }
+    )
+
+    expect(crossOrgUpdate.response.status).toBe(401)
+
+    const crossOrgDelete = await requestJson<{ message: string }>(
+      `/v1/organizations/${orgA.id}`,
+      'cross-org-mutation-delete-forbidden',
+      {
+        method: 'DELETE',
+        headers: {
+          authorization: `Bearer ${ownerB.token}`
+        }
+      }
+    )
+
+    expect(crossOrgDelete.response.status).toBe(401)
+
+    const orgStillExists = await requestJson<{ id: string; name: string }>(
+      `/v1/organizations/${orgA.id}`,
+      'cross-org-mutation-verify-unchanged',
+      {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${ownerA.token}`
+        }
+      }
+    )
+
+    expect(orgStillExists.response.status).toBe(200)
+    expect(orgStillExists.body.name).toBe('Cross Org Mutation Target')
+  })
+
+  it('invoice.payment_failed does not resurrect a canceled subscription', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'no-resurrect-fail-owner@example.com',
+      password: 'no-resurrect-fail-pass-12345',
+      name: 'No Resurrect Fail Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'No Resurrect Fail Team'
+    })
+
+    const cancelPayload = {
+      id: 'evt_cancel_for_fail_no_resurrect',
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          id: 'sub_fail_no_resurrect_1',
+          customer: 'cus_fail_no_resurrect_1',
+          status: 'canceled',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'cancel-for-fail-no-resurrect', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(cancelPayload)
+    })
+
+    const failPayload = {
+      id: 'evt_fail_no_resurrect',
+      type: 'invoice.payment_failed',
+      data: {
+        object: {
+          id: 'in_fail_no_resurrect_1',
+          customer: 'cus_fail_no_resurrect_1',
+          subscription: 'sub_fail_no_resurrect_1',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'fail-no-resurrect-attempt', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(failPayload)
+    })
+
+    const settings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-fail-no-resurrect',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(settings.body.isSubscribed).toBe(false)
+    expect(settings.body.subscriptionStatus).toBe('canceled')
+  })
+
+  it('processes webhook events without a resolvable organizationId gracefully', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const orphanPayload = {
+      id: 'evt_orphan_webhook_1',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_orphan_1',
+          customer: 'cus_orphan_unknown_1',
+          status: 'active',
+          start_date: Math.floor(Date.now() / 1000) - 100,
+          current_period_end: Math.floor(Date.now() / 1000) + 86_400,
+          metadata: {},
+          items: { data: [] }
+        }
+      }
+    }
+
+    const result = await requestJson<{ processed: boolean; idempotent: boolean }>(
+      '/v1/webhooks/stripe',
+      'orphan-webhook-no-org',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'integration-signature' },
+        body: JSON.stringify(orphanPayload)
+      }
+    )
+
+    expect(result.response.status).toBe(200)
+    expect(result.body.processed).toBe(true)
+    expect(result.body.idempotent).toBe(false)
+  })
+
+  it('transitions subscription from trialing to active via customer.subscription.updated', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'trial-to-active-owner@example.com',
+      password: 'trial-to-active-pass-12345',
+      name: 'Trial To Active Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Trial To Active Team'
+    })
+
+    const trialPayload = {
+      id: 'evt_trial_start_1',
+      type: 'customer.subscription.created',
+      data: {
+        object: {
+          id: 'sub_trial_to_active_1',
+          customer: 'cus_trial_to_active_1',
+          status: 'trialing',
+          start_date: Math.floor(Date.now() / 1000) - 86_400 * 14,
+          current_period_end: Math.floor(Date.now() / 1000),
+          metadata: { organizationId: organization.id },
+          items: { data: [] }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'trial-start', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(trialPayload)
+    })
+
+    const trialSettings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-trial-start',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(trialSettings.body.isSubscribed).toBe(true)
+    expect(trialSettings.body.subscriptionStatus).toBe('trialing')
+
+    const activatePayload = {
+      id: 'evt_trial_to_active_1',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_trial_to_active_1',
+          customer: 'cus_trial_to_active_1',
+          status: 'active',
+          start_date: Math.floor(Date.now() / 1000) - 86_400 * 14,
+          current_period_end: Math.floor(Date.now() / 1000) + 86_400 * 30,
+          metadata: { organizationId: organization.id },
+          items: { data: [] }
+        }
+      }
+    }
+
+    const result = await requestJson<{ processed: boolean }>(
+      '/v1/webhooks/stripe',
+      'trial-to-active-transition',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'integration-signature' },
+        body: JSON.stringify(activatePayload)
+      }
+    )
+
+    expect(result.response.status).toBe(200)
+    expect(result.body.processed).toBe(true)
+
+    const activeSettings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-trial-to-active',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(activeSettings.body.isSubscribed).toBe(true)
+    expect(activeSettings.body.subscriptionStatus).toBe('active')
+  })
+
+  it('updates and clears organization onboarding data', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'onboarding-data-owner@example.com',
+      password: 'onboarding-data-pass-12345',
+      name: 'Onboarding Data Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Onboarding Data Team'
+    })
+
+    const onboardingPayload = {
+      version: 1,
+      status: 'in_progress',
+      currentStep: 'organization_profile',
+      completedSteps: []
+    }
+
+    const setOnboarding = await requestJson<{ id: string; onboardingData: Record<string, unknown> | null }>(
+      `/v1/organizations/${organization.id}`,
+      'set-onboarding-data',
+      {
+        method: 'PATCH',
+        headers: { authorization: `Bearer ${owner.token}` },
+        body: JSON.stringify({
+          onboardingData: onboardingPayload
+        })
+      }
+    )
+
+    expect(setOnboarding.response.status).toBe(200)
+    expect(setOnboarding.body.onboardingData).toEqual(onboardingPayload)
+
+    const fetched = await requestJson<{ onboardingData: Record<string, unknown> | null }>(
+      `/v1/organizations/${organization.id}`,
+      'get-onboarding-data',
+      {
+        method: 'GET',
+        headers: { authorization: `Bearer ${owner.token}` }
+      }
+    )
+
+    expect(fetched.response.status).toBe(200)
+    expect(fetched.body.onboardingData).toEqual(onboardingPayload)
+
+    const clearOnboarding = await requestJson<{ id: string; onboardingData: Record<string, unknown> | null }>(
+      `/v1/organizations/${organization.id}`,
+      'clear-onboarding-data',
+      {
+        method: 'PATCH',
+        headers: { authorization: `Bearer ${owner.token}` },
+        body: JSON.stringify({
+          onboardingData: null
+        })
+      }
+    )
+
+    expect(clearOnboarding.response.status).toBe(200)
+    expect(clearOnboarding.body.onboardingData).toBeNull()
+  })
+
+  it('sets mandatory security headers on API responses', async () => {
+    const signIn = await fetch(`${dbAuthContext.baseUrl}/v1/auth/sign-in`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': '198.51.100.200',
+        ...dbAuthContext.testContext.headersForCase('security-headers-sign-in')
+      },
+      body: JSON.stringify({
+        email: 'security-headers-probe@example.com',
+        password: 'does-not-matter'
+      })
+    })
+
+    expect(signIn.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(signIn.headers.get('x-frame-options')).toBe('DENY')
+    expect(signIn.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin')
+    expect(signIn.headers.get('permissions-policy')).toBe('camera=(), microphone=(), geolocation=()')
+    expect(signIn.headers.get('cache-control')).toBe('no-store')
+    expect(signIn.headers.get('x-download-options')).toBe('noopen')
+    expect(signIn.headers.get('x-permitted-cross-domain-policies')).toBe('none')
+    expect(signIn.headers.get('strict-transport-security')).toContain('max-age=')
+    expect(signIn.headers.get('strict-transport-security')).toContain('includeSubDomains')
+  })
+
+  it('returns CORS headers for allowed origin and rejects disallowed origins', async () => {
+    const allowedPreflight = await fetch(`${dbAuthContext.baseUrl}/v1/auth/sign-in`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'http://localhost:3000',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type,authorization',
+        ...dbAuthContext.testContext.headersForCase('cors-allowed-preflight')
+      }
+    })
+
+    const allowedOriginHeader = allowedPreflight.headers.get('access-control-allow-origin')
+    expect(allowedOriginHeader).toBe('http://localhost:3000')
+
+    const disallowedPreflight = await fetch(`${dbAuthContext.baseUrl}/v1/auth/sign-in`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://evil.attacker.example',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type,authorization',
+        ...dbAuthContext.testContext.headersForCase('cors-disallowed-preflight')
+      }
+    })
+
+    const disallowedOriginHeader = disallowedPreflight.headers.get('access-control-allow-origin')
+    expect(disallowedOriginHeader).not.toBe('https://evil.attacker.example')
+    expect(disallowedOriginHeader).not.toBe('*')
+  })
+
+  it('revokes all refresh tokens for a deleted user', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const user = await createUser(factoryContext, {
+      email: 'delete-refresh-token@example.com',
+      password: 'strong-pass-12345',
+      name: 'Delete Refresh Token User'
+    })
+
+    // createUser returns a refreshToken from sign-up — use it directly to avoid
+    // consuming rate-limit budget on /v1/auth/sign-in.
+    const refreshToken = user.refreshToken
+
+    const deleteResponse = await requestJson<{ deleted: boolean }>(
+      '/v1/auth/me',
+      'delete-user-refresh-delete',
+      {
+        method: 'DELETE',
+        headers: {
+          authorization: `Bearer ${user.token}`
+        }
+      }
+    )
+    expect(deleteResponse.response.status).toBe(200)
+    expect(deleteResponse.body.deleted).toBe(true)
+
+    const refreshAfterDelete = await requestJson<{ message: string }>(
+      '/v1/auth/refresh',
+      'delete-user-refresh-after-delete',
+      {
+        method: 'POST',
+        body: JSON.stringify({ refreshToken })
+      }
+    )
+    expect(refreshAfterDelete.response.status).toBe(401)
+  })
+
+  it('transitions past_due subscription to canceled via customer.subscription.deleted', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'pastdue-to-cancel-owner@example.com',
+      password: 'pastdue-to-cancel-pass-12345',
+      name: 'PastDue To Cancel Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'PastDue To Cancel Team'
+    })
+
+    // Step 1: Activate subscription
+    const activatePayload = {
+      id: 'evt_activate_pastdue_cancel_1',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_pastdue_cancel_1',
+          customer: 'cus_pastdue_cancel_1',
+          status: 'active',
+          start_date: Math.floor(Date.now() / 1000) - 100,
+          current_period_end: Math.floor(Date.now() / 1000) + 86_400,
+          metadata: { organizationId: organization.id },
+          items: { data: [] }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'activate-for-pastdue-cancel', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(activatePayload)
+    })
+
+    // Step 2: Payment fails → past_due
+    const failPayload = {
+      id: 'evt_fail_pastdue_cancel_1',
+      type: 'invoice.payment_failed',
+      data: {
+        object: {
+          id: 'in_fail_pastdue_cancel_1',
+          customer: 'cus_pastdue_cancel_1',
+          subscription: 'sub_pastdue_cancel_1',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'fail-for-pastdue-cancel', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(failPayload)
+    })
+
+    const pastDueSettings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-verify-pastdue-before-cancel',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(pastDueSettings.body.isSubscribed).toBe(true)
+    expect(pastDueSettings.body.subscriptionStatus).toBe('past_due')
+
+    // Step 3: Stripe cancels after retry exhaustion → canceled
+    const deletePayload = {
+      id: 'evt_delete_pastdue_cancel_1',
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          id: 'sub_pastdue_cancel_1',
+          customer: 'cus_pastdue_cancel_1',
+          status: 'canceled',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    const deleteResult = await requestJson<{ processed: boolean }>(
+      '/v1/webhooks/stripe',
+      'delete-pastdue-cancel',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'integration-signature' },
+        body: JSON.stringify(deletePayload)
+      }
+    )
+
+    expect(deleteResult.response.status).toBe(200)
+    expect(deleteResult.body.processed).toBe(true)
+
+    const canceledSettings = await requestJson<{
+      isSubscribed: boolean
+      subscriptionStatus: string
+      stripeSubscriptionId: string | null
+      stripeMeteredSubscriptionItemId: string | null
+    }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-pastdue-cancel',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(canceledSettings.body.isSubscribed).toBe(false)
+    expect(canceledSettings.body.subscriptionStatus).toBe('canceled')
+    expect(canceledSettings.body.stripeSubscriptionId).toBeNull()
+    expect(canceledSettings.body.stripeMeteredSubscriptionItemId).toBeNull()
+  })
+
+  it('recovers from payment failure: active → past_due → active via payment_succeeded', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'recovery-flow-owner@example.com',
+      password: 'recovery-flow-pass-12345',
+      name: 'Recovery Flow Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Recovery Flow Team'
+    })
+
+    // Step 1: Activate subscription
+    const activatePayload = {
+      id: 'evt_activate_recovery_1',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_recovery_1',
+          customer: 'cus_recovery_1',
+          status: 'active',
+          start_date: Math.floor(Date.now() / 1000) - 100,
+          current_period_end: Math.floor(Date.now() / 1000) + 86_400,
+          metadata: { organizationId: organization.id },
+          items: { data: [] }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'activate-for-recovery', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(activatePayload)
+    })
+
+    const activeSettings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-verify-active-recovery',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(activeSettings.body.isSubscribed).toBe(true)
+    expect(activeSettings.body.subscriptionStatus).toBe('active')
+
+    // Step 2: Payment fails → past_due (subscription still accessible)
+    const failPayload = {
+      id: 'evt_fail_recovery_1',
+      type: 'invoice.payment_failed',
+      data: {
+        object: {
+          id: 'in_fail_recovery_1',
+          customer: 'cus_recovery_1',
+          subscription: 'sub_recovery_1',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'fail-for-recovery', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(failPayload)
+    })
+
+    const pastDueSettings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-verify-pastdue-recovery',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(pastDueSettings.body.isSubscribed).toBe(true)
+    expect(pastDueSettings.body.subscriptionStatus).toBe('past_due')
+
+    // Step 3: Payment succeeds (retry or card update) → active
+    const successPayload = {
+      id: 'evt_success_recovery_1',
+      type: 'invoice.payment_succeeded',
+      data: {
+        object: {
+          id: 'in_success_recovery_1',
+          customer: 'cus_recovery_1',
+          subscription: 'sub_recovery_1',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    const successResult = await requestJson<{ processed: boolean }>(
+      '/v1/webhooks/stripe',
+      'success-for-recovery',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'integration-signature' },
+        body: JSON.stringify(successPayload)
+      }
+    )
+
+    expect(successResult.response.status).toBe(200)
+    expect(successResult.body.processed).toBe(true)
+
+    const recoveredSettings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-recovery',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(recoveredSettings.body.isSubscribed).toBe(true)
+    expect(recoveredSettings.body.subscriptionStatus).toBe('active')
+  })
+
+  it('past_due subscription still allows usage summary access', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'pastdue-access-owner@example.com',
+      password: 'pastdue-access-pass-12345',
+      name: 'PastDue Access Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'PastDue Access Team'
+    })
+
+    // Activate with past_due status via subscription.updated
+    const pastDuePayload = {
+      id: 'evt_pastdue_access_1',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_pastdue_access_1',
+          customer: 'cus_pastdue_access_1',
+          status: 'past_due',
+          start_date: Math.floor(Date.now() / 1000) - 100,
+          current_period_end: Math.floor(Date.now() / 1000) + 86_400,
+          metadata: { organizationId: organization.id },
+          items: { data: [] }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'setup-pastdue-access', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(pastDuePayload)
+    })
+
+    const settings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-verify-pastdue-access',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(settings.body.isSubscribed).toBe(true)
+    expect(settings.body.subscriptionStatus).toBe('past_due')
+
+    // Usage summary should be accessible (past_due is treated as active)
+    const periodStart = new Date(Date.now() - (1000 * 60 * 60 * 24)).toISOString()
+    const periodEnd = new Date(Date.now() + (1000 * 60 * 60 * 24)).toISOString()
+
+    const usageSummary = await requestJson<{ totalQuantity: number }>(
+      `/v1/organizations/${organization.id}/usage?category=api_call&periodStart=${encodeURIComponent(periodStart)}&periodEnd=${encodeURIComponent(periodEnd)}`,
+      'usage-summary-pastdue-access',
+      {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${owner.token}`
+        }
+      }
+    )
+
+    expect(usageSummary.response.status).toBe(200)
+    expect(usageSummary.body.totalQuantity).toBe(0)
+  })
+
+  it('invoice.payment_failed does not change an unpaid subscription to past_due', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const owner = await createUser(factoryContext, {
+      email: 'unpaid-guard-owner@example.com',
+      password: 'unpaid-guard-pass-12345',
+      name: 'Unpaid Guard Owner'
+    })
+
+    const organization = await createTeam(factoryContext, {
+      token: owner.token,
+      name: 'Unpaid Guard Team'
+    })
+
+    // Set subscription to unpaid via subscription.updated
+    const unpaidPayload = {
+      id: 'evt_set_unpaid_guard_1',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_unpaid_guard_1',
+          customer: 'cus_unpaid_guard_1',
+          status: 'unpaid',
+          start_date: Math.floor(Date.now() / 1000) - 86_400 * 30,
+          current_period_end: Math.floor(Date.now() / 1000) - 86_400,
+          metadata: { organizationId: organization.id },
+          items: { data: [] }
+        }
+      }
+    }
+
+    await requestJson('/v1/webhooks/stripe', 'set-unpaid-guard', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'integration-signature' },
+      body: JSON.stringify(unpaidPayload)
+    })
+
+    const unpaidSettings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-verify-unpaid-guard',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(unpaidSettings.body.isSubscribed).toBe(false)
+    expect(unpaidSettings.body.subscriptionStatus).toBe('unpaid')
+
+    // invoice.payment_failed should NOT change unpaid → past_due
+    const failPayload = {
+      id: 'evt_fail_unpaid_guard_1',
+      type: 'invoice.payment_failed',
+      data: {
+        object: {
+          id: 'in_fail_unpaid_guard_1',
+          customer: 'cus_unpaid_guard_1',
+          subscription: 'sub_unpaid_guard_1',
+          metadata: { organizationId: organization.id }
+        }
+      }
+    }
+
+    const failResult = await requestJson<{ processed: boolean }>(
+      '/v1/webhooks/stripe',
+      'fail-unpaid-guard',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'integration-signature' },
+        body: JSON.stringify(failPayload)
+      }
+    )
+
+    expect(failResult.response.status).toBe(200)
+    expect(failResult.body.processed).toBe(true)
+
+    // Status must remain unpaid, not resurrected to past_due
+    const afterSettings = await requestJson<{ isSubscribed: boolean; subscriptionStatus: string }>(
+      `/v1/organizations/${organization.id}/billing`,
+      'billing-after-unpaid-guard',
+      { method: 'GET', headers: { authorization: `Bearer ${owner.token}` } }
+    )
+    expect(afterSettings.body.isSubscribed).toBe(false)
+    expect(afterSettings.body.subscriptionStatus).toBe('unpaid')
   })
 })

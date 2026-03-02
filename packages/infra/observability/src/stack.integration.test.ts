@@ -43,7 +43,7 @@ const defaultApiHarnessPort = 4707
 const defaultApiHarnessHost = '127.0.0.1'
 const defaultApiStartupTimeoutMs = 40_000
 const defaultApiDatabaseUrl = 'postgresql://postgres:postgres@localhost:5432/tx_agent_kit'
-const defaultAuthSecret = 'integration-auth-secret-12345'
+const defaultAuthSecret = 'integration-auth-secret-minimum-32-chars'
 const apiServerEntryPath = resolve(apiCwd, 'src/server.ts')
 const nodeCommand = process.env.NODE_BINARY ?? 'node'
 

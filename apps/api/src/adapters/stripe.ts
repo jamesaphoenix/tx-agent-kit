@@ -1,8 +1,11 @@
 import { StripePort, type StripeWebhookEvent } from '@tx-agent-kit/core'
+import { createLogger } from '@tx-agent-kit/logging'
 import { Effect, Layer } from 'effect'
 import { randomUUID } from 'node:crypto'
 import Stripe from 'stripe'
 import { getApiEnv } from '../config/env.js'
+
+const stripeLogger = createLogger('stripe')
 
 type JsonPrimitive = string | number | boolean | null
 type JsonValue = JsonPrimitive | JsonObject | JsonValue[]
@@ -183,7 +186,11 @@ export const StripePortLive = Layer.succeed(StripePort, {
       const webhookSecret = env.STRIPE_WEBHOOK_SECRET
 
       if (!stripe || !webhookSecret) {
-        return yield* Effect.sync(() => parseWebhookEventWithoutVerification(rawBody))
+        if (env.NODE_ENV === 'development' || env.NODE_ENV === 'test') {
+          stripeLogger.warn('Processing webhook without signature verification (Stripe not fully configured)')
+          return yield* Effect.sync(() => parseWebhookEventWithoutVerification(rawBody))
+        }
+        return yield* Effect.fail(new Error('Stripe webhook secret is not configured — signature verification required outside development'))
       }
 
       return yield* Effect.try({

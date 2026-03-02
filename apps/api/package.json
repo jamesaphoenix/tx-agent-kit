@@ -19,6 +19,7 @@
     "@effect/platform-node": "^0.104.1",
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/core": "workspace:*",
+    "@tx-agent-kit/db": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
     "@tx-agent-kit/observability": "workspace:*",
     "effect": "^3.19.16",

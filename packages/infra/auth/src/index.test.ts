@@ -4,7 +4,7 @@ import { hashPassword, signSessionToken, verifyPassword, verifySessionToken } fr
 
 describe('auth primitives', () => {
   beforeEach(() => {
-    process.env.AUTH_SECRET = 'local-dev-auth-secret-12345'
+    process.env.AUTH_SECRET = 'test-auth-secret-at-least-32-chars-long'
     process.env.AUTH_BCRYPT_ROUNDS = '4'
     process.env.AUTH_ACCESS_TOKEN_TTL = '15m'
   })

@@ -4483,7 +4483,6 @@
                     "role",
                     "status",
                     "invitedByUserId",
-                    "token",
                     "expiresAt",
                     "createdAt"
                   ],
@@ -4514,9 +4513,6 @@
                       ]
                     },
                     "invitedByUserId": {
-                      "type": "string"
-                    },
-                    "token": {
                       "type": "string"
                     },
                     "expiresAt": {

@@ -12,9 +12,15 @@ import { resourceFromAttributes } from '@opentelemetry/resources'
 import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { BatchSpanProcessor, BasicTracerProvider } from '@opentelemetry/sdk-trace-base'
 import {
-  ATTR_SERVICE_NAME,
-  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT
+  ATTR_SERVICE_NAME
 } from '@opentelemetry/semantic-conventions'
+
+/**
+ * Stable semantic convention for deployment environment.
+ * Replaces deprecated SEMRESATTRS_DEPLOYMENT_ENVIRONMENT ('deployment.environment').
+ * @see https://opentelemetry.io/docs/specs/semconv/resource/deployment-environment/
+ */
+const ATTR_DEPLOYMENT_ENVIRONMENT_NAME = 'deployment.environment.name'
 import { getClientObservabilityEnv } from './env.js'
 import { getOrCreateHttpClientMetrics } from './metrics-registry.js'
 
@@ -58,7 +64,7 @@ const createClientTelemetryState = (
 
   const resource = resourceFromAttributes({
     [ATTR_SERVICE_NAME]: config.serviceName,
-    [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: deploymentEnvironment
+    [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: deploymentEnvironment
   })
 
   const tracerProvider = new BasicTracerProvider({

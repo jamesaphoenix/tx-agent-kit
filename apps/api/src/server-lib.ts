@@ -35,6 +35,7 @@ import { getApiEnv, getSubscriptionGuardEnabled } from './config/env.js'
 import { authRateLimitMiddleware } from './middleware/auth-rate-limit.js'
 import { bodyLimitMiddleware } from './middleware/body-limit.js'
 import { getCorsConfig } from './middleware/cors.js'
+import { securityHeadersMiddleware } from './middleware/security-headers.js'
 import { InvitationEmailPortLive } from './adapters/invitation-email.js'
 import { PasswordResetEmailPortLive } from './adapters/password-reset-email.js'
 import { GoogleOidcPortLive } from './adapters/google-oidc.js'
@@ -62,7 +63,10 @@ const MiddlewareLive = Layer.mergeAll(
   HttpApiBuilder.middleware(bodyLimitMiddleware),
   HttpApiBuilder.middlewareCors(getCorsConfig()),
   HttpApiBuilder.middlewareOpenApi({ path: '/openapi.json' }),
-  HttpApiSwagger.layer({ path: '/docs' })
+  HttpApiSwagger.layer({ path: '/docs' }),
+  // Security headers must be outermost (added last) so appendPreResponseHandler
+  // runs before rate-limiter or body-limit short-circuit the pipeline.
+  HttpApiBuilder.middleware(securityHeadersMiddleware)
 )
 
 const BillingGuardPortLive = Layer.succeed(BillingGuardPort, {
@@ -139,19 +143,38 @@ export const main = (): void => {
     }
   })()
 
-  NodeRuntime.runMain(Layer.launch(layer))
+  let shuttingDown = false
+  const shutdown = (signal: string) => {
+    if (shuttingDown) {
+      return
+    }
+    shuttingDown = true
+    logger.info('Stopping API server.', { signal })
 
-  const shutdown = () => {
-    logger.info('Stopping API server.')
+    const forceExitTimeout = setTimeout(() => {
+      logger.error('Graceful shutdown timed out, forcing exit.')
+      process.exit(1)
+    }, 15_000)
+    forceExitTimeout.unref()
+
     void (async () => {
       try {
         await stopTelemetry()
+      } catch (telemetryError) {
+        logger.error(
+          'Telemetry shutdown error.',
+          {},
+          telemetryError instanceof Error ? telemetryError : new Error(String(telemetryError))
+        )
       } finally {
+        logger.info('API server stopped.')
         process.exit(0)
       }
     })()
   }
 
-  process.on('SIGINT', shutdown)
-  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', () => shutdown('SIGINT'))
+  process.on('SIGTERM', () => shutdown('SIGTERM'))
+
+  NodeRuntime.runMain(Layer.launch(layer))
 }

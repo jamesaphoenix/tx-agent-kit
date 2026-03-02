@@ -21,7 +21,8 @@ const requiredApiEnvShape = {
   STRIPE_WEBHOOK_SECRET: Schema.optional(Schema.String),
   STRIPE_PRO_PRICE_ID: Schema.optional(Schema.String),
   STRIPE_PRO_METERED_PRICE_ID: Schema.optional(Schema.String),
-  SUBSCRIPTION_GUARD_ENABLED: Schema.optional(Schema.String)
+  SUBSCRIPTION_GUARD_ENABLED: Schema.optional(Schema.String),
+  TRUST_PROXY: Schema.optional(Schema.String)
 } as const
 
 export const requiredApiEnvKeys = [
@@ -60,6 +61,10 @@ const assertApiEnvInvariants = (env: ApiEnv): ApiEnv => {
     throw new Error('AUTH_SECRET cannot use the default placeholder in production.')
   }
 
+  if (env.NODE_ENV === 'production' && env.AUTH_SECRET.length < 32) {
+    throw new Error('AUTH_SECRET must be at least 32 characters (256 bits) in production.')
+  }
+
   if (resendConfigured && hasResendApiKey !== hasResendFromEmail) {
     throw new Error('RESEND_API_KEY and RESEND_FROM_EMAIL must be configured together.')
   }
@@ -89,6 +94,17 @@ const assertApiEnvInvariants = (env: ApiEnv): ApiEnv => {
     throw new Error('STRIPE_PRO_PRICE_ID and STRIPE_PRO_METERED_PRICE_ID are required when Stripe is configured.')
   }
 
+  const hasWebhookSecret =
+    typeof env.STRIPE_WEBHOOK_SECRET === 'string' && env.STRIPE_WEBHOOK_SECRET.length > 0
+  const isProductionLike = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging'
+  if (stripeConfigured && isProductionLike && !hasWebhookSecret) {
+    throw new Error('STRIPE_WEBHOOK_SECRET is required in production and staging when Stripe is configured.')
+  }
+
+  if (isProductionLike && env.API_CORS_ORIGIN === '*') {
+    throw new Error('API_CORS_ORIGIN must not be wildcard (*) in production or staging.')
+  }
+
   const googleOidcValues = [
     env.GOOGLE_OIDC_ISSUER_URL,
     env.GOOGLE_OIDC_CLIENT_ID,
@@ -111,8 +127,20 @@ const assertApiEnvInvariants = (env: ApiEnv): ApiEnv => {
   return env
 }
 
-export const getApiEnv = (): ApiEnv =>
-  assertApiEnvInvariants(decodeApiEnv(process.env))
+let _cachedApiEnv: ApiEnv | null = null
+
+export const getApiEnv = (): ApiEnv => {
+  if (_cachedApiEnv) {
+    return _cachedApiEnv
+  }
+
+  _cachedApiEnv = assertApiEnvInvariants(decodeApiEnv(process.env))
+  return _cachedApiEnv
+}
+
+export const resetApiEnvCache = (): void => {
+  _cachedApiEnv = null
+}
 
 export interface AuthRateLimitConfig {
   windowMs: number
@@ -160,6 +188,18 @@ export const getGoogleOidcConfig = (): GoogleOidcConfig | null => {
     clientSecret: env.GOOGLE_OIDC_CLIENT_SECRET,
     callbackUrl: env.GOOGLE_OIDC_CALLBACK_URL
   }
+}
+
+export const getTrustProxy = (): boolean => {
+  const env = getApiEnv()
+  const rawValue = env.TRUST_PROXY
+
+  if (rawValue === undefined) {
+    return false
+  }
+
+  const normalized = rawValue.trim().toLowerCase()
+  return normalized === 'true' || normalized === '1'
 }
 
 export const getSubscriptionGuardEnabled = (): boolean => {

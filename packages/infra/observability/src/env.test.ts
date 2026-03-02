@@ -27,7 +27,7 @@ describe('getObservabilityEnv', () => {
 
     expect(getObservabilityEnv()).toEqual({
       OTEL_LOG_LEVEL: undefined,
-      OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4320',
       OTEL_LOGS_EXPORTER: 'otlp',
       NODE_ENV: 'development'
     })

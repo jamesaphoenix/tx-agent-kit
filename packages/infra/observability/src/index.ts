@@ -7,9 +7,15 @@ import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs'
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import {
-  ATTR_SERVICE_NAME,
-  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT
+  ATTR_SERVICE_NAME
 } from '@opentelemetry/semantic-conventions'
+
+/**
+ * Stable semantic convention for deployment environment.
+ * Replaces deprecated SEMRESATTRS_DEPLOYMENT_ENVIRONMENT ('deployment.environment').
+ * @see https://opentelemetry.io/docs/specs/semconv/resource/deployment-environment/
+ */
+const ATTR_DEPLOYMENT_ENVIRONMENT_NAME = 'deployment.environment.name'
 import { getObservabilityEnv } from './env.js'
 import { getOrCreateNodeServiceMetrics } from './metrics-registry.js'
 
@@ -47,7 +53,7 @@ export const startTelemetry = async (serviceName: string): Promise<void> => {
   telemetrySdk = new NodeSDK({
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: serviceName,
-      [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: env.NODE_ENV
+      [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: env.NODE_ENV
     }),
     ...(logRecordProcessors ? { logRecordProcessors } : {}),
     traceExporter: new OTLPTraceExporter({
@@ -69,8 +75,9 @@ export const stopTelemetry = async (): Promise<void> => {
     return
   }
 
-  await Promise.resolve(telemetrySdk.shutdown())
+  const sdk = telemetrySdk
   telemetrySdk = undefined
+  await sdk.shutdown()
 }
 
 export const emitNodeTelemetrySmoke = (

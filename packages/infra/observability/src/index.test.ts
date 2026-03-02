@@ -135,7 +135,7 @@ describe('telemetry lifecycle', () => {
     expect(resourceFromAttributesMock).toHaveBeenCalledWith(
       expect.objectContaining({
         'service.name': 'tx-agent-kit-test-service',
-        'deployment.environment': 'staging'
+        'deployment.environment.name': 'staging'
       })
     )
 

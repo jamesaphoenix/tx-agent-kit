@@ -1,4 +1,5 @@
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from '@effect/platform'
+import { createLogger } from '@tx-agent-kit/logging'
 import {
   billingSettingsSchema,
   createCheckoutSessionSchema,
@@ -50,6 +51,8 @@ export class InternalError extends Schema.TaggedError<InternalError>()('Internal
   message: Schema.String
 }) {}
 
+const apiLogger = createLogger('api')
+
 export const mapCoreError = (error: unknown): BadRequest | Unauthorized | NotFound | Conflict | InternalError => {
   if (error && typeof error === 'object' && '_tag' in error) {
     const e = error as { _tag: string; code?: string; message?: string }
@@ -65,10 +68,12 @@ export const mapCoreError = (error: unknown): BadRequest | Unauthorized | NotFou
       case 'CONFLICT':
         return new Conflict({ message })
       default:
+        apiLogger.error('Unmapped core error code fell through to 500', { tag: e._tag, code: e.code, message: e.message })
         return new InternalError({ message: 'Internal server error' })
     }
   }
 
+  apiLogger.error('Non-CoreError fell through to 500', { error: String(error) })
   return new InternalError({ message: 'Internal server error' })
 }
 
@@ -179,6 +184,17 @@ const CreateOrganizationBody = Schema.Struct({
 const UpdateOrganizationBody = Schema.Struct({
   name: Schema.optional(Schema.String),
   onboardingData: Schema.optional(Schema.NullOr(organizationOnboardingDataSchema))
+})
+
+const InvitationSummary = Schema.Struct({
+  id: Schema.String,
+  organizationId: Schema.String,
+  email: Schema.String,
+  role: Schema.Literal(...invitationAssignableRoles),
+  status: Schema.Literal(...invitationStatuses),
+  invitedByUserId: Schema.String,
+  expiresAt: Schema.String,
+  createdAt: Schema.String
 })
 
 const Invitation = Schema.Struct({
@@ -380,7 +396,7 @@ export const OrganizationsGroup = HttpApiGroup.make('organizations')
   .add(
     HttpApiEndpoint.patch('updateInvitation')`/v1/invitations/${InvitationIdParam}`
       .setPayload(UpdateInvitationBody)
-      .addSuccess(Invitation)
+      .addSuccess(InvitationSummary)
   )
   .add(
     HttpApiEndpoint.del('removeInvitation')`/v1/invitations/${InvitationIdParam}`
