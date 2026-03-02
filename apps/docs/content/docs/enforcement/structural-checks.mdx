@@ -126,7 +126,7 @@ Every test file must have a colocated source module.
 
 The script `scripts/lint/enforce-domain-event-contracts.mjs` enforces ten rules that protect the integrity of the domain event system. Names are derived from event type strings via dot-split PascalCase conversion (e.g., `organization.created` → `OrganizationCreatedEventPayload`).
 
-### Rule 1 -- Event Type Registry
+### Rule 1 - Event Type Registry
 
 All dot-separated event type strings used in `eventType:`, `case`, or `=== '...'` patterns must be registered in `domainEventTypes` in `packages/contracts/src/literals.ts`. This prevents ad-hoc event types from slipping into domain or worker code without being centrally declared.
 
@@ -137,7 +137,7 @@ All dot-separated event type strings used in `eventType:`, `case`, or `=== '...'
 | Filter | Only strings matching `^[a-z][a-z_]*\.[a-z][a-z_]*$` (ignores auth audit types) |
 | Failure | Unregistered event type string used in source |
 
-### Rule 2 -- Event Payload Interface Parity
+### Rule 2 - Event Payload Interface Parity
 
 Each registered event type must have a corresponding `export interface <Type>EventPayload` in the aggregate's `domain/*-events.ts` file.
 
@@ -148,7 +148,7 @@ Each registered event type must have a corresponding `export interface <Type>Eve
 | Expected export | `export interface OrganizationCreatedEventPayload` (derived via PascalCase) |
 | Failure | Missing interface for a registered event type |
 
-### Rule 3 -- Event Payload Schema Parity
+### Rule 3 - Event Payload Schema Parity
 
 Each registered event type must have a corresponding `export const <Type>EventPayloadSchema` in `packages/temporal-client/src/types/`.
 
@@ -158,7 +158,7 @@ Each registered event type must have a corresponding `export const <Type>EventPa
 | Expected export | `export const OrganizationCreatedEventPayloadSchema` (derived via PascalCase) |
 | Failure | Missing schema constant for a registered event type |
 
-### Rule 5 -- Transactional Event Write
+### Rule 5 - Transactional Event Write
 
 Domain event inserts in repository files must appear inside a `db.transaction()` block or use a `trx` handle. This ensures atomicity between the business write and the outbox event.
 
@@ -168,7 +168,7 @@ Domain event inserts in repository files must appear inside a `db.transaction()`
 | Pattern | `.insert(domainEvents)` with no preceding `trx` or `.transaction(` in 3000-char window |
 | Failure | Domain event insert outside a transaction context |
 
-### Rule 6 -- Event Handler Completeness
+### Rule 6 - Event Handler Completeness
 
 Every registered event type must have a `case '...'` handler in the worker's workflow dispatcher files (`apps/worker/src/workflows*.ts`).
 
@@ -178,7 +178,7 @@ Every registered event type must have a `case '...'` handler in the worker's wor
 | Scanned files | `apps/worker/src/workflows*.ts` (non-test) |
 | Failure | Missing case branch for a registered event type |
 
-### Rule 7 -- Idempotent Workflow ID
+### Rule 7 - Idempotent Workflow ID
 
 Every `startChild`/`executeChild` call in `apps/worker/src/workflows.ts` must include a `workflowId` property containing `event.id`. This ensures deterministic, idempotent dispatch — if the same event is processed twice, Temporal returns `WorkflowExecutionAlreadyStartedError` instead of duplicating work.
 
@@ -188,7 +188,7 @@ Every `startChild`/`executeChild` call in `apps/worker/src/workflows.ts` must in
 | Extraction | Brace-balanced block capture of `startChild`/`executeChild` call arguments |
 | Failure | Missing `workflowId` property, or `workflowId` value not containing `event.id` |
 
-### Rule 8 -- No Payload `as` Casts
+### Rule 8 - No Payload `as` Casts
 
 `.payload as <Type>` assertions are forbidden in worker source files. Use `effect/Schema` decode for event payload deserialization instead.
 
@@ -198,7 +198,7 @@ Every `startChild`/`executeChild` call in `apps/worker/src/workflows.ts` must in
 | Pattern | `.payload as ` |
 | Failure | Type assertion on event payload |
 
-### Rule 9 -- Event Type Naming Convention
+### Rule 9 - Event Type Naming Convention
 
 All event type strings in `domainEventTypes` must match the pattern `^[a-z][a-z_]*\.[a-z][a-z_]*$` — lowercase, dot-separated, with underscores allowed within segments.
 
@@ -208,7 +208,7 @@ All event type strings in `domainEventTypes` must match the pattern `^[a-z][a-z_
 | Valid examples | `organization.created`, `billing.subscription_updated` |
 | Invalid examples | `Organization.Created`, `org-created`, `org.` |
 
-### Rule 11 -- Retention Settings Completeness
+### Rule 11 - Retention Settings Completeness
 
 Every table listed in `retentionTableNames` (from `packages/contracts/src/literals.ts`) must have a corresponding entry in the `retention_settings` seed in the migration files. This prevents adding a table to the retention contract without providing its default retention configuration.
 
@@ -218,7 +218,7 @@ Every table listed in `retentionTableNames` (from `packages/contracts/src/litera
 | Validated against | `retention_settings` seed rows in migration SQL files |
 | Failure | Missing seed entry for a declared retention table |
 
-### Rule 12 -- Domain Event Insert Helper
+### Rule 12 - Domain Event Insert Helper
 
 Repositories outside `domain-events.ts` must not use inline `.insert(domainEvents).values(...)` patterns. All domain event inserts must go through the shared helper `insertDomainEventInTransaction(trx, ...)` exported from the domain-events repository.
 
