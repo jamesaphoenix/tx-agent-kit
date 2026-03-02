@@ -6,7 +6,11 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: 'worker-temporal-integration',
-      include: ['src/activities.integration.test.ts']
+      include: [
+        'src/activities.integration.test.ts',
+        'src/temporal-connectivity.integration.test.ts',
+        'src/temporal-cloud-mtls.integration.test.ts'
+      ]
     }
   })
 )

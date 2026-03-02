@@ -17,10 +17,13 @@
   "dependencies": {
     "@sentry/node": "^10.40.0",
     "@temporalio/client": "^1.13.1",
+    "@temporalio/common": "^1.13.1",
     "@temporalio/worker": "^1.13.1",
     "@temporalio/workflow": "^1.13.1",
+    "@tx-agent-kit/db": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
-    "@tx-agent-kit/observability": "workspace:*"
+    "@tx-agent-kit/observability": "workspace:*",
+    "effect": "^3.12.0"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*"

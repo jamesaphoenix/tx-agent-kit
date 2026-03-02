@@ -58,6 +58,10 @@ describe('worker sentry integration', () => {
   it('is a no-op when WORKER_SENTRY_DSN is not configured', async () => {
     const initialized = await initializeWorkerSentry({
       NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://localhost:5432/test',
+      OUTBOX_POLL_BATCH_SIZE: 50,
+      OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
+      OUTBOX_PRUNE_RETENTION_DAYS: 30,
       TEMPORAL_RUNTIME_MODE: 'cli',
       TEMPORAL_ADDRESS: 'localhost:7233',
       TEMPORAL_NAMESPACE: 'default',
@@ -65,7 +69,13 @@ describe('worker sentry integration', () => {
       TEMPORAL_API_KEY: undefined,
       TEMPORAL_TLS_ENABLED: false,
       TEMPORAL_TLS_SERVER_NAME: undefined,
-      WORKER_SENTRY_DSN: undefined
+      TEMPORAL_TLS_CA_CERT_PEM: undefined,
+      TEMPORAL_TLS_CLIENT_CERT_PEM: undefined,
+      TEMPORAL_TLS_CLIENT_KEY_PEM: undefined,
+      WORKER_SENTRY_DSN: undefined,
+      RESEND_API_KEY: undefined,
+      RESEND_FROM_EMAIL: undefined,
+      WEB_BASE_URL: undefined
     })
 
     captureWorkerException(new Error('no-op'))
@@ -79,6 +89,10 @@ describe('worker sentry integration', () => {
     try {
       const initialized = await initializeWorkerSentry({
         NODE_ENV: 'test',
+        DATABASE_URL: 'postgresql://localhost:5432/test',
+        OUTBOX_POLL_BATCH_SIZE: 50,
+        OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
+        OUTBOX_PRUNE_RETENTION_DAYS: 30,
         TEMPORAL_RUNTIME_MODE: 'cli',
         TEMPORAL_ADDRESS: 'localhost:7233',
         TEMPORAL_NAMESPACE: 'default',
@@ -86,7 +100,13 @@ describe('worker sentry integration', () => {
         TEMPORAL_API_KEY: undefined,
         TEMPORAL_TLS_ENABLED: false,
         TEMPORAL_TLS_SERVER_NAME: undefined,
-        WORKER_SENTRY_DSN: sentrySink.dsn
+        TEMPORAL_TLS_CA_CERT_PEM: undefined,
+        TEMPORAL_TLS_CLIENT_CERT_PEM: undefined,
+        TEMPORAL_TLS_CLIENT_KEY_PEM: undefined,
+        WORKER_SENTRY_DSN: sentrySink.dsn,
+        RESEND_API_KEY: undefined,
+        RESEND_FROM_EMAIL: undefined,
+        WEB_BASE_URL: undefined
       })
 
       captureWorkerException(new Error('integration-capture'))

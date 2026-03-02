@@ -27,6 +27,10 @@ describe('worker sentry wiring', () => {
   it('skips initialization when DSN is missing', async () => {
     const initialized = await initializeWorkerSentry({
       NODE_ENV: 'development',
+      DATABASE_URL: 'postgresql://localhost:5432/test',
+      OUTBOX_POLL_BATCH_SIZE: 50,
+      OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
+      OUTBOX_PRUNE_RETENTION_DAYS: 30,
       TEMPORAL_RUNTIME_MODE: 'cli',
       TEMPORAL_ADDRESS: 'localhost:7233',
       TEMPORAL_NAMESPACE: 'default',
@@ -34,7 +38,13 @@ describe('worker sentry wiring', () => {
       TEMPORAL_API_KEY: undefined,
       TEMPORAL_TLS_ENABLED: false,
       TEMPORAL_TLS_SERVER_NAME: undefined,
-      WORKER_SENTRY_DSN: undefined
+      TEMPORAL_TLS_CA_CERT_PEM: undefined,
+      TEMPORAL_TLS_CLIENT_CERT_PEM: undefined,
+      TEMPORAL_TLS_CLIENT_KEY_PEM: undefined,
+      WORKER_SENTRY_DSN: undefined,
+      RESEND_API_KEY: undefined,
+      RESEND_FROM_EMAIL: undefined,
+      WEB_BASE_URL: undefined
     })
 
     captureWorkerException(new Error('should-not-send'))
@@ -49,6 +59,10 @@ describe('worker sentry wiring', () => {
   it('initializes once and captures exceptions when DSN is configured', async () => {
     const firstInitialize = await initializeWorkerSentry({
       NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://localhost:5432/prod',
+      OUTBOX_POLL_BATCH_SIZE: 50,
+      OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
+      OUTBOX_PRUNE_RETENTION_DAYS: 30,
       TEMPORAL_RUNTIME_MODE: 'cloud',
       TEMPORAL_ADDRESS: 'cloud.temporal.io:7233',
       TEMPORAL_NAMESPACE: 'default',
@@ -56,10 +70,20 @@ describe('worker sentry wiring', () => {
       TEMPORAL_API_KEY: 'key',
       TEMPORAL_TLS_ENABLED: true,
       TEMPORAL_TLS_SERVER_NAME: undefined,
-      WORKER_SENTRY_DSN: 'https://worker@sentry.example.com/123'
+      TEMPORAL_TLS_CA_CERT_PEM: undefined,
+      TEMPORAL_TLS_CLIENT_CERT_PEM: undefined,
+      TEMPORAL_TLS_CLIENT_KEY_PEM: undefined,
+      WORKER_SENTRY_DSN: 'https://worker@sentry.example.com/123',
+      RESEND_API_KEY: undefined,
+      RESEND_FROM_EMAIL: undefined,
+      WEB_BASE_URL: undefined
     })
     const secondInitialize = await initializeWorkerSentry({
       NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://localhost:5432/prod',
+      OUTBOX_POLL_BATCH_SIZE: 50,
+      OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
+      OUTBOX_PRUNE_RETENTION_DAYS: 30,
       TEMPORAL_RUNTIME_MODE: 'cloud',
       TEMPORAL_ADDRESS: 'cloud.temporal.io:7233',
       TEMPORAL_NAMESPACE: 'default',
@@ -67,7 +91,13 @@ describe('worker sentry wiring', () => {
       TEMPORAL_API_KEY: 'key',
       TEMPORAL_TLS_ENABLED: true,
       TEMPORAL_TLS_SERVER_NAME: undefined,
-      WORKER_SENTRY_DSN: 'https://worker@sentry.example.com/123'
+      TEMPORAL_TLS_CA_CERT_PEM: undefined,
+      TEMPORAL_TLS_CLIENT_CERT_PEM: undefined,
+      TEMPORAL_TLS_CLIENT_KEY_PEM: undefined,
+      WORKER_SENTRY_DSN: 'https://worker@sentry.example.com/123',
+      RESEND_API_KEY: undefined,
+      RESEND_FROM_EMAIL: undefined,
+      WEB_BASE_URL: undefined
     })
 
     captureWorkerException(new Error('boom'))
