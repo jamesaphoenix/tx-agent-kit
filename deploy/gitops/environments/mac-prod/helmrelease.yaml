@@ -1,0 +1,53 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tx-agent-kit-mac-prod
+  namespace: flux-system
+spec:
+  interval: 5m
+  releaseName: tx-agent-kit-prod
+  targetNamespace: tx-prod
+  chart:
+    spec:
+      chart: ./deploy/k8s/chart
+      sourceRef:
+        kind: GitRepository
+        name: tx-agent-kit-repo
+        namespace: flux-system
+      interval: 1m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    timeout: 10m
+    remediation:
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: tx-agent-kit-images
+      valuesKey: values.yaml
+  values:
+    runtimeEnvSecretName: tx-agent-kit-prod-runtime
+    api:
+      service:
+        type: NodePort
+        port: 80
+        nodePort: 32081
+      ingress:
+        enabled: false
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1024Mi
+    worker:
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1024Mi

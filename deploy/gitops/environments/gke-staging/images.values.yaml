@@ -1,0 +1,3 @@
+images:
+  api: us-central1-docker.pkg.dev/<gcp-project>/<artifact-repo>/api:replace-me
+  worker: us-central1-docker.pkg.dev/<gcp-project>/<artifact-repo>/worker:replace-me

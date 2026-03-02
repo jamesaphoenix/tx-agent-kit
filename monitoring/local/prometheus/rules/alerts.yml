@@ -1,45 +1,41 @@
 # Prometheus Alert Rules for tx-agent-kit
 # Basic alerting rules for local development
+#
+# Available application metrics (from metrics-registry.ts):
+#   tx_agent_kit_client_http_request_total      — HTTP client request counter
+#   tx_agent_kit_client_http_request_duration    — HTTP client request duration histogram
+#   tx_agent_kit_node_service_startup_total      — service startup counter
+#
+# Scrape targets (from prometheus.yml):
+#   prometheus, node, otel-collector
 
 groups:
   - name: tx-agent-kit-api
     rules:
-      # API is down
-      - alert: APIDown
-        expr: up{job="tx-agent-kit-api"} == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: 'tx-agent-kit API is down'
-          description: 'The tx-agent-kit API has been down for more than 1 minute.'
-
-      # High error rate
-      - alert: HighErrorRate
+      # High client-side HTTP error rate
+      - alert: HighClientErrorRate
         expr: |
-          sum(rate(http_requests_total{job="tx-agent-kit-api",status=~"5.."}[5m]))
-          / sum(rate(http_requests_total{job="tx-agent-kit-api"}[5m])) > 0.05
+          sum(rate(tx_agent_kit_client_http_request_total{status_code=~"5.."}[5m]))
+          / sum(rate(tx_agent_kit_client_http_request_total[5m])) > 0.05
         for: 2m
         labels:
           severity: warning
         annotations:
-          summary: 'High error rate on tx-agent-kit API'
-          description: 'Error rate is above 5% for the last 2 minutes.'
+          summary: 'High client-side HTTP error rate'
+          description: 'Outgoing HTTP client error rate is above 5% for the last 2 minutes.'
 
-  - name: temporal
+  - name: infrastructure
     rules:
-      # Temporal is down
-      - alert: TemporalDown
-        expr: up{job="temporal"} == 0
+      # OTel Collector is down
+      - alert: OTelCollectorDown
+        expr: up{job="otel-collector"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: 'Temporal server is down'
-          description: 'The Temporal server has been down for more than 1 minute.'
+          summary: 'OTel Collector is down'
+          description: 'The OpenTelemetry Collector has been down for more than 1 minute.'
 
-  - name: infrastructure
-    rules:
       # Node exporter down
       - alert: NodeExporterDown
         expr: up{job="node"} == 0

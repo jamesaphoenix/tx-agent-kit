@@ -15,7 +15,6 @@ export type OrganizationsUpdateInvitation200 = {
   role: OrganizationsUpdateInvitation200Role;
   status: OrganizationsUpdateInvitation200Status;
   invitedByUserId: string;
-  token: string;
   expiresAt: string;
   createdAt: string;
 };

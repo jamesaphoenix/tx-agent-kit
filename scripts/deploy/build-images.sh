@@ -22,23 +22,29 @@ if ! docker buildx version >/dev/null 2>&1; then
   exit 1
 fi
 
-infer_repository() {
-  local origin_url
-  origin_url="$(git config --get remote.origin.url 2>/dev/null || true)"
-
-  if [[ "$origin_url" =~ github.com[:/]([^/]+/[^/.]+)(\.git)?$ ]]; then
-    printf '%s' "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]'
-    return
-  fi
-
-  echo "jamesaphoenix/tx-agent-kit"
-}
+if ! docker info >/dev/null 2>&1; then
+  echo "Cannot connect to the Docker daemon. Ensure Docker is running."
+  exit 1
+fi
 
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short=12 HEAD)}"
 IMAGE_PLATFORM="${IMAGE_PLATFORM:-linux/amd64}"
 PUSH_IMAGES="${PUSH_IMAGES:-0}"
-IMAGE_REGISTRY="${IMAGE_REGISTRY:-ghcr.io}"
-IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-$(infer_repository)}"
+ARTIFACT_REGISTRY_REGION="${ARTIFACT_REGISTRY_REGION:-us-central1}"
+ARTIFACT_REGISTRY_REPOSITORY="${ARTIFACT_REGISTRY_REPOSITORY:-tx-agent-kit}"
+IMAGE_REGISTRY="${IMAGE_REGISTRY:-${ARTIFACT_REGISTRY_REGION}-docker.pkg.dev}"
+
+if [[ -n "${IMAGE_REPOSITORY:-}" ]]; then
+  :
+elif [[ -n "${GCP_PROJECT_ID:-}" ]]; then
+  IMAGE_REPOSITORY="${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPOSITORY}"
+elif [[ "$PUSH_IMAGES" == "1" ]]; then
+  echo "GCP_PROJECT_ID must be set when PUSH_IMAGES=1 and IMAGE_REPOSITORY is not provided."
+  exit 1
+else
+  IMAGE_REPOSITORY="local/tx-agent-kit"
+fi
+
 API_IMAGE_REPO="${API_IMAGE_REPO:-${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}/api}"
 WORKER_IMAGE_REPO="${WORKER_IMAGE_REPO:-${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}/worker}"
 

@@ -2,13 +2,26 @@ name: Integration Tests
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-tests-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_ENV: test
   API_PORT: '4100'
   API_HOST: '127.0.0.1'
   DATABASE_URL: postgres://postgres:postgres@localhost:5432/tx_agent_kit
-  AUTH_SECRET: ci-auth-secret-123456
+  AUTH_SECRET: ci-integration-auth-secret-${{ github.run_id }}-${{ github.run_attempt }}
   API_CORS_ORIGIN: http://localhost:3000
   AUTH_RATE_LIMIT_WINDOW_MS: '60000'
   AUTH_RATE_LIMIT_MAX_REQUESTS: '100'
@@ -18,18 +31,52 @@ env:
   WEB_BASE_URL: http://localhost:3000
   GOOGLE_OIDC_ISSUER_URL: http://localhost:65535
   GOOGLE_OIDC_CLIENT_ID: ci-google-client-id
-  GOOGLE_OIDC_CLIENT_SECRET: ci-google-client-secret
+  GOOGLE_OIDC_CLIENT_SECRET: ''
   GOOGLE_OIDC_CALLBACK_URL: http://localhost:4100/v1/auth/google/callback
   STRIPE_SECRET_KEY: ''
   STRIPE_WEBHOOK_SECRET: ''
   STRIPE_PRO_PRICE_ID: ''
   STRIPE_PRO_METERED_PRICE_ID: ''
   SUBSCRIPTION_GUARD_ENABLED: 'true'
+  TRUST_PROXY: 'false'
 
 jobs:
-  placeholder:
-    name: Integration Placeholder
+  integration:
+    name: Run Integration Suites
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - run: echo "integration workflow scaffold"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Configure local env files
+        run: pnpm env:configure
+      - name: Ensure infrastructure
+        run: pnpm infra:ensure
+      - name: Run integration suites
+        run: pnpm test:integration:quiet
+
+  temporal-integration:
+    name: Run Temporal Integration Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Configure local env files
+        run: pnpm env:configure
+      - name: Run Temporal integration suite
+        run: pnpm test:temporal:integration

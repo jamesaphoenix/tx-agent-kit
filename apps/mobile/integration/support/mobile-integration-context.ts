@@ -36,7 +36,7 @@ const dbAuthContext = createDbAuthContext({
   apiCwd,
   host: '127.0.0.1',
   port: integrationPort,
-  authSecret: 'mobile-integration-auth-secret-12345',
+  authSecret: 'mobile-integration-auth-secret-32-chars',
   corsOrigin: '*',
   sql: {
     schemaPrefix: integrationSchemaPrefix

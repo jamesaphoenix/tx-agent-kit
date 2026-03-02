@@ -1,0 +1,93 @@
+{{- if .Values.otelCollector.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tx-agent-kit.fullname" . }}-otel-collector
+  labels:
+    {{- include "tx-agent-kit.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.otelCollector.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "tx-agent-kit.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: otel-collector
+  template:
+    metadata:
+      annotations:
+        checksum/otel-config: {{ include (print $.Template.BasePath "/otel-configmap.yaml") . | sha256sum }}
+        checksum/runtime-secret: {{ include (print $.Template.BasePath "/runtime-secret.yaml") . | sha256sum }}
+      labels:
+        {{- include "tx-agent-kit.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: otel-collector
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: otel-collector
+          image: {{ .Values.images.otelCollector | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: GOOGLE_CLOUD_PROJECT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tx-agent-kit.runtimeSecretName" . }}
+                  key: GOOGLE_CLOUD_PROJECT
+            - name: OTEL_SERVICE_NAMESPACE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tx-agent-kit.runtimeSecretName" . }}
+                  key: OTEL_SERVICE_NAMESPACE
+                  optional: true
+            - name: NODE_ENV
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tx-agent-kit.runtimeSecretName" . }}
+                  key: NODE_ENV
+                  optional: true
+          args:
+            - --config=/etc/otel-collector/config.yaml
+          ports:
+            - containerPort: 4317
+              name: otlp-grpc
+            - containerPort: {{ .Values.otelCollector.service.port }}
+              name: otlp-http
+            - containerPort: 13133
+              name: health
+          livenessProbe:
+            httpGet:
+              path: /health/status
+              port: 13133
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/status
+              port: 13133
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otel-collector
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.otelCollector.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "tx-agent-kit.fullname" . }}-otel-collector
+        - name: tmp
+          emptyDir: {}
+{{- end }}

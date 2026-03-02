@@ -22,6 +22,10 @@ elif [[ -z "${GCP_PROJECT_ID:-}" && -f "$GCP_RENDERED_DIR/toy-project.env" ]]; t
 fi
 
 require_env GCP_PROJECT_ID
+if [[ "$GCP_PROJECT_ID" != txak-otel-* && "${ALLOW_NONTOY_PROJECT_TEARDOWN:-0}" != "1" ]]; then
+  echo "Refusing to delete non-toy project id '$GCP_PROJECT_ID'. Set ALLOW_NONTOY_PROJECT_TEARDOWN=1 to override."
+  exit 1
+fi
 
 echo "Scheduling deletion for toy GCP project: $GCP_PROJECT_ID"
 gcloud projects delete "$GCP_PROJECT_ID" --quiet

@@ -1,0 +1,496 @@
+name: Release Flux GitOps
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_strategy:
+        description: Image build strategy
+        required: true
+        default: google_cloud
+        type: choice
+        options:
+          - locally
+          - google_cloud
+      deploy_env:
+        description: Environments to update via GitOps
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - prod
+          - both
+      deploy_gke:
+        description: Also update GKE GitOps environments
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-flux-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  guard_trusted_ref:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ensure GitOps workflow runs only from main
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Flux release workflow is restricted to refs/heads/main. Current ref: ${GITHUB_REF}"
+            exit 1
+          fi
+
+  approve_gitops_prod:
+    if: ${{ needs.guard_trusted_ref.result == 'success' && (github.event.inputs.deploy_env == 'prod' || github.event.inputs.deploy_env == 'both') }}
+    needs: [guard_trusted_ref]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: mac-k3s-prod
+    steps:
+      - run: echo "Approved prod GitOps mutation."
+
+  approve_gitops_gke:
+    if: ${{ needs.guard_trusted_ref.result == 'success' && github.event.inputs.deploy_gke == 'true' }}
+    needs: [guard_trusted_ref]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: gke-loadtest
+    steps:
+      - run: echo "Approved GKE GitOps mutation."
+
+  build_images_locally:
+    if: ${{ needs.guard_trusted_ref.result == 'success' && github.event.inputs.build_strategy == 'locally' }}
+    needs: [guard_trusted_ref]
+    runs-on: [self-hosted, mac-studio]
+    timeout-minutes: 45
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      ARTIFACT_REGISTRY_REGION: ${{ secrets.ARTIFACT_REGISTRY_REGION }}
+      ARTIFACT_REGISTRY_REPOSITORY: ${{ secrets.ARTIFACT_REGISTRY_REPOSITORY }}
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.name }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Configure Artifact Registry auth
+        run: |
+          set -euo pipefail
+          gcloud auth configure-docker "${ARTIFACT_REGISTRY_REGION}-docker.pkg.dev" --quiet
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build and push images
+        run: PUSH_IMAGES=1 pnpm deploy:build-images
+      - name: Resolve artifact file
+        id: artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_file="$(ls -t deploy/artifacts/images-*.env | head -n 1)"
+          artifact_name="$(basename "$artifact_file")"
+          echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
+      - name: Upload image artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: deploy/artifacts/${{ steps.artifact.outputs.name }}
+          if-no-files-found: error
+
+  build_images_google_cloud:
+    if: ${{ needs.guard_trusted_ref.result == 'success' && github.event.inputs.build_strategy == 'google_cloud' }}
+    needs: [guard_trusted_ref]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.name }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f
+      - name: Configure Artifact Registry auth
+        env:
+          ARTIFACT_REGISTRY_REGION: ${{ secrets.ARTIFACT_REGISTRY_REGION }}
+        run: gcloud auth configure-docker "${ARTIFACT_REGISTRY_REGION}-docker.pkg.dev" --quiet
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build and push images
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          ARTIFACT_REGISTRY_REGION: ${{ secrets.ARTIFACT_REGISTRY_REGION }}
+          ARTIFACT_REGISTRY_REPOSITORY: ${{ secrets.ARTIFACT_REGISTRY_REPOSITORY }}
+        run: PUSH_IMAGES=1 pnpm deploy:build-images
+      - name: Resolve artifact file
+        id: artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_file="$(ls -t deploy/artifacts/images-*.env | head -n 1)"
+          artifact_name="$(basename "$artifact_file")"
+          echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
+      - name: Upload image artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: deploy/artifacts/${{ steps.artifact.outputs.name }}
+          if-no-files-found: error
+
+  update_gitops_refs_local:
+    if: ${{ needs.guard_trusted_ref.result == 'success' && github.event.inputs.build_strategy == 'locally' && needs.build_images_locally.result == 'success' && (needs.approve_gitops_prod.result == 'success' || needs.approve_gitops_prod.result == 'skipped') && (needs.approve_gitops_gke.result == 'success' || needs.approve_gitops_gke.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - guard_trusted_ref
+      - build_images_locally
+      - approve_gitops_prod
+      - approve_gitops_gke
+    permissions:
+      contents: write
+    outputs:
+      updated_commit: ${{ steps.commit.outputs.commit }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Download image artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ needs.build_images_locally.outputs.artifact_name }}
+          path: deploy/artifacts
+      - name: Validate artifact
+        run: ./scripts/deploy/ci/verify-artifact.sh "deploy/artifacts/${{ needs.build_images_locally.outputs.artifact_name }}"
+      - name: Update GitOps image values
+        shell: bash
+        env:
+          DEPLOY_ENV: ${{ github.event.inputs.deploy_env }}
+          DEPLOY_GKE: ${{ github.event.inputs.deploy_gke }}
+          ARTIFACT_NAME: ${{ needs.build_images_locally.outputs.artifact_name }}
+        run: |
+          set -euo pipefail
+          artifact="deploy/artifacts/${ARTIFACT_NAME}"
+          case "$DEPLOY_ENV" in
+            staging)
+              pnpm deploy:gitops:update mac-staging "$artifact"
+              ;;
+            prod)
+              pnpm deploy:gitops:update mac-prod "$artifact"
+              ;;
+            both)
+              pnpm deploy:gitops:update mac-staging "$artifact"
+              pnpm deploy:gitops:update mac-prod "$artifact"
+              ;;
+            *)
+              echo "Invalid deploy_env: $DEPLOY_ENV" >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ "$DEPLOY_GKE" == "true" ]]; then
+            case "$DEPLOY_ENV" in
+              staging)
+                pnpm deploy:gitops:update gke-staging "$artifact"
+                ;;
+              prod)
+                pnpm deploy:gitops:update gke-prod "$artifact"
+                ;;
+              both)
+                pnpm deploy:gitops:update gke-staging "$artifact"
+                pnpm deploy:gitops:update gke-prod "$artifact"
+                ;;
+            esac
+          fi
+      - name: Commit and push GitOps refs
+        id: commit
+        shell: bash
+        env:
+          DEPLOY_ENV: ${{ github.event.inputs.deploy_env }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- deploy/gitops; then
+            echo "No GitOps changes to commit"
+            echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/gitops
+          git commit -m "chore(gitops): update image refs for ${DEPLOY_ENV}"
+          push_ok=0
+          for attempt in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              push_ok=1
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$push_ok" != "1" ]]; then
+            echo "Failed to push GitOps refs after retries."
+            exit 1
+          fi
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  update_gitops_refs_cloud:
+    if: ${{ always() && needs.guard_trusted_ref.result == 'success' && github.event.inputs.build_strategy == 'google_cloud' && needs.build_images_google_cloud.result == 'success' && (needs.approve_gitops_prod.result == 'success' || needs.approve_gitops_prod.result == 'skipped') && (needs.approve_gitops_gke.result == 'success' || needs.approve_gitops_gke.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - guard_trusted_ref
+      - build_images_google_cloud
+      - approve_gitops_prod
+      - approve_gitops_gke
+    permissions:
+      contents: write
+    outputs:
+      updated_commit: ${{ steps.commit.outputs.commit }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Download image artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ needs.build_images_google_cloud.outputs.artifact_name }}
+          path: deploy/artifacts
+      - name: Validate artifact
+        run: ./scripts/deploy/ci/verify-artifact.sh "deploy/artifacts/${{ needs.build_images_google_cloud.outputs.artifact_name }}"
+      - name: Update GitOps image values
+        shell: bash
+        env:
+          DEPLOY_ENV: ${{ github.event.inputs.deploy_env }}
+          DEPLOY_GKE: ${{ github.event.inputs.deploy_gke }}
+          ARTIFACT_NAME: ${{ needs.build_images_google_cloud.outputs.artifact_name }}
+        run: |
+          set -euo pipefail
+          artifact="deploy/artifacts/${ARTIFACT_NAME}"
+          case "$DEPLOY_ENV" in
+            staging)
+              pnpm deploy:gitops:update mac-staging "$artifact"
+              ;;
+            prod)
+              pnpm deploy:gitops:update mac-prod "$artifact"
+              ;;
+            both)
+              pnpm deploy:gitops:update mac-staging "$artifact"
+              pnpm deploy:gitops:update mac-prod "$artifact"
+              ;;
+            *)
+              echo "Invalid deploy_env: $DEPLOY_ENV" >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ "$DEPLOY_GKE" == "true" ]]; then
+            case "$DEPLOY_ENV" in
+              staging)
+                pnpm deploy:gitops:update gke-staging "$artifact"
+                ;;
+              prod)
+                pnpm deploy:gitops:update gke-prod "$artifact"
+                ;;
+              both)
+                pnpm deploy:gitops:update gke-staging "$artifact"
+                pnpm deploy:gitops:update gke-prod "$artifact"
+                ;;
+            esac
+          fi
+      - name: Commit and push GitOps refs
+        id: commit
+        shell: bash
+        env:
+          DEPLOY_ENV: ${{ github.event.inputs.deploy_env }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- deploy/gitops; then
+            echo "No GitOps changes to commit"
+            echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/gitops
+          git commit -m "chore(gitops): update image refs for ${DEPLOY_ENV}"
+          push_ok=0
+          for attempt in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              push_ok=1
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$push_ok" != "1" ]]; then
+            echo "Failed to push GitOps refs after retries."
+            exit 1
+          fi
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  reconcile_mac_staging:
+    if: ${{ needs.guard_trusted_ref.result == 'success' && (github.event.inputs.deploy_env == 'staging' || github.event.inputs.deploy_env == 'both') && (needs.update_gitops_refs_local.result == 'success' || needs.update_gitops_refs_cloud.result == 'success') }}
+    runs-on: [self-hosted, mac-studio]
+    timeout-minutes: 20
+    needs: [guard_trusted_ref, update_gitops_refs_local, update_gitops_refs_cloud]
+    environment: mac-k3s-staging
+    concurrency:
+      group: k8s-mac-staging
+      cancel-in-progress: false
+    env:
+      K8S_CONTEXT_MAC: ${{ vars.K8S_CONTEXT_MAC }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Reconcile Flux staging
+        run: pnpm deploy:gitops:reconcile mac-staging
+      - name: Check staging status
+        run: pnpm deploy:k8s:status mac-staging
+
+  reconcile_mac_prod:
+    if: ${{ needs.guard_trusted_ref.result == 'success' && (github.event.inputs.deploy_env == 'prod' || github.event.inputs.deploy_env == 'both') && (needs.update_gitops_refs_local.result == 'success' || needs.update_gitops_refs_cloud.result == 'success') }}
+    runs-on: [self-hosted, mac-studio]
+    timeout-minutes: 20
+    needs: [guard_trusted_ref, update_gitops_refs_local, update_gitops_refs_cloud]
+    environment: mac-k3s-prod
+    concurrency:
+      group: k8s-mac-prod
+      cancel-in-progress: false
+    env:
+      K8S_CONTEXT_MAC: ${{ vars.K8S_CONTEXT_MAC }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Reconcile Flux prod
+        run: pnpm deploy:gitops:reconcile mac-prod
+      - name: Check prod status
+        run: pnpm deploy:k8s:status mac-prod
+
+  reconcile_gke:
+    if: ${{ needs.guard_trusted_ref.result == 'success' && github.event.inputs.deploy_gke == 'true' && (needs.update_gitops_refs_local.result == 'success' || needs.update_gitops_refs_cloud.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [guard_trusted_ref, update_gitops_refs_local, update_gitops_refs_cloud]
+    environment: gke-loadtest
+    concurrency:
+      group: k8s-gke
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f
+      - name: Get GKE credentials
+        env:
+          GKE_CLUSTER: ${{ secrets.GKE_CLUSTER }}
+          GKE_LOCATION: ${{ secrets.GKE_LOCATION }}
+          GKE_LOCATION_TYPE: ${{ secrets.GKE_LOCATION_TYPE }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          location_flag="--region"
+          case "${GKE_LOCATION_TYPE:-region}" in
+            zone)
+              location_flag="--zone"
+              ;;
+            region|'')
+              location_flag="--region"
+              ;;
+            *)
+              echo "Invalid GKE_LOCATION_TYPE: ${GKE_LOCATION_TYPE}"
+              exit 1
+              ;;
+          esac
+          gcloud container clusters get-credentials "$GKE_CLUSTER" "$location_flag" "$GKE_LOCATION" --project "$GCP_PROJECT_ID"
+          echo "K8S_CONTEXT_GKE=$(kubectl config current-context)" >> "$GITHUB_ENV"
+      - name: Reconcile Flux gke staging/prod
+        env:
+          K8S_CONTEXT_GKE: ${{ env.K8S_CONTEXT_GKE }}
+          DEPLOY_ENV: ${{ github.event.inputs.deploy_env }}
+        run: |
+          set -euo pipefail
+          case "$DEPLOY_ENV" in
+            staging)
+              pnpm deploy:gitops:reconcile gke-staging
+              ;;
+            prod)
+              pnpm deploy:gitops:reconcile gke-prod
+              ;;
+            both)
+              pnpm deploy:gitops:reconcile gke-staging
+              pnpm deploy:gitops:reconcile gke-prod
+              ;;
+          esac
+      - name: Check GKE status
+        env:
+          K8S_CONTEXT_GKE: ${{ env.K8S_CONTEXT_GKE }}
+          DEPLOY_ENV: ${{ github.event.inputs.deploy_env }}
+        run: |
+          set -euo pipefail
+          case "$DEPLOY_ENV" in
+            staging)
+              GKE_ENVIRONMENT=staging pnpm deploy:k8s:status gke
+              ;;
+            prod)
+              GKE_ENVIRONMENT=prod pnpm deploy:k8s:status gke
+              ;;
+            both)
+              GKE_ENVIRONMENT=staging pnpm deploy:k8s:status gke
+              GKE_ENVIRONMENT=prod pnpm deploy:k8s:status gke
+              ;;
+          esac

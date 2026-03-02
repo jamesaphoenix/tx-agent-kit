@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-agent-kit
+description: Kubernetes deployment chart for tx-agent-kit API, worker, and OTEL collector
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

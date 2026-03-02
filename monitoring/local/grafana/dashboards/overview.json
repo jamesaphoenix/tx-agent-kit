@@ -13,7 +13,7 @@
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
-          "expr": "sum(rate(http_server_duration_milliseconds_count[5m]))",
+          "expr": "sum(rate(tx_agent_kit_client_http_request_total[5m]))",
           "legendFormat": "req/s",
           "refId": "A"
         }

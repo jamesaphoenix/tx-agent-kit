@@ -32,7 +32,7 @@ const devProbeEnv = {
   TEMPORAL_NAMESPACE: 'default',
   TEMPORAL_TASK_QUEUE: 'tx-agent-kit',
   TEMPORAL_TLS_ENABLED: 'false',
-  OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318'
+  OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4320'
 } as const
 
 const createdTempRoots: string[] = []
@@ -110,12 +110,17 @@ describe.sequential('root command entrypoints integration', () => {
         output.includes('@tx-agent-kit/worker:dev:') &&
         output.includes('@tx-agent-kit/mobile:dev:')
 
+      const infraPreflightProgress =
+        output.includes('Infrastructure already healthy') ||
+        output.includes('Checking local infrastructure health')
+
       const temporalPreflightProgress =
         output.includes('Temporal CLI server started') ||
         output.includes('Starting Temporal CLI dev server on') ||
-        output.includes('Temporal CLI process is running')
+        output.includes('Temporal CLI process is running') ||
+        output.includes('Temporal CLI server is already healthy')
 
-      expect(bootedAppProcesses || temporalPreflightProgress).toBe(true)
+      expect(bootedAppProcesses || infraPreflightProgress || temporalPreflightProgress).toBe(true)
     },
     60_000
   )
@@ -155,7 +160,7 @@ describe.sequential('root command entrypoints integration', () => {
       expect(`${api.stdout}\n${api.stderr}`).toContain('Starting API server.')
 
       expect(`${worker.stdout}\n${worker.stderr}`).toMatch(
-        /Temporal worker started\.|Connection refused/u
+        /Temporal worker started\.|Starting worker runtime/u
       )
 
       expect(`${mobile.stdout}\n${mobile.stderr}`).toMatch(

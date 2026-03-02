@@ -14,11 +14,17 @@ OBSERVABILITY_RETRY_SLEEP_SECONDS="${OBSERVABILITY_RETRY_SLEEP_SECONDS:-2}"
 OBSERVABILITY_CURL_CONNECT_TIMEOUT_SECONDS="${OBSERVABILITY_CURL_CONNECT_TIMEOUT_SECONDS:-2}"
 OBSERVABILITY_CURL_MAX_TIME_SECONDS="${OBSERVABILITY_CURL_MAX_TIME_SECONDS:-5}"
 SMOKE_LOG_MARKER="${OTEL_SMOKE_LOG_MARKER:-observability.smoke.log}"
+SMOKE_SUFFIX="${OTEL_SMOKE_SUFFIX:-$(date +%s)-$RANDOM}"
+SMOKE_LOG_MARKER="${SMOKE_LOG_MARKER}.${SMOKE_SUFFIX}"
+API_SERVICE_NAME="tx-agent-kit-api-${SMOKE_SUFFIX}"
+WORKER_SERVICE_NAME="tx-agent-kit-worker-${SMOKE_SUFFIX}"
+WEB_SERVICE_NAME="tx-agent-kit-web-${SMOKE_SUFFIX}"
+MOBILE_SERVICE_NAME="tx-agent-kit-mobile-${SMOKE_SUFFIX}"
 REQUIRED_JAEGER_SERVICES=(
-  "tx-agent-kit-api"
-  "tx-agent-kit-worker"
-  "tx-agent-kit-web"
-  "tx-agent-kit-mobile"
+  "$API_SERVICE_NAME"
+  "$WORKER_SERVICE_NAME"
+  "$WEB_SERVICE_NAME"
+  "$MOBILE_SERVICE_NAME"
 )
 
 require_tool() {
@@ -163,10 +169,10 @@ if [[ "$readiness_failed" -ne 0 ]]; then
   exit 1
 fi
 
-emit_smoke_telemetry node tx-agent-kit-api
-emit_smoke_telemetry node tx-agent-kit-worker
-emit_smoke_telemetry client tx-agent-kit-web
-emit_smoke_telemetry client tx-agent-kit-mobile
+emit_smoke_telemetry node "$API_SERVICE_NAME"
+emit_smoke_telemetry node "$WORKER_SERVICE_NAME"
+emit_smoke_telemetry client "$WEB_SERVICE_NAME"
+emit_smoke_telemetry client "$MOBILE_SERVICE_NAME"
 
 for ((attempt = 1; attempt <= OBSERVABILITY_RETRY_ATTEMPTS; attempt += 1)); do
   all_services_present=true
@@ -178,12 +184,12 @@ for ((attempt = 1; attempt <= OBSERVABILITY_RETRY_ATTEMPTS; attempt += 1)); do
   done
 
   if [ "$all_services_present" = true ] &&
-    prometheus_metric_for_job_positive "tx_agent_kit_client_http_request_total" "tx-agent-kit/tx-agent-kit-web" &&
-    prometheus_metric_for_job_positive "tx_agent_kit_client_http_request_total" "tx-agent-kit/tx-agent-kit-mobile" &&
-    prometheus_metric_for_job_positive "tx_agent_kit_node_service_startup_total" "tx-agent-kit/tx-agent-kit-api" &&
-    prometheus_metric_for_job_positive "tx_agent_kit_node_service_startup_total" "tx-agent-kit/tx-agent-kit-worker" &&
-    loki_has_smoke_log_for_service "tx-agent-kit-api" &&
-    loki_has_smoke_log_for_service "tx-agent-kit-worker"; then
+    prometheus_metric_for_job_positive "tx_agent_kit_client_http_request_total" "tx-agent-kit/${WEB_SERVICE_NAME}" &&
+    prometheus_metric_for_job_positive "tx_agent_kit_client_http_request_total" "tx-agent-kit/${MOBILE_SERVICE_NAME}" &&
+    prometheus_metric_for_job_positive "tx_agent_kit_node_service_startup_total" "tx-agent-kit/${API_SERVICE_NAME}" &&
+    prometheus_metric_for_job_positive "tx_agent_kit_node_service_startup_total" "tx-agent-kit/${WORKER_SERVICE_NAME}" &&
+    loki_has_smoke_log_for_service "$API_SERVICE_NAME" &&
+    loki_has_smoke_log_for_service "$WORKER_SERVICE_NAME"; then
     echo "Observability stack healthy and ingesting smoke telemetry."
     exit 0
   fi

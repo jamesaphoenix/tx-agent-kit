@@ -1,0 +1,23 @@
+api:
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 32081
+  ingress:
+    enabled: false
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+worker:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi

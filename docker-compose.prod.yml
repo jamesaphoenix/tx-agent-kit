@@ -11,6 +11,12 @@ services:
       - ./monitoring/production/otel-collector.oss.yaml:/etc/otel-collector/otel-collector.oss.yaml:ro
       - "${OTEL_COLLECTOR_GCP_CREDENTIALS_DIR:-./deploy/gcp-empty}:/var/secrets/google:ro"
       - "${OTEL_COLLECTOR_GCLOUD_CONFIG_DIR:-./deploy/gcloud-empty}:/root/.config/gcloud:ro"
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:13133/health/status']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   api:
     image: ${API_IMAGE:?API_IMAGE must be set to a pinned image reference}
@@ -26,7 +32,7 @@ services:
       - '${API_PORT:-4000}:4000'
     depends_on:
       otel-collector:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test:
         - CMD
@@ -50,4 +56,4 @@ services:
       api:
         condition: service_healthy
       otel-collector:
-        condition: service_started
+        condition: service_healthy

@@ -9,7 +9,7 @@ const defaultPort = 4100
 const defaultHost = '127.0.0.1'
 const defaultStartupTimeoutMs = 40_000
 const defaultHealthPath = '/health'
-const defaultAuthSecret = 'integration-auth-secret-12345'
+const defaultAuthSecret = 'integration-auth-secret-minimum-32-chars'
 
 const delay = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => {
@@ -183,7 +183,9 @@ export const createApiServerHarness = (
         API_PORT: String(port),
         AUTH_SECRET: authSecret,
         DATABASE_URL: options.testContext.schemaDatabaseUrl,
-        API_CORS_ORIGIN: corsOrigin
+        API_CORS_ORIGIN: corsOrigin,
+        AUTH_RATE_LIMIT_MAX_REQUESTS: '200',
+        AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '200'
       },
       stdio: detached ? 'ignore' : ['ignore', 'pipe', 'pipe'],
       detached

@@ -1,0 +1,89 @@
+nameOverride: tx-agent-kit
+fullnameOverride: ''
+
+images:
+  api: ''
+  worker: ''
+  otelCollector: otel/opentelemetry-collector-contrib:0.146.1
+  pullPolicy: IfNotPresent
+
+runtimeEnv: {}
+runtimeEnvSecretName: ''
+
+api:
+  replicas: 1
+  containerPort: 4000
+  service:
+    type: ClusterIP
+    port: 80
+    nodePort: null
+  ingress:
+    enabled: false
+    className: ''
+    annotations: {}
+    hosts:
+      - host: api.localhost
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+worker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+otelCollector:
+  enabled: true
+  replicas: 1
+  service:
+    port: 4318
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+          http:
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+        path: /health/status
+    processors:
+      batch:
+    exporters:
+      debug:
+        verbosity: normal
+    service:
+      extensions: [health_check]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [debug]
+        metrics:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [debug]
+        logs:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [debug]

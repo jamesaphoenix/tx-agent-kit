@@ -24,7 +24,7 @@ const dbAuthContext = createDbAuthContext({
   apiCwd,
   host: '127.0.0.1',
   port: integrationPort,
-  authSecret: 'web-integration-auth-secret-12345',
+  authSecret: 'web-integration-auth-secret-32-chars-ok',
   corsOrigin: '*',
   sql: {
     testRunId,

@@ -21,7 +21,10 @@ require_env GCP_PROJECT_ID
 
 echo "Enabling required GCP APIs for project: $GCP_PROJECT_ID"
 gcloud services enable \
+  artifactregistry.googleapis.com \
   cloudtrace.googleapis.com \
+  compute.googleapis.com \
+  container.googleapis.com \
   logging.googleapis.com \
   monitoring.googleapis.com \
   iam.googleapis.com \

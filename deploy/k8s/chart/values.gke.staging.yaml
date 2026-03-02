@@ -1,0 +1,67 @@
+api:
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: true
+    className: gce
+    annotations:
+      kubernetes.io/ingress.allow-http: "false"
+    hosts:
+      - host: api-loadtest.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - hosts:
+          - api-loadtest.example.com
+        secretName: api-tls-cert
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+worker:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+otelCollector:
+  enabled: true
+  config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+          http:
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+        path: /health/status
+    processors:
+      batch:
+    exporters:
+      googlecloud:
+        project: ${env:GOOGLE_CLOUD_PROJECT}
+    service:
+      extensions: [health_check]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [googlecloud]
+        metrics:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [googlecloud]
+        logs:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [googlecloud]

@@ -1,0 +1,26 @@
+images:
+  pullPolicy: Never
+
+api:
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 32080
+  ingress:
+    enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+worker:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

@@ -1,0 +1,97 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tx-agent-kit-gke-staging
+  namespace: flux-system
+spec:
+  interval: 5m
+  releaseName: tx-agent-kit-gke-staging
+  targetNamespace: tx-gke-staging
+  chart:
+    spec:
+      chart: ./deploy/k8s/chart
+      sourceRef:
+        kind: GitRepository
+        name: tx-agent-kit-repo
+        namespace: flux-system
+      interval: 1m
+  install:
+    createNamespace: true
+    timeout: 10m
+    remediation:
+      retries: 3
+  upgrade:
+    timeout: 10m
+    remediation:
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: tx-agent-kit-images
+      valuesKey: values.yaml
+  values:
+    runtimeEnvSecretName: tx-agent-kit-gke-staging-runtime
+    otelCollector:
+      enabled: true
+      config: |
+        receivers:
+          otlp:
+            protocols:
+              grpc:
+              http:
+        extensions:
+          health_check:
+            endpoint: 0.0.0.0:13133
+            path: /health/status
+        processors:
+          batch:
+        exporters:
+          googlecloud:
+            project: ${env:GOOGLE_CLOUD_PROJECT}
+        service:
+          extensions: [health_check]
+          pipelines:
+            traces:
+              receivers: [otlp]
+              processors: [batch]
+              exporters: [googlecloud]
+            metrics:
+              receivers: [otlp]
+              processors: [batch]
+              exporters: [googlecloud]
+            logs:
+              receivers: [otlp]
+              processors: [batch]
+              exporters: [googlecloud]
+    api:
+      service:
+        type: ClusterIP
+        port: 80
+      ingress:
+        enabled: true
+        className: gce
+        annotations:
+          kubernetes.io/ingress.allow-http: "false"
+        hosts:
+          - host: api-staging.<domain>
+            paths:
+              - path: /
+                pathType: Prefix
+        tls:
+          - hosts:
+              - api-staging.<domain>
+            secretName: api-staging-tls
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1024Mi
+    worker:
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1024Mi

@@ -1,0 +1,11 @@
+{{- if .Values.otelCollector.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tx-agent-kit.fullname" . }}-otel-collector
+  labels:
+    {{- include "tx-agent-kit.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+{{ .Values.otelCollector.config | indent 4 }}
+{{- end }}

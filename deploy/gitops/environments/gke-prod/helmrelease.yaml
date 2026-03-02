@@ -1,0 +1,100 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tx-agent-kit-gke-prod
+  namespace: flux-system
+spec:
+  interval: 5m
+  releaseName: tx-agent-kit-gke-prod
+  targetNamespace: tx-gke-prod
+  chart:
+    spec:
+      chart: ./deploy/k8s/chart
+      sourceRef:
+        kind: GitRepository
+        name: tx-agent-kit-repo
+        namespace: flux-system
+      interval: 1m
+  install:
+    createNamespace: true
+    timeout: 10m
+    remediation:
+      retries: 3
+  upgrade:
+    timeout: 10m
+    remediation:
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: tx-agent-kit-images
+      valuesKey: values.yaml
+  values:
+    runtimeEnvSecretName: tx-agent-kit-gke-prod-runtime
+    otelCollector:
+      enabled: true
+      replicas: 2
+      config: |
+        receivers:
+          otlp:
+            protocols:
+              grpc:
+              http:
+        extensions:
+          health_check:
+            endpoint: 0.0.0.0:13133
+            path: /health/status
+        processors:
+          batch:
+        exporters:
+          googlecloud:
+            project: ${env:GOOGLE_CLOUD_PROJECT}
+        service:
+          extensions: [health_check]
+          pipelines:
+            traces:
+              receivers: [otlp]
+              processors: [batch]
+              exporters: [googlecloud]
+            metrics:
+              receivers: [otlp]
+              processors: [batch]
+              exporters: [googlecloud]
+            logs:
+              receivers: [otlp]
+              processors: [batch]
+              exporters: [googlecloud]
+    api:
+      replicas: 2
+      service:
+        type: ClusterIP
+        port: 80
+      ingress:
+        enabled: true
+        className: gce
+        annotations:
+          kubernetes.io/ingress.allow-http: "false"
+        hosts:
+          - host: api.<domain>
+            paths:
+              - path: /
+                pathType: Prefix
+        tls:
+          - hosts:
+              - api.<domain>
+            secretName: api-prod-tls
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 2Gi
+    worker:
+      replicas: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 2Gi

@@ -20,12 +20,14 @@ processors:
     check_interval: 1s
     limit_mib: 512
     spike_limit_mib: 128
+  deltatocumulative:
+    max_stale: 5m
   resource:
     attributes:
       - key: service.namespace
         value: 'tx-agent-kit'
         action: upsert
-      - key: deployment.environment
+      - key: deployment.environment.name
         value: 'local'
         action: upsert
 
@@ -64,7 +66,7 @@ service:
 
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, resource, batch]
+      processors: [memory_limiter, resource, deltatocumulative, batch]
       exporters: [otlphttp/prometheus, debug]
 
     logs:

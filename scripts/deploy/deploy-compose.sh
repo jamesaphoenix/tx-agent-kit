@@ -36,10 +36,12 @@ if [[ -n "$IMAGES_ENV_FILE" ]]; then
     exit 1
   fi
 
-  set -a
-  # shellcheck disable=SC1090
-  source "$IMAGES_ENV_FILE"
-  set +a
+  while IFS='=' read -r key value; do
+    case "$key" in
+      API_IMAGE) export API_IMAGE="$value" ;;
+      WORKER_IMAGE) export WORKER_IMAGE="$value" ;;
+    esac
+  done < <("$SCRIPT_DIR/ci/load-image-artifact.sh" "$IMAGES_ENV_FILE")
 fi
 
 if [[ -z "${API_IMAGE:-}" || -z "${WORKER_IMAGE:-}" ]]; then
@@ -60,11 +62,12 @@ if [[ ! -f "$COMPOSE_FILE" ]]; then
   exit 1
 fi
 
-RENDERED_ENV_DIR="${DEPLOY_RENDERED_DIR:-deploy/.rendered}"
-mkdir -p "$RENDERED_ENV_DIR"
-RENDERED_ENV_FILE="${RENDERED_ENV_DIR}/${TARGET_ENV}.env"
+RENDERED_ENV_FILE="$(mktemp /tmp/tx-deploy-compose-XXXXXX.env)"
+chmod 600 "$RENDERED_ENV_FILE"
+cleanup_rendered_env() { rm -f "$RENDERED_ENV_FILE"; }
+trap cleanup_rendered_env EXIT
 
-op inject -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
+op inject -f -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
 
 {
   printf '\nAPI_IMAGE=%s\n' "$API_IMAGE"
@@ -78,12 +81,15 @@ docker compose -f "$COMPOSE_FILE" --env-file "$RENDERED_ENV_FILE" pull
 docker compose -f "$COMPOSE_FILE" --env-file "$RENDERED_ENV_FILE" up -d --remove-orphans
 
 if [[ "${RUN_SMOKE:-1}" == "1" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "$RENDERED_ENV_FILE"
-  set +a
+  API_EXTERNAL_BASE_URL=""
+  while IFS='=' read -r key value; do
+    if [[ "$key" == "API_EXTERNAL_BASE_URL" ]]; then
+      API_EXTERNAL_BASE_URL="$value"
+      break
+    fi
+  done < "$RENDERED_ENV_FILE"
 
-  if [[ -z "${API_EXTERNAL_BASE_URL:-}" ]]; then
+  if [[ -z "$API_EXTERNAL_BASE_URL" ]]; then
     echo "Skipping smoke checks: API_EXTERNAL_BASE_URL is not configured"
     exit 0
   fi

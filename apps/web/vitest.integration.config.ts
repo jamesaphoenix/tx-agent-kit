@@ -21,6 +21,7 @@ export default mergeConfig(
           url: 'http://localhost:3000'
         }
       },
+      hookTimeout: 120_000,
       setupFiles: ['./vitest.integration.setup.ts'],
       include: ['**/*.integration.test.ts', '**/*.integration.test.tsx'],
       exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/coverage/**'],

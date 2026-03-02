@@ -29,7 +29,7 @@ processors:
       - key: service.namespace
         value: ${OTEL_SERVICE_NAMESPACE}
         action: upsert
-      - key: deployment.environment
+      - key: deployment.environment.name
         value: ${NODE_ENV}
         action: upsert
 

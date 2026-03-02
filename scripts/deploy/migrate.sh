@@ -30,9 +30,10 @@ if [[ ! -f "$TEMPLATE_FILE" ]]; then
 fi
 
 RENDERED_ENV_FILE="$(mktemp -t tx-agent-kit-${TARGET_ENV}-migrate-env.XXXXXX)"
+chmod 600 "$RENDERED_ENV_FILE"
 trap 'rm -f "$RENDERED_ENV_FILE"' EXIT
 
-op inject -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
+op inject -f -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
 
 set -a
 # shellcheck disable=SC1090

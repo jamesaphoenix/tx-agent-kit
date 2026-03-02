@@ -10,7 +10,7 @@ const dbAuthContext = createDbAuthContext({
   apiCwd,
   host: '127.0.0.1',
   port: Number.parseInt(process.env.TESTKIT_INTEGRATION_API_PORT ?? '4102', 10),
-  authSecret: 'testkit-integration-auth-secret-12345',
+  authSecret: 'testkit-integration-auth-secret-32-chars',
   corsOrigin: '*',
   sql: {
     schemaPrefix: 'testkit'

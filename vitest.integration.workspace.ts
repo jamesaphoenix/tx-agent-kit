@@ -153,6 +153,6 @@ export default defineConfig({
   test: {
     projects: resolveProjectPaths(),
     globalSetup: ['./scripts/test/vitest-global-setup.ts'],
-    passWithNoTests: true
+    passWithNoTests: process.env.CI !== 'true'
   }
 })

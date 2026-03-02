@@ -1,0 +1,247 @@
+name: Verify k3s Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_strategy:
+        description: Image build strategy
+        required: true
+        default: google_cloud
+        type: choice
+        options:
+          - locally
+          - google_cloud
+
+permissions:
+  contents: read
+
+concurrency:
+  group: k8s-mac-staging
+  cancel-in-progress: false
+
+jobs:
+  guard_trusted_ref:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ensure self-hosted staging verification runs only from main
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Staging verification is restricted to refs/heads/main. Current ref: ${GITHUB_REF}"
+            exit 1
+          fi
+
+  build_images_locally:
+    if: ${{ needs.guard_trusted_ref.result == 'success' && github.event.inputs.build_strategy == 'locally' }}
+    needs: [guard_trusted_ref]
+    runs-on: [self-hosted, mac-studio]
+    timeout-minutes: 45
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      ARTIFACT_REGISTRY_REGION: ${{ secrets.ARTIFACT_REGISTRY_REGION }}
+      ARTIFACT_REGISTRY_REPOSITORY: ${{ secrets.ARTIFACT_REGISTRY_REPOSITORY }}
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.name }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Configure Artifact Registry auth
+        run: |
+          set -euo pipefail
+          if ! command -v gcloud >/dev/null 2>&1; then
+            echo "gcloud is required for Artifact Registry auth"
+            exit 1
+          fi
+          gcloud auth configure-docker "${ARTIFACT_REGISTRY_REGION}-docker.pkg.dev" --quiet
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build and push images
+        run: PUSH_IMAGES=1 pnpm deploy:build-images
+      - name: Resolve artifact file
+        id: artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_file="$(ls -t deploy/artifacts/images-*.env | head -n 1)"
+          artifact_name="$(basename "$artifact_file")"
+          echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
+      - name: Upload image artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: deploy/artifacts/${{ steps.artifact.outputs.name }}
+          if-no-files-found: error
+
+  build_images_google_cloud:
+    if: ${{ needs.guard_trusted_ref.result == 'success' && github.event.inputs.build_strategy == 'google_cloud' }}
+    needs: [guard_trusted_ref]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.name }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f
+      - name: Configure Artifact Registry auth
+        env:
+          ARTIFACT_REGISTRY_REGION: ${{ secrets.ARTIFACT_REGISTRY_REGION }}
+        run: gcloud auth configure-docker "${ARTIFACT_REGISTRY_REGION}-docker.pkg.dev" --quiet
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build and push images
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          ARTIFACT_REGISTRY_REGION: ${{ secrets.ARTIFACT_REGISTRY_REGION }}
+          ARTIFACT_REGISTRY_REPOSITORY: ${{ secrets.ARTIFACT_REGISTRY_REPOSITORY }}
+        run: PUSH_IMAGES=1 pnpm deploy:build-images
+      - name: Resolve artifact file
+        id: artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_file="$(ls -t deploy/artifacts/images-*.env | head -n 1)"
+          artifact_name="$(basename "$artifact_file")"
+          echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
+      - name: Upload image artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: deploy/artifacts/${{ steps.artifact.outputs.name }}
+          if-no-files-found: error
+
+  verify_k3s_staging:
+    if: ${{ always() && needs.guard_trusted_ref.result == 'success' && (needs.build_images_locally.result == 'success' || needs.build_images_google_cloud.result == 'success') }}
+    runs-on: [self-hosted, mac-studio]
+    timeout-minutes: 60
+    needs:
+      - guard_trusted_ref
+      - build_images_locally
+      - build_images_google_cloud
+    environment: mac-k3s-staging
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      K8S_CONTEXT_MAC: ${{ vars.K8S_CONTEXT_MAC }}
+      K8S_NAMESPACE_MAC_STAGING: ${{ vars.K8S_NAMESPACE_MAC_STAGING }}
+      HELM_RELEASE_MAC_STAGING: ${{ vars.HELM_RELEASE_MAC_STAGING }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      ARTIFACT_REGISTRY_REGION: ${{ secrets.ARTIFACT_REGISTRY_REGION }}
+      ARTIFACT_REGISTRY_REPOSITORY: ${{ secrets.ARTIFACT_REGISTRY_REPOSITORY }}
+      CLOUDFLARE_TUNNEL_UPSTREAM_STAGING: ${{ vars.CLOUDFLARE_TUNNEL_UPSTREAM_STAGING }}
+      CLOUDFLARED_RESTART_COMMAND: ${{ vars.CLOUDFLARED_RESTART_COMMAND }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 10
+      - name: Verify 1Password CLI access
+        shell: bash
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! command -v op >/dev/null 2>&1; then
+            echo "1Password CLI (op) is required on the Mac runner."
+            exit 1
+          fi
+          if [[ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]]; then
+            echo "Using OP_SERVICE_ACCOUNT_TOKEN for non-interactive 1Password access."
+            exit 0
+          fi
+          if ! op whoami >/dev/null 2>&1; then
+            echo "1Password CLI is not signed in and OP_SERVICE_ACCOUNT_TOKEN is not set."
+            exit 1
+          fi
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f
+      - name: Configure Artifact Registry auth
+        run: gcloud auth configure-docker "${ARTIFACT_REGISTRY_REGION}-docker.pkg.dev" --quiet
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Resolve artifact name
+        id: artifact
+        shell: bash
+        env:
+          LOCAL_ARTIFACT: ${{ needs.build_images_locally.outputs.artifact_name }}
+          CLOUD_ARTIFACT: ${{ needs.build_images_google_cloud.outputs.artifact_name }}
+        run: |
+          set -euo pipefail
+          artifact_name="${LOCAL_ARTIFACT:-$CLOUD_ARTIFACT}"
+          if [[ -z "$artifact_name" ]]; then
+            echo "Unable to resolve artifact name from build jobs"
+            exit 1
+          fi
+          echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
+      - name: Download image artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: deploy/artifacts
+      - name: Validate artifact
+        run: ./scripts/deploy/ci/verify-artifact.sh "deploy/artifacts/${{ steps.artifact.outputs.name }}"
+      - name: Prepare Cloudflare tunnel credentials file
+        id: cloudflare_creds
+        shell: bash
+        env:
+          CLOUDFLARE_TUNNEL_CREDENTIALS_FILE: ${{ secrets.CLOUDFLARE_TUNNEL_CREDENTIALS_FILE }}
+        run: |
+          set -euo pipefail
+          candidate="${CLOUDFLARE_TUNNEL_CREDENTIALS_FILE:-}"
+          if [[ -z "$candidate" ]]; then
+            echo "path=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ -f "$candidate" ]]; then
+            echo "path=$candidate" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/cloudflared"
+          credentials_path="$RUNNER_TEMP/cloudflared/credentials.json"
+          printf '%s' "$candidate" > "$credentials_path"
+          chmod 600 "$credentials_path"
+          echo "path=$credentials_path" >> "$GITHUB_OUTPUT"
+      - name: Verify staging deploy on Mac k3s
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_TUNNEL_ID: ${{ secrets.CLOUDFLARE_TUNNEL_ID }}
+          CLOUDFLARE_TUNNEL_HOST_STAGING: ${{ secrets.CLOUDFLARE_TUNNEL_HOST_STAGING }}
+          CLOUDFLARE_TUNNEL_CREDENTIALS_FILE: ${{ steps.cloudflare_creds.outputs.path != '' && steps.cloudflare_creds.outputs.path || env.CLOUDFLARE_TUNNEL_CREDENTIALS_FILE }}
+          VERIFY_TEMPORAL_TLS_CERT_WIRING: '1'
+          K3S_BOOTSTRAP_ALLOW_K3D: '0'
+        run: pnpm deploy:k8s:verify:staging "deploy/artifacts/${{ steps.artifact.outputs.name }}"
+      - name: Cleanup Cloudflare credentials
+        if: ${{ always() && steps.cloudflare_creds.outputs.path != '' && startsWith(steps.cloudflare_creds.outputs.path, runner.temp) }}
+        shell: bash
+        env:
+          CREDS_PATH: ${{ steps.cloudflare_creds.outputs.path }}
+        run: rm -f "$CREDS_PATH"

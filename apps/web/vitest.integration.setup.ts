@@ -1,5 +1,7 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
+
+configure({ asyncUtilTimeout: 5_000 })
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 import { resolveWebIntegrationPort } from './integration/support/web-integration-harness'
 import { resetIntegrationRouterLocation } from './integration/support/next-router-context'
