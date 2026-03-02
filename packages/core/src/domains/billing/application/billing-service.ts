@@ -258,18 +258,19 @@ export const BillingServiceLive = Layer.effect(
           return yield* Effect.fail(notFound('Organization not found'))
         }
 
-        const customerId = settings.stripeCustomerId
-          ? settings.stripeCustomerId
-          : (yield* stripe.createCustomer({
-              organizationId: input.organizationId,
-              email: principal.email
-            }).pipe(Effect.mapError(() => badRequest('Failed to create Stripe customer')))).id
-
-        if (!settings.stripeCustomerId) {
-          yield* billingStore.updateSubscriptionFields({
+        let customerId: string = settings.stripeCustomerId ?? ''
+        if (!customerId) {
+          const newCustomer = yield* stripe.createCustomer({
             organizationId: input.organizationId,
-            stripeCustomerId: customerId
+            email: principal.email
+          }).pipe(Effect.mapError(() => badRequest('Failed to create Stripe customer')))
+
+          const claimed = yield* billingStore.claimStripeCustomerId({
+            organizationId: input.organizationId,
+            stripeCustomerId: newCustomer.id
           }).pipe(Effect.mapError(() => badRequest('Failed to update billing customer reference')))
+
+          customerId = claimed ?? newCustomer.id
         }
 
         return yield* stripe.createCheckoutSession({
@@ -357,16 +358,26 @@ export const BillingServiceLive = Layer.effect(
           return yield* Effect.fail(badRequest('Failed to persist webhook event'))
         }
 
+        const claimed = yield* eventStore.markProcessed(createdEvent.id).pipe(
+          Effect.mapError(() => badRequest('Failed to claim webhook event for processing'))
+        )
+
+        if (!claimed) {
+          return {
+            processed: true as const,
+            idempotent: true as const,
+            eventId: event.id
+          }
+        }
+
         if (organizationId) {
           if (event.type === 'checkout.session.completed') {
+            const paymentMethodId = readStringField(event.data.object, 'payment_method')
             yield* billingStore.updateSubscriptionFields({
               organizationId,
               stripeCustomerId: readStringField(event.data.object, 'customer'),
               stripeSubscriptionId: readStringField(event.data.object, 'subscription'),
-              stripePaymentMethodId: readStringField(event.data.object, 'payment_method'),
-              isSubscribed: true,
-              subscriptionStatus: 'active',
-              subscriptionPlan: 'pro'
+              ...(paymentMethodId !== null ? { stripePaymentMethodId: paymentMethodId } : {})
             }).pipe(Effect.mapError(() => badRequest('Failed to persist checkout webhook state')))
           } else if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
             const status = parseSubscriptionStatus(readStringField(event.data.object, 'status')) ?? 'inactive'
@@ -381,7 +392,7 @@ export const BillingServiceLive = Layer.effect(
               organizationId,
               stripeCustomerId: readStringField(event.data.object, 'customer'),
               stripeSubscriptionId: readStringField(event.data.object, 'id'),
-              stripeMeteredSubscriptionItemId: meteredItemId,
+              ...(meteredItemId !== null ? { stripeMeteredSubscriptionItemId: meteredItemId } : {}),
               isSubscribed: canAccessFeature('pro', status, 'free'),
               subscriptionStatus: status,
               subscriptionPlan: 'pro',
@@ -390,31 +401,33 @@ export const BillingServiceLive = Layer.effect(
               subscriptionCurrentPeriodEnd: currentPeriodEnd
             }).pipe(Effect.mapError(() => badRequest('Failed to persist subscription webhook state')))
           } else if (event.type === 'customer.subscription.deleted') {
-            const now = yield* clock.now()
+            const endedAt = toDateFromUnixSeconds(
+              readNumberField(event.data.object, 'ended_at') ?? readNumberField(event.data.object, 'cancel_at')
+            ) ?? (yield* clock.now())
             yield* billingStore.updateSubscriptionFields({
               organizationId,
               isSubscribed: false,
               subscriptionStatus: 'canceled',
-              subscriptionEndsAt: now
+              subscriptionEndsAt: endedAt,
+              stripeSubscriptionId: null,
+              stripeMeteredSubscriptionItemId: null
             }).pipe(Effect.mapError(() => badRequest('Failed to persist cancellation webhook state')))
           } else if (event.type === 'invoice.payment_failed') {
             yield* billingStore.updateSubscriptionFields({
               organizationId,
-              subscriptionStatus: 'past_due'
+              isSubscribed: true,
+              subscriptionStatus: 'past_due',
+              onlyIfStatusIn: ['active', 'trialing', 'past_due']
             }).pipe(Effect.mapError(() => badRequest('Failed to persist failed payment webhook state')))
           } else if (event.type === 'invoice.payment_succeeded') {
             yield* billingStore.updateSubscriptionFields({
               organizationId,
               isSubscribed: true,
-              subscriptionStatus: 'active'
+              subscriptionStatus: 'active',
+              onlyIfStatusIn: ['active', 'past_due', 'trialing', 'unpaid']
             }).pipe(Effect.mapError(() => badRequest('Failed to persist payment success webhook state')))
           }
         }
-
-        const processedAt = yield* clock.now()
-        yield* eventStore.markProcessed(createdEvent.id, processedAt).pipe(
-          Effect.mapError(() => badRequest('Failed to mark webhook event processed'))
-        )
 
         return {
           processed: true as const,
@@ -456,14 +469,44 @@ export const BillingServiceLive = Layer.effect(
             Effect.mapError(() => badRequest('Failed to look up usage reference'))
           )
 
-          if (existing) {
+          if (existing && (existing.stripeUsageRecordId || !settings.stripeMeteredSubscriptionItemId)) {
             return toUsageRecord(existing)
+          }
+
+          if (existing && settings.stripeMeteredSubscriptionItemId && !existing.stripeUsageRecordId) {
+            const usageRecord = yield* stripe.reportUsage({
+              subscriptionItemId: settings.stripeMeteredSubscriptionItemId,
+              quantity: existing.quantity,
+              timestamp: existing.recordedAt,
+              idempotencyKey: input.referenceId
+            }).pipe(Effect.mapError(() => badRequest('Failed to report usage to Stripe')))
+
+            const updated = yield* usageStore.updateStripeUsageRecordId(existing.id, usageRecord.id).pipe(
+              Effect.mapError(() => badRequest('Failed to update Stripe usage record reference'))
+            )
+
+            return toUsageRecord(updated ?? existing)
           }
         }
 
         const totalCostDecimillicents = input.quantity * input.unitCostDecimillicents
         const recordedAt = yield* clock.now()
-        let stripeUsageRecordId: string | null = null
+
+        const recorded = yield* usageStore.record({
+          organizationId: input.organizationId,
+          category: input.category,
+          quantity: input.quantity,
+          unitCostDecimillicents: input.unitCostDecimillicents,
+          totalCostDecimillicents,
+          referenceId: input.referenceId ?? null,
+          stripeUsageRecordId: null,
+          metadata: input.metadata ?? {},
+          recordedAt
+        }).pipe(Effect.mapError(() => badRequest('Failed to record usage')))
+
+        if (!recorded) {
+          return yield* Effect.fail(badRequest('Failed to record usage'))
+        }
 
         if (settings.stripeMeteredSubscriptionItemId) {
           const usageRecord = yield* stripe.reportUsage({
@@ -473,23 +516,11 @@ export const BillingServiceLive = Layer.effect(
             idempotencyKey: input.referenceId ?? undefined
           }).pipe(Effect.mapError(() => badRequest('Failed to report usage to Stripe')))
 
-          stripeUsageRecordId = usageRecord.id
-        }
+          const updated = yield* usageStore.updateStripeUsageRecordId(recorded.id, usageRecord.id).pipe(
+            Effect.mapError(() => badRequest('Failed to update Stripe usage record reference'))
+          )
 
-        const recorded = yield* usageStore.record({
-          organizationId: input.organizationId,
-          category: input.category,
-          quantity: input.quantity,
-          unitCostDecimillicents: input.unitCostDecimillicents,
-          totalCostDecimillicents,
-          referenceId: input.referenceId ?? null,
-          stripeUsageRecordId,
-          metadata: input.metadata ?? {},
-          recordedAt
-        }).pipe(Effect.mapError(() => badRequest('Failed to record usage')))
-
-        if (!recorded) {
-          return yield* Effect.fail(badRequest('Failed to record usage'))
+          return toUsageRecord(updated ?? recorded)
         }
 
         return toUsageRecord(recorded)

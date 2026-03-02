@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { type CreditEntryType, type SubscriptionStatus } from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
@@ -101,7 +101,7 @@ export const billingRepository = {
       })
     ).pipe(Effect.mapError((error) => toDbError('Failed to fetch billing org by Stripe subscription id', error))),
 
-  updateSubscriptionFields: (input: { organizationId: string } & SubscriptionPatch) =>
+  updateSubscriptionFields: (input: { organizationId: string; onlyIfStatusIn?: ReadonlyArray<SubscriptionStatus> } & SubscriptionPatch) =>
     provideDB(
       Effect.gen(function* () {
         const db = yield* DB
@@ -141,10 +141,17 @@ export const billingRepository = {
           patch.subscriptionCurrentPeriodEnd = input.subscriptionCurrentPeriodEnd
         }
 
+        const whereCondition = input.onlyIfStatusIn && input.onlyIfStatusIn.length > 0
+          ? and(
+              eq(organizations.id, input.organizationId),
+              inArray(organizations.subscriptionStatus, [...input.onlyIfStatusIn])
+            )
+          : eq(organizations.id, input.organizationId)
+
         const rows = yield* db
           .update(organizations)
-          .set(patch)
-          .where(eq(organizations.id, input.organizationId))
+          .set({ ...patch, updatedAt: sql`now()` })
+          .where(whereCondition)
           .returning()
           .execute()
 
@@ -184,7 +191,7 @@ export const billingRepository = {
 
         const rows = yield* db
           .update(organizations)
-          .set(patch)
+          .set({ ...patch, updatedAt: sql`now()` })
           .where(eq(organizations.id, input.organizationId))
           .returning()
           .execute()
@@ -207,25 +214,27 @@ export const billingRepository = {
 
         const result = yield* db.transaction((trx) =>
           Effect.gen(function* () {
-            const orgRows = yield* trx
-              .select({ creditsBalance: organizations.creditsBalance })
-              .from(organizations)
-              .where(eq(organizations.id, input.organizationId))
-              .limit(1)
+            const updatedRows = yield* trx
+              .update(organizations)
+              .set({
+                creditsBalance: sql`${organizations.creditsBalance} + ${input.amountDecimillicents}`,
+                updatedAt: sql`now()`
+              })
+              .where(
+                input.amountDecimillicents < 0
+                  ? and(
+                      eq(organizations.id, input.organizationId),
+                      sql`${organizations.creditsBalance} + ${input.amountDecimillicents} >= 0`
+                    )
+                  : eq(organizations.id, input.organizationId)
+              )
+              .returning({ creditsBalance: organizations.creditsBalance })
               .execute()
 
-            const org = orgRows[0]
-            if (!org) {
+            const updated = updatedRows[0]
+            if (!updated) {
               return null
             }
-
-            const nextBalance = org.creditsBalance + input.amountDecimillicents
-
-            yield* trx
-              .update(organizations)
-              .set({ creditsBalance: nextBalance })
-              .where(eq(organizations.id, input.organizationId))
-              .execute()
 
             const ledgerRows = yield* trx
               .insert(creditLedger)
@@ -235,7 +244,7 @@ export const billingRepository = {
                 entryType: input.entryType,
                 reason: input.reason,
                 referenceId: input.referenceId ?? null,
-                balanceAfter: nextBalance,
+                balanceAfter: updated.creditsBalance,
                 metadata: input.metadata ?? {}
               })
               .returning()
@@ -247,5 +256,36 @@ export const billingRepository = {
 
         return yield* decodeNullableCreditLedger(result)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to adjust organization credits', error)))
+    ).pipe(Effect.mapError((error) => toDbError('Failed to adjust organization credits', error))),
+
+  claimStripeCustomerId: (input: { organizationId: string; stripeCustomerId: string }) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const rows = yield* db
+          .update(organizations)
+          .set({ stripeCustomerId: input.stripeCustomerId, updatedAt: sql`now()` })
+          .where(
+            and(
+              eq(organizations.id, input.organizationId),
+              isNull(organizations.stripeCustomerId)
+            )
+          )
+          .returning({ stripeCustomerId: organizations.stripeCustomerId })
+          .execute()
+
+        if (rows.length > 0) {
+          return rows[0]?.stripeCustomerId ?? null
+        }
+
+        const existing = yield* db
+          .select({ stripeCustomerId: organizations.stripeCustomerId })
+          .from(organizations)
+          .where(eq(organizations.id, input.organizationId))
+          .limit(1)
+          .execute()
+
+        return existing[0]?.stripeCustomerId ?? null
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to claim Stripe customer ID', error)))
 }

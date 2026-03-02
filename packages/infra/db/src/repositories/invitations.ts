@@ -10,6 +10,7 @@ import {
   inArray,
   lt,
   or,
+  sql,
   type SQL
 } from 'drizzle-orm'
 import {
@@ -271,7 +272,7 @@ export const invitationsRepository = {
           .values({
             ...input,
             token: crypto.randomUUID(),
-            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
+            expiresAt: sql`now() + interval '7 days'`
           })
           .returning()
           .execute()
@@ -339,47 +340,62 @@ export const invitationsRepository = {
     provideDB(
       Effect.gen(function* () {
         const db = yield* DB
-        const invitationRows = yield* db
-          .select()
-          .from(invitations)
-          .where(
-            and(
-              eq(invitations.token, token),
-              eq(invitations.inviteeUserId, userId),
-              eq(invitations.status, 'pending'),
-              gte(invitations.expiresAt, new Date())
-            )
-          )
-          .limit(1)
-          .execute()
-        const invitationRow = invitationRows[0]
 
-        const invitation = yield* decodeNullableInvitation(invitationRow)
-        if (!invitation) {
-          return null
-        }
-
-        yield* db.transaction((trx) =>
+        const result = yield* db.transaction((trx) =>
           Effect.gen(function* () {
-            yield* trx
+            const updatedRows = yield* trx
               .update(invitations)
               .set({ status: 'accepted' })
-              .where(eq(invitations.id, invitation.id))
+              .where(
+                and(
+                  eq(invitations.token, token),
+                  eq(invitations.inviteeUserId, userId),
+                  eq(invitations.status, 'pending'),
+                  gte(invitations.expiresAt, sql`now()`)
+                )
+              )
+              .returning()
               .execute()
+
+            const accepted = yield* decodeNullableInvitation(updatedRows[0] ?? null)
+            if (!accepted) {
+              return null
+            }
 
             yield* trx
               .insert(orgMembers)
               .values({
-                organizationId: invitation.organizationId,
+                organizationId: accepted.organizationId,
                 userId,
-                role: invitation.role
+                role: accepted.role
               })
               .onConflictDoNothing()
               .execute()
+
+            return accepted
           })
         )
 
-        return invitation
+        return result
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to accept invitation by token', error)))
+    ).pipe(Effect.mapError((error) => toDbError('Failed to accept invitation by token', error))),
+
+  pruneTerminal: (olderThan: Date) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const rows = yield* db
+          .delete(invitations)
+          .where(
+            and(
+              inArray(invitations.status, ['accepted', 'revoked', 'expired']),
+              lt(invitations.createdAt, olderThan)
+            )
+          )
+          .returning({ id: invitations.id })
+          .execute()
+
+        return rows.length
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to prune terminal invitations', error)))
 }

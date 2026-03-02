@@ -36,7 +36,7 @@ export const usersRepository = {
         const rows = yield* db
           .select()
           .from(users)
-          .where(eq(users.email, email))
+          .where(sql`lower(trim(${users.email})) = lower(trim(${email}))`)
           .limit(1)
           .execute()
         const row = rows[0]

@@ -3,6 +3,7 @@ import {
   authLoginAuditEventTypes,
   authLoginAuditStatuses,
   authLoginProviders,
+  domainEventStatuses,
   invitationStatuses,
   membershipTypes,
   orgMemberRoles,
@@ -13,6 +14,7 @@ import {
   bigint,
   boolean,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -45,6 +47,7 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', subscription
 export const authLoginProviderEnum = pgEnum('auth_login_provider', authLoginProviders)
 export const authLoginAuditStatusEnum = pgEnum('auth_login_audit_status', authLoginAuditStatuses)
 export const authLoginAuditEventTypeEnum = pgEnum('auth_login_audit_event_type', authLoginAuditEventTypes)
+export const domainEventStatusEnum = pgEnum('domain_event_status', domainEventStatuses)
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -154,7 +157,6 @@ export const authLoginIdentities = pgTable('auth_login_identities', {
     table.userId,
     table.provider
   ),
-  userProviderIdx: index('auth_login_identities_user_provider_idx').on(table.userId, table.provider),
 	emailCiIdx: index('auth_login_identities_email_ci_idx').on(sql`lower(trim(${table.email}))`)
 }))
 
@@ -198,7 +200,15 @@ export const organizations = pgTable('organizations', {
   subscriptionCurrentPeriodEnd: timestamp('subscription_current_period_end', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
-})
+}, (table) => ({
+  stripeCustomerIdUnique: uniqueIndex('organizations_stripe_customer_id_unique')
+    .on(table.stripeCustomerId)
+    .where(sql`${table.stripeCustomerId} IS NOT NULL`),
+  stripeSubscriptionIdUnique: uniqueIndex('organizations_stripe_subscription_id_unique')
+    .on(table.stripeSubscriptionId)
+    .where(sql`${table.stripeSubscriptionId} IS NOT NULL`),
+  nameIdIdx: index('organizations_name_id_idx').on(table.name, table.id)
+}))
 
 export const roles = pgTable('roles', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -234,6 +244,7 @@ export const orgMembers = pgTable('org_members', {
   orgUserUnique: uniqueIndex('org_members_org_user_unique').on(table.organizationId, table.userId),
   orgIdIdx: index('org_members_org_id_idx').on(table.organizationId),
   userIdIdx: index('org_members_user_id_idx').on(table.userId),
+  userCreatedAtIdx: index('org_members_user_created_at_idx').on(table.userId, table.createdAt),
   roleIdIdx: index('org_members_role_id_idx').on(table.roleId)
 }))
 
@@ -246,7 +257,8 @@ export const teams = pgTable('teams', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 }, (table) => ({
-  orgIdIdx: index('teams_org_id_idx').on(table.organizationId)
+  orgIdIdx: index('teams_org_id_idx').on(table.organizationId),
+  nameIdIdx: index('teams_name_id_idx').on(table.name, table.id)
 }))
 
 export const teamMembers = pgTable('team_members', {
@@ -323,10 +335,9 @@ export const usageRecords = pgTable('usage_records', {
     table.recordedAt
   ),
   orgRecordedAtIdx: index('usage_records_org_recorded_at_idx').on(table.organizationId, table.recordedAt),
-  orgReferenceIdUniqueIdx: uniqueIndex('usage_records_org_reference_id_unique_idx').on(
-    table.organizationId,
-    table.referenceId
-  ),
+  orgReferenceIdUniqueIdx: uniqueIndex('usage_records_org_reference_id_unique_idx')
+    .on(table.organizationId, table.referenceId)
+    .where(sql`${table.referenceId} IS NOT NULL`),
   referenceIdIdx: index('usage_records_reference_id_idx').on(table.referenceId)
 }))
 
@@ -340,8 +351,52 @@ export const subscriptionEvents = pgTable('subscription_events', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, (table) => ({
   orgCreatedAtIdx: index('subscription_events_org_created_at_idx').on(table.organizationId, table.createdAt),
-  eventTypeCreatedAtIdx: index('subscription_events_event_type_created_at_idx').on(table.eventType, table.createdAt)
+  eventTypeCreatedAtIdx: index('subscription_events_event_type_created_at_idx').on(table.eventType, table.createdAt),
+  unprocessedIdx: index('subscription_events_unprocessed_idx')
+    .on(table.createdAt)
+    .where(sql`processed_at IS NULL`)
 }))
+
+export const domainEvents = pgTable('domain_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  eventType: text('event_type').notNull(),
+  aggregateType: text('aggregate_type').notNull(),
+  aggregateId: uuid('aggregate_id').notNull(),
+  payload: jsonb('payload').$type<JsonObject>().notNull().default(sql`'{}'::jsonb`),
+  correlationId: uuid('correlation_id'),
+  sequenceNumber: integer('sequence_number').notNull().default(1),
+  status: domainEventStatusEnum('status').notNull().default('pending'),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  processingAt: timestamp('processing_at', { withTimezone: true }),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  failedAt: timestamp('failed_at', { withTimezone: true }),
+  failureReason: text('failure_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  pendingPollerIdx: index('domain_events_pending_poller_idx')
+    .on(table.occurredAt, table.id)
+    .where(sql`${table.status} = 'pending'`),
+  stuckProcessingIdx: index('domain_events_stuck_processing_idx')
+    .on(table.processingAt)
+    .where(sql`${table.status} = 'processing'`),
+  prunePublishedIdx: index('domain_events_prune_published_idx')
+    .on(table.publishedAt)
+    .where(sql`${table.status} = 'published'`),
+  pruneFailedIdx: index('domain_events_prune_failed_idx')
+    .on(table.failedAt)
+    .where(sql`${table.status} = 'failed'`),
+  aggregateStreamIdx: index('domain_events_aggregate_stream_idx')
+    .on(table.aggregateType, table.aggregateId),
+  aggregateSequenceUnique: uniqueIndex('domain_events_aggregate_sequence_unique')
+    .on(table.aggregateId, table.sequenceNumber)
+}))
+
+export const systemSettings = pgTable('system_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').$type<JsonObject>().notNull(),
+  description: text('description'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+})
 
 export type UserRow = typeof users.$inferSelect
 export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect
@@ -358,3 +413,5 @@ export type InvitationRow = typeof invitations.$inferSelect
 export type CreditLedgerRow = typeof creditLedger.$inferSelect
 export type UsageRecordRow = typeof usageRecords.$inferSelect
 export type SubscriptionEventRow = typeof subscriptionEvents.$inferSelect
+export type DomainEventRow = typeof domainEvents.$inferSelect
+export type SystemSettingRow = typeof systemSettings.$inferSelect

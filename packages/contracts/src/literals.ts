@@ -26,11 +26,12 @@ export const authLoginAuditEventTypes = [
   'oauth_linked',
   'oauth_unlinked',
   'session_refreshed',
-  'session_revoked'
+  'session_revoked',
+  'account_deleted'
 ] as const
 export type AuthLoginAuditEventType = (typeof authLoginAuditEventTypes)[number]
 
-export const authRateLimitedPaths = ['/v1/auth/sign-in', '/v1/auth/forgot-password'] as const
+export const authRateLimitedPaths = ['/v1/auth/sign-in', '/v1/auth/sign-up', '/v1/auth/forgot-password', '/v1/auth/reset-password', '/v1/auth/refresh', '/v1/auth/google/start', '/v1/auth/google/callback', '/v1/auth/sign-out', '/v1/auth/sign-out-all'] as const
 export type AuthRateLimitedPath = (typeof authRateLimitedPaths)[number]
 
 export const subscriptionStatuses = ['active', 'inactive', 'trialing', 'past_due', 'canceled', 'paused', 'unpaid'] as const
@@ -64,8 +65,29 @@ export const organizationOnboardingGoals = [
 
 export const organizationOnboardingTeamSizes = ['1-5', '6-20', '21-50', '51+'] as const
 
+export const domainEventTypes = ['organization.created'] as const
+export type DomainEventType = (typeof domainEventTypes)[number]
+
+export const domainEventAggregateTypes = ['organization'] as const
+export type DomainEventAggregateType = (typeof domainEventAggregateTypes)[number]
+
+export const domainEventStatuses = ['pending', 'processing', 'published', 'failed'] as const
+export type DomainEventStatus = (typeof domainEventStatuses)[number]
+
 export const sortOrders = ['asc', 'desc'] as const
 export type SortOrder = (typeof sortOrders)[number]
+
+export const retentionTableNames = [
+  'auth_login_sessions',
+  'auth_refresh_tokens',
+  'auth_oidc_states',
+  'auth_password_reset_tokens',
+  'auth_login_audit_events',
+  'subscription_events',
+  'domain_events',
+  'invitations'
+] as const
+export type RetentionTableName = (typeof retentionTableNames)[number]
 
 export const permissionActions = [
   'view_organization',

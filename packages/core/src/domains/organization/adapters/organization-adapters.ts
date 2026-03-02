@@ -9,6 +9,7 @@ import {
   toOrganizationUserRecord
 } from '../../../adapters/db-row-mappers.js'
 import type { ListParams } from '../../../pagination.js'
+import type { DomainEventInput } from '../domain/organization-events.js'
 import {
   type InvitationAssignableRole,
   type InvitationStatus,
@@ -27,6 +28,17 @@ export const OrganizationStorePortLive = Layer.succeed(OrganizationStorePort, {
   getById: (id: string) => organizationsRepository.getById(id).pipe(Effect.map((row) => mapNullable(row, toOrganizationRecord))),
   create: (input: { name: string; ownerUserId: string }) =>
     organizationsRepository.create(input).pipe(Effect.map((row) => mapNullable(row, toOrganizationRecord))),
+  createWithEvent: (input: { name: string; ownerUserId: string; event: DomainEventInput }) =>
+    organizationsRepository.createWithEvent({
+      name: input.name,
+      ownerUserId: input.ownerUserId,
+      event: {
+        eventType: input.event.eventType,
+        aggregateType: input.event.aggregateType,
+        payload: input.event.payload,
+        correlationId: input.event.correlationId
+      }
+    }).pipe(Effect.map((row) => mapNullable(row, toOrganizationRecord))),
   update: (input: { id: string; name?: string; onboardingData?: OrganizationRecord['onboardingData'] | null }) =>
     organizationsRepository.update(input).pipe(Effect.map((row) => mapNullable(row, toOrganizationRecord))),
   remove: (id: string) => organizationsRepository.remove(id).pipe(Effect.map(() => ({ deleted: true as const }))),

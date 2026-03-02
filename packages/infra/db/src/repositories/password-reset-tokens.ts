@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, isNotNull, lt, or, sql } from 'drizzle-orm'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
 import {
@@ -110,5 +110,27 @@ export const passwordResetTokensRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke active password reset tokens', error)))
+    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke active password reset tokens', error))),
+
+  pruneExpired: (olderThan: Date) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const rows = yield* db
+          .delete(passwordResetTokens)
+          .where(
+            or(
+              and(
+                isNotNull(passwordResetTokens.usedAt),
+                lt(passwordResetTokens.createdAt, olderThan)
+              ),
+              lt(passwordResetTokens.expiresAt, olderThan)
+            )
+          )
+          .returning({ id: passwordResetTokens.id })
+          .execute()
+
+        return rows.length
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to prune expired password reset tokens', error)))
 }

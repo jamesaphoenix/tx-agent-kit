@@ -7,6 +7,7 @@ import {
   gt,
   lt,
   or,
+  sql,
   type SQL
 } from 'drizzle-orm'
 import { Effect, Schema } from 'effect'
@@ -247,7 +248,7 @@ export const teamsRepository = {
 
         const rows = yield* db
           .update(teams)
-          .set(patch)
+          .set({ ...patch, updatedAt: sql`now()` })
           .where(eq(teams.id, input.id))
           .returning()
           .execute()
@@ -319,6 +320,7 @@ export const teamsRepository = {
           })
           .from(teamMembers)
           .where(eq(teamMembers.teamId, teamId))
+          .limit(500)
           .execute()
 
         return yield* decodeTeamMemberRows(rows).pipe(

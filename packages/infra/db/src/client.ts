@@ -18,7 +18,12 @@ const getDatabaseUrl = (): string => {
 export const getPool = (): Pool => {
   if (!poolSingleton) {
     const connectionString = getDatabaseUrl()
-    poolSingleton = new Pool({ connectionString })
+    poolSingleton = new Pool({
+      connectionString,
+      max: 20,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 5_000
+    })
   }
   return poolSingleton
 }

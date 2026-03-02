@@ -195,7 +195,9 @@ export const AuthLoginRefreshTokenPortLive = Layer.succeed(AuthLoginRefreshToken
       return null
     }),
   revokeForSession: (sessionId: string) =>
-    authLoginRefreshTokensRepository.revokeActiveForSession(sessionId).pipe(Effect.asVoid)
+    authLoginRefreshTokensRepository.revokeActiveForSession(sessionId).pipe(Effect.asVoid),
+  revokeAllForUser: (userId: string) =>
+    authLoginRefreshTokensRepository.revokeAllActiveForUser(userId).pipe(Effect.asVoid)
 })
 
 export const PasswordResetTokenPortLive = Layer.succeed(PasswordResetTokenPort, {
@@ -307,7 +309,7 @@ export const AuthLoginIdentityPortLive = Layer.succeed(AuthLoginIdentityPort, {
 export const AuthLoginAuditPortLive = Layer.succeed(AuthLoginAuditPort, {
   record: (input: {
     userId: string | null
-    eventType: 'login_success' | 'login_failure' | 'password_reset_requested' | 'password_changed' | 'oauth_linked' | 'oauth_unlinked' | 'session_refreshed' | 'session_revoked'
+    eventType: 'login_success' | 'login_failure' | 'password_reset_requested' | 'password_changed' | 'oauth_linked' | 'oauth_unlinked' | 'session_refreshed' | 'session_revoked' | 'account_deleted'
     status: 'success' | 'failure'
     identifier: string | null
     ipAddress: string | null

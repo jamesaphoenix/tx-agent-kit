@@ -1,6 +1,7 @@
 import { Context } from 'effect'
 import type * as Effect from 'effect/Effect'
 import type { ListParams, PaginatedResult } from '../../../pagination.js'
+import type { DomainEventInput } from '../domain/organization-events.js'
 import type {
   InvitationAssignableRole,
   InvitationRole,
@@ -20,7 +21,8 @@ export type {
   InvitationStatus,
   OrganizationRecord,
   OrganizationUserRecord,
-  InvitationRecord
+  InvitationRecord,
+  DomainEventInput
 }
 
 export class OrganizationStorePort extends Context.Tag('OrganizationStorePort')<
@@ -31,6 +33,11 @@ export class OrganizationStorePort extends Context.Tag('OrganizationStorePort')<
     getManyByIdsForUser: (userId: string, ids: ReadonlyArray<string>) => Effect.Effect<ReadonlyArray<OrganizationRecord>, unknown>
     getById: (id: string) => Effect.Effect<OrganizationRecord | null, unknown>
     create: (input: { name: string; ownerUserId: string }) => Effect.Effect<OrganizationRecord | null, unknown>
+    createWithEvent: (input: {
+      name: string
+      ownerUserId: string
+      event: DomainEventInput
+    }) => Effect.Effect<OrganizationRecord | null, unknown>
     update: (
       input: {
         id: string

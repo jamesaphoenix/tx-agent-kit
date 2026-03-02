@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, lt, or, sql } from 'drizzle-orm'
 import type { AuthLoginProvider } from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
@@ -7,7 +7,7 @@ import {
   type AuthLoginSessionRowShape
 } from '../effect-schemas/auth-login-sessions.js'
 import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
-import { authLoginSessions } from '../schema.js'
+import { authLoginAuditEvents, authLoginSessions } from '../schema.js'
 
 const decodeAuthLoginSessionRow = Schema.decodeUnknown(authLoginSessionRowSchema)
 
@@ -58,7 +58,17 @@ export const authLoginSessionsRepository = {
         const db = yield* DB
         const nowExpression = sql`now()`
         const rows = yield* db
-          .select()
+          .select({
+            id: authLoginSessions.id,
+            userId: authLoginSessions.userId,
+            provider: authLoginSessions.provider,
+            createdIp: authLoginSessions.createdIp,
+            createdUserAgent: authLoginSessions.createdUserAgent,
+            lastSeenAt: authLoginSessions.lastSeenAt,
+            expiresAt: authLoginSessions.expiresAt,
+            revokedAt: authLoginSessions.revokedAt,
+            createdAt: authLoginSessions.createdAt
+          })
           .from(authLoginSessions)
           .where(
             and(
@@ -83,7 +93,12 @@ export const authLoginSessionsRepository = {
           .set({
             lastSeenAt: sql`now()`
           })
-          .where(eq(authLoginSessions.id, id))
+          .where(
+            and(
+              eq(authLoginSessions.id, id),
+              sql`${authLoginSessions.lastSeenAt} < now() - interval '60 seconds'`
+            )
+          )
           .returning({ id: authLoginSessions.id })
           .execute()
 
@@ -123,5 +138,41 @@ export const authLoginSessionsRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke all auth login sessions for user', error)))
+    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke all auth login sessions for user', error))),
+
+  pruneExpired: (olderThan: Date) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const rows = yield* db
+          .delete(authLoginSessions)
+          .where(
+            or(
+              and(
+                isNull(authLoginSessions.revokedAt),
+                lt(authLoginSessions.expiresAt, olderThan)
+              ),
+              lt(authLoginSessions.revokedAt, olderThan)
+            )
+          )
+          .returning({ id: authLoginSessions.id })
+          .execute()
+
+        return rows.length
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to prune expired auth login sessions', error))),
+
+  pruneAuditEvents: (olderThan: Date) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const rows = yield* db
+          .delete(authLoginAuditEvents)
+          .where(lt(authLoginAuditEvents.createdAt, olderThan))
+          .returning({ id: authLoginAuditEvents.id })
+          .execute()
+
+        return rows.length
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to prune auth login audit events', error)))
 }

@@ -120,7 +120,7 @@ export const usageRecordsRepository = {
             referenceId: input.referenceId ?? null,
             stripeUsageRecordId: input.stripeUsageRecordId ?? null,
             metadata: input.metadata ?? {},
-            recordedAt: input.recordedAt ?? new Date()
+            recordedAt: input.recordedAt ?? sql`now()`
           })
           .onConflictDoNothing({
             target: [usageRecords.organizationId, usageRecords.referenceId]

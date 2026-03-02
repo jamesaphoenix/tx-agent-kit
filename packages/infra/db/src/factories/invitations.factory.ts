@@ -1,7 +1,5 @@
 import type { invitations } from '../schema.js'
 import {
-  invitationStatuses,
-  orgMemberRoles,
   type InvitationRole,
   type InvitationStatus
 } from '@tx-agent-kit/contracts'
@@ -36,8 +34,8 @@ export const createInvitationFactory = (
     organizationId: options.organizationId,
     inviteeUserId: options.inviteeUserId ?? null,
     email: options.email ?? generateEmail('invite'),
-    role: options.role ?? orgMemberRoles[2],
-    status: options.status ?? invitationStatuses[0],
+    role: options.role ?? 'member',
+    status: options.status ?? 'pending',
     invitedByUserId: options.invitedByUserId,
     token: options.token ?? generateToken('invite'),
     expiresAt: options.expiresAt ?? generateFutureTimestamp(7 * 24 * 60 * 60 * 1000),

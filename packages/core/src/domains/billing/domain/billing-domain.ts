@@ -160,7 +160,7 @@ const isSubscriptionPlanSlug = (value: string): value is SubscriptionPlanSlug =>
   value === 'pro'
 
 export const isSubscriptionActive = (status: SubscriptionStatus): boolean =>
-  status === 'active' || status === 'trialing'
+  status === 'active' || status === 'trialing' || status === 'past_due'
 
 export const canAccessFeature = (
   plan: string | null,

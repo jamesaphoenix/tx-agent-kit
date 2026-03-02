@@ -76,6 +76,7 @@ export class AuthLoginRefreshTokenPort extends Context.Tag('AuthLoginRefreshToke
     issueForSession: (sessionId: string) => Effect.Effect<{ refreshToken: string; expiresAt: Date }, unknown>
     rotate: (refreshToken: string) => Effect.Effect<{ sessionId: string; refreshToken: string; expiresAt: Date } | null, unknown>
     revokeForSession: (sessionId: string) => Effect.Effect<void, unknown>
+    revokeAllForUser: (userId: string) => Effect.Effect<void, unknown>
   }
 >() {}
 
@@ -135,7 +136,7 @@ export class AuthLoginAuditPort extends Context.Tag('AuthLoginAuditPort')<
   {
     record: (input: {
       userId: string | null
-      eventType: 'login_success' | 'login_failure' | 'password_reset_requested' | 'password_changed' | 'oauth_linked' | 'oauth_unlinked' | 'session_refreshed' | 'session_revoked'
+      eventType: 'login_success' | 'login_failure' | 'password_reset_requested' | 'password_changed' | 'oauth_linked' | 'oauth_unlinked' | 'session_refreshed' | 'session_revoked' | 'account_deleted'
       status: 'success' | 'failure'
       identifier: string | null
       ipAddress: string | null

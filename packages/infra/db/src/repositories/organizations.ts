@@ -8,16 +8,18 @@ import {
   inArray,
   lt,
   or,
+  sql,
   type SQL
 } from 'drizzle-orm'
-import { type OrgMemberRole } from '@tx-agent-kit/contracts'
+import { type DomainEventAggregateType, type DomainEventType, type OrgMemberRole } from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
 import { buildCursorPage } from '../pagination.js'
 import { organizationRowSchema, type OrganizationRowShape } from '../effect-schemas/organizations.js'
 import { orgMemberRowSchema, type OrgMemberRowShape } from '../effect-schemas/org-members.js'
 import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
-import { organizations, orgMembers } from '../schema.js'
+import { organizations, orgMembers, type JsonObject } from '../schema.js'
+import { insertDomainEventInTransaction } from './domain-events.js'
 import type { ListParams } from './list-params.js'
 
 const decodeOrganizationRows = Schema.decodeUnknown(Schema.Array(organizationRowSchema))
@@ -331,6 +333,58 @@ export const organizationsRepository = {
       })
     ).pipe(Effect.mapError((error) => toDbError('Failed to create organization', error))),
 
+  createWithEvent: (input: {
+    name: string
+    ownerUserId: string
+    event: {
+      eventType: DomainEventType
+      aggregateType: DomainEventAggregateType
+      payload: JsonObject
+      correlationId?: string | null
+    }
+  }) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+
+        const result = yield* db.transaction((trx) =>
+          Effect.gen(function* () {
+            const orgRows = yield* trx
+              .insert(organizations)
+              .values({ name: input.name })
+              .returning()
+              .execute()
+
+            const org = orgRows[0]
+            if (!org) {
+              return null
+            }
+
+            yield* trx
+              .insert(orgMembers)
+              .values({
+                organizationId: org.id,
+                userId: input.ownerUserId,
+                role: 'owner'
+              })
+              .execute()
+
+            yield* insertDomainEventInTransaction(trx, {
+              eventType: input.event.eventType,
+              aggregateType: input.event.aggregateType,
+              aggregateId: org.id,
+              payload: input.event.payload,
+              correlationId: input.event.correlationId ?? null
+            })
+
+            return org
+          })
+        )
+
+        return yield* decodeNullableOrganization(result)
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to create organization with event', error))),
+
   update: (input: { id: string; name?: string; onboardingData?: OrganizationRowShape['onboardingData'] | null }) =>
     provideDB(
       Effect.gen(function* () {
@@ -384,7 +438,7 @@ export const organizationsRepository = {
 
         const rows = yield* db
           .update(organizations)
-          .set(patch)
+          .set({ ...patch, updatedAt: sql`now()` })
           .where(eq(organizations.id, input.id))
           .returning()
           .execute()

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
 import {
@@ -92,18 +92,37 @@ export const subscriptionEventsRepository = {
       })
     ).pipe(Effect.mapError((error) => toDbError('Failed to create subscription event', error))),
 
-  markProcessed: (id: string, processedAt: Date = new Date()) =>
+  markProcessed: (id: string) =>
     provideDB(
       Effect.gen(function* () {
         const db = yield* DB
         const rows = yield* db
           .update(subscriptionEvents)
-          .set({ processedAt })
-          .where(eq(subscriptionEvents.id, id))
+          .set({ processedAt: sql`now()` })
+          .where(and(eq(subscriptionEvents.id, id), isNull(subscriptionEvents.processedAt)))
           .returning()
           .execute()
 
         return yield* decodeNullableSubscriptionEvent(rows[0] ?? null)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to mark subscription event as processed', error)))
+    ).pipe(Effect.mapError((error) => toDbError('Failed to mark subscription event as processed', error))),
+
+  pruneProcessed: (olderThan: Date) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const rows = yield* db
+          .delete(subscriptionEvents)
+          .where(
+            and(
+              isNotNull(subscriptionEvents.processedAt),
+              lt(subscriptionEvents.processedAt, olderThan)
+            )
+          )
+          .returning({ id: subscriptionEvents.id })
+          .execute()
+
+        return rows.length
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to prune processed subscription events', error)))
 }

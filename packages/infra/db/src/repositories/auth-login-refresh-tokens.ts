@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
 import {
@@ -106,5 +106,53 @@ export const authLoginRefreshTokensRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke auth login refresh tokens', error)))
+    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke auth login refresh tokens', error))),
+
+  revokeAllActiveForUser: (userId: string) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const nowExpression = sql`now()`
+        const rows = yield* db
+          .update(authLoginRefreshTokens)
+          .set({
+            revokedAt: nowExpression
+          })
+          .where(
+            and(
+              inArray(
+                authLoginRefreshTokens.sessionId,
+                sql`(SELECT id FROM auth_login_sessions WHERE user_id = ${userId})`
+              ),
+              isNull(authLoginRefreshTokens.usedAt),
+              isNull(authLoginRefreshTokens.revokedAt),
+              gt(authLoginRefreshTokens.expiresAt, nowExpression)
+            )
+          )
+          .returning({ id: authLoginRefreshTokens.id })
+          .execute()
+
+        return rows.length
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke all auth login refresh tokens for user', error))),
+
+  pruneExpired: (olderThan: Date) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const rows = yield* db
+          .delete(authLoginRefreshTokens)
+          .where(
+            or(
+              lt(authLoginRefreshTokens.expiresAt, olderThan),
+              lt(authLoginRefreshTokens.revokedAt, olderThan),
+              lt(authLoginRefreshTokens.usedAt, olderThan)
+            )
+          )
+          .returning({ id: authLoginRefreshTokens.id })
+          .execute()
+
+        return rows.length
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to prune expired auth login refresh tokens', error)))
 }

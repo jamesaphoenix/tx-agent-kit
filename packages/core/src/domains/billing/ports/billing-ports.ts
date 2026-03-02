@@ -36,6 +36,7 @@ export class BillingStorePort extends Context.Tag('BillingStorePort')<
         subscriptionStartedAt?: Date | null
         subscriptionEndsAt?: Date | null
         subscriptionCurrentPeriodEnd?: Date | null
+        onlyIfStatusIn?: ReadonlyArray<SubscriptionStatus>
       }
     ) => Effect.Effect<BillingSettingsRecord | null, unknown>
     updateBillingSettings: (
@@ -57,6 +58,12 @@ export class BillingStorePort extends Context.Tag('BillingStorePort')<
         metadata?: JsonObject
       }
     ) => Effect.Effect<CreditLedgerEntryRecord | null, unknown>
+    claimStripeCustomerId: (
+      input: {
+        organizationId: string
+        stripeCustomerId: string
+      }
+    ) => Effect.Effect<string | null, unknown>
     getMemberRole: (organizationId: string, userId: string) => Effect.Effect<OrgMemberRole | null, unknown>
   }
 >() {}
@@ -117,7 +124,7 @@ export class SubscriptionEventStorePort extends Context.Tag('SubscriptionEventSt
         payload: JsonObject
       }
     ) => Effect.Effect<SubscriptionEventRecord | null, unknown>
-    markProcessed: (id: string, processedAt?: Date) => Effect.Effect<SubscriptionEventRecord | null, unknown>
+    markProcessed: (id: string) => Effect.Effect<SubscriptionEventRecord | null, unknown>
   }
 >() {}
 

@@ -59,7 +59,7 @@ const isAuthLoginIdentityUniqueViolation = (error: unknown): boolean => {
 const recordAuditEvent = (
   input: {
     userId: string | null
-    eventType: 'login_success' | 'login_failure' | 'password_reset_requested' | 'password_changed' | 'oauth_linked' | 'oauth_unlinked' | 'session_refreshed' | 'session_revoked'
+    eventType: 'login_success' | 'login_failure' | 'password_reset_requested' | 'password_changed' | 'oauth_linked' | 'oauth_unlinked' | 'session_refreshed' | 'session_revoked' | 'account_deleted'
     status: 'success' | 'failure'
     identifier: string | null
     ipAddress: string | null
@@ -164,7 +164,7 @@ export class AuthService extends Context.Tag('AuthService')<
     ) => Effect.Effect<
       { revokedSessions: number },
       CoreError,
-      AuthLoginSessionPort | AuthLoginAuditPort
+      AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthLoginAuditPort
     >
     startGoogleAuth: (
       input: StartGoogleAuthCommand
@@ -190,14 +190,14 @@ export class AuthService extends Context.Tag('AuthService')<
     ) => Effect.Effect<
       { reset: true },
       CoreError,
-      AuthUsersPort | PasswordHasherPort | PasswordResetTokenPort | AuthLoginAuditPort
+      AuthUsersPort | PasswordHasherPort | PasswordResetTokenPort | AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthLoginAuditPort
     >
     getPrincipalFromToken: (
       token: string
     ) => Effect.Effect<AuthPrincipal, CoreError, AuthUsersPort | SessionTokenPort | AuthOrganizationMembershipPort | AuthLoginSessionPort>
     deleteUser: (
       principal: { userId: string }
-    ) => Effect.Effect<{ deleted: true }, CoreError, AuthUsersPort | AuthOrganizationOwnershipPort>
+    ) => Effect.Effect<{ deleted: true }, CoreError, AuthUsersPort | AuthOrganizationOwnershipPort | AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthLoginAuditPort>
   }
 >() {}
 
@@ -367,6 +367,9 @@ export const AuthServiceLive = Layer.effect(
         }
 
         const activeSession = yield* loginSessionPort.findActiveById(rotated.sessionId).pipe(
+          Effect.tapError(() =>
+            refreshTokenPort.revokeForSession(rotated.sessionId).pipe(Effect.catchAll(() => Effect.void))
+          ),
           Effect.mapError(() => unauthorized('Invalid refresh session'))
         )
 
@@ -374,6 +377,14 @@ export const AuthServiceLive = Layer.effect(
           yield* refreshTokenPort.revokeForSession(rotated.sessionId).pipe(
             Effect.catchAll(() => Effect.void)
           )
+          yield* recordAuditEvent({
+            userId: null,
+            eventType: 'session_refreshed',
+            status: 'failure',
+            identifier: null,
+            ipAddress: null,
+            metadata: { reason: 'session_inactive', sessionId: rotated.sessionId }
+          })
           return yield* Effect.fail(unauthorized('Invalid refresh session'))
         }
 
@@ -444,6 +455,11 @@ export const AuthServiceLive = Layer.effect(
     signOutAllSessions: (principal) =>
       Effect.gen(function* () {
         const loginSessionPort = yield* AuthLoginSessionPort
+        const refreshTokenPort = yield* AuthLoginRefreshTokenPort
+
+        yield* refreshTokenPort.revokeAllForUser(principal.userId).pipe(
+          Effect.catchAll(() => Effect.void)
+        )
 
         const revokedSessions = yield* loginSessionPort.revokeAllForUser(principal.userId).pipe(
           Effect.mapError(() => badRequest('Failed to revoke user sessions'))
@@ -604,6 +620,14 @@ export const AuthServiceLive = Layer.effect(
         const passwordResetEmailPort = yield* PasswordResetEmailPort
 
         if (!isValidEmail(input.email)) {
+          yield* recordAuditEvent({
+            userId: null,
+            eventType: 'password_reset_requested',
+            status: 'failure',
+            identifier: normalizeEmail(input.email),
+            ipAddress: context.ipAddress ?? null,
+            metadata: { reason: 'invalid_forgot_password_payload' }
+          })
           return yield* Effect.fail(badRequest('Invalid forgot-password payload'))
         }
 
@@ -684,6 +708,17 @@ export const AuthServiceLive = Layer.effect(
           Effect.mapError(() => badRequest('Failed to finalize password reset'))
         )
 
+        const loginSessionPort = yield* AuthLoginSessionPort
+        const refreshTokenPort = yield* AuthLoginRefreshTokenPort
+
+        yield* refreshTokenPort.revokeAllForUser(tokenPrincipal.userId).pipe(
+          Effect.catchAll(() => Effect.void)
+        )
+
+        yield* loginSessionPort.revokeAllForUser(tokenPrincipal.userId).pipe(
+          Effect.catchAll(() => Effect.void)
+        )
+
         yield* recordAuditEvent({
           userId: tokenPrincipal.userId,
           eventType: 'password_changed',
@@ -753,6 +788,8 @@ export const AuthServiceLive = Layer.effect(
       Effect.gen(function* () {
         const usersPort = yield* AuthUsersPort
         const organizationOwnershipPort = yield* AuthOrganizationOwnershipPort
+        const loginSessionPort = yield* AuthLoginSessionPort
+        const refreshTokenPort = yield* AuthLoginRefreshTokenPort
 
         const existing = yield* usersPort.findById(principal.userId).pipe(
           Effect.mapError(() => badRequest('Failed to read user'))
@@ -770,6 +807,14 @@ export const AuthServiceLive = Layer.effect(
           return yield* Effect.fail(conflict('Cannot delete account while owning organizations. Transfer ownership first.'))
         }
 
+        yield* refreshTokenPort.revokeAllForUser(principal.userId).pipe(
+          Effect.catchAll(() => Effect.void)
+        )
+
+        yield* loginSessionPort.revokeAllForUser(principal.userId).pipe(
+          Effect.catchAll(() => Effect.void)
+        )
+
         const deleted = yield* usersPort.deleteById(principal.userId).pipe(
           Effect.mapError(() => badRequest('Failed to delete user'))
         )
@@ -777,6 +822,15 @@ export const AuthServiceLive = Layer.effect(
         if (!deleted) {
           return yield* Effect.fail(notFound('User not found'))
         }
+
+        yield* recordAuditEvent({
+          userId: principal.userId,
+          eventType: 'account_deleted',
+          status: 'success',
+          identifier: existing.email,
+          ipAddress: null,
+          metadata: {}
+        })
 
         return { deleted: true as const }
       })

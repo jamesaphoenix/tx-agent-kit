@@ -56,7 +56,7 @@ export class OrganizationService extends Context.Tag('OrganizationService')<
       principal: { userId: string },
       ids: ReadonlyArray<string>
     ) => Effect.Effect<ReadonlyArray<Organization>, CoreError, OrganizationStorePort>
-    createForUser: (userId: string, input: CreateOrganizationCommand) => Effect.Effect<Organization, CoreError, OrganizationStorePort>
+    createForUser: (userId: string, input: CreateOrganizationCommand, options?: { email?: string }) => Effect.Effect<Organization, CoreError, OrganizationStorePort>
     updateById: (
       principal: { userId: string },
       organizationId: string,
@@ -162,7 +162,7 @@ export const OrganizationServiceLive = Layer.effect(
         })
       }),
 
-    createForUser: (userId: string, input) =>
+    createForUser: (userId: string, input, options) =>
       Effect.gen(function* () {
         const organizationStore = yield* OrganizationStorePort
 
@@ -172,7 +172,15 @@ export const OrganizationServiceLive = Layer.effect(
 
         const name = normalizeOrganizationName(input.name)
 
-        const created = yield* organizationStore.create({ name, ownerUserId: userId }).pipe(
+        const created = yield* organizationStore.createWithEvent({
+          name,
+          ownerUserId: userId,
+          event: {
+            eventType: 'organization.created',
+            aggregateType: 'organization',
+            payload: { organizationName: name, ownerUserId: userId, ownerEmail: options?.email ?? '' }
+          }
+        }).pipe(
           Effect.mapError(() => badRequest('Failed to create organization'))
         )
 

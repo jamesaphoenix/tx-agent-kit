@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, lt, or, sql } from 'drizzle-orm'
 import type { AuthLoginProvider } from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
 import { DB, provideDB } from '../client.js'
@@ -78,5 +78,24 @@ export const authLoginOidcStatesRepository = {
 
         return yield* decodeNullableAuthLoginOidcState(rows[0] ?? null)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to consume auth login oidc state', error)))
+    ).pipe(Effect.mapError((error) => toDbError('Failed to consume auth login oidc state', error))),
+
+  pruneExpired: (olderThan: Date) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        const rows = yield* db
+          .delete(authLoginOidcStates)
+          .where(
+            or(
+              lt(authLoginOidcStates.expiresAt, olderThan),
+              lt(authLoginOidcStates.consumedAt, olderThan)
+            )
+          )
+          .returning({ id: authLoginOidcStates.id })
+          .execute()
+
+        return rows.length
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to prune expired auth login oidc states', error)))
 }

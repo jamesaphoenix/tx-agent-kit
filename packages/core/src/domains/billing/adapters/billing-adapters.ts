@@ -45,6 +45,8 @@ export const BillingStorePortLive = Layer.succeed(BillingStorePort, {
     billingRepository
       .adjustCredits(input)
       .pipe(Effect.map((row) => mapNullable(row, toCreditLedgerEntryRecord))),
+  claimStripeCustomerId: (input) =>
+    billingRepository.claimStripeCustomerId(input),
   getMemberRole: (organizationId: string, userId: string) =>
     organizationsRepository.getMemberRole(organizationId, userId).pipe(
       Effect.map((row) => (row ? row.role : null))
@@ -81,8 +83,8 @@ export const SubscriptionEventStorePortLive = Layer.succeed(SubscriptionEventSto
     subscriptionEventsRepository.create(input).pipe(
       Effect.map((row) => mapNullable(row, toSubscriptionEventRecord))
     ),
-  markProcessed: (id: string, processedAt?: Date) =>
-    subscriptionEventsRepository.markProcessed(id, processedAt).pipe(
+  markProcessed: (id: string) =>
+    subscriptionEventsRepository.markProcessed(id).pipe(
       Effect.map((row) => mapNullable(row, toSubscriptionEventRecord))
     )
 })

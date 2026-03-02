@@ -5,7 +5,15 @@ export interface DbEnv {
 }
 
 export const getDbEnv = (): DbEnv => {
-  return {
-    DATABASE_URL: process.env.DATABASE_URL ?? defaultDatabaseUrl
+  const url = process.env.DATABASE_URL
+  if (url) {
+    return { DATABASE_URL: url }
   }
+
+  const nodeEnv = (process.env.NODE_ENV ?? '').toLowerCase()
+  if (nodeEnv === 'production' || nodeEnv === 'staging') {
+    throw new Error('DATABASE_URL must be set in production and staging environments')
+  }
+
+  return { DATABASE_URL: defaultDatabaseUrl }
 }
