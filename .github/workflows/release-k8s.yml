@@ -63,7 +63,7 @@ jobs:
       - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
         with:
           node-version: 22
-      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
       - name: Configure Artifact Registry auth
         run: |
           set -euo pipefail
@@ -106,7 +106,7 @@ jobs:
       - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
         with:
           node-version: 22
-      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
         with:
@@ -171,7 +171,7 @@ jobs:
       - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
         with:
           node-version: 22
-      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
       - name: Verify 1Password CLI access
         shell: bash
         env:
@@ -290,7 +290,7 @@ jobs:
       - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
         with:
           node-version: 22
-      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
       - name: Verify 1Password CLI access
         shell: bash
         env:
@@ -409,7 +409,7 @@ jobs:
       - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
         with:
           node-version: 22
-      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@9b82e19ce89f957763220d632ec1de246084f78a
       - name: Verify 1Password CLI access
