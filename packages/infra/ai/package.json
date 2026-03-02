@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@openrouter/sdk": "^0.9.11",
-    "effect": "^3.19.16",
+    "effect": "^3.19.19",
     "zod": "^4.1.7"
   },
   "devDependencies": {

@@ -22,7 +22,7 @@
     "@tx-agent-kit/db": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
     "@tx-agent-kit/observability": "workspace:*",
-    "effect": "^3.19.16",
+    "effect": "^3.19.19",
     "openid-client": "^5.7.1",
     "stripe": "^19.2.0"
   },
