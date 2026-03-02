@@ -33,7 +33,7 @@ export const runLiveK3sStagingVerification = (): LiveCommandRun => {
       TUNNEL_RECONCILE_MODE: 'staging',
       TUNNEL_CHECK_MODE: 'staging'
     },
-    30 * 60 * 1_000
+    30 * 60 * 1000
   )
 
   return {

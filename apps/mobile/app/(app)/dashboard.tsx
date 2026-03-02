@@ -30,30 +30,30 @@ export default function DashboardScreen() {
       const principal = await clientApi.me()
       const organizationPayload = await clientApi.listOrganizations()
 
-      if (!mountedRef.current) return
+      if (!mountedRef.current) {return}
 
       setState({
         principal,
         organizations: organizationPayload.organizations
       })
-    } catch (err) {
-      const handled = await handleUnauthorizedApiError(err, routerRef.current, '/dashboard')
-      if (handled || !mountedRef.current) return
+    } catch (error_) {
+      const handled = await handleUnauthorizedApiError(error_, routerRef.current, '/dashboard')
+      if (handled || !mountedRef.current) {return}
 
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard')
+      setError(error_ instanceof Error ? error_.message : 'Failed to load dashboard')
     } finally {
-      if (mountedRef.current) setLoading(false)
+      if (mountedRef.current) {setLoading(false)}
     }
   }, [])
 
   const load = useCallback(async (): Promise<void> => {
     const hasSession = await ensureSessionOrRedirect(routerRef.current, '/dashboard')
     if (!hasSession) {
-      if (mountedRef.current) setLoading(false)
+      if (mountedRef.current) {setLoading(false)}
       return
     }
 
-    if (!mountedRef.current) return
+    if (!mountedRef.current) {return}
 
     setLoading(true)
     setError(null)
@@ -61,7 +61,7 @@ export default function DashboardScreen() {
   }, [fetchData])
 
   const refresh = useCallback(async (): Promise<void> => {
-    if (!mountedRef.current) return
+    if (!mountedRef.current) {return}
     setError(null)
     await fetchData()
   }, [fetchData])

@@ -20,6 +20,7 @@ export const baseConfig = [
       }
     },
     rules: {
+      'no-constant-binary-expression': 'error',
       'no-console': 'error',
       'no-warning-comments': [
         'error',

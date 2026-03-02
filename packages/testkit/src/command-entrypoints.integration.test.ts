@@ -447,7 +447,7 @@ describe.sequential('root command entrypoints integration', () => {
   it(
     'starts db studio command without immediate boot failure',
     async () => {
-      const result = await probeLongRunningCommand('pnpm', ['db:studio'], {}, 6_000)
+      const result = await probeLongRunningCommand('pnpm', ['db:studio'], {}, 6000)
       const output = `${result.stdout}\n${result.stderr}`
 
       expect(output).toMatch(/drizzle|studio/u)

@@ -6,6 +6,7 @@ import { effectConsistencyConfig } from './packages/tooling/eslint-config/effect
 import { promiseConfig } from './packages/tooling/eslint-config/promise.js'
 import { testingConfig } from './packages/tooling/eslint-config/testing.js'
 import { typeSafetyConfig } from './packages/tooling/eslint-config/type-safety.js'
+import { unicornConfig } from './packages/tooling/eslint-config/unicorn.js'
 
 export default [
   {
@@ -32,6 +33,7 @@ export default [
   ...testingConfig,
   ...boundariesConfig,
   ...typeSafetyConfig,
+  ...unicornConfig,
   {
     files: ['apps/mobile/**/*.test.ts', 'apps/mobile/**/*.test.tsx'],
     rules: {

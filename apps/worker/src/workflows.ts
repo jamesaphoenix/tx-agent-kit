@@ -63,11 +63,11 @@ export async function outboxPollerWorkflow(batchSize: number): Promise<void> {
           await markEventFailed(event.id, `Unknown event type '${event.eventType}'`)
           break
       }
-    } catch (err: unknown) {
-      if (err instanceof WorkflowExecutionAlreadyStartedError) {
+    } catch (error: unknown) {
+      if (error instanceof WorkflowExecutionAlreadyStartedError) {
         dispatched.push(event.id)
       } else {
-        const message = err instanceof Error ? err.message : String(err)
+        const message = error instanceof Error ? error.message : String(error)
         await markEventFailed(event.id, `Failed to dispatch child workflow for event type '${event.eventType}': ${message}`)
       }
     }

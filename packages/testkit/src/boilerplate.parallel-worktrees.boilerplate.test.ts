@@ -53,7 +53,7 @@ const testkitEnv = getTestkitEnv()
 const baseDatabaseUrl =
   testkitEnv.DATABASE_URL ?? defaultWorktreeSetupDatabaseUrl
 
-const quoteIdentifier = (value: string): string => `"${value.replace(/"/g, '""')}"`
+const quoteIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
 
 const requireEnvValue = (
   setup: WorktreeSetupResult,

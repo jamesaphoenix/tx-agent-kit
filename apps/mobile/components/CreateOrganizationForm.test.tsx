@@ -30,7 +30,7 @@ describe('CreateOrganizationForm', () => {
   it('renders heading and name input', () => {
     const tree = create(<CreateOrganizationForm />)
     const texts = findByType(tree.root, 'Text')
-    const labels = texts.map((t) => t.props.children).flat()
+    const labels = texts.flatMap((t) => t.props.children)
     expect(labels).toContain('Create Organization')
 
     const inputs = findByType(tree.root, 'TextInput')
@@ -168,7 +168,7 @@ describe('CreateOrganizationForm', () => {
 
     // Button should be re-enabled
     const texts = findByType(tree.root, 'Text')
-    const labels = texts.map((t) => t.props.children).flat()
+    const labels = texts.flatMap((t) => t.props.children)
     expect(labels).toContain('Create organization')
   })
 })

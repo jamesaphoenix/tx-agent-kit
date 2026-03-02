@@ -14,7 +14,7 @@ export function AcceptInvitationForm({
   const [pending, setPending] = useState(false)
 
   const onSubmit = async () => {
-    if (pending) return
+    if (pending) {return}
     setPending(true)
     setError(null)
     setMessage(null)
@@ -25,8 +25,8 @@ export function AcceptInvitationForm({
       setMessage('Invitation accepted successfully')
       notify.success('Invitation accepted')
       await onAccepted?.()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to accept invitation'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to accept invitation'
       setError(message)
       notify.error(message)
     } finally {

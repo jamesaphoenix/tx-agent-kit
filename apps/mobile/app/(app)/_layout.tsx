@@ -12,13 +12,13 @@ export default function AppTabLayout() {
   const isAuthenticated = useIsAuthenticated()
 
   useEffect(() => {
-    if (!isReady) return
+    if (!isReady) {return}
     if (!isAuthenticated) {
       routerRef.current.replace('/sign-in')
     }
   }, [isReady, isAuthenticated])
 
-  if (!isReady || !isAuthenticated) return null
+  if (!isReady || !isAuthenticated) {return null}
 
   return (
     <Tabs

@@ -137,7 +137,7 @@ export const activities = {
     }
 
     const dashboardUrl = env.WEB_BASE_URL ? `${env.WEB_BASE_URL}/dashboard` : undefined
-    const safeName = payload.organizationName.replace(/[\r\n]/g, '')
+    const safeName = payload.organizationName.replaceAll(/[\r\n]/g, '')
     const subject = `Welcome to ${safeName}`
     const text = [
       `Your organization "${safeName}" has been created.`,
@@ -203,9 +203,9 @@ export const activities = {
 
 function escapeHtml(text: string): string {
   return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('\'', '&#x27;')
 }

@@ -84,11 +84,11 @@ export default function InvitationsPage() {
       )
       setOrganizations(organizationsPayload.data)
       setPrincipalEmail(principal.email)
-    } catch (err) {
-      if (handleUnauthorizedApiError(err, router, '/invitations')) {
+    } catch (error_) {
+      if (handleUnauthorizedApiError(error_, router, '/invitations')) {
         return
       }
-      setError(err instanceof Error ? err.message : 'Failed to load invitations')
+      setError(error_ instanceof Error ? error_.message : 'Failed to load invitations')
     } finally {
       setLoading(false)
     }
@@ -116,8 +116,8 @@ export default function InvitationsPage() {
         } else {
           router.push('/org')
         }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to accept invitation'
+      } catch (error_) {
+        const message = error_ instanceof Error ? error_.message : 'Failed to accept invitation'
         notify.error(message)
         setError(message)
       } finally {
@@ -138,8 +138,8 @@ export default function InvitationsPage() {
       setManualToken('')
       notify.success('Invitation accepted')
       await load()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to accept invitation'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to accept invitation'
       setError(message)
       notify.error(message)
     } finally {
@@ -153,8 +153,8 @@ export default function InvitationsPage() {
       await clientApi.removeInvitation(invitationId)
       notify.success('Invitation revoked')
       await load()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to revoke invitation'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to revoke invitation'
       notify.error(message)
     } finally {
       setRevoking(null)
@@ -178,8 +178,8 @@ export default function InvitationsPage() {
       setInviteEmail('')
       notify.success('Invitation sent')
       await load()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to send invitation'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to send invitation'
       setError(message)
       notify.error(message)
     } finally {

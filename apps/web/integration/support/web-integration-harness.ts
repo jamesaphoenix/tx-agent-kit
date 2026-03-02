@@ -152,7 +152,7 @@ const stopProcess = async (pid: number): Promise<boolean> => {
     return !isProcessAlive(pid)
   }
 
-  const exitedAfterTerm = await waitForProcessExit(pid, 5_000)
+  const exitedAfterTerm = await waitForProcessExit(pid, 5000)
   if (exitedAfterTerm) {
     return true
   }
@@ -163,7 +163,7 @@ const stopProcess = async (pid: number): Promise<boolean> => {
     return !isProcessAlive(pid)
   }
 
-  return waitForProcessExit(pid, 2_000)
+  return waitForProcessExit(pid, 2000)
 }
 
 const readProcessCommandLine = (pid: number): string | undefined => {

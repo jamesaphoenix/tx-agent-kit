@@ -45,8 +45,8 @@ const ensureValidName = (value: string, label: string): void => {
 
 const toKebabCase = (value: string): string =>
   value
-    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-    .replace(/[\s_]+/g, '-')
+    .replaceAll(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replaceAll(/[\s_]+/g, '-')
     .toLowerCase()
 
 const toPascalCase = (value: string): string =>
@@ -479,7 +479,7 @@ const buildDbNames = (n: NameSet): DbNameSet => {
   const tableFileSlug = `${n.domainSlug}-${n.pluralSlug}`
   return {
     tableConst: toCamelCase(tableFileSlug),
-    tableSqlName: tableFileSlug.replace(/-/g, '_'),
+    tableSqlName: tableFileSlug.replaceAll('-', '_'),
     tableFileSlug
   }
 }

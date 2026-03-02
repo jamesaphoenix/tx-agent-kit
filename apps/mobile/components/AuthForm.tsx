@@ -16,7 +16,7 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
   const actionLabel = mode === 'sign-up' ? 'Create account' : 'Sign in'
 
   const onSubmit = async () => {
-    if (pending) return
+    if (pending) {return}
     setPending(true)
     setError(null)
 
@@ -31,16 +31,16 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
       sessionStoreActions.setPrincipal(principal)
       notify.success(mode === 'sign-up' ? 'Account created successfully' : 'Signed in successfully')
       router.replace(nextPath)
-    } catch (err) {
+    } catch (error_) {
       const isAuthRejection =
-        err instanceof ApiClientError && (err.status === 401 || err.status === 403)
+        error_ instanceof ApiClientError && (error_.status === 401 || error_.status === 403)
 
       if (isAuthRejection) {
         await clearAuthToken()
         sessionStoreActions.clear()
       }
 
-      const message = err instanceof Error ? err.message : 'Authentication failed'
+      const message = error_ instanceof Error ? error_.message : 'Authentication failed'
       setError(message)
       notify.error(message)
     } finally {

@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, configure } from '@testing-library/react'
 
-configure({ asyncUtilTimeout: 5_000 })
+configure({ asyncUtilTimeout: 5000 })
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 import { resolveWebIntegrationPort } from './integration/support/web-integration-harness'
 import { resetIntegrationRouterLocation } from './integration/support/next-router-context'
@@ -85,9 +85,9 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-afterAll(async () => {
+afterAll(() => {
   try {
-    await teardownWebIntegrationSuite()
+    teardownWebIntegrationSuite()
   } finally {
     releaseVitestWorkerSlot()
   }

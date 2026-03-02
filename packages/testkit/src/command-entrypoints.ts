@@ -223,7 +223,7 @@ export const probeLongRunningCommand = (
         killProcessTree(child.pid, 'SIGTERM')
         setTimeout(() => {
           killProcessTree(child.pid!, 'SIGKILL')
-        }, 2_000).unref()
+        }, 2000).unref()
       }
     }, timeoutMs)
 
@@ -243,7 +243,7 @@ export const probeLongRunningCommand = (
         stderr,
         timedOut
       })
-    }, timeoutMs + 8_000)
+    }, timeoutMs + 8000)
     forceFinalizeHandle.unref()
 
     child.on('error', (error) => {
@@ -293,7 +293,7 @@ export const probeLongRunningCommandUntilReady = (
 
     const readinessPatternWithoutGlobal = new RegExp(
       readinessPattern.source,
-      readinessPattern.flags.replace(/g/gu, '')
+      readinessPattern.flags.replaceAll('g', '')
     )
 
     const triggerShutdown = (): void => {
@@ -307,7 +307,7 @@ export const probeLongRunningCommandUntilReady = (
         if (child.pid) {
           killProcessTree(child.pid, 'SIGKILL')
         }
-      }, 2_000).unref()
+      }, 2000).unref()
     }
 
     const maybeMarkReady = (): void => {
@@ -361,7 +361,7 @@ export const probeLongRunningCommandUntilReady = (
         timedOut,
         readinessMatched
       })
-    }, timeoutMs + 8_000)
+    }, timeoutMs + 8000)
     forceFinalizeHandle.unref()
 
     child.on('error', (error) => {

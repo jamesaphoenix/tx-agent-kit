@@ -37,11 +37,11 @@ export default function TeamDashboardPage() {
         clientApi.getTeam(teamId)
       ])
       setState({ principal, organization, team })
-    } catch (err) {
-      if (handleUnauthorizedApiError(err, router, `/org/${orgId}/${teamId}`)) {
+    } catch (error_) {
+      if (handleUnauthorizedApiError(error_, router, `/org/${orgId}/${teamId}`)) {
         return
       }
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard')
+      setError(error_ instanceof Error ? error_.message : 'Failed to load dashboard')
     } finally {
       setLoading(false)
     }

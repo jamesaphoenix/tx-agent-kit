@@ -42,6 +42,7 @@ ensure_file() {
 ensure_file ".env.example" ".env"
 
 upsert_key ".env" "NODE_ENV" "development"
+upsert_key ".env" "LOG_LEVEL" "debug"
 upsert_key ".env" "API_PORT" "4000"
 upsert_key ".env" "API_HOST" "0.0.0.0"
 upsert_key ".env" "DATABASE_URL" "postgres://postgres:postgres@localhost:5432/tx_agent_kit"

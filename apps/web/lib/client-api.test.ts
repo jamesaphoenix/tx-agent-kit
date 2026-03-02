@@ -21,8 +21,8 @@ describe('ApiClientError', () => {
     let caught: unknown
     try {
       throw new ApiClientError('thrown', 403)
-    } catch (e) {
-      caught = e
+    } catch (error) {
+      caught = error
     }
     expect(caught instanceof ApiClientError).toBe(true)
     expect((caught as ApiClientError).status).toBe(403)

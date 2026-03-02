@@ -103,7 +103,7 @@ describe('AuthForm', () => {
     it('renders Sign in button text', () => {
       const tree = create(<AuthForm mode="sign-in" nextPath="/dashboard" />)
       const texts = findByType(tree.root, 'Text')
-      const labels = texts.map((t) => t.props.children).flat()
+      const labels = texts.flatMap((t) => t.props.children)
       expect(labels).toContain('Sign in')
     })
 
@@ -134,7 +134,7 @@ describe('AuthForm', () => {
       expect(sessionStoreActions.clear).not.toHaveBeenCalled()
 
       const texts = findByType(tree.root, 'Text')
-      const labels = texts.map((t) => t.props.children).flat()
+      const labels = texts.flatMap((t) => t.props.children)
       expect(labels).toContain('Sign in')
     })
 
@@ -146,7 +146,7 @@ describe('AuthForm', () => {
       await fillAndSubmit(tree, 'sign-in')
 
       const texts = findByType(tree.root, 'Text')
-      const labels = texts.map((t) => t.props.children).flat()
+      const labels = texts.flatMap((t) => t.props.children)
       expect(labels).toContain('Sign in')
       expect(labels).not.toContain('Working...')
     })
@@ -239,7 +239,7 @@ describe('AuthForm', () => {
       expect(placeholders).toContain('Jane Founder')
 
       const texts = findByType(tree.root, 'Text')
-      const labels = texts.map((t) => t.props.children).flat()
+      const labels = texts.flatMap((t) => t.props.children)
       expect(labels).toContain('Create account')
     })
 

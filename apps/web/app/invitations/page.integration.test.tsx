@@ -134,7 +134,7 @@ describe('InvitationsPage integration', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Invite a teammate')).toBeInTheDocument()
-    }, { timeout: 5_000 })
+    }, { timeout: 5000 })
 
     const inviteFormHeading = screen.getByRole('heading', { name: 'Invite a teammate' })
     const inviteForm = inviteFormHeading.closest('form')
@@ -148,7 +148,7 @@ describe('InvitationsPage integration', () => {
       await within(inviteOrganizationSelect).findByRole(
         'option',
         { name: organization.name },
-        { timeout: 5_000 }
+        { timeout: 5000 }
       )
     ).toBeInTheDocument()
 
@@ -242,7 +242,7 @@ describe('InvitationsPage integration', () => {
 
     await waitFor(() => {
       expect(readIntegrationRouterLocation().pathname).toBe(`/org/${organization.id}/workspaces`)
-    }, { timeout: 5_000 })
+    }, { timeout: 5000 })
 
     const inviteeInvitations = await clientApi.listInvitations()
     const accepted = inviteeInvitations.data.find((item) => item.id === invitation.id)

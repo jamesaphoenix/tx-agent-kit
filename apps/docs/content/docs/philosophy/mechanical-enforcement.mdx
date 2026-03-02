@@ -19,9 +19,11 @@ ESLint rules are split across config files in `packages/tooling/eslint-config/`:
 
 - `base.js` - `strictTypeChecked` preset and project-wide rule overrides
 - `domain-invariants.js` - Architecture and DDD layer boundary rules
-- `code-quality.js` - General code quality rules (nested ternaries, require, void)
+- `code-quality.js` - General code quality (unused imports, curly braces, modern JS style)
 - `effect-consistency.js` - Effect-specific patterns (ban `new Promise`)
 - `type-safety.js` - Exhaustive switch checks, nullish coalescing, optional chain, consistent type exports
+- `testing.js` - Test-specific rules (vitest globals, no `.only()`)
+- `unicorn.js` - Modern JS best practices from `eslint-plugin-unicorn`
 
 ```js
 // Example: ban drizzle-orm imports outside packages/infra/db
@@ -60,6 +62,25 @@ The following table summarizes the key rules enforced via ESLint:
 | Consistent type exports (`export type`) | Type-only exports missing the `type` keyword |
 | No unnecessary conditions | Dead code branches; conditions always true/false |
 | No switch fallthrough | Missing `break`/`return` in switch cases (TypeScript compiler) |
+| No `.only()` in test files | A committed `.only()` silently skips the rest of the suite in CI |
+| Auto-remove unused imports | Dead imports cluttering modules |
+| No constant binary expressions | Provably-wrong logic like `"hello" ?? "world"` |
+| Curly braces on all blocks | Ambiguous single-line `if` statements |
+| Object shorthand | Verbose `{ foo: foo }` instead of `{ foo }` |
+| Arrow callbacks | Anonymous `function` expressions in callbacks |
+| `...args` over `arguments` | Legacy `arguments` object usage |
+| Spread over `.apply()` | Verbose `.apply()` calls |
+| `node:` protocol for builtins | Bare `fs` instead of `node:fs` |
+| `.replaceAll()` over `.replace(/…/g)` | Global regex when `.replaceAll()` suffices |
+| `.slice()` over `.substring()` | Legacy `.substring()`/`.substr()` methods |
+| `.flatMap()` over `.map().flat()` | Two-step chain when `.flatMap()` suffices |
+| `.some()` over `.filter().length` | Materializing a full array to check existence |
+| `structuredClone` over JSON round-trip | `JSON.parse(JSON.stringify())` for cloning |
+| `Number.isNaN` over global `isNaN` | Global `isNaN` coerces non-numbers |
+| Consistent `error` naming in catch | Non-standard names like `catch (e)` |
+| Numeric separators for large literals | `1000000` instead of `1_000_000` |
+| No blanket `eslint-disable` | `/* eslint-disable */` without specific rule |
+| Drop unused catch bindings | `catch (error)` when `error` is unused |
 
 ### 2. Structural invariant checks
 

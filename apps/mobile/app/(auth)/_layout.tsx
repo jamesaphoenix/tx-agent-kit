@@ -11,7 +11,7 @@ export default function AuthLayout() {
   const isAuthenticated = useIsAuthenticated()
 
   useEffect(() => {
-    if (!isReady) return
+    if (!isReady) {return}
     if (isAuthenticated) {
       routerRef.current.replace('/dashboard')
     }

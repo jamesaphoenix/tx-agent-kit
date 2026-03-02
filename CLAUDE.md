@@ -82,6 +82,27 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
 - Prefer optional chain `a?.b` over manual `a && a.b`.
 - Switch statements on union/enum types must be exhaustive (all cases handled).
 - Use `export type` for type-only exports (`consistent-type-exports` enforced).
+- No committed `.only()` in test files (`no-only-tests/no-only-tests` enforced).
+- Remove unused imports; do not leave dead imports (`unused-imports/no-unused-imports` auto-fixable).
+- Always use braces on control-flow blocks (`curly` enforced).
+- Use object shorthand `{ foo }` over `{ foo: foo }` (`object-shorthand` enforced).
+- Use arrow callbacks (`prefer-arrow-callback` with `allowNamedFunctions`).
+- Use rest params `...args` over `arguments` object (`prefer-rest-params`).
+- Use spread `fn(...args)` over `.apply()` (`prefer-spread`).
+- Name catch-block variables `error` (`unicorn/catch-error-name`).
+- Use `node:` protocol for Node.js built-in imports (`unicorn/prefer-node-protocol`).
+- Use `Number.*` properties over global equivalents — `Number.isNaN`, `Number.isFinite`, `Number.parseInt`, `Number.parseFloat` (`unicorn/prefer-number-properties`).
+- Use `.replaceAll()` over `.replace(/…/g, …)` (`unicorn/prefer-string-replace-all`).
+- Use `.slice()` over `.substring()`/`.substr()` (`unicorn/prefer-string-slice`).
+- Use `.flatMap()` over `.map().flat()` (`unicorn/prefer-array-flat-map`).
+- Use `.some()` over `.filter().length` (`unicorn/prefer-array-some`).
+- Use `structuredClone()` over `JSON.parse(JSON.stringify())` (`unicorn/prefer-structured-clone`).
+- Use numeric separators `1_000_000` for large numbers (`unicorn/numeric-separators-style`).
+- No blanket `/* eslint-disable */` without rule names (`unicorn/no-abusive-eslint-disable`).
+- No redundant `[...array]` / `{...obj}` spreads (`unicorn/no-useless-spread`).
+- No `return Promise.resolve(x)` in async functions (`unicorn/no-useless-promise-resolve-reject`).
+- Drop unused catch-block variables — `catch { }` over `catch (error) { }` when unused (`unicorn/prefer-optional-catch-binding`).
+- No provably-wrong binary expressions like `x === null || x` (`no-constant-binary-expression`).
 
 ## DDD Construction Pattern
 For each domain, create:
@@ -139,9 +160,11 @@ When adding a table in `packages/infra/db/src/schema.ts`:
 - ESLint restrictions live in `packages/tooling/eslint-config/`:
   - `base.js` — `strictTypeChecked` preset + project-wide overrides
   - `domain-invariants.js` — architecture and DDD layer boundary rules
-  - `code-quality.js` — general code quality (nested ternaries, require, void)
+  - `code-quality.js` — general code quality (nested ternaries, require, void, unused imports, curly, shorthand, arrow callbacks, spread)
   - `effect-consistency.js` — Effect-specific patterns (ban `new Promise`)
   - `type-safety.js` — exhaustive switches, nullish coalescing, optional chain, type exports
+  - `testing.js` — test globals + `no-only-tests`
+  - `unicorn.js` — modern JS best practices (catch naming, node protocol, replaceAll, flatMap, etc.)
 - Structural checks live in dedicated scripts under `scripts/lint/`:
   - `enforce-domain-invariants.mjs`
   - `enforce-web-client-contracts.mjs`

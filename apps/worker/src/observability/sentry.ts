@@ -75,7 +75,7 @@ export const flushWorkerSentry = async (): Promise<void> => {
     return
   }
 
-  await sentryModule.flush(2_000)
+  await sentryModule.flush(2000)
 }
 
 export const _resetWorkerSentryForTest = (): void => {

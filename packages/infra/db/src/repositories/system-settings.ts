@@ -16,7 +16,7 @@ export interface RetentionTableConfig {
 export type RetentionSettings = Record<string, RetentionTableConfig>
 
 const isRetentionSettings = (value: JsonObject): value is JsonObject & RetentionSettings => {
-  if (Object.keys(value).length === 0) return false
+  if (Object.keys(value).length === 0) {return false}
   for (const key of Object.keys(value)) {
     const entry = value[key]
     if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {

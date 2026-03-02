@@ -72,7 +72,7 @@ export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
 
         if (!orgId) {
           setOrganizationSelection((current) => {
-            if (current) return current
+            if (current) {return current}
             return response.data[0]?.id ?? ''
           })
         }
@@ -210,8 +210,8 @@ export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
       setTeamInput(createdTeam.name)
       notify.success(`Workspace "${createdTeam.name}" created`)
       router.push(`/org/${selectedOrgId}/${createdTeam.id}`)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create workspace'
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create workspace'
       notify.error(message)
     } finally {
       setTeamCreating(false)

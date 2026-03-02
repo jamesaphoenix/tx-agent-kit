@@ -17,6 +17,6 @@ describe.sequential('live k3s staging deploy integration', () => {
       expect(run.output).toContain('Temporal TLS cert wiring checks passed.')
       expect(run.output).toContain('Mac k3s staging verification succeeded.')
     },
-    31 * 60 * 1_000
+    31 * 60 * 1000
   )
 })

@@ -40,12 +40,154 @@ const drizzleIsolationRestrictions = {
   ]
 }
 
+// ── Global restrictions that must be merged into every no-restricted-imports block ─
+// ESLint flat config does NOT merge rule options — the last matching config
+// object wins. Every block that sets no-restricted-imports must include
+// the global restrictions or they silently disappear.
+const globalPaths = [...effectSchemaOnlyRestrictions.paths]
+const globalPatterns = [
+  ...effectSchemaOnlyRestrictions.patterns,
+  ...drizzleIsolationRestrictions.patterns
+]
+
+// Merge global restrictions into a rule config.
+const withGlobalRestrictions = (config) => ({
+  paths: [...globalPaths, ...(config.paths ?? [])],
+  patterns: [...globalPatterns, ...(config.patterns ?? [])]
+})
+
+// Merge global restrictions but WITHOUT drizzle (for packages/infra/db).
+const withSchemaOnlyRestrictions = (config) => ({
+  paths: [...effectSchemaOnlyRestrictions.paths, ...(config.paths ?? [])],
+  patterns: [...effectSchemaOnlyRestrictions.patterns, ...(config.patterns ?? [])]
+})
+
+// ── Shared web import restrictions ──────────────────────────────────────
+// Extracted so they can be merged into every web no-restricted-imports
+// config object (ESLint flat config does NOT merge rule options across
+// config objects — the last matching object wins).
+const webCorePaths = [
+  ...globalPaths,
+  {
+    name: '@tx-agent-kit/db',
+    message: 'Web must stay API-first. Call `apps/api` via typed client functions, never DB modules.'
+  },
+  {
+    name: 'drizzle-orm',
+    message: 'Web must stay API-first. Only the DB layer may import Drizzle.'
+  },
+  {
+    name: 'effect',
+    message:
+      'apps/web is intentionally dumb. Keep Effect runtime usage in API/core/worker layers.'
+  },
+  {
+    name: 'next/server',
+    message:
+      'apps/web is client-only. Server runtime imports (`next/server`) are forbidden.'
+  },
+  {
+    name: 'next/headers',
+    message:
+      'apps/web is client-only. Request header/cookie APIs (`next/headers`) are forbidden.'
+  },
+  {
+    name: 'next/navigation',
+    importNames: ['useSearchParams'],
+    message:
+      'Avoid `useSearchParams` in apps/web; it introduces Suspense/prerender constraints in static client pages.'
+  },
+  {
+    name: 'next/navigation',
+    importNames: ['redirect', 'notFound'],
+    message:
+      'apps/web is client-only. `redirect`/`notFound` server navigation APIs are forbidden.'
+  }
+]
+
+const webCorePatterns = [
+  ...globalPatterns,
+  {
+    group: ['@tx-agent-kit/db/*', 'drizzle-orm/*'],
+    message: 'Web must stay API-first. Keep persistence concerns behind API/core services.'
+  },
+  {
+    group: ['effect/*'],
+    message:
+      'apps/web is intentionally dumb. Keep Effect runtime usage in API/core/worker layers.'
+  },
+  {
+    group: ['next/server/*', 'next/headers/*'],
+    message: 'apps/web is client-only. Server runtime imports are forbidden.'
+  }
+]
+
+// ── Shared mobile import restrictions ───────────────────────────────────
+const mobileCorePaths = [
+  ...globalPaths,
+  {
+    name: '@tx-agent-kit/db',
+    message: 'Mobile must stay API-first. Call `apps/api` via typed client functions, never DB modules.'
+  },
+  {
+    name: 'drizzle-orm',
+    message: 'Mobile must stay API-first. Only the DB layer may import Drizzle.'
+  },
+  {
+    name: 'effect',
+    message:
+      'apps/mobile is a dumb API consumer. Keep Effect runtime usage in API/core/worker layers.'
+  },
+  {
+    name: '@tx-agent-kit/core',
+    message:
+      'apps/mobile is a dumb API consumer. Import contracts only, not core domain modules.'
+  },
+  {
+    name: '@tx-agent-kit/logging',
+    message: 'Mobile must use `apps/mobile/lib/log.ts` for logging.'
+  }
+]
+
+const mobileCorePatterns = [
+  ...globalPatterns,
+  {
+    group: ['@tx-agent-kit/db/*', 'drizzle-orm/*'],
+    message: 'Mobile must stay API-first. Keep persistence concerns behind API/core services.'
+  },
+  {
+    group: ['effect/*'],
+    message:
+      'apps/mobile is a dumb API consumer. Keep Effect runtime usage in API/core/worker layers.'
+  },
+  {
+    group: ['@tx-agent-kit/core/*'],
+    message:
+      'apps/mobile is a dumb API consumer. Import contracts only, not core domain modules.'
+  },
+  {
+    group: ['@tx-agent-kit/logging/*'],
+    message: 'Mobile must use `apps/mobile/lib/log.ts` for logging.'
+  }
+]
+
 export const domainInvariantConfig = [
+  // ── Global: schema-only + drizzle isolation ────────────────────────
+  // infra/ai is exempt from schema-only (uses its own validation).
+  // infra/db is exempt from drizzle isolation (IS the drizzle layer).
   {
     files: ['**/*.{ts,tsx}'],
-    ignores: ['packages/infra/ai/**/*.{ts,tsx}'],
+    ignores: ['packages/infra/ai/**/*.{ts,tsx}', 'packages/infra/db/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', effectSchemaOnlyRestrictions]
+      'no-restricted-imports': ['error', {
+        paths: [
+          ...effectSchemaOnlyRestrictions.paths
+        ],
+        patterns: [
+          ...effectSchemaOnlyRestrictions.patterns,
+          ...drizzleIsolationRestrictions.patterns
+        ]
+      }]
     }
   },
   {
@@ -53,7 +195,7 @@ export const domainInvariantConfig = [
     rules: {
       'no-restricted-imports': [
         'error',
-        {
+        withSchemaOnlyRestrictions({
           paths: [
             {
               name: '@tx-agent-kit/core',
@@ -67,10 +209,60 @@ export const domainInvariantConfig = [
               message: 'Infrastructure packages must not import from core.'
             }
           ]
-        }
+        })
       ]
     }
   },
+
+  // ── Rule: Ban relative imports crossing package boundaries ──────────
+  // Cross-package imports must use @tx-agent-kit/* aliases.
+  // Relative paths bypass TypeScript project references and create fragile coupling.
+  // IMPORTANT: This must come BEFORE DDD layer blocks so that more-specific
+  // layer restrictions (domain/ports/adapters/application) override it.
+  {
+    files: ['packages/**/src/**/*.{ts,tsx}', 'apps/**/src/**/*.{ts,tsx}'],
+    ignores: ['packages/infra/db/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        withGlobalRestrictions({
+          patterns: [
+            {
+              group: [
+                '**/packages/core/**',
+                '**/packages/infra/**',
+                '**/packages/contracts/**',
+                '**/packages/temporal-client/**',
+                '**/packages/testkit/**',
+                '**/apps/api/**',
+                '**/apps/web/**',
+                '**/apps/worker/**',
+                '**/apps/mobile/**'
+              ],
+              message:
+                'Use @tx-agent-kit/* package aliases instead of relative cross-package imports.'
+            }
+          ]
+        })
+      ]
+    }
+  },
+
+  // ── Rule: Service/application layer must not import domain-events repo ─
+  // IMPORTANT: Must come BEFORE DDD application-layer block so the more
+  // specific application restrictions override this one.
+  {
+    files: ['packages/core/**/application/**/*.{ts,tsx}', 'packages/core/**/services/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', withGlobalRestrictions({
+        patterns: [{
+          group: ['**/repositories/domain-events*', '@tx-agent-kit/db'],
+          message: 'Service layer must not import domain events repository directly. Use port methods (e.g., createWithEvent) to write events transactionally.'
+        }]
+      })]
+    }
+  },
+
   {
     files: [
       'packages/**/src/domains/**/*.{ts,tsx}',
@@ -163,64 +355,15 @@ export const domainInvariantConfig = [
       'domain-structure/core-adapters-use-db-row-mappers': 'error'
     }
   },
+  // ── Web: core import restrictions + use server ban ──────────────────
   {
     files: ['apps/web/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          paths: [
-            {
-              name: '@tx-agent-kit/db',
-              message: 'Web must stay API-first. Call `apps/api` via typed client functions, never DB modules.'
-            },
-            {
-              name: 'drizzle-orm',
-              message: 'Web must stay API-first. Only the DB layer may import Drizzle.'
-            },
-            {
-              name: 'effect',
-              message:
-                'apps/web is intentionally dumb. Keep Effect runtime usage in API/core/worker layers.'
-            },
-            {
-              name: 'next/server',
-              message:
-                'apps/web is client-only. Server runtime imports (`next/server`) are forbidden.'
-            },
-            {
-              name: 'next/headers',
-              message:
-                'apps/web is client-only. Request header/cookie APIs (`next/headers`) are forbidden.'
-            },
-            {
-              name: 'next/navigation',
-              importNames: ['useSearchParams'],
-              message:
-                'Avoid `useSearchParams` in apps/web; it introduces Suspense/prerender constraints in static client pages.'
-            },
-            {
-              name: 'next/navigation',
-              importNames: ['redirect', 'notFound'],
-              message:
-                'apps/web is client-only. `redirect`/`notFound` server navigation APIs are forbidden.'
-            }
-          ],
-          patterns: [
-            {
-              group: ['@tx-agent-kit/db/*', 'drizzle-orm/*'],
-              message: 'Web must stay API-first. Keep persistence concerns behind API/core services.'
-            },
-            {
-              group: ['effect/*'],
-              message:
-                'apps/web is intentionally dumb. Keep Effect runtime usage in API/core/worker layers.'
-            },
-            {
-              group: ['next/server/*', 'next/headers/*'],
-              message: 'apps/web is client-only. Server runtime imports are forbidden.'
-            }
-          ]
+          paths: webCorePaths,
+          patterns: webCorePatterns
         }
       ],
       'no-restricted-syntax': [
@@ -233,6 +376,7 @@ export const domainInvariantConfig = [
       ]
     }
   },
+  // ── Web: axios centralization (ignores axios.ts itself) ───────────
   {
     files: ['apps/web/**/*.{ts,tsx}'],
     ignores: ['apps/web/lib/axios.ts'],
@@ -241,12 +385,14 @@ export const domainInvariantConfig = [
         'error',
         {
           paths: [
+            ...webCorePaths,
             {
               name: 'axios',
               message: 'Use shared axios clients from `apps/web/lib/axios.ts` only.'
             }
           ],
           patterns: [
+            ...webCorePatterns,
             {
               group: ['axios/*'],
               message: 'Use shared axios clients from `apps/web/lib/axios.ts` only.'
@@ -303,6 +449,7 @@ export const domainInvariantConfig = [
       ]
     }
   },
+  // ── Web: sonner centralization (ignores notify.tsx itself) ──────────
   {
     files: ['apps/web/**/*.{ts,tsx}'],
     ignores: ['apps/web/lib/notify.tsx'],
@@ -311,6 +458,7 @@ export const domainInvariantConfig = [
         'error',
         {
           paths: [
+            ...webCorePaths,
             {
               name: 'sonner',
               message:
@@ -318,6 +466,7 @@ export const domainInvariantConfig = [
             }
           ],
           patterns: [
+            ...webCorePatterns,
             {
               group: ['sonner/*'],
               message:
@@ -328,6 +477,7 @@ export const domainInvariantConfig = [
       ]
     }
   },
+  // ── Web: nuqs centralization (ignores url-state.tsx itself) ───────
   {
     files: ['apps/web/**/*.{ts,tsx}'],
     ignores: ['apps/web/lib/url-state.tsx'],
@@ -336,12 +486,14 @@ export const domainInvariantConfig = [
         'error',
         {
           paths: [
+            ...webCorePaths,
             {
               name: 'nuqs',
               message: 'Use `apps/web/lib/url-state.tsx` wrappers for URL query state.'
             }
           ],
           patterns: [
+            ...webCorePatterns,
             {
               group: ['nuqs/*'],
               message: 'Use `apps/web/lib/url-state.tsx` wrappers for URL query state.'
@@ -439,7 +591,7 @@ export const domainInvariantConfig = [
     rules: {
       'no-restricted-imports': [
         'error',
-        {
+        withGlobalRestrictions({
           paths: [
             {
               name: 'node:child_process',
@@ -453,7 +605,7 @@ export const domainInvariantConfig = [
                 'API integration tests must use `createDbAuthContext(...)` (not direct `createSqlTestContext(...)`).'
             }
           ]
-        }
+        })
       ],
       'no-restricted-syntax': [
         'error',
@@ -479,13 +631,10 @@ export const domainInvariantConfig = [
       ]
     }
   },
-  {
-    files: ['**/*.{ts,tsx}'],
-    ignores: ['packages/infra/db/**/*.{ts,tsx}'],
-    rules: {
-      'no-restricted-imports': ['error', drizzleIsolationRestrictions]
-    }
-  },
+  // NOTE: The former standalone drizzle-isolation config object was removed.
+  // Its restrictions are now merged into every no-restricted-imports block
+  // via globalPaths/globalPatterns/withGlobalRestrictions to prevent the
+  // ESLint flat-config cascade from silently dropping earlier restrictions.
   {
     files: [
       'packages/**/src/domains/*/{domain,ports,application,adapters,runtime,ui}/**/*.{ts,tsx}',
@@ -530,7 +679,7 @@ export const domainInvariantConfig = [
       ],
       'no-restricted-imports': [
         'error',
-        {
+        withGlobalRestrictions({
           paths: [
             {
               name: '@tx-agent-kit/auth',
@@ -569,7 +718,7 @@ export const domainInvariantConfig = [
               message: 'Domain layer is innermost and may only import from domain.'
             }
           ]
-        }
+        })
       ]
     }
   },
@@ -590,14 +739,14 @@ export const domainInvariantConfig = [
       ],
       'no-restricted-imports': [
         'error',
-        {
+        withGlobalRestrictions({
           patterns: [
             {
               regex: '(^|/)(application|adapters|runtime|ui)(/|$)',
               message: 'Ports may depend only on domain/ports.'
             }
           ]
-        }
+        })
       ]
     }
   },
@@ -609,14 +758,14 @@ export const domainInvariantConfig = [
     rules: {
       'no-restricted-imports': [
         'error',
-        {
+        withGlobalRestrictions({
           patterns: [
             {
               regex: '(^|/)(application|runtime|ui)(/|$)',
               message: 'Adapters may depend on domain/ports only.'
             }
           ]
-        }
+        })
       ]
     }
   },
@@ -643,7 +792,7 @@ export const domainInvariantConfig = [
     rules: {
       'no-restricted-imports': [
         'error',
-        {
+        withGlobalRestrictions({
           paths: [
             {
               name: '@tx-agent-kit/db',
@@ -680,7 +829,7 @@ export const domainInvariantConfig = [
                 'Application layer must not couple to transport/infra packages. Use domain models and capability ports, then map in outer layers.'
             }
           ]
-        }
+        })
       ],
       'no-restricted-syntax': [
         'error',
@@ -702,12 +851,31 @@ export const domainInvariantConfig = [
       ]
     }
   },
+  // ── Rule: API must not import Temporal ──────────────────────────────
+  // IMPORTANT: Must come BEFORE the API routes block so that route-specific
+  // restrictions override this broader apps/api/** block.
+  {
+    files: ['apps/api/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', withGlobalRestrictions({
+        paths: [
+          { name: '@temporalio/client', message: 'API must not import Temporal client. Write to the outbox table; the worker processes events.' },
+          { name: '@temporalio/workflow', message: 'API must not import Temporal workflows.' },
+          { name: '@temporalio/worker', message: 'API must not import Temporal worker.' }
+        ],
+        patterns: [{
+          group: ['@temporalio/*'],
+          message: 'API must not depend on Temporal. Events flow through the outbox pattern: API → domain_events table → worker.'
+        }]
+      })]
+    }
+  },
   {
     files: ['apps/api/src/routes/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
-        {
+        withGlobalRestrictions({
           paths: [
             {
               name: '@tx-agent-kit/db',
@@ -724,7 +892,7 @@ export const domainInvariantConfig = [
               message: 'API routes must not depend on adapter implementations directly.'
             }
           ]
-        }
+        })
       ],
       'no-restricted-syntax': [
         'error',
@@ -745,7 +913,7 @@ export const domainInvariantConfig = [
     rules: {
       'no-restricted-imports': [
         'error',
-        {
+        withGlobalRestrictions({
           paths: [
             {
               name: '@tx-agent-kit/db',
@@ -766,7 +934,7 @@ export const domainInvariantConfig = [
               message: 'Temporal workflows must stay deterministic and must not import non-deterministic infrastructure.'
             }
           ]
-        }
+        })
       ],
       'no-restricted-syntax': [
         'error',
@@ -908,60 +1076,20 @@ export const domainInvariantConfig = [
       ]
     }
   },
+  // ── Mobile: core import restrictions ────────────────────────────────
   {
     files: ['apps/mobile/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          paths: [
-            {
-              name: '@tx-agent-kit/db',
-              message: 'Mobile must stay API-first. Call `apps/api` via typed client functions, never DB modules.'
-            },
-            {
-              name: 'drizzle-orm',
-              message: 'Mobile must stay API-first. Only the DB layer may import Drizzle.'
-            },
-            {
-              name: 'effect',
-              message:
-                'apps/mobile is a dumb API consumer. Keep Effect runtime usage in API/core/worker layers.'
-            },
-            {
-              name: '@tx-agent-kit/core',
-              message:
-                'apps/mobile is a dumb API consumer. Import contracts only, not core domain modules.'
-            },
-            {
-              name: '@tx-agent-kit/logging',
-              message: 'Mobile must use `apps/mobile/lib/log.ts` for logging.'
-            }
-          ],
-          patterns: [
-            {
-              group: ['@tx-agent-kit/db/*', 'drizzle-orm/*'],
-              message: 'Mobile must stay API-first. Keep persistence concerns behind API/core services.'
-            },
-            {
-              group: ['effect/*'],
-              message:
-                'apps/mobile is a dumb API consumer. Keep Effect runtime usage in API/core/worker layers.'
-            },
-            {
-              group: ['@tx-agent-kit/core/*'],
-              message:
-                'apps/mobile is a dumb API consumer. Import contracts only, not core domain modules.'
-            },
-            {
-              group: ['@tx-agent-kit/logging/*'],
-              message: 'Mobile must use `apps/mobile/lib/log.ts` for logging.'
-            }
-          ]
+          paths: mobileCorePaths,
+          patterns: mobileCorePatterns
         }
       ]
     }
   },
+  // ── Mobile: axios centralization (ignores axios.ts itself) ────────
   {
     files: ['apps/mobile/**/*.{ts,tsx}'],
     ignores: ['apps/mobile/lib/axios.ts'],
@@ -970,12 +1098,14 @@ export const domainInvariantConfig = [
         'error',
         {
           paths: [
+            ...mobileCorePaths,
             {
               name: 'axios',
               message: 'Use shared axios clients from `apps/mobile/lib/axios.ts` only.'
             }
           ],
           patterns: [
+            ...mobileCorePatterns,
             {
               group: ['axios/*'],
               message: 'Use shared axios clients from `apps/mobile/lib/axios.ts` only.'
@@ -1005,6 +1135,7 @@ export const domainInvariantConfig = [
       ]
     }
   },
+  // ── Mobile: notify centralization (ignores notify.tsx itself) ───────
   {
     files: ['apps/mobile/**/*.{ts,tsx}'],
     ignores: ['apps/mobile/lib/notify.tsx'],
@@ -1013,6 +1144,7 @@ export const domainInvariantConfig = [
         'error',
         {
           paths: [
+            ...mobileCorePaths,
             {
               name: 'react-native-toast-message',
               message:
@@ -1020,6 +1152,7 @@ export const domainInvariantConfig = [
             }
           ],
           patterns: [
+            ...mobileCorePatterns,
             {
               group: ['react-native-toast-message/*'],
               message:
@@ -1030,6 +1163,7 @@ export const domainInvariantConfig = [
       ]
     }
   },
+  // ── Mobile: url-state centralization (ignores url-state.tsx itself) ─
   {
     files: ['apps/mobile/**/*.{ts,tsx}'],
     ignores: ['apps/mobile/lib/url-state.tsx'],
@@ -1038,16 +1172,19 @@ export const domainInvariantConfig = [
         'error',
         {
           paths: [
+            ...mobileCorePaths,
             {
               name: 'expo-router',
               importNames: ['useLocalSearchParams', 'useGlobalSearchParams'],
               message: 'Use `apps/mobile/lib/url-state.tsx` wrappers for URL search params.'
             }
-          ]
+          ],
+          patterns: mobileCorePatterns
         }
       ]
     }
   },
+  // ── Mobile: auth-token centralization (ignores auth-token.ts itself) ─
   {
     files: ['apps/mobile/**/*.{ts,tsx}'],
     ignores: ['apps/mobile/lib/auth-token.ts'],
@@ -1056,6 +1193,7 @@ export const domainInvariantConfig = [
         'error',
         {
           paths: [
+            ...mobileCorePaths,
             {
               name: 'expo-secure-store',
               message:
@@ -1063,6 +1201,7 @@ export const domainInvariantConfig = [
             }
           ],
           patterns: [
+            ...mobileCorePatterns,
             {
               group: ['expo-secure-store/*'],
               message:
@@ -1117,65 +1256,6 @@ export const domainInvariantConfig = [
       'no-console': 'off'
     }
   },
-  {
-    files: ['packages/core/**/application/**/*.{ts,tsx}', 'packages/core/**/services/**/*.{ts,tsx}'],
-    rules: {
-      'no-restricted-imports': ['error', {
-        patterns: [{
-          group: ['**/repositories/domain-events*', '@tx-agent-kit/db'],
-          message: 'Service layer must not import domain events repository directly. Use port methods (e.g., createWithEvent) to write events transactionally.'
-        }]
-      }]
-    }
-  },
-  {
-    files: ['apps/api/**/*.{ts,tsx}'],
-    rules: {
-      'no-restricted-imports': ['error', {
-        paths: [
-          { name: '@temporalio/client', message: 'API must not import Temporal client. Write to the outbox table; the worker processes events.' },
-          { name: '@temporalio/workflow', message: 'API must not import Temporal workflows.' },
-          { name: '@temporalio/worker', message: 'API must not import Temporal worker.' }
-        ],
-        patterns: [{
-          group: ['@temporalio/*'],
-          message: 'API must not depend on Temporal. Events flow through the outbox pattern: API → domain_events table → worker.'
-        }]
-      }]
-    }
-  },
-
-  // ── Rule: Ban relative imports crossing package boundaries ──────────
-  // Cross-package imports must use @tx-agent-kit/* aliases.
-  // Relative paths bypass TypeScript project references and create fragile coupling.
-  {
-    files: ['packages/**/src/**/*.{ts,tsx}', 'apps/**/src/**/*.{ts,tsx}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: [
-                '**/packages/core/**',
-                '**/packages/infra/**',
-                '**/packages/contracts/**',
-                '**/packages/temporal-client/**',
-                '**/packages/testkit/**',
-                '**/apps/api/**',
-                '**/apps/web/**',
-                '**/apps/worker/**',
-                '**/apps/mobile/**'
-              ],
-              message:
-                'Use @tx-agent-kit/* package aliases instead of relative cross-package imports.'
-            }
-          ]
-        }
-      ]
-    }
-  },
-
   // ── Rule: Enforce explicit return types on exported port functions ───
   // Ports are API contracts. Inferred return types can silently change.
   {

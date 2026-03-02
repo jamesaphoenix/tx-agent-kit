@@ -55,7 +55,7 @@ describe('OrganizationsPage integration', () => {
       expect(
         within(organizationsSection).getByText(organization.name, { selector: 'strong' })
       ).toBeInTheDocument()
-    }, { timeout: 5_000 })
+    }, { timeout: 5000 })
     expect(readIntegrationRouterLocation().pathname).not.toBe('/sign-in')
   })
 

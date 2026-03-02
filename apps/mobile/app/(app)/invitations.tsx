@@ -33,29 +33,29 @@ export default function InvitationsScreen() {
         clientApi.listOrganizations()
       ])
 
-      if (!mountedRef.current) return
+      if (!mountedRef.current) {return}
 
       setState({
         invitations: invitationsPayload.invitations,
         organizations: organizationsPayload.organizations
       })
-    } catch (err) {
-      const handled = await handleUnauthorizedApiError(err, routerRef.current, '/invitations')
-      if (handled || !mountedRef.current) return
-      setError(err instanceof Error ? err.message : 'Failed to load invitations')
+    } catch (error_) {
+      const handled = await handleUnauthorizedApiError(error_, routerRef.current, '/invitations')
+      if (handled || !mountedRef.current) {return}
+      setError(error_ instanceof Error ? error_.message : 'Failed to load invitations')
     } finally {
-      if (mountedRef.current) setLoading(false)
+      if (mountedRef.current) {setLoading(false)}
     }
   }, [])
 
   const load = useCallback(async (): Promise<void> => {
     const hasSession = await ensureSessionOrRedirect(routerRef.current, '/invitations')
     if (!hasSession) {
-      if (mountedRef.current) setLoading(false)
+      if (mountedRef.current) {setLoading(false)}
       return
     }
 
-    if (!mountedRef.current) return
+    if (!mountedRef.current) {return}
 
     setLoading(true)
     setError(null)
@@ -63,7 +63,7 @@ export default function InvitationsScreen() {
   }, [fetchData])
 
   const refresh = useCallback(async (): Promise<void> => {
-    if (!mountedRef.current) return
+    if (!mountedRef.current) {return}
     setError(null)
     await fetchData()
   }, [fetchData])

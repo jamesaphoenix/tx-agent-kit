@@ -1,7 +1,9 @@
 import { logs, SeverityNumber, type AnyValue, type AnyValueMap } from '@opentelemetry/api-logs'
 import { getLoggingEnv } from './env.js'
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+export type { LogLevel } from './env.js'
+
+import type { LogLevel } from './env.js'
 
 export interface LogContext {
   [key: string]: unknown
@@ -33,6 +35,13 @@ const severityNumberByLevel: Record<LogLevel, SeverityNumber> = {
   info: SeverityNumber.INFO,
   warn: SeverityNumber.WARN,
   error: SeverityNumber.ERROR
+}
+
+const levelPriority: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3
 }
 
 const safeJsonStringify = (value: unknown): string => {
@@ -137,8 +146,18 @@ const createEntry = (
   }
 }
 
-export const createLogger = (service: string, baseContext: LogContext = {}): StructuredLogger => {
+export const createLogger = (
+  service: string,
+  baseContext: LogContext = {},
+  minLevel?: LogLevel
+): StructuredLogger => {
+  const threshold = minLevel ?? getLoggingEnv().LOG_LEVEL
+
   const log = (level: LogLevel, message: string, context?: LogContext, error?: Error): void => {
+    if (levelPriority[level] < levelPriority[threshold]) {
+      return
+    }
+
     writeLog(
       createEntry(
         service,
@@ -170,7 +189,7 @@ export const createLogger = (service: string, baseContext: LogContext = {}): Str
       return createLogger(withScope(service, scope), {
         ...baseContext,
         ...context
-      })
+      }, threshold)
     }
   }
 }

@@ -11,7 +11,7 @@ export default function IndexPage() {
   const isAuthenticated = useIsAuthenticated()
 
   useEffect(() => {
-    if (!isReady) return
+    if (!isReady) {return}
     routerRef.current.replace(isAuthenticated ? '/dashboard' : '/sign-in')
   }, [isReady, isAuthenticated])
 

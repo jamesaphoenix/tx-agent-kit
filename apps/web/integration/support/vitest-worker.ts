@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const slotClaimDirRelativePath = '.vitest/web-integration/slot-claims'
 const slotClaimPidRegex = /^pid=(\d+)$/
-const staleClaimWithoutPidMs = 5_000
+const staleClaimWithoutPidMs = 5000
 const defaultSlotClaimWaitMs = 60_000
 const defaultSlotClaimPollMs = 100
 const maxAutoIntegrationWorkers = 6

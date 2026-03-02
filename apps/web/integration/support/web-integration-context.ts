@@ -48,10 +48,9 @@ export const resetWebIntegrationCase = async (): Promise<void> => {
   await dbAuthContext.reset()
 }
 
-export const teardownWebIntegrationSuite = async (): Promise<void> => {
+export const teardownWebIntegrationSuite = (): void => {
   // Worker-slot API/DB harnesses are shared across files and cleaned up
   // centrally in vitest global teardown.
-  return Promise.resolve()
 }
 
 export const createWebFactoryContext = (): ApiFactoryContext => dbAuthContext.apiFactoryContext

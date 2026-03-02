@@ -28,7 +28,7 @@ export function CreateInvitationForm({
   const organizationId = organizations[selectedIndex]?.id ?? ''
 
   const onSubmit = async () => {
-    if (pending) return
+    if (pending) {return}
     if (!organizationId) {
       const message = 'Create an organization first'
       setError(message)
@@ -44,8 +44,8 @@ export function CreateInvitationForm({
       setEmail('')
       notify.success('Invitation sent')
       await onCreated?.()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to send invitation'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to send invitation'
       setError(message)
       notify.error(message)
     } finally {

@@ -50,14 +50,14 @@ export const setBlogDataSource = (source: BlogDataSource): void => {
 export const getBlogDataSource = (): BlogDataSource | null => dataSource
 
 export const estimateReadingTime = (content: string): number => {
-  const words = content.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length
+  const words = content.replaceAll(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length
   return Math.max(1, Math.ceil(words / 200))
 }
 
 export const escapeXml = (text: string): string =>
   text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('\'', '&#039;')

@@ -26,15 +26,15 @@ export function AuthBootstrapProvider({ children }: { children: ReactNode }) {
         }
 
         sessionStoreActions.setPrincipal(principal)
-      } catch (err) {
-        log.error('Auth bootstrap failed', err)
+      } catch (error) {
+        log.error('Auth bootstrap failed', error)
 
         if (!isActive()) {
           return
         }
 
         const isAuthRejection =
-          err instanceof ApiClientError && (err.status === 401 || err.status === 403)
+          error instanceof ApiClientError && (error.status === 401 || error.status === 403)
 
         if (isAuthRejection) {
           await clearAuthToken()

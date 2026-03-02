@@ -8,14 +8,14 @@ export const isValidTestRunId = (value: string): boolean =>
   validateUuid(value) && uuidVersion(value) === 7
 
 export const compactTestRunId = (testRunId: string): string =>
-  testRunId.toLowerCase().replace(/[^a-z0-9]/g, '')
+  testRunId.toLowerCase().replaceAll(/[^a-z0-9]/g, '')
 
 export const createTestCaseId = (testRunId: string, caseName: string): string => {
   const normalizedCase = caseName
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '')
 
   const fallbackCaseName = normalizedCase.length > 0 ? normalizedCase : 'case'
   return `${testRunId}:${fallbackCaseName}`
@@ -25,7 +25,7 @@ export const buildSchemaName = (
   testRunId: string,
   prefix = 'test'
 ): string => {
-  const sanitizedPrefix = prefix.toLowerCase().replace(/[^a-z0-9_]/g, '_')
+  const sanitizedPrefix = prefix.toLowerCase().replaceAll(/[^a-z0-9_]/g, '_')
   const sanitizedRunId = compactTestRunId(testRunId)
   const candidate = `${sanitizedPrefix}_${sanitizedRunId}`
   return candidate.slice(0, 63)

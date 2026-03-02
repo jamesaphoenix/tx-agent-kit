@@ -13,7 +13,7 @@ export function CreateOrganizationForm({
   const [pending, setPending] = useState(false)
 
   const onSubmit = async () => {
-    if (pending) return
+    if (pending) {return}
     setPending(true)
     setError(null)
 
@@ -22,8 +22,8 @@ export function CreateOrganizationForm({
       setName('')
       notify.success('Organization created')
       await onCreated?.()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create organization'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to create organization'
       setError(message)
       notify.error(message)
     } finally {

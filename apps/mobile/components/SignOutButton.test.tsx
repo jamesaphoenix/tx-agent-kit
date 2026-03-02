@@ -53,7 +53,7 @@ describe('SignOutButton', () => {
   it('renders Sign out text', () => {
     const tree = create(<SignOutButton />)
     const texts = findByType(tree.root, 'Text')
-    const labels = texts.map((t) => t.props.children).flat()
+    const labels = texts.flatMap((t) => t.props.children)
     expect(labels).toContain('Sign out')
   })
 
@@ -126,7 +126,7 @@ describe('SignOutButton', () => {
 
     // Button should show "Sign out" again, not "Signing out..."
     const texts = findByType(tree.root, 'Text')
-    const labels = texts.map((t) => t.props.children).flat()
+    const labels = texts.flatMap((t) => t.props.children)
     expect(labels).toContain('Sign out')
   })
 })

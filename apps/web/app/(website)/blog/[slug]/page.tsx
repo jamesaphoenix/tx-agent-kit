@@ -24,7 +24,7 @@ const ALLOWED_ATTRS = new Set([
 ])
 
 function sanitizeHtml(html: string): string {
-  if (typeof document === 'undefined') return ''
+  if (typeof document === 'undefined') {return ''}
   const parser = new DOMParser()
   const doc = parser.parseFromString(html, 'text/html')
 

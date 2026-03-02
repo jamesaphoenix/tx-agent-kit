@@ -26,6 +26,9 @@ ESLint catches per-file violations during editing and in CI. These rules cover t
 |----------|----------|
 | Import restrictions | No `drizzle-orm` outside `packages/infra/db`, no `effect` in `apps/web` |
 | Code patterns | `console.*` banned, `as any` banned, no suppression directives |
+| Code quality | Unused import removal, curly braces, object shorthand, arrow callbacks |
+| Modern JS (unicorn) | `node:` protocol, `.replaceAll()`, `.slice()`, `.flatMap()`, `structuredClone` |
+| Test governance | No `.only()` in test files, no constant binary expressions |
 | Package boundaries | Cross-package import control via `eslint-plugin-boundaries` |
 
 ### 2. Structural Scripts

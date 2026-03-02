@@ -41,8 +41,8 @@ export function CreateInvitationForm({
       notify.success('Invitation sent')
       await onCreated?.()
       setPending(false)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to send invitation'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to send invitation'
       setError(message)
       notify.error(message)
       setPending(false)

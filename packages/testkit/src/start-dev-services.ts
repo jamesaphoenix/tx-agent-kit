@@ -36,7 +36,7 @@ const resolveSpawnTimeoutMs = (envOverrides: Readonly<NodeJS.ProcessEnv>): numbe
     20
   )
 
-  return (readinessTimeoutSeconds + headroomSeconds) * 1_000
+  return (readinessTimeoutSeconds + headroomSeconds) * 1000
 }
 
 export const runStartDevServices = (

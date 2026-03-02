@@ -34,7 +34,7 @@ const requiredNodeMetricJobs = [
 const requiredNodeLogServices = ['tx-agent-kit-api', 'tx-agent-kit-worker'] as const
 const smokeLogMarker = 'observability.smoke.log'
 const pollAttempts = 60
-const pollIntervalMs = 1_000
+const pollIntervalMs = 1000
 const repoRoot = resolve(import.meta.dirname, '../../../..')
 const apiCwd = resolve(repoRoot, 'apps/api')
 const smokeScriptPath = resolve(repoRoot, 'scripts/test/emit-observability-smoke.ts')
@@ -186,13 +186,13 @@ const startApiHarness = async (
       }
 
       processRef.kill('SIGTERM')
-      const exitedAfterTerm = await waitForExit(processRef, 5_000)
+      const exitedAfterTerm = await waitForExit(processRef, 5000)
       if (exitedAfterTerm) {
         return
       }
 
       processRef.kill('SIGKILL')
-      await waitForExit(processRef, 2_000)
+      await waitForExit(processRef, 2000)
     }
   }
 }

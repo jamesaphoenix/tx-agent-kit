@@ -33,7 +33,7 @@ describe('AcceptInvitationForm', () => {
     expect(inputs.some((i) => i.props.placeholder === 'Paste invitation token')).toBe(true)
 
     const texts = findByType(tree.root, 'Text')
-    const labels = texts.map((t) => t.props.children).flat()
+    const labels = texts.flatMap((t) => t.props.children)
     expect(labels).toContain('Accept invitation')
   })
 
@@ -89,7 +89,7 @@ describe('AcceptInvitationForm', () => {
     expect(updatedInput.props.value).toBe('')
 
     const texts = findByType(tree.root, 'Text')
-    const labels = texts.map((t) => t.props.children).flat()
+    const labels = texts.flatMap((t) => t.props.children)
     expect(labels).toContain('Invitation accepted successfully')
   })
 
@@ -144,7 +144,7 @@ describe('AcceptInvitationForm', () => {
     expect(notify.error).toHaveBeenCalledWith('Token expired')
 
     const texts = findByType(tree.root, 'Text')
-    const labels = texts.map((t) => t.props.children).flat()
+    const labels = texts.flatMap((t) => t.props.children)
     expect(labels).toContain('Accept invitation')
   })
 })

@@ -39,12 +39,12 @@ export default function DashboardPage() {
         principal,
         organizations: organizationPayload.data
       })
-    } catch (err) {
-      if (handleUnauthorizedApiError(err, router, '/dashboard')) {
+    } catch (error_) {
+      if (handleUnauthorizedApiError(error_, router, '/dashboard')) {
         return
       }
 
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard')
+      setError(error_ instanceof Error ? error_.message : 'Failed to load dashboard')
     } finally {
       setLoading(false)
     }

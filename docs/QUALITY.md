@@ -49,6 +49,11 @@
 - Type-safety governance: `as any` assertions are forbidden in source modules.
 - Type-safety governance: chained assertions (`as unknown as ...`) are forbidden in source modules.
 - Error-handling governance: empty catch blocks are forbidden in source modules.
+- Test-only governance: `.only()` in test files is forbidden (`no-only-tests/no-only-tests`); a committed `.only()` silently skips the rest of the suite in CI.
+- Dead import governance: unused imports are auto-removed (`unused-imports/no-unused-imports`).
+- Modern JS governance: curly braces required on all blocks; object shorthand, arrow callbacks, rest params, and spread are enforced.
+- Unicorn governance: `node:` protocol for builtins, `.replaceAll()` over `.replace(/…/g)`, `.slice()` over `.substring()`/`.substr()`, `.flatMap()` over `.map().flat()`, `.some()` over `.filter().length`, `structuredClone` over JSON round-trip, `Number.*` properties over globals (`isNaN`, `isFinite`, `parseInt`, `parseFloat`), consistent `error` naming in catch blocks, numeric separators for large literals, no redundant spreads, no useless `Promise.resolve/reject` in async functions, drop unused catch bindings.
+- Constant expression governance: provably-wrong binary expressions are forbidden (`no-constant-binary-expression`).
 - Test colocation governance: `__tests__` folders, `.spec.ts[x]`, and `.integration.ts[x]` names are forbidden; use colocated `<file>.test.ts[x]` and `<file>.integration.test.ts[x]`.
 - Critical integration baseline governance:
   - API integration suite must exercise health/auth/organization/invitation endpoints and invitation idempotency.

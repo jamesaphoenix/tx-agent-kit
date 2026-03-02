@@ -227,11 +227,11 @@ export const createApiServerHarness = (
     }
 
     active.kill('SIGTERM')
-    const exitedAfterTerm = await waitForExit(active, 5_000)
+    const exitedAfterTerm = await waitForExit(active, 5000)
 
     if (!exitedAfterTerm) {
       active.kill('SIGKILL')
-      await waitForExit(active, 2_000)
+      await waitForExit(active, 2000)
     }
 
     processRef = undefined

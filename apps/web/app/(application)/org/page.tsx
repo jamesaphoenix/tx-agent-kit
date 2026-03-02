@@ -35,11 +35,11 @@ export default function OrgRedirectPage() {
         }
 
         router.replace(`/org/${orgId}/${firstTeam.id}`)
-      } catch (err) {
-        if (handleUnauthorizedApiError(err, router, '/org')) {
+      } catch (error_) {
+        if (handleUnauthorizedApiError(error_, router, '/org')) {
           return
         }
-        setError(err instanceof Error ? err.message : 'Failed to resolve organization context')
+        setError(error_ instanceof Error ? error_.message : 'Failed to resolve organization context')
       }
     }
 

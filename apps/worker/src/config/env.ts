@@ -88,7 +88,7 @@ const normalizePemValue = (value: string | undefined): string | undefined => {
     return undefined
   }
 
-  return value.replace(/\\n/g, '\n')
+  return value.replaceAll('\\n', '\n')
 }
 
 const resolveRuntimeModeDefaults = (

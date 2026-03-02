@@ -14,7 +14,7 @@ export const buildCursorCondition = (
   sortValue: Date | string,
   idColumn: Column
 ): SQL | undefined => {
-  if (!cursor) return undefined
+  if (!cursor) {return undefined}
 
   const cmp = sortOrder === 'asc' ? gt : lt
   return or(

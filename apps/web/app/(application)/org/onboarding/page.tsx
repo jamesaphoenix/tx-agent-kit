@@ -210,12 +210,12 @@ export default function OrganizationOnboardingPage() {
         }
 
         setLoading(false)
-      } catch (err) {
-        if (handleUnauthorizedApiError(err, router, '/org/onboarding')) {
+      } catch (error_) {
+        if (handleUnauthorizedApiError(error_, router, '/org/onboarding')) {
           return
         }
 
-        setError(err instanceof Error ? err.message : 'Failed to load onboarding state')
+        setError(error_ instanceof Error ? error_.message : 'Failed to load onboarding state')
         setLoading(false)
       }
     }
@@ -276,8 +276,8 @@ export default function OrganizationOnboardingPage() {
 
       setCurrentStep('workspace_setup')
       notify.success('Organization profile saved')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save organization profile'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to save organization profile'
       setError(message)
       notify.error(message)
     } finally {
@@ -335,8 +335,8 @@ export default function OrganizationOnboardingPage() {
 
       setCurrentStep('goals')
       notify.success('Workspace setup saved')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save workspace setup'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to save workspace setup'
       setError(message)
       notify.error(message)
     } finally {
@@ -376,8 +376,8 @@ export default function OrganizationOnboardingPage() {
       }
 
       router.replace(`/org/${organizationId}/workspaces`)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to complete onboarding'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to complete onboarding'
       setError(message)
       notify.error(message)
     } finally {

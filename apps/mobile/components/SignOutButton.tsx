@@ -23,8 +23,8 @@ export function SignOutButton() {
           try {
             await clientApi.signOut()
             notify.info('Signed out')
-          } catch (err) {
-            log.error('Sign out failed', err)
+          } catch (error) {
+            log.error('Sign out failed', error)
             notify.error('Sign out failed')
           } finally {
             setPending(false)

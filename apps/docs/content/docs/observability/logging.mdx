@@ -122,6 +122,26 @@ Every log entry is simultaneously emitted as an OTEL log record via the `@opente
 
 When `OTEL_LOGS_EXPORTER=otlp` is set (the default), logs flow through the OTEL Collector to the configured backend. Set `OTEL_LOGS_EXPORTER=none` to disable OTEL log export while keeping stdout output.
 
+## Log level filtering
+
+The logger respects the `LOG_LEVEL` environment variable. Logs below the configured level are silently dropped (no stdout, no OTEL emit).
+
+| `NODE_ENV` | Default `LOG_LEVEL` |
+|---|---|
+| `development` / `test` | `debug` |
+| `staging` / `production` | `warn` |
+
+Valid values are `debug`, `info`, `warn`, and `error`. Set `LOG_LEVEL` explicitly in `.env` to override the default:
+
+```bash
+# In root .env — override to info in local dev
+LOG_LEVEL=info
+```
+
+Staging and production deploy templates (`deploy/env/staging.env.template`, `deploy/env/prod.env.template`) default to `warn`.
+
+Child loggers inherit the parent's log level automatically.
+
 ## Default logger
 
 A default logger is exported for convenience, using the `SERVICE_NAME` environment variable:

@@ -29,11 +29,11 @@ export default function WorkspacesPage() {
       ])
       setTeams(result.data)
       setPrincipalEmail(principal.email)
-    } catch (err) {
-      if (handleUnauthorizedApiError(err, router, `/org/${orgId}/workspaces`)) {
+    } catch (error_) {
+      if (handleUnauthorizedApiError(error_, router, `/org/${orgId}/workspaces`)) {
         return
       }
-      setError(err instanceof Error ? err.message : 'Failed to load workspaces')
+      setError(error_ instanceof Error ? error_.message : 'Failed to load workspaces')
     } finally {
       setLoading(false)
     }
@@ -55,8 +55,8 @@ export default function WorkspacesPage() {
       notify.success(`Workspace "${team.name}" created`)
       setNewTeamName('')
       router.push(`/org/${orgId}/${team.id}`)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create workspace'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to create workspace'
       notify.error(message)
     } finally {
       setCreating(false)

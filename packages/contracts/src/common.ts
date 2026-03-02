@@ -35,7 +35,7 @@ const encodeBase64Url = (value: string): string => {
   const maybeBtoa = (globalThis as { btoa?: (input: string) => string }).btoa
 
   if (maybeBtoa) {
-    return maybeBtoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+    return maybeBtoa(value).replaceAll('+', '-').replaceAll('/', '_').replaceAll(/=+$/g, '')
   }
 
   const maybeBuffer = (globalThis as { Buffer?: { from: (input: string, encoding?: string) => { toString: (encoding: string) => string } } }).Buffer
@@ -47,7 +47,7 @@ const encodeBase64Url = (value: string): string => {
 }
 
 const decodeBase64Url = (value: string): string => {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const normalized = value.replaceAll('-', '+').replaceAll('_', '/')
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
   const maybeAtob = (globalThis as { atob?: (input: string) => string }).atob
 

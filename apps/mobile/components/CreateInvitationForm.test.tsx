@@ -35,7 +35,7 @@ describe('CreateInvitationForm', () => {
   it('renders organization chips, email input, role chips, and send button', () => {
     const tree = create(<CreateInvitationForm organizations={organizations} />)
     const texts = findByType(tree.root, 'Text')
-    const labels = texts.map((t) => t.props.children).flat()
+    const labels = texts.flatMap((t) => t.props.children)
 
     expect(labels).toContain('Invite teammate')
     expect(labels).toContain('Alpha')
@@ -285,7 +285,7 @@ describe('CreateInvitationForm', () => {
     expect(notify.error).toHaveBeenCalledWith('Already invited')
 
     const texts = findByType(tree.root, 'Text')
-    const labels = texts.map((t) => t.props.children).flat()
+    const labels = texts.flatMap((t) => t.props.children)
     expect(labels).toContain('Send invitation')
   })
 })

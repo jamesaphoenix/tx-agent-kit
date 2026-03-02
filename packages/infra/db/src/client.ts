@@ -22,7 +22,7 @@ export const getPool = (): Pool => {
       connectionString,
       max: 20,
       idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 5_000
+      connectionTimeoutMillis: 5000
     })
   }
   return poolSingleton

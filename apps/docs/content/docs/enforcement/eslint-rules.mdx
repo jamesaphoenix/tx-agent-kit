@@ -3,7 +3,15 @@ title: ESLint Rules
 description: ESLint enforcement layer covering import restrictions, code patterns, and package boundaries.
 ---
 
-The ESLint configuration lives in `packages/tooling/eslint-config/` and provides per-file enforcement of architectural constraints. The primary file is `domain-invariants.js`.
+The ESLint configuration lives in `packages/tooling/eslint-config/` and provides per-file enforcement of architectural constraints. Config files are split by concern:
+
+- `base.js` — `strictTypeChecked` preset and project-wide overrides
+- `domain-invariants.js` — Architecture, DDD layer boundaries, and import restrictions
+- `code-quality.js` — General code quality (unused imports, curly braces, modern JS style)
+- `effect-consistency.js` — Effect-specific patterns (ban `new Promise`)
+- `type-safety.js` — Exhaustive switches, nullish coalescing, optional chain, type exports
+- `testing.js` — Test-specific rules (vitest globals, no `.only()`)
+- `unicorn.js` — Modern JS best practices from `eslint-plugin-unicorn`
 
 ## Import Restrictions
 
@@ -104,6 +112,68 @@ export default class OrganizationService { }
 // Required
 export class OrganizationService { }
 ```
+
+## Code Quality Rules
+
+### No `.only()` in Test Files
+
+A committed `.only()` silently skips the rest of the test suite in CI:
+
+```typescript
+// Forbidden in *.test.ts and *.integration.test.ts
+describe.only('my test', () => {})
+it.only('single test', () => {})
+```
+
+### No Constant Binary Expressions
+
+Provably-wrong binary expressions are forbidden (`no-constant-binary-expression`):
+
+```typescript
+// Forbidden — always truthy
+const x = "hello" ?? "world"
+```
+
+### Dead Import Removal
+
+Unused imports are auto-removed via `eslint-plugin-unused-imports`:
+
+```typescript
+// Auto-fixed: removed if foo is unused
+import { foo } from './bar'
+```
+
+### Modern JS Style
+
+The following modern JavaScript patterns are enforced:
+
+| Rule | Enforces |
+|------|----------|
+| `curly` | Braces required on all blocks |
+| `object-shorthand` | `{ foo }` over `{ foo: foo }` |
+| `prefer-arrow-callback` | Arrow callbacks (named functions allowed) |
+| `prefer-rest-params` | `...args` over `arguments` |
+| `prefer-spread` | Spread over `.apply()` |
+
+### Unicorn Rules
+
+Modern JS best practices from `eslint-plugin-unicorn`:
+
+| Rule | Enforces |
+|------|----------|
+| `unicorn/prefer-node-protocol` | `node:fs` over `fs` |
+| `unicorn/prefer-string-replace-all` | `.replaceAll()` over `.replace(/…/g)` |
+| `unicorn/prefer-string-slice` | `.slice()` over `.substring()`/`.substr()` |
+| `unicorn/prefer-array-flat-map` | `.flatMap()` over `.map().flat()` |
+| `unicorn/prefer-array-some` | `.some()` over `.filter().length` |
+| `unicorn/prefer-structured-clone` | `structuredClone` over JSON round-trip |
+| `unicorn/prefer-number-properties` | `Number.isNaN` over global `isNaN` |
+| `unicorn/catch-error-name` | Consistent `error` naming in catch blocks |
+| `unicorn/numeric-separators-style` | `1_000_000` over `1000000` |
+| `unicorn/no-useless-spread` | No redundant spreads |
+| `unicorn/no-useless-promise-resolve-reject` | No `return Promise.resolve(x)` in async functions |
+| `unicorn/no-abusive-eslint-disable` | No blanket `/* eslint-disable */` |
+| `unicorn/prefer-optional-catch-binding` | Drop unused `catch (error)` bindings |
 
 ## Package Boundaries
 

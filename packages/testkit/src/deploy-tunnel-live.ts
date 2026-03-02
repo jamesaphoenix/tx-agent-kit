@@ -21,7 +21,7 @@ export const runLiveTunnelCommand = (
     'pnpm',
     [command, resolveLiveTunnelMode()],
     envOverrides,
-    5 * 60 * 1_000
+    5 * 60 * 1000
   )
 
   return {

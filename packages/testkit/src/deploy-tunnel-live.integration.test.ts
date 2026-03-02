@@ -21,7 +21,7 @@ describe.sequential('live cloudflare tunnel integration', () => {
       expect(check.output).toMatch(/Tunnel route check passed/u)
       expect(check.output).toMatch(/Tunnel health passed/u)
     },
-    11 * 60 * 1_000
+    11 * 60 * 1000
   )
 
   it.skipIf(!shouldRunLiveTunnelNegativeIntegration)(
@@ -35,7 +35,7 @@ describe.sequential('live cloudflare tunnel integration', () => {
       expect(run.exitCode).not.toBe(0)
       expect(run.output).toContain('Missing tunnel host for dev')
     },
-    3 * 60 * 1_000
+    3 * 60 * 1000
   )
 
   it.skipIf(!shouldRunLiveTunnelNegativeIntegration)(
@@ -51,6 +51,6 @@ describe.sequential('live cloudflare tunnel integration', () => {
       expect(run.exitCode).not.toBe(0)
       expect(run.output).toContain('Tunnel health check failed for unreachable.invalid')
     },
-    3 * 60 * 1_000
+    3 * 60 * 1000
   )
 })

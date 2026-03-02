@@ -47,7 +47,7 @@ describe('AppProviders integration', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('tanstack-store-devtools-panel')).toBeInTheDocument()
-    }, { timeout: 5_000 })
+    }, { timeout: 5000 })
 
     sessionStoreActions.setPrincipal({
       userId: randomUUID(),
@@ -60,7 +60,7 @@ describe('AppProviders integration', () => {
       expect(screen.getByTestId('tanstack-store-devtools-current-state')).toHaveTextContent(
         'devtools-integration@example.com'
       )
-    }, { timeout: 5_000 })
+    }, { timeout: 5000 })
 
     expect(screen.getByTestId('tanstack-store-devtools-history-count')).toHaveTextContent(
       /snapshot/i
@@ -90,7 +90,7 @@ describe('AppProviders integration', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('tanstack-store-devtools-panel')).toBeInTheDocument()
-    }, { timeout: 5_000 })
+    }, { timeout: 5000 })
 
     for (let index = 0; index < 45; index += 1) {
       sessionStoreActions.setPrincipal({
@@ -106,7 +106,7 @@ describe('AppProviders integration', () => {
       expect(screen.getByTestId('tanstack-store-devtools-history-count')).toHaveTextContent(
         '30 snapshots'
       )
-    }, { timeout: 5_000 })
+    }, { timeout: 5000 })
 
     expect(screen.getByTestId('tanstack-store-devtools-current-state')).toHaveTextContent(
       'history-44@example.com'

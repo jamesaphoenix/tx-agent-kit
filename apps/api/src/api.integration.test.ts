@@ -25,7 +25,7 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
 
 const healthReadinessLatencyBudgetMs = parsePositiveInt(
   process.env.API_HEALTH_READINESS_MAX_LATENCY_MS,
- 1_500
+ 1500
 )
 const healthBurstRequestCount = parsePositiveInt(
   process.env.API_HEALTH_BURST_REQUEST_COUNT,

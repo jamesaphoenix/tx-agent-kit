@@ -14,11 +14,11 @@ describe('billing money helpers', () => {
 
   it('converts dollars to decimillicents', () => {
     expect(toDecimillicents(1)).toBe(10_000_000)
-    expect(toDecimillicents(0.0001)).toBe(1_000)
+    expect(toDecimillicents(0.0001)).toBe(1000)
   })
 
   it('converts decimillicents back to dollars', () => {
     expect(fromDecimillicents(10_000_000)).toBe(1)
-    expect(fromDecimillicents(1_000)).toBe(0.0001)
+    expect(fromDecimillicents(1000)).toBe(0.0001)
   })
 })

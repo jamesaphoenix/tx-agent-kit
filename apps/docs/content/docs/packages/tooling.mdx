@@ -11,13 +11,13 @@ The tooling package contains shared ESLint configurations and the scaffold CLI. 
 
 The package exports several ESLint configurations under `packages/tooling/eslint-config/`:
 
-### Base Config
+### Base Config (`base.js`)
 
-Standard TypeScript + import rules shared across all packages and apps.
+`strictTypeChecked` preset from `typescript-eslint` with project-wide overrides.
 
 ### Domain Invariants (`domain-invariants.js`)
 
-Project-specific rules that enforce architectural constraints:
+Architecture and DDD layer boundary rules:
 
 | Rule | Rationale |
 |------|-----------|
@@ -29,17 +29,56 @@ Project-specific rules that enforce architectural constraints:
 | No chained assertions (`as unknown as ...`) | Decode at boundaries instead of double-casting |
 | No suppression directives | Fix root types rather than suppressing errors |
 
+### Code Quality (`code-quality.js`)
+
+General code quality and modern JS style:
+
+| Rule | Rationale |
+|------|-----------|
+| `unused-imports/no-unused-imports` | Auto-remove dead imports |
+| `curly` | Braces required on all blocks |
+| `object-shorthand` | `{ foo }` over `{ foo: foo }` |
+| `prefer-arrow-callback` | Arrow callbacks (named functions allowed) |
+| `prefer-rest-params` | `...args` over `arguments` |
+| `prefer-spread` | Spread over `.apply()` |
+| `no-nested-ternary` | Readable conditionals |
+| `no-void` | No floating void expressions |
+
+### Effect Consistency (`effect-consistency.js`)
+
+Effect-specific patterns. Bans `new Promise()` in core/API source in favor of `Effect.promise`/`Effect.tryPromise`.
+
+### Type Safety (`type-safety.js`)
+
+Exhaustive switch checks, nullish coalescing (`??` over `||`), optional chain, and consistent type exports.
+
+### Testing (`testing.js`)
+
+Test-specific rules: vitest globals, `no-only-tests/no-only-tests` to prevent committed `.only()` calls.
+
+### Unicorn (`unicorn.js`)
+
+Modern JS best practices from `eslint-plugin-unicorn`:
+
+| Rule | Enforces |
+|------|----------|
+| `unicorn/prefer-node-protocol` | `node:fs` over `fs` |
+| `unicorn/prefer-string-replace-all` | `.replaceAll()` over `.replace(/…/g)` |
+| `unicorn/prefer-string-slice` | `.slice()` over `.substring()`/`.substr()` |
+| `unicorn/prefer-array-flat-map` | `.flatMap()` over `.map().flat()` |
+| `unicorn/prefer-array-some` | `.some()` over `.filter().length` |
+| `unicorn/prefer-structured-clone` | `structuredClone` over JSON round-trip |
+| `unicorn/prefer-number-properties` | `Number.isNaN` over global `isNaN` |
+| `unicorn/catch-error-name` | Consistent `error` naming in catch blocks |
+| `unicorn/numeric-separators-style` | `1_000_000` over `1000000` |
+| `unicorn/no-useless-spread` | No redundant spreads |
+| `unicorn/no-useless-promise-resolve-reject` | No `return Promise.resolve(x)` in async functions |
+| `unicorn/no-abusive-eslint-disable` | No blanket `/* eslint-disable */` |
+| `unicorn/prefer-optional-catch-binding` | Drop unused `catch (error)` bindings |
+
 ### Boundaries Config
 
 Package boundary enforcement via `eslint-plugin-boundaries`. Prevents unauthorized cross-package imports.
-
-### Promise Config
-
-Rules for proper async/await and Promise handling.
-
-### Testing Config
-
-Test-specific rules and relaxed constraints for test files.
 
 ## Scaffold CLI
 

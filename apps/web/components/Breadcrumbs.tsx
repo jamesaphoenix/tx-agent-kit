@@ -8,7 +8,7 @@ export interface BreadcrumbItem {
 }
 
 export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
-  if (items.length === 0) return null
+  if (items.length === 0) {return null}
 
   return (
     <nav className="breadcrumbs" aria-label="Breadcrumb">

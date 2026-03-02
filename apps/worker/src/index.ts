@@ -153,7 +153,7 @@ const runWorker = async (): Promise<void> => {
     captureWorkerException(error)
     logger.error('Uncaught exception in worker', { error: { name: error.name, message: error.message, stack: error.stack } })
     process.exitCode = 1
-    setTimeout(() => { process.exit(1) }, 5_000)
+    setTimeout(() => { process.exit(1) }, 5000)
   })
 
   try {

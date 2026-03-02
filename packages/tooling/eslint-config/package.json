@@ -9,8 +9,12 @@
   "exports": {
     "./base": "./base.js",
     "./boundaries": "./boundaries.js",
+    "./code-quality": "./code-quality.js",
     "./domain-invariants": "./domain-invariants.js",
+    "./effect-consistency": "./effect-consistency.js",
     "./promise": "./promise.js",
-    "./testing": "./testing.js"
+    "./testing": "./testing.js",
+    "./type-safety": "./type-safety.js",
+    "./unicorn": "./unicorn.js"
   }
 }

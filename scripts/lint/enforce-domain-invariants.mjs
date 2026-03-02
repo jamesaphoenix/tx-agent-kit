@@ -1108,7 +1108,7 @@ const enforceNoSuppressionDirectives = () => {
         return false
       }
 
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx')) {
+      if (normalized.includes('/__tests__/') || /\.(integration\.)?test\.tsx?$/.test(normalized)) {
         return false
       }
 
@@ -1117,6 +1117,10 @@ const enforceNoSuppressionDirectives = () => {
       }
 
       if (normalized.includes('/lib/api/generated/')) {
+        return false
+      }
+
+      if (normalized.includes('/tooling/eslint-config/')) {
         return false
       }
 

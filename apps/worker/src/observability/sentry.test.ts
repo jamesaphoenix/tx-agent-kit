@@ -114,6 +114,6 @@ describe('worker sentry wiring', () => {
       })
     )
     expect(sentryCaptureExceptionMock).toHaveBeenCalledTimes(1)
-    expect(sentryFlushMock).toHaveBeenCalledWith(2_000)
+    expect(sentryFlushMock).toHaveBeenCalledWith(2000)
   })
 })

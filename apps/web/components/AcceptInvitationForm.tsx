@@ -27,8 +27,8 @@ export function AcceptInvitationForm({
       notify.success('Invitation accepted')
       await onAccepted?.()
       setPending(false)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to accept invitation'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to accept invitation'
       setError(message)
       notify.error(message)
       setPending(false)

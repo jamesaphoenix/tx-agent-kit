@@ -35,8 +35,8 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
       setError(null)
       notify.success(mode === 'sign-up' ? 'Account created successfully' : 'Signed in successfully')
       router.push(nextPath)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Authentication failed'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Authentication failed'
       setError(message)
       notify.error(message, { id: `auth-${mode}-error` })
     } finally {

@@ -4,8 +4,45 @@
  * - Ban nested ternaries (readability)
  * - Ban require() in TypeScript (enforce ESM)
  * - Ban floating void expressions (error swallowing)
+ * - Remove unused imports (auto-fixable)
+ * - Enforce consistent code style (curly, shorthand, arrow callbacks, spread)
  */
+import unusedImports from 'eslint-plugin-unused-imports'
+
 export const codeQualityConfig = [
+  // ── Rule: Modern JS style + unused imports ────────────────────────────
+  {
+    files: ['**/*.{ts,tsx}'],
+    ignores: ['**/lib/api/generated/**/*.{ts,tsx}'],
+    plugins: {
+      'unused-imports': unusedImports
+    },
+    rules: {
+      // Delegate unused-import detection to unused-imports plugin (auto-fixable).
+      // Delegate unused-var detection to unused-imports wrapper to avoid
+      // duplicate reports with @typescript-eslint/no-unused-vars.
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'unused-imports/no-unused-imports': 'error',
+      'unused-imports/no-unused-vars': [
+        'error',
+        {
+          vars: 'all',
+          varsIgnorePattern: '^_',
+          args: 'after-used',
+          argsIgnorePattern: '^_',
+          caughtErrors: 'all',
+          caughtErrorsIgnorePattern: '^_'
+        }
+      ],
+      curly: 'error',
+      'object-shorthand': 'error',
+      'prefer-arrow-callback': ['error', { allowNamedFunctions: true }],
+      'prefer-rest-params': 'error',
+      'prefer-spread': 'error'
+    }
+  },
+
   // ── Rule: Ban nested ternaries ──────────────────────────────────────
   {
     files: ['**/*.{ts,tsx}'],

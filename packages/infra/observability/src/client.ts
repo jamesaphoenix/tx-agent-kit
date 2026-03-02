@@ -85,7 +85,7 @@ const createClientTelemetryState = (
     exporter: new OTLPMetricExporter({
       url: `${otlpEndpoint}/v1/metrics`
     }),
-    exportIntervalMillis: 5_000
+    exportIntervalMillis: 5000
   })
 
   const meterProvider = new MeterProvider({

@@ -32,9 +32,11 @@ vi.mock('@opentelemetry/api-logs', () => ({
 }))
 
 import { createLogger, createPerfLogger, logError, toErrorDetails } from './index.js'
+import { getLoggingEnv } from './env.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  delete process.env.LOG_LEVEL
 })
 
 describe('createLogger', () => {
@@ -125,5 +127,81 @@ describe('logging helpers', () => {
         queryName: 'listUsers'
       })
     )
+  })
+})
+
+describe('getLoggingEnv', () => {
+  it('defaults to debug when NODE_ENV is development', () => {
+    process.env.NODE_ENV = 'development'
+    expect(getLoggingEnv().LOG_LEVEL).toBe('debug')
+  })
+
+  it('defaults to debug when NODE_ENV is test', () => {
+    process.env.NODE_ENV = 'test'
+    expect(getLoggingEnv().LOG_LEVEL).toBe('debug')
+  })
+
+  it('defaults to warn when NODE_ENV is production', () => {
+    process.env.NODE_ENV = 'production'
+    expect(getLoggingEnv().LOG_LEVEL).toBe('warn')
+  })
+
+  it('defaults to warn when NODE_ENV is staging', () => {
+    process.env.NODE_ENV = 'staging'
+    expect(getLoggingEnv().LOG_LEVEL).toBe('warn')
+  })
+
+  it('respects explicit LOG_LEVEL override', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.LOG_LEVEL = 'info'
+    expect(getLoggingEnv().LOG_LEVEL).toBe('info')
+  })
+
+  it('ignores invalid LOG_LEVEL and falls back to default', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.LOG_LEVEL = 'verbose'
+    expect(getLoggingEnv().LOG_LEVEL).toBe('debug')
+  })
+
+  it('normalizes LOG_LEVEL to lowercase', () => {
+    process.env.LOG_LEVEL = 'ERROR'
+    expect(getLoggingEnv().LOG_LEVEL).toBe('error')
+  })
+})
+
+describe('log level filtering', () => {
+  it('suppresses debug logs when level is warn', () => {
+    const logger = createLogger('test-service', {}, 'warn')
+    logger.debug('should be suppressed')
+    logger.info('should also be suppressed')
+
+    expect(otelEmitMock).not.toHaveBeenCalled()
+  })
+
+  it('emits warn and error when level is warn', () => {
+    const logger = createLogger('test-service', {}, 'warn')
+    logger.warn('visible warning')
+    logger.error('visible error')
+
+    expect(otelEmitMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('emits all levels when level is debug', () => {
+    const logger = createLogger('test-service', {}, 'debug')
+    logger.debug('d')
+    logger.info('i')
+    logger.warn('w')
+    logger.error('e')
+
+    expect(otelEmitMock).toHaveBeenCalledTimes(4)
+  })
+
+  it('child logger inherits parent log level', () => {
+    const logger = createLogger('test-service', {}, 'error')
+    const child = logger.child('sub')
+    child.warn('suppressed')
+    child.error('visible')
+
+    expect(otelEmitMock).toHaveBeenCalledTimes(1)
   })
 })

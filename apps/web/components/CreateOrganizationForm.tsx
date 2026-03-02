@@ -24,8 +24,8 @@ export function CreateOrganizationForm({
       notify.success('Organization created')
       await onCreated?.()
       setPending(false)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create organization'
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : 'Failed to create organization'
       setError(message)
       notify.error(message)
       setPending(false)

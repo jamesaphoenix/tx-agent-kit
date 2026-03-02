@@ -75,6 +75,28 @@ const authLogger = logger.child('auth', { module: 'auth' })
 
 Every log entry is emitted as an OTEL log record through the `@opentelemetry/api-logs` SDK. This means logs flow through the same OTEL collector pipeline as traces and metrics, enabling correlated observability.
 
+## Log Level
+
+The logger filters output based on the `LOG_LEVEL` environment variable. Logs below the threshold are dropped entirely (no stdout, no OTEL emit).
+
+| `NODE_ENV` | Default `LOG_LEVEL` |
+|---|---|
+| `development` / `test` | `debug` |
+| `staging` / `production` | `warn` |
+
+Override by setting `LOG_LEVEL` in your root `.env`:
+
+```bash
+LOG_LEVEL=info
+```
+
+Valid values: `debug`, `info`, `warn`, `error`. Invalid values fall back to the NODE_ENV-based default. Child loggers inherit the parent's level.
+
 ## Environment
 
-The default logger reads its service name from the `SERVICE_NAME` environment variable via `packages/infra/logging/src/env.ts`.
+| Variable | Purpose | Default |
+|---|---|---|
+| `SERVICE_NAME` | Logger service name | `tx-agent-kit` |
+| `LOG_LEVEL` | Minimum log severity | `debug` (dev) / `warn` (staging/prod) |
+
+Both are read from `packages/infra/logging/src/env.ts`.

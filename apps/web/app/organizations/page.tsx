@@ -30,12 +30,12 @@ export default function OrganizationsPage() {
       ])
       setOrganizations(payload.data)
       setPrincipalEmail(principal.email)
-    } catch (err) {
-      if (handleUnauthorizedApiError(err, router, '/organizations')) {
+    } catch (error_) {
+      if (handleUnauthorizedApiError(error_, router, '/organizations')) {
         return
       }
 
-      setError(err instanceof Error ? err.message : 'Failed to load organizations')
+      setError(error_ instanceof Error ? error_.message : 'Failed to load organizations')
     } finally {
       setLoading(false)
     }
