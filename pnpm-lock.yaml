@@ -196,8 +196,8 @@ importers:
         specifier: ~4.0.0
         version: 4.0.22(0b8cb13e3af505d63aa5fc66bad041e7)
       expo-secure-store:
-        specifier: ~14.0.0
-        version: 14.0.1(expo@53.0.27(@babel/core@7.29.0)(@expo/metro-runtime@4.0.1(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1)))(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1))(react@18.3.1))
+        specifier: ~55.0.8
+        version: 55.0.8(expo@53.0.27(@babel/core@7.29.0)(@expo/metro-runtime@4.0.1(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1)))(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1))(react@18.3.1))
       expo-status-bar:
         specifier: ~2.2.0
         version: 2.2.3(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1))(react@18.3.1)
@@ -5855,8 +5855,8 @@ packages:
       react-native-reanimated:
         optional: true
 
-  expo-secure-store@14.0.1:
-    resolution: {integrity: sha512-QUS+j4+UG4jRQalgnpmTvvrFnMVLqPiUZRzYPnG3+JrZ5kwVW2w6YS3WWerPoR7C6g3y/a2htRxRSylsDs+TaQ==}
+  expo-secure-store@55.0.8:
+    resolution: {integrity: sha512-8w9tQe8U6oRo5YIzqCqVhRrOnfoODNDoitBtLXEx+zS6WLUnkRq5kH7ViJuOgiM7PzLr9pvAliRiDOKyvFbTuQ==}
     peerDependencies:
       expo: '*'
 
@@ -16153,7 +16153,7 @@ snapshots:
       - react-native
       - supports-color
 
-  expo-secure-store@14.0.1(expo@53.0.27(@babel/core@7.29.0)(@expo/metro-runtime@4.0.1(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1)))(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1))(react@18.3.1)):
+  expo-secure-store@55.0.8(expo@53.0.27(@babel/core@7.29.0)(@expo/metro-runtime@4.0.1(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1)))(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1))(react@18.3.1)):
     dependencies:
       expo: 53.0.27(@babel/core@7.29.0)(@expo/metro-runtime@4.0.1(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1)))(react-native@0.84.1(@babel/core@7.29.0)(@types/react@18.3.28)(react@18.3.1))(react@18.3.1)
 
