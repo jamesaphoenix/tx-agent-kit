@@ -12,9 +12,9 @@ upsert_key() {
   local value="$3"
 
   if grep -Eq "^${key}=" "$file"; then
-    sed -i.bak "s|^${key}=.*|${key}=${value}|" "$file"
+    sed -i.bak "s|^${key}=.*|${key}=\"${value}\"|" "$file"
   else
-    printf "\n%s=%s\n" "$key" "$value" >> "$file"
+    printf "\n%s=\"%s\"\n" "$key" "$value" >> "$file"
   fi
 
   rm -f "${file}.bak"
@@ -26,7 +26,7 @@ ensure_key_if_missing() {
   local value="${3:-}"
 
   if ! grep -Eq "^${key}=" "$file"; then
-    printf "\n%s=%s\n" "$key" "$value" >> "$file"
+    printf "\n%s=\"%s\"\n" "$key" "$value" >> "$file"
   fi
 }
 
