@@ -22,7 +22,8 @@ export default [
       'apps/mobile/*.config.{js,mjs,ts}',
       'apps/mobile/babel.config.js',
       'apps/mobile/vitest.component-setup.ts',
-      'apps/docs/**'
+      'apps/docs/**',
+      'packages/testkit/src/api-client/generated/**'
     ]
   },
   ...baseConfig,

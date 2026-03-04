@@ -19,56 +19,33 @@ export const clearTestAuthToken = (): void => {
 }
 
 export const testFetchInstance = async <T>(
-  { url, method, params, data, headers }: {
-    url: string
-    method: string
-    params?: Record<string, string>
-    data?: unknown
-    headers?: Record<string, string>
-    signal?: AbortSignal
-  }
+  url: string,
+  init?: RequestInit
 ): Promise<T> => {
   const resolvedUrl = new URL(`${clientBaseUrl}${url}`)
 
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      resolvedUrl.searchParams.set(key, value)
-    }
-  }
+  const incomingHeaders = init?.headers instanceof Headers
+    ? Object.fromEntries(init.headers.entries())
+    : (init?.headers as Record<string, string> | undefined) ?? {}
 
   const mergedHeaders: Record<string, string> = {
     'content-type': 'application/json',
     ...clientHeaders,
-    ...(headers ?? {})
+    ...incomingHeaders
   }
 
   if (authToken) {
     mergedHeaders.authorization = `Bearer ${authToken}`
   }
 
-  const init: RequestInit = {
-    method,
+  const response = await fetch(resolvedUrl.toString(), {
+    ...init,
     headers: mergedHeaders
-  }
-
-  if (data !== undefined) {
-    init.body = JSON.stringify(data)
-  }
-
-  const response = await fetch(resolvedUrl.toString(), init)
+  })
   const text = await response.text()
+  const data: unknown = text ? JSON.parse(text) as unknown : undefined
 
-  if (!response.ok) {
-    throw new Error(
-      `testFetchInstance: ${method} ${url} returned ${response.status}: ${text}`
-    )
-  }
-
-  if (!text) {
-    return undefined as T
-  }
-
-  return JSON.parse(text) as T
+  return { data, status: response.status, headers: response.headers } as T
 }
 
 export default testFetchInstance

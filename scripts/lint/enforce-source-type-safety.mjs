@@ -61,7 +61,7 @@ const enforceNoAnyTypeAssertions = () => {
         return false
       }
 
-      if (normalized.includes('/lib/api/generated/')) {
+      if (normalized.includes('/lib/api/generated/') || normalized.includes('/api-client/generated/')) {
         return false
       }
 
@@ -108,7 +108,7 @@ const enforceNoEmptyCatchBlocks = () => {
         return false
       }
 
-      if (normalized.includes('/lib/api/generated/')) {
+      if (normalized.includes('/lib/api/generated/') || normalized.includes('/api-client/generated/')) {
         return false
       }
 
@@ -155,7 +155,7 @@ const enforceNoChainedTypeAssertions = () => {
         return false
       }
 
-      if (normalized.includes('/lib/api/generated/')) {
+      if (normalized.includes('/lib/api/generated/') || normalized.includes('/api-client/generated/')) {
         return false
       }
 
@@ -192,7 +192,7 @@ const isSourceModule = (normalizedPath) => {
     return false
   }
 
-  if (normalizedPath.includes('/lib/api/generated/')) {
+  if (normalizedPath.includes('/lib/api/generated/') || normalizedPath.includes('/api-client/generated/')) {
     return false
   }
 
