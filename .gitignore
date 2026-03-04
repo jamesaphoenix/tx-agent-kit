@@ -12,6 +12,7 @@ coverage
 .DS_Store
 *.log
 *.map
+*.tsbuildinfo
 deploy/.rendered
 deploy/artifacts
 apps/*/.next
