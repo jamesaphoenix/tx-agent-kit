@@ -20,7 +20,7 @@
     "@effect/sql": "^0.49.0",
     "@effect/sql-pg": "^0.50.3",
     "@tx-agent-kit/contracts": "workspace:*",
-    "drizzle-orm": "^1.0.0-beta.9",
+    "drizzle-orm": "^1.0.0-beta.15-9485290",
     "effect": "^3.19.19",
     "pg": "^8.19.0"
   },
