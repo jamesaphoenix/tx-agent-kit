@@ -128,30 +128,31 @@ describe.sequential('root command entrypoints integration', () => {
   it(
     'starts web/api/worker/mobile dev entrypoints without immediate boot failures',
     async () => {
+      const probeMs = process.env.CI ? 30_000 : 10_000
       const [web, api, worker, mobile] = await Promise.all([
         probeLongRunningCommand(
           'pnpm',
           ['dev:web'],
           { ...devProbeEnv, WEB_PORT: '3411' },
-          10_000
+          probeMs
         ),
         probeLongRunningCommand(
           'pnpm',
           ['dev:api'],
           { ...devProbeEnv, API_PORT: '4411', API_BASE_URL: 'http://127.0.0.1:4411' },
-          10_000
+          probeMs
         ),
         probeLongRunningCommand(
           'pnpm',
           ['dev:worker'],
           { ...devProbeEnv, WORKER_INSPECT_PORT: '9430' },
-          10_000
+          probeMs
         ),
         probeLongRunningCommand(
           'pnpm',
           ['dev:mobile'],
           { ...devProbeEnv, MOBILE_PORT: '9182' },
-          10_000
+          probeMs
         )
       ])
 
