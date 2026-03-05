@@ -16,8 +16,6 @@ import {
 } from './command-entrypoints.js'
 import { txCliPath } from './cli-workflows.js'
 
-const temporalAvailable = process.env.TEMPORAL_RUNTIME_MODE !== 'off'
-
 const devProbeEnv = {
   NODE_ENV: 'development',
   API_HOST: '127.0.0.1',
@@ -79,7 +77,7 @@ afterAll(() => {
 })
 
 describe.sequential('root command entrypoints integration', () => {
-  it.skipIf(!temporalAvailable)(
+  it(
     'starts root dev command without immediate boot failures',
     async () => {
       const temporalReady = runCommand(
@@ -127,7 +125,7 @@ describe.sequential('root command entrypoints integration', () => {
     60_000
   )
 
-  it.skipIf(!temporalAvailable)(
+  it(
     'starts web/api/worker/mobile dev entrypoints without immediate boot failures',
     async () => {
       const [web, api, worker, mobile] = await Promise.all([

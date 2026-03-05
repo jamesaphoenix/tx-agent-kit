@@ -42,34 +42,11 @@ env:
 
 jobs:
   integration:
-    name: Run Integration Suites
+    name: Run All Integration Suites
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      TEMPORAL_RUNTIME_MODE: 'off'
       WORKTREE_SETUP_BATCH_MAX_LATENCY_MS: '60000'
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
-      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Build packages
-        run: pnpm exec turbo run build --filter='./packages/**'
-      - name: Configure local env files
-        run: pnpm env:configure
-      - name: Ensure infrastructure
-        run: pnpm infra:ensure
-      - name: Run integration suites
-        run: pnpm test:integration:quiet
-
-  temporal-integration:
-    name: Run Temporal Integration Suite
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
@@ -87,5 +64,9 @@ jobs:
         run: |
           curl -sSf https://temporal.download/cli.sh | sh
           echo "$HOME/.temporalio/bin" >> $GITHUB_PATH
+      - name: Ensure infrastructure
+        run: pnpm infra:ensure
+      - name: Run integration suites
+        run: pnpm test:integration:quiet
       - name: Run Temporal integration suite
         run: pnpm test:temporal:integration
