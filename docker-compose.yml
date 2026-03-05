@@ -9,6 +9,7 @@ services:
       POSTGRES_DB: tx_agent_kit
     ports:
       - '5432:5432'
+    shm_size: 256mb
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
