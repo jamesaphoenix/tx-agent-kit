@@ -30,6 +30,6 @@
     "@tx-agent-kit/auth": "workspace:*",
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
-    "jose": "^6.1.0"
+    "jose": "^6.2.1"
   }
 }
