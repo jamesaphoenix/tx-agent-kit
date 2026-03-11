@@ -60,7 +60,7 @@ jobs:
       artifact_name: ${{ steps.artifact.outputs.name }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: 22
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
@@ -103,7 +103,7 @@ jobs:
       artifact_name: ${{ steps.artifact.outputs.name }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: 22
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
@@ -168,7 +168,7 @@ jobs:
       RUN_TUNNEL_CHECK_SOFT_FAIL: '0'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: 22
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
@@ -287,7 +287,7 @@ jobs:
       RUN_TUNNEL_CHECK_SOFT_FAIL: '0'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: 22
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
@@ -406,7 +406,7 @@ jobs:
       GCP_BILLING_ACCOUNT_ID: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: 22
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
