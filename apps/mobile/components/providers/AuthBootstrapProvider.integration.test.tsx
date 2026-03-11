@@ -2,10 +2,10 @@ import React from 'react'
 import { randomUUID } from 'node:crypto'
 import { create, act } from 'react-test-renderer'
 import { describe, expect, it } from 'vitest'
-import { createUser } from '../../../../packages/testkit/src/index.ts'
+import { createUser } from '@tx-agent-kit/testkit'
 import { createMobileFactoryContext } from '../../integration/support/mobile-integration-context'
 import { waitFor } from '../../integration/support/wait-for'
-import { writeAuthToken } from '../../lib/auth-token'
+import { writeAuthToken, writeRefreshToken } from '../../lib/auth-token'
 import { sessionStore, sessionStoreSelectors } from '../../stores/session-store'
 import { AuthBootstrapProvider } from './AuthBootstrapProvider'
 
@@ -20,6 +20,33 @@ describe('AuthBootstrapProvider integration', () => {
     })
 
     await writeAuthToken(user.token)
+
+    await act(async () => {
+      create(
+        <AuthBootstrapProvider>
+          <React.Fragment />
+        </AuthBootstrapProvider>
+      )
+    })
+
+    await waitFor(() => sessionStoreSelectors.getPrincipal(sessionStore.state)?.userId === user.user.id)
+
+    const principal = sessionStoreSelectors.getPrincipal(sessionStore.state)
+    expect(principal?.userId).toBe(user.user.id)
+    expect(principal?.email).toBe(user.user.email)
+    expect(sessionStoreSelectors.getIsAuthenticated(sessionStore.state)).toBe(true)
+  })
+
+  it('restores the session from a stored refresh token when the access token is missing', async () => {
+    const factoryContext = createMobileFactoryContext()
+
+    const user = await createUser(factoryContext, {
+      email: `mobile-bootstrap-refresh-${randomUUID()}@example.com`,
+      password: 'strong-pass-12345',
+      name: 'Mobile Bootstrap Refresh User'
+    })
+
+    await writeRefreshToken(user.refreshToken)
 
     await act(async () => {
       create(

@@ -5,10 +5,19 @@
  * Contract for apps/api. Domain behavior is modeled as closed invariants at API boundaries.
  * OpenAPI spec version: 0.1.0
  */
+import type { Uuid } from './uuid.js';
 
 export type AuthGoogleCallback200User = {
-  id: string;
+  id: Uuid;
+  /**
+   * a string matching the pattern ^[^\s@]+@[^\s@]+\.[^\s@]+$
+   * @pattern ^[^\s@]+@[^\s@]+\.[^\s@]+$
+   */
   email: string;
+  /**
+   * a string at least 1 character(s) long
+   * @minLength 1
+   */
   name: string;
   createdAt: string;
 };

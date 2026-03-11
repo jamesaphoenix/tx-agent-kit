@@ -220,6 +220,9 @@ importers:
       '@babel/core':
         specifier: ^7.27.4
         version: 7.29.0
+      '@tx-agent-kit/testkit':
+        specifier: workspace:*
+        version: link:../../packages/testkit
       '@tx-agent-kit/vitest-config':
         specifier: workspace:*
         version: link:../../packages/tooling/vitest-config
@@ -274,9 +277,6 @@ importers:
       axios:
         specifier: ^1.13.6
         version: 1.13.6
-      effect:
-        specifier: ^3.19.19
-        version: 3.19.19
       next:
         specifier: 16.1.6
         version: 16.1.6(@opentelemetry/api@1.9.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)

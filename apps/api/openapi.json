@@ -133,317 +133,6 @@
                   "type": "object",
                   "required": [
                     "token",
-                    "refreshToken",
-                    "user"
-                  ],
-                  "properties": {
-                    "token": {
-                      "type": "string"
-                    },
-                    "refreshToken": {
-                      "type": "string"
-                    },
-                    "user": {
-                      "type": "object",
-                      "required": [
-                        "id",
-                        "email",
-                        "name",
-                        "createdAt"
-                      ],
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "email": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "createdAt": {
-                          "type": "string"
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The request did not match the expected schema",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/HttpApiDecodeError"
-                    },
-                    {
-                      "$ref": "#/components/schemas/BadRequest"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Conflict"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "TooManyRequests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalError"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "email",
-                  "password",
-                  "name"
-                ],
-                "properties": {
-                  "email": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              }
-            }
-          },
-          "required": true
-        },
-        "x-invariants": [
-          "INV-AUTH-001"
-        ]
-      }
-    },
-    "/v1/auth/sign-in": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "operationId": "auth.signIn",
-        "parameters": [],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "token",
-                    "refreshToken",
-                    "user"
-                  ],
-                  "properties": {
-                    "token": {
-                      "type": "string"
-                    },
-                    "refreshToken": {
-                      "type": "string"
-                    },
-                    "user": {
-                      "type": "object",
-                      "required": [
-                        "id",
-                        "email",
-                        "name",
-                        "createdAt"
-                      ],
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "email": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "createdAt": {
-                          "type": "string"
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The request did not match the expected schema",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/HttpApiDecodeError"
-                    },
-                    {
-                      "$ref": "#/components/schemas/BadRequest"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Conflict"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "TooManyRequests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalError"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "email",
-                  "password"
-                ],
-                "properties": {
-                  "email": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              }
-            }
-          },
-          "required": true
-        },
-        "x-invariants": [
-          "INV-AUTH-001"
-        ]
-      }
-    },
-    "/v1/auth/refresh": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "operationId": "auth.refreshSession",
-        "parameters": [],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "token",
-                    "refreshToken",
                     "user"
                   ],
                   "properties": {
@@ -562,8 +251,337 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "refreshToken"
+                  "email",
+                  "password",
+                  "name"
                 ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                    "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "a string at least 8 character(s) long",
+                    "title": "minLength(8)",
+                    "minLength": 8
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "a string at least 1 character(s) long",
+                    "title": "minLength(1)",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "x-invariants": [
+          "INV-AUTH-001"
+        ]
+      }
+    },
+    "/v1/auth/sign-in": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "auth.signIn",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "token",
+                    "user"
+                  ],
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "createdAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/UUID"
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "a string at least 1 character(s) long",
+                          "title": "minLength(1)",
+                          "minLength": 1
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request did not match the expected schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/HttpApiDecodeError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BadRequest"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conflict"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "TooManyRequests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequests"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                    "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "a string at least 8 character(s) long",
+                    "title": "minLength(8)",
+                    "minLength": 8
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "x-invariants": [
+          "INV-AUTH-001"
+        ]
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "auth.refreshSession",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "token",
+                    "user"
+                  ],
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "createdAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/UUID"
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "a string at least 1 character(s) long",
+                          "title": "minLength(1)",
+                          "minLength": 1
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request did not match the expected schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/HttpApiDecodeError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BadRequest"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conflict"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "TooManyRequests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequests"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [],
                 "properties": {
                   "refreshToken": {
                     "type": "string",
@@ -893,17 +911,25 @@
             "name": "code",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "a string at least 1 character(s) long",
+              "title": "minLength(1)",
+              "minLength": 1
             },
-            "required": true
+            "required": true,
+            "description": "a string at least 1 character(s) long"
           },
           {
             "name": "state",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "a string at least 1 character(s) long",
+              "title": "minLength(1)",
+              "minLength": 1
             },
-            "required": true
+            "required": true,
+            "description": "a string at least 1 character(s) long"
           }
         ],
         "security": [],
@@ -916,7 +942,6 @@
                   "type": "object",
                   "required": [
                     "token",
-                    "refreshToken",
                     "user"
                   ],
                   "properties": {
@@ -936,13 +961,18 @@
                       ],
                       "properties": {
                         "id": {
-                          "type": "string"
+                          "$ref": "#/components/schemas/UUID"
                         },
                         "email": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
                         },
                         "name": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "a string at least 1 character(s) long",
+                          "title": "minLength(1)",
+                          "minLength": 1
                         },
                         "createdAt": {
                           "type": "string"
@@ -1300,18 +1330,25 @@
                   ],
                   "properties": {
                     "userId": {
-                      "type": "string"
+                      "$ref": "#/components/schemas/UUID"
                     },
                     "email": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                      "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
                     },
                     "organizationId": {
-                      "type": "string"
+                      "$ref": "#/components/schemas/UUID"
                     },
                     "roles": {
                       "type": "array",
                       "items": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                          "owner",
+                          "admin",
+                          "member"
+                        ]
                       }
                     },
                     "permissions": {

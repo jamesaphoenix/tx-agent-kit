@@ -19,3 +19,24 @@ export { usageRecordsRepository } from './repositories/usage-records.js'
 export { subscriptionEventsRepository } from './repositories/subscription-events.js'
 export { domainEventsRepository, insertDomainEventInTransaction, type DomainEventInput, type InsertDomainEventInput } from './repositories/domain-events.js'
 export { systemSettingsRepository, type RetentionSettings, type RetentionTableConfig } from './repositories/system-settings.js'
+export {
+  defaultRetentionSettings,
+  defaultRetentionSettingsDescription,
+  renderSystemSettingsReconcileSql,
+  type DefaultRetentionSetting
+} from './system-settings-defaults.js'
+export {
+  desiredStateSchemaDefinitions,
+  type DesiredStateSchemaDefinition
+} from './desired-state-schemas.js'
+export {
+  applySqlFiles,
+  applySqlMigration,
+  ensureMigrationTable,
+  getMigrationFiles,
+  getSchemaFiles,
+  migrationsRelativePath,
+  resolveRepoRoot,
+  schemasRelativePath,
+  type SqlFile
+} from './sql-admin.js'

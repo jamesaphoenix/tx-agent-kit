@@ -1,8 +1,8 @@
 import {
   createDbAuthContext,
-  type ApiFactoryContext
-} from '../../../../packages/testkit/src/index.ts'
-import { getTestkitEnv } from '../../../../packages/testkit/src/env.ts'
+  type ApiFactoryContext,
+  getTestkitEnv
+} from '@tx-agent-kit/testkit'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 

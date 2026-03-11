@@ -42,8 +42,10 @@ describe('db auth context integration', () => {
       password: createdUser.credentials.password
     })
 
+    expect(createdUser.refreshToken.length).toBeGreaterThan(0)
     expect(loggedIn.user.id).toBe(createdUser.user.id)
     expect(loggedIn.user.email).toBe(createdUser.credentials.email)
+    expect(loggedIn.refreshToken.length).toBeGreaterThan(0)
 
     const deleted = await dbAuthContext.deleteUser(loggedIn.token)
     expect(deleted.deleted).toBe(true)
@@ -65,7 +67,7 @@ describe('db auth context integration', () => {
       name: 'Testkit Organization Owner'
     })
 
-    const organization = await dbAuthContext.createTeam({
+    const organization = await dbAuthContext.createOrganization({
       token: owner.token,
       name: 'Testkit Organization'
     })

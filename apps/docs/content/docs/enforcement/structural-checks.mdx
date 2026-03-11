@@ -210,12 +210,12 @@ All event type strings in `domainEventTypes` must match the pattern `^[a-z][a-z_
 
 ### Rule 11 - Retention Settings Completeness
 
-Every table listed in `retentionTableNames` (from `packages/contracts/src/literals.ts`) must have a corresponding entry in the `retention_settings` seed in the migration files. This prevents adding a table to the retention contract without providing its default retention configuration.
+Every table listed in `retentionTableNames` (from `packages/contracts/src/literals.ts`) must have a corresponding entry in the generated `retention_settings` reconcile schema. This prevents adding a table to the retention contract without providing its default retention configuration in the desired-state layer.
 
 | Check | Detail |
 |-------|--------|
 | Source of truth | `retentionTableNames` array in `packages/contracts/src/literals.ts` |
-| Validated against | `retention_settings` seed rows in migration SQL files |
+| Validated against | Generated `packages/infra/db/schemas/system-settings/reconcile_retention_settings.sql` |
 | Failure | Missing seed entry for a declared retention table |
 
 ### Rule 12 - Domain Event Insert Helper
@@ -247,7 +247,7 @@ Migration files in `packages/infra/db/drizzle/migrations/` must follow the namin
 | Check | Detail |
 |-------|--------|
 | Pattern | `^\d{4}_[a-z][a-z0-9_]*\.sql$` |
-| Duplicate prefix detection | No two files may share the same numeric prefix (historical exceptions: `0008`, `0010`) |
+| Duplicate prefix detection | No two files may share the same numeric prefix |
 | Failure | File name does not match convention, or duplicate prefix detected |
 
 ## Test File Vitest Import

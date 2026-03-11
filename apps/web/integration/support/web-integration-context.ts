@@ -22,10 +22,10 @@ const pidFilePath = resolveWebIntegrationPidFilePath(workerSlot)
 
 const dbAuthContext = createDbAuthContext({
   apiCwd,
-  host: '127.0.0.1',
+  host: 'localhost',
   port: integrationPort,
   authSecret: 'web-integration-auth-secret-32-chars-ok',
-  corsOrigin: '*',
+  corsOrigin: 'http://localhost:3000',
   sql: {
     testRunId,
     schemaPrefix

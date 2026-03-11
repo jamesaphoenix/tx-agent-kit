@@ -1,12 +1,17 @@
-'use client'
-
 import { getClientHttpTelemetry } from '@tx-agent-kit/observability/client'
+import type { AuthResponse } from '@tx-agent-kit/contracts'
 import axios, {
   type AxiosError,
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig
 } from 'axios'
-import { readAuthToken } from './auth-token'
+import {
+  clearAuthToken,
+  readAuthToken,
+  withSerializedAuthRefresh,
+  writeAuthToken
+} from './auth-token'
+import { browserAuthSessionHeaders } from './auth-session-mode'
 import { getWebEnv } from './env'
 
 const webEnv = getWebEnv()
@@ -28,6 +33,11 @@ interface RequestTelemetryContext {
   readonly startedAtMs: number
   readonly method: string
   readonly path: string
+}
+
+interface ApiRequestConfig extends InternalAxiosRequestConfig {
+  _retryAuthRefresh?: boolean
+  _skipAuthRefresh?: boolean
 }
 
 const spanStatusCode = {
@@ -137,22 +147,86 @@ const isApiErrorPayload = (value: unknown): value is ApiErrorPayload => {
 }
 
 const attachAuthHeader = (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
+  const requestConfig = config as ApiRequestConfig
   const token = readAuthToken()
+  const hasExplicitAuthorizationHeader =
+    config.headers.Authorization !== undefined && config.headers.Authorization !== null
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
-  } else {
+  } else if (!hasExplicitAuthorizationHeader) {
     delete config.headers.Authorization
   }
 
-  return startRequestTelemetry(config)
+  return startRequestTelemetry(requestConfig)
+}
+
+const authRefreshExcludedPaths = new Set([
+  '/v1/auth/sign-in',
+  '/v1/auth/sign-up',
+  '/v1/auth/refresh',
+  '/v1/auth/forgot-password',
+  '/v1/auth/reset-password',
+  '/v1/auth/google/start',
+  '/v1/auth/google/callback'
+])
+
+let refreshAccessTokenPromise: Promise<void> | null = null
+
+const refreshApi = axios.create({
+  baseURL: webEnv.API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    ...browserAuthSessionHeaders
+  },
+  withCredentials: true
+})
+
+const refreshAccessToken = async (): Promise<void> => {
+  if (refreshAccessTokenPromise !== null) {
+    return refreshAccessTokenPromise
+  }
+
+  refreshAccessTokenPromise = (async () => {
+    try {
+      await withSerializedAuthRefresh(async () => {
+        const { data } = await refreshApi.post<AuthResponse>('/v1/auth/refresh', {})
+        writeAuthToken(data.token)
+      })
+    } finally {
+      refreshAccessTokenPromise = null
+    }
+  })()
+
+  return refreshAccessTokenPromise
+}
+
+const shouldRetryWithRefresh = (
+  config: ApiRequestConfig,
+  statusCode: number | undefined
+): boolean => {
+  if (statusCode !== 401) {
+    return false
+  }
+
+  if (config._retryAuthRefresh || config._skipAuthRefresh) {
+    return false
+  }
+
+  if (readAuthToken() === null) {
+    return false
+  }
+
+  const path = resolveRequestPath(config)
+  return !authRefreshExcludedPaths.has(path)
 }
 
 export const api = axios.create({
   baseURL: webEnv.API_BASE_URL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true
 })
 
 api.interceptors.request.use(attachAuthHeader)
@@ -161,14 +235,27 @@ api.interceptors.response.use(
     finishRequestTelemetry(response.config, response.status, undefined)
     return response
   },
-  (error: unknown) => {
+  async (error: unknown) => {
     if (axios.isAxiosError(error) && error.config) {
-      finishRequestTelemetry(error.config, error.response?.status, error)
+      const config = error.config as ApiRequestConfig
+      const statusCode = error.response?.status
+
+      if (shouldRetryWithRefresh(config, statusCode)) {
+        finishRequestTelemetry(config, statusCode, error)
+
+        try {
+          await refreshAccessToken()
+          config._retryAuthRefresh = true
+          return await api(config)
+        } catch {
+          clearAuthToken()
+        }
+      } else {
+        finishRequestTelemetry(config, statusCode, error)
+      }
     }
 
-    const rejectionError =
-      error instanceof Error ? error : new Error('Web API client request failed.')
-    return Promise.reject(rejectionError)
+    throw error instanceof Error ? error : new Error('Web API client request failed.')
   }
 )
 

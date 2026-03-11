@@ -18,6 +18,15 @@ export interface JsonObject {
   [key: string]: JsonValue
 }
 
+export interface StripeWebhookEvent {
+  id: string
+  type: string
+  payload: JsonObject
+  data: {
+    object: JsonObject
+  }
+}
+
 export interface BillingSettingsRecord {
   id: string
   billingEmail: string | null

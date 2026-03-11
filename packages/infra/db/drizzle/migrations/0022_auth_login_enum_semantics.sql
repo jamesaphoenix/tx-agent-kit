@@ -1,4 +1,4 @@
--- 0020_auth_login_enum_semantics.sql
+-- 0022_auth_login_enum_semantics.sql
 -- Clarify enum semantics for first-party login/auth-specific OAuth state and session records.
 
 BEGIN;

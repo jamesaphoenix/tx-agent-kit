@@ -1,6 +1,6 @@
 import React from 'react'
 import { readAuthToken, writeAuthToken } from '@/lib/auth-token'
-import { createTeam, createUser } from '@tx-agent-kit/testkit'
+import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import { describe, expect, it } from 'vitest'
 import OrganizationsPage from './page'
 import { createWebFactoryContext } from '../../integration/support/web-integration-context'
@@ -31,7 +31,7 @@ describe('OrganizationsPage integration', () => {
       name: 'Organizations Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Organizations Integration Team'
     })

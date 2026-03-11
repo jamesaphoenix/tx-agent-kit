@@ -6,11 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AuthMe200PermissionsItem } from './authMe200PermissionsItem';
+import type { AuthMe200RolesItem } from './authMe200RolesItem';
+import type { Uuid } from './uuid';
 
 export type AuthMe200 = {
-  userId: string;
+  userId: Uuid;
+  /**
+   * a string matching the pattern ^[^\s@]+@[^\s@]+\.[^\s@]+$
+   * @pattern ^[^\s@]+@[^\s@]+\.[^\s@]+$
+   */
   email: string;
-  organizationId?: string;
-  roles: string[];
+  organizationId?: Uuid;
+  roles: AuthMe200RolesItem[];
   permissions?: AuthMe200PermissionsItem[];
 };

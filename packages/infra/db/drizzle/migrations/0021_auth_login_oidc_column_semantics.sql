@@ -1,4 +1,4 @@
--- 0019_auth_login_oidc_column_semantics.sql
+-- 0021_auth_login_oidc_column_semantics.sql
 -- Strengthen semantic clarity that auth_login_oidc_states is strictly for SaaS login auth.
 
 BEGIN;

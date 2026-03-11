@@ -42,7 +42,7 @@ describe('useSessionStore', () => {
 
     // Verify the identity selector returns the full state object
     const calledSelector = (useStore as Mock).mock.calls[0][1] as (s: SessionStoreState) => SessionStoreState
-    const testState: SessionStoreState = { principal: { userId: 'u-1', email: 'a@b.com', roles: ['member'] }, isReady: true }
+    const testState: SessionStoreState = { principal: { userId: 'u-1', email: 'a@b.com', roles: ['member'], permissions: [] }, isReady: true }
     expect(calledSelector(testState)).toBe(testState)
   })
 })
@@ -61,7 +61,7 @@ describe('useSessionStoreSelector', () => {
 
 describe('useCurrentPrincipal', () => {
   it('uses getPrincipal selector', () => {
-    const principal = { userId: 'u-1', email: 'a@b.com', roles: ['member'] as readonly string[] }
+    const principal = { userId: 'u-1', email: 'a@b.com', roles: ['member'] as readonly string[], permissions: [] as readonly string[] }
     ;(useStore as Mock).mockReturnValue(principal)
 
     const result = useCurrentPrincipal()

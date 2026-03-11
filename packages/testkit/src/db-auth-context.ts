@@ -1,6 +1,6 @@
 import {
   createInvitation as createInvitationFactory,
-  createTeam as createTeamFactory,
+  createOrganization as createOrganizationFactory,
   createUser as createUserFactory,
   createUserWithOrg as createUserWithOrgFactory,
   createUserWithOrgAndInvitation as createUserWithOrgAndInvitationFactory,
@@ -51,7 +51,7 @@ export interface DbAuthContext {
   createUser: (options?: CreateUserOptions) => Promise<CreatedUserSession>
   loginUser: (options: LoginUserOptions) => Promise<FactoryAuthResponse>
   deleteUser: (token: string) => Promise<{ deleted: boolean }>
-  createTeam: (options: CreateOrganizationOptions) => Promise<CreatedOrganization>
+  createOrganization: (options: CreateOrganizationOptions) => Promise<CreatedOrganization>
   createInvitation: (options: CreateInvitationOptions) => Promise<CreatedInvitation>
   createUserWithOrg: (options?: {
     user?: CreateUserOptions
@@ -122,8 +122,8 @@ export const createDbAuthContext = (options: CreateDbAuthContextOptions): DbAuth
     loginUser: async (loginUserOptions: LoginUserOptions) =>
       loginUserFactory(getFactoryContext(), loginUserOptions),
     deleteUser: async (token: string) => deleteUserFactory(getFactoryContext(), token),
-    createTeam: async (createOrganizationOptions: CreateOrganizationOptions) =>
-      createTeamFactory(getFactoryContext(), createOrganizationOptions),
+    createOrganization: async (createOrganizationOptions: CreateOrganizationOptions) =>
+      createOrganizationFactory(getFactoryContext(), createOrganizationOptions),
     createInvitation: async (invitationOptions: CreateInvitationOptions) =>
       createInvitationFactory(getFactoryContext(), invitationOptions),
     createUserWithOrg: async (userWithOrgOptions) =>

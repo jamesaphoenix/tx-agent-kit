@@ -7,6 +7,14 @@
  */
 
 export type AuthSignInBody = {
+  /**
+   * a string matching the pattern ^[^\s@]+@[^\s@]+\.[^\s@]+$
+   * @pattern ^[^\s@]+@[^\s@]+\.[^\s@]+$
+   */
   email: string;
+  /**
+   * a string at least 8 character(s) long
+   * @minLength 8
+   */
   password: string;
 };

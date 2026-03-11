@@ -1,6 +1,6 @@
 import React from 'react'
 import { readAuthToken, writeAuthToken } from '@/lib/auth-token'
-import { createTeam, createUser } from '@tx-agent-kit/testkit'
+import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import { describe, expect, it } from 'vitest'
 import DashboardPage from './page'
 import { readIntegrationRouterLocation } from '../../integration/support/next-router-context'
@@ -31,7 +31,7 @@ describe('DashboardPage integration', () => {
       name: 'Dashboard Owner'
     })
 
-    await createTeam(factoryContext, {
+    await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Dashboard Organization'
     })
@@ -51,9 +51,11 @@ describe('DashboardPage integration', () => {
       throw new Error('Expected current organization section to exist')
     }
 
-    expect(
-      within(organizationCard).getByText('Dashboard Organization', { selector: 'strong' })
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        within(organizationCard).getByText('Dashboard Organization', { selector: 'strong' })
+      ).toBeInTheDocument()
+    }, { timeout: 5000 })
   })
 
   it('redirects to sign-in and clears session when auth token is invalid', async () => {

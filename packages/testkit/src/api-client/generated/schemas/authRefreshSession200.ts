@@ -9,6 +9,6 @@ import type { AuthRefreshSession200User } from './authRefreshSession200User.js';
 
 export type AuthRefreshSession200 = {
   token: string;
-  refreshToken: string;
+  refreshToken?: string;
   user: AuthRefreshSession200User;
 };

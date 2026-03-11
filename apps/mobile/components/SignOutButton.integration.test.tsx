@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { create, act } from 'react-test-renderer'
 import { useRouter } from 'expo-router'
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
-import { createUser } from '../../../packages/testkit/src/index.ts'
+import { createUser } from '@tx-agent-kit/testkit'
 import { createMobileFactoryContext } from '../integration/support/mobile-integration-context'
 import { clearAuthToken, readAuthToken, writeAuthToken } from '../lib/auth-token'
 import { SignOutButton } from './SignOutButton'
@@ -43,7 +43,8 @@ describe('SignOutButton integration', () => {
     sessionStoreActions.setPrincipal({
       userId: user.user.id,
       email: user.user.email,
-      roles: ['member']
+      roles: ['member'],
+      permissions: []
     })
 
     const tree = create(<SignOutButton />)

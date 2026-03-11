@@ -11,5 +11,5 @@ export type AuthRefreshSessionBody = {
    * a string at least 1 character(s) long
    * @minLength 1
    */
-  refreshToken: string;
+  refreshToken?: string;
 };

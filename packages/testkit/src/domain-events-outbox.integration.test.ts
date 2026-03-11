@@ -50,7 +50,7 @@ describe('domain events outbox integration', () => {
       name: 'Domain Events Test User'
     })
 
-    const organization = await dbAuthContext.createTeam({
+    const organization = await dbAuthContext.createOrganization({
       token: user.token,
       name: 'Domain Events Test Org'
     })
@@ -87,7 +87,7 @@ describe('domain events outbox integration', () => {
       name: 'Atomicity Test User'
     })
 
-    const org = await dbAuthContext.createTeam({
+    const org = await dbAuthContext.createOrganization({
       token: user.token,
       name: 'Atomicity Org'
     })
@@ -106,7 +106,7 @@ describe('domain events outbox integration', () => {
       name: 'Lifecycle Test User'
     })
 
-    const org = await dbAuthContext.createTeam({
+    const org = await dbAuthContext.createOrganization({
       token: user.token,
       name: 'Lifecycle Org'
     })
@@ -149,7 +149,7 @@ describe('domain events outbox integration', () => {
       name: 'Fail Lifecycle Test User'
     })
 
-    const org = await dbAuthContext.createTeam({
+    const org = await dbAuthContext.createOrganization({
       token: user.token,
       name: 'Fail Lifecycle Org'
     })
@@ -185,12 +185,12 @@ describe('domain events outbox integration', () => {
       name: 'Fetch Test User'
     })
 
-    const org1 = await dbAuthContext.createTeam({
+    const org1 = await dbAuthContext.createOrganization({
       token: user.token,
       name: 'Fetch Org 1'
     })
 
-    const org2 = await dbAuthContext.createTeam({
+    const org2 = await dbAuthContext.createOrganization({
       token: user.token,
       name: 'Fetch Org 2'
     })
@@ -226,7 +226,7 @@ describe('domain events outbox integration', () => {
     const orgNames = ['Batch Org A', 'Batch Org B', 'Batch Org C']
     const orgs = []
     for (const name of orgNames) {
-      const org = await dbAuthContext.createTeam({ token: user.token, name })
+      const org = await dbAuthContext.createOrganization({ token: user.token, name })
       orgs.push(org)
     }
 
@@ -258,9 +258,9 @@ describe('domain events outbox integration', () => {
       name: 'Order Test User'
     })
 
-    await dbAuthContext.createTeam({ token: user.token, name: 'Order Org First' })
-    await dbAuthContext.createTeam({ token: user.token, name: 'Order Org Second' })
-    await dbAuthContext.createTeam({ token: user.token, name: 'Order Org Third' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Order Org First' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Order Org Second' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Order Org Third' })
 
     const pendingEvents = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       queryPendingDomainEvents(client)
@@ -286,7 +286,7 @@ describe('domain events outbox integration', () => {
       name: 'Unique Constraint Test User'
     })
 
-    const org = await dbAuthContext.createTeam({
+    const org = await dbAuthContext.createOrganization({
       token: user.token,
       name: 'Unique Constraint Org'
     })
@@ -318,8 +318,8 @@ describe('domain events outbox — claim and dispatch', () => {
       name: 'Claim Atomic User'
     })
 
-    await dbAuthContext.createTeam({ token: user.token, name: 'Claim Org A' })
-    await dbAuthContext.createTeam({ token: user.token, name: 'Claim Org B' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Claim Org A' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Claim Org B' })
 
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       claimPendingEventsForProcessing(client, 10)
@@ -347,7 +347,7 @@ describe('domain events outbox — claim and dispatch', () => {
       name: 'Mark Published Guard User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Pub Guard Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Pub Guard Org' })
 
     const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       queryDomainEventsByAggregate(client, 'organization', org.id)
@@ -391,7 +391,7 @@ describe('domain events outbox — claim and dispatch', () => {
       name: 'Idempotent Publish User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Idempotent Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Idempotent Org' })
 
     const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       queryDomainEventsByAggregate(client, 'organization', org.id)
@@ -429,7 +429,7 @@ describe('domain events outbox — claim and dispatch', () => {
       name: 'Mark Failed Guard User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Fail Guard Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Fail Guard Org' })
 
     const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       queryDomainEventsByAggregate(client, 'organization', org.id)
@@ -476,9 +476,9 @@ describe('domain events outbox — claim and dispatch', () => {
       name: 'Dead Letter User'
     })
 
-    const org1 = await dbAuthContext.createTeam({ token: user.token, name: 'Dead Letter Org 1' })
-    const org2 = await dbAuthContext.createTeam({ token: user.token, name: 'Dead Letter Org 2' })
-    const org3 = await dbAuthContext.createTeam({ token: user.token, name: 'Dead Letter Org 3' })
+    const org1 = await dbAuthContext.createOrganization({ token: user.token, name: 'Dead Letter Org 1' })
+    const org2 = await dbAuthContext.createOrganization({ token: user.token, name: 'Dead Letter Org 2' })
+    const org3 = await dbAuthContext.createOrganization({ token: user.token, name: 'Dead Letter Org 3' })
 
     await dbAuthContext.testContext.withSchemaClient(async (client) => {
       const events1 = await queryDomainEventsByAggregate(client, 'organization', org1.id)
@@ -515,9 +515,9 @@ describe('domain events outbox — claim and dispatch', () => {
       name: 'Batch Limit User'
     })
 
-    await dbAuthContext.createTeam({ token: user.token, name: 'Batch Limit Org A' })
-    await dbAuthContext.createTeam({ token: user.token, name: 'Batch Limit Org B' })
-    await dbAuthContext.createTeam({ token: user.token, name: 'Batch Limit Org C' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Batch Limit Org A' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Batch Limit Org B' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Batch Limit Org C' })
 
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       claimPendingEventsForProcessing(client, 2)
@@ -539,7 +539,7 @@ describe('domain events outbox — claim and dispatch', () => {
       name: 'Fail Idempotent User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Fail Idempotent Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Fail Idempotent Org' })
 
     const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       queryDomainEventsByAggregate(client, 'organization', org.id)
@@ -578,7 +578,7 @@ describe('domain events outbox — claim and dispatch', () => {
       name: 'Fail Published User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Fail Published Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Fail Published Org' })
 
     const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       queryDomainEventsByAggregate(client, 'organization', org.id)
@@ -615,7 +615,7 @@ describe('domain events outbox — claim and dispatch', () => {
       name: 'Concurrent Poller User'
     })
 
-    await dbAuthContext.createTeam({ token: user.token, name: 'Concurrent Poller Org' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Concurrent Poller Org' })
 
     const [claimed1, claimed2] = await Promise.all([
       dbAuthContext.testContext.withSchemaClient((client) =>
@@ -642,7 +642,7 @@ describe('domain events outbox — resetStuckProcessing', () => {
       name: 'Reset Stuck User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Reset Stuck Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Reset Stuck Org' })
 
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       claimPendingEventsForProcessing(client, 1)
@@ -682,7 +682,7 @@ describe('domain events outbox — resetStuckProcessing', () => {
       name: 'Reset Fresh User'
     })
 
-    await dbAuthContext.createTeam({ token: user.token, name: 'Reset Fresh Org' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Reset Fresh Org' })
 
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       claimPendingEventsForProcessing(client, 1)
@@ -713,7 +713,7 @@ describe('domain events outbox — resetStuckProcessing', () => {
       name: 'Reset Reclaim User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Reset Reclaim Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Reset Reclaim Org' })
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
       claimPendingEventsForProcessing(client, 10)
@@ -756,7 +756,7 @@ describe('domain events outbox — sequence number auto-increment', () => {
       name: 'Sequence Auto User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Sequence Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Sequence Org' })
 
     const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       queryDomainEventsByAggregate(client, 'organization', org.id)
@@ -802,8 +802,8 @@ describe('domain events outbox — sequence number auto-increment', () => {
       name: 'Independent Seq User'
     })
 
-    const org1 = await dbAuthContext.createTeam({ token: user.token, name: 'Seq Org 1' })
-    const org2 = await dbAuthContext.createTeam({ token: user.token, name: 'Seq Org 2' })
+    const org1 = await dbAuthContext.createOrganization({ token: user.token, name: 'Seq Org 1' })
+    const org2 = await dbAuthContext.createOrganization({ token: user.token, name: 'Seq Org 2' })
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
       insertDomainEventDirect(client, {
@@ -834,9 +834,9 @@ describe('domain events outbox — pruning', () => {
       name: 'Prune Old User'
     })
 
-    const org1 = await dbAuthContext.createTeam({ token: user.token, name: 'Prune Org Published' })
-    const org2 = await dbAuthContext.createTeam({ token: user.token, name: 'Prune Org Failed' })
-    const org3 = await dbAuthContext.createTeam({ token: user.token, name: 'Prune Org Pending' })
+    const org1 = await dbAuthContext.createOrganization({ token: user.token, name: 'Prune Org Published' })
+    const org2 = await dbAuthContext.createOrganization({ token: user.token, name: 'Prune Org Failed' })
+    const org3 = await dbAuthContext.createOrganization({ token: user.token, name: 'Prune Org Pending' })
 
     await dbAuthContext.testContext.withSchemaClient(async (client) => {
       const events1 = await queryDomainEventsByAggregate(client, 'organization', org1.id)
@@ -889,7 +889,7 @@ describe('domain events outbox — pruning', () => {
       name: 'Prune Recent User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Prune Recent Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Prune Recent Org' })
 
     await dbAuthContext.testContext.withSchemaClient(async (client) => {
       const events = await queryDomainEventsByAggregate(client, 'organization', org.id)
@@ -924,7 +924,7 @@ describe('domain events outbox — pruning edge cases', () => {
       name: 'Prune Processing User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Prune Processing Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Prune Processing Org' })
 
     await dbAuthContext.testContext.withSchemaClient(async (client) => {
       const events = await queryDomainEventsByAggregate(client, 'organization', org.id)
@@ -956,7 +956,7 @@ describe('domain events outbox — pruning edge cases', () => {
       name: 'Prune Boundary User'
     })
 
-    const org = await dbAuthContext.createTeam({ token: user.token, name: 'Prune Boundary Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Prune Boundary Org' })
 
     const threshold = new Date(Date.now() - 24 * 60 * 60_000)
 
@@ -984,8 +984,8 @@ describe('domain events outbox — pruning edge cases', () => {
       name: 'Reset Terminal User'
     })
 
-    const org1 = await dbAuthContext.createTeam({ token: user.token, name: 'Reset Terminal Org 1' })
-    const org2 = await dbAuthContext.createTeam({ token: user.token, name: 'Reset Terminal Org 2' })
+    const org1 = await dbAuthContext.createOrganization({ token: user.token, name: 'Reset Terminal Org 1' })
+    const org2 = await dbAuthContext.createOrganization({ token: user.token, name: 'Reset Terminal Org 2' })
 
     await dbAuthContext.testContext.withSchemaClient(async (client) => {
       const events1 = await queryDomainEventsByAggregate(client, 'organization', org1.id)
@@ -1026,7 +1026,7 @@ describe('domain events outbox — pruning edge cases', () => {
       name: 'Batch Zero User'
     })
 
-    await dbAuthContext.createTeam({ token: user.token, name: 'Batch Zero Org' })
+    await dbAuthContext.createOrganization({ token: user.token, name: 'Batch Zero Org' })
 
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       claimPendingEventsForProcessing(client, 0)

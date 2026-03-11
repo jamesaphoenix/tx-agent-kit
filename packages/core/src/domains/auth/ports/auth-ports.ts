@@ -92,7 +92,10 @@ export class PasswordResetTokenPort extends Context.Tag('PasswordResetTokenPort'
 export class GoogleOidcPort extends Context.Tag('GoogleOidcPort')<
   GoogleOidcPort,
   {
-    startAuthorization: (input: { ipAddress: string | null }) => Effect.Effect<GoogleAuthStartResult, unknown>
+    startAuthorization: (input: {
+      ipAddress: string | null
+      statePrefix?: string
+    }) => Effect.Effect<GoogleAuthStartResult, unknown>
     completeAuthorization: (input: {
       code: string
       state: string

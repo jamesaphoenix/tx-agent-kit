@@ -1,6 +1,11 @@
 import * as Schema from 'effect/Schema'
 import { emailSchema } from './common.js'
 import { permissionActions } from './literals.js'
+import { orgMemberRoleSchema } from './permissions.js'
+
+export const browserAuthSessionModeHeaderName = 'x-tx-auth-session-mode'
+export const browserAuthSessionModeHeaderValue = 'browser-cookie'
+export const authRefreshTokenKey = 'tx-agent-kit.refresh-token'
 
 export const userSchema = Schema.Struct({
   id: Schema.UUID,
@@ -13,8 +18,8 @@ export const authPrincipalSchema = Schema.Struct({
   userId: Schema.UUID,
   email: emailSchema,
   organizationId: Schema.optional(Schema.UUID),
-  roles: Schema.Array(Schema.String),
-  permissions: Schema.optional(Schema.Array(Schema.Literal(...permissionActions)))
+  roles: Schema.Array(orgMemberRoleSchema),
+  permissions: Schema.optionalWith(Schema.Array(Schema.Literal(...permissionActions)), { default: () => [] })
 })
 
 export const signUpRequestSchema = Schema.Struct({
@@ -47,12 +52,17 @@ export const resetPasswordResponseSchema = Schema.Struct({
 
 export const authResponseSchema = Schema.Struct({
   token: Schema.String,
-  refreshToken: Schema.String,
+  refreshToken: Schema.optional(Schema.String),
+  user: userSchema
+})
+
+export const browserAuthResponseSchema = Schema.Struct({
+  token: Schema.String,
   user: userSchema
 })
 
 export const refreshSessionRequestSchema = Schema.Struct({
-  refreshToken: Schema.String.pipe(Schema.minLength(1))
+  refreshToken: Schema.optional(Schema.String.pipe(Schema.minLength(1)))
 })
 
 export const refreshSessionResponseSchema = authResponseSchema
@@ -85,6 +95,7 @@ export type ForgotPasswordResponse = Schema.Schema.Type<typeof forgotPasswordRes
 export type ResetPasswordRequest = Schema.Schema.Type<typeof resetPasswordRequestSchema>
 export type ResetPasswordResponse = Schema.Schema.Type<typeof resetPasswordResponseSchema>
 export type AuthResponse = Schema.Schema.Type<typeof authResponseSchema>
+export type BrowserAuthResponse = Schema.Schema.Type<typeof browserAuthResponseSchema>
 export type RefreshSessionRequest = Schema.Schema.Type<typeof refreshSessionRequestSchema>
 export type RefreshSessionResponse = Schema.Schema.Type<typeof refreshSessionResponseSchema>
 export type SignOutResponse = Schema.Schema.Type<typeof signOutResponseSchema>

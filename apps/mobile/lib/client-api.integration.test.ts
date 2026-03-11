@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import {
   createUser
-} from '../../../packages/testkit/src/index.ts'
+} from '@tx-agent-kit/testkit'
 import { createMobileFactoryContext } from '../integration/support/mobile-integration-context'
 import { readAuthToken } from './auth-token'
 import { describe, expect, it, vi } from 'vitest'

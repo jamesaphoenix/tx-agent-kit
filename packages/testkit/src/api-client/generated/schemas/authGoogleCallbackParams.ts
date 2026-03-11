@@ -7,6 +7,14 @@
  */
 
 export type AuthGoogleCallbackParams = {
+/**
+ * a string at least 1 character(s) long
+ * @minLength 1
+ */
 code: string;
+/**
+ * a string at least 1 character(s) long
+ * @minLength 1
+ */
 state: string;
 };

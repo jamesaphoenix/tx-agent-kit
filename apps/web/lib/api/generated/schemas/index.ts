@@ -23,6 +23,7 @@ export * from './authGoogleCallbackParams';
 export * from './authGoogleStart200';
 export * from './authMe200';
 export * from './authMe200PermissionsItem';
+export * from './authMe200RolesItem';
 export * from './authRefreshSession200';
 export * from './authRefreshSession200User';
 export * from './authRefreshSessionBody';

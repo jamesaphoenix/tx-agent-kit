@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import type { BillingSettings } from '@tx-agent-kit/contracts'
 import { writeAuthToken } from '@/lib/auth-token'
 import { ApiClientError, clientApi } from '@/lib/client-api'
-import { createTeam, createUser } from '@tx-agent-kit/testkit'
+import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import { describe, expect, it } from 'vitest'
 import { createWebFactoryContext } from '../integration/support/web-integration-context'
 import { renderWithProviders, screen, waitFor } from '../integration/test-utils'
@@ -72,7 +72,7 @@ describe('SubscriptionGate integration', () => {
       name: 'Subscription Gate Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Subscription Gate Active Team'
     })
@@ -107,7 +107,7 @@ describe('SubscriptionGate integration', () => {
       name: 'Subscription Gate Inactive Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Subscription Gate Inactive Team'
     })

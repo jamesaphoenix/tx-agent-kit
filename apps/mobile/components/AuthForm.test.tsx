@@ -58,7 +58,8 @@ beforeEach(() => {
 const principal = {
   userId: 'u-1',
   email: 'test@example.com',
-  roles: ['member'] as readonly string[]
+  roles: ['member'] as readonly string[],
+  permissions: [] as readonly string[]
 }
 
 const findByType = (root: ReturnType<typeof create>['root'], type: string) =>

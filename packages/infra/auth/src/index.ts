@@ -77,5 +77,6 @@ export const verifySessionToken = (token: string): Effect.Effect<SessionTokenPay
 export const toPrincipal = (payload: SessionTokenPayload): AuthPrincipal => ({
   userId: payload.sub,
   email: payload.email,
-  roles: ['member']
+  roles: ['member'],
+  permissions: []
 })

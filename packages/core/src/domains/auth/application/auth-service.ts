@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { Context, Effect, Layer } from 'effect'
 import { badRequest, conflict, notFound, unauthorized, type CoreError } from '../../../errors.js'
 import {
@@ -279,7 +280,7 @@ export const AuthServiceLive = Layer.effect(
         const usersPort = yield* AuthUsersPort
         const passwordHasher = yield* PasswordHasherPort
 
-        if (!isValidEmail(input.email) || input.password.length < 8) {
+        if (!isValidEmail(input.email)) {
           yield* recordAuditEvent({
             userId: null,
             eventType: 'login_failure',
@@ -483,7 +484,8 @@ export const AuthServiceLive = Layer.effect(
 
         return yield* googleOidcPort
           .startAuthorization({
-            ipAddress: input.ipAddress ?? null
+            ipAddress: input.ipAddress ?? null,
+            statePrefix: input.statePrefix
           })
           .pipe(Effect.mapError(() => badRequest('Failed to start Google authorization')))
       }),
@@ -535,7 +537,7 @@ export const AuthServiceLive = Layer.effect(
           if (existingUser) {
             user = existingUser
           } else {
-            const syntheticPassword = `google-oauth:${identity.providerSubject}:${normalizedEmail}`
+            const syntheticPassword = randomBytes(64).toString('base64url')
             const syntheticPasswordHash = yield* passwordHasher.hash(syntheticPassword).pipe(
               Effect.mapError(() => badRequest('Failed to generate Google account credentials'))
             )
@@ -563,7 +565,7 @@ export const AuthServiceLive = Layer.effect(
           }).pipe(Effect.mapError(() => badRequest('Failed to read existing Google link')))
 
           if (!existingProviderLink) {
-            yield* identityPort.linkIdentity({
+            const linkResult = yield* identityPort.linkIdentity({
               userId: user.id,
               provider: 'google',
               providerSubject: identity.providerSubject,
@@ -577,7 +579,7 @@ export const AuthServiceLive = Layer.effect(
               ),
               Effect.mapError(() => badRequest('Failed to link Google identity'))
             )
-            didLinkIdentity = true
+            didLinkIdentity = linkResult !== null
           }
         }
 

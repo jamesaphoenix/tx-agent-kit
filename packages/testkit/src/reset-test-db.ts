@@ -36,15 +36,37 @@ export const queryScalarCount = async (
   databaseUrl: string,
   sql: string
 ): Promise<number> => {
+  const scalarValue = await queryScalarText(databaseUrl, sql)
+  return Number.parseInt(scalarValue ?? '0', 10)
+}
+
+export const queryScalarText = async (
+  databaseUrl: string,
+  sql: string
+): Promise<string | null> => {
+  const rows = await queryRows(databaseUrl, sql)
+  const firstRow = rows[0]
+  if (!firstRow) {
+    return null
+  }
+
+  const [firstValue] = Object.values(firstRow)
+  return typeof firstValue === 'string' ? firstValue : null
+}
+
+export const queryRows = async<T extends Record<string, unknown>>(
+  databaseUrl: string,
+  sql: string,
+  params?: ReadonlyArray<unknown>
+): Promise<ReadonlyArray<T>> => {
   const client = new Client({
     connectionString: databaseUrl
   })
 
   await client.connect()
   try {
-    const result = await client.query<{ count: string }>(sql)
-    const countValue = result.rows[0]?.count ?? '0'
-    return Number.parseInt(countValue, 10)
+    const result = await client.query<T>(sql, params ? [...params] : undefined)
+    return result.rows
   } finally {
     await client.end()
   }

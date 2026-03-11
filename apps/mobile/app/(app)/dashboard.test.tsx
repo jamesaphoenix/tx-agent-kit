@@ -42,7 +42,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-const principal = { userId: 'u-1', email: 'test@co.com', roles: ['member'] as readonly string[] }
+const principal = { userId: 'u-1', email: 'test@co.com', roles: ['member'] as readonly string[], permissions: [] as readonly string[] }
 const organization = { id: 'o-1', name: 'Alpha', ownerUserId: 'u-1' }
 
 describe('DashboardScreen', () => {

@@ -476,7 +476,7 @@ describe.sequential('root command entrypoints integration', () => {
     expect(downResult.exitCode).toBe(0)
   }, 180_000)
 
-  it('executes db migrate and guards db:test:reset for non-local hosts', () => {
+  it('executes db migrate/db schemas entrypoints and guards db:test:reset for non-local hosts', () => {
     const ensureResult = runCommand('pnpm', ['infra:ensure'], {}, 300_000)
     const ensureOutput = combinedOutput(ensureResult)
     expect(
@@ -492,6 +492,18 @@ describe.sequential('root command entrypoints integration', () => {
     expect(
       migrateResult.exitCode === 0 ||
         /AggregateError|ECONNREFUSED|connect|Connection refused/u.test(migrateOutput)
+    ).toBe(true)
+
+    const generateSchemasResult = runCommand('pnpm', ['db:schemas:generate'], {}, 60_000)
+    expect(generateSchemasResult.exitCode).toBe(0)
+    expect(generateSchemasResult.stdout).toContain('reconcile_role_permissions.sql')
+    expect(generateSchemasResult.stdout).toContain('reconcile_retention_settings.sql')
+
+    const applySchemasResult = runCommand('pnpm', ['db:schemas:apply'], {}, 120_000)
+    const applySchemasOutput = combinedOutput(applySchemasResult)
+    expect(
+      applySchemasResult.exitCode === 0 ||
+        /AggregateError|ECONNREFUSED|connect|Connection refused/u.test(applySchemasOutput)
     ).toBe(true)
 
     const resetGuardResult = runCommand(

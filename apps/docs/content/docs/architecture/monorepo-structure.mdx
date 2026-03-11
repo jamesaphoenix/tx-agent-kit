@@ -9,7 +9,7 @@ This page describes every app and package in the monorepo, their responsibilitie
 
 ### `apps/api`: Effect HttpApi Server
 
-The API server is built with Effect HttpApi, providing typed REST endpoints for all domain operations. It handles authentication (sign-up, sign-in, JWT token management), CRUD operations for organizations and invitations, OpenAPI spec generation, and request validation using `effect/Schema` contracts.
+The API server is built with Effect HttpApi, providing typed REST endpoints for all domain operations. It handles authentication (sign-up, sign-in, JWT access tokens, HttpOnly refresh-cookie browser flows), CRUD operations for organizations and invitations, OpenAPI spec generation, and request validation using `effect/Schema` contracts.
 
 | File / Directory | Role |
 |-----------------|------|
@@ -40,7 +40,7 @@ The web application is a strictly client-side Next.js SPA. It communicates with 
 | `components/WebsiteHeader.tsx` | Sticky header (config-driven, auth-aware) |
 | `components/WebsiteFooter.tsx` | Footer (config-driven, product/legal/support links) |
 | `lib/env.ts` | Centralized runtime environment reads |
-| `lib/auth-token.ts` | Only file that reads/writes `localStorage` |
+| `lib/auth-token.ts` | Only file that manages browser-visible access token state (in-memory on web) |
 | `lib/url-state.tsx` | Only entry point for URL query state (wraps `nuqs`) |
 | `lib/notify.tsx` | Only entry point for notifications (wraps `sonner`) |
 
@@ -74,7 +74,7 @@ The mobile app is a cross-platform Expo React Native client that mirrors the web
 
 | Capability | Implementation |
 |-----------|---------------|
-| Authentication | Secure token storage via `expo-secure-store` instead of `localStorage` |
+| Authentication | Secure token storage via `expo-secure-store` instead of the web app's in-memory access-token + HttpOnly refresh-cookie model |
 | API communication | Shared typed API client patterns matching the web app |
 | Navigation | Expo Router for file-system-based native navigation |
 | State management | Same URL-state and session-store patterns adapted for mobile |

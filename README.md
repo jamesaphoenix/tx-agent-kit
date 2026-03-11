@@ -57,6 +57,7 @@ pnpm env:configure
 pnpm infra:ensure
 pnpm temporal:dev:up
 pnpm db:migrate
+pnpm db:schemas:apply
 pnpm dev
 ```
 
@@ -98,6 +99,7 @@ PUSH_IMAGES=1 pnpm deploy:build-images
 pnpm deploy:migrate:staging
 pnpm deploy:staging deploy/artifacts/images-<git-sha>.env
 pnpm db:migrate
+pnpm db:schemas:apply
 pnpm db:test:reset
 pnpm db:studio
 pnpm infra:ensure
@@ -159,7 +161,6 @@ pnpm mcp:prometheus
 pnpm mcp:jaeger
 pnpm mcp:context7
 pnpm mcp:supabase
-pnpm mcp:playwright
 pnpm mcp:codex-config
 ```
 
@@ -174,5 +175,4 @@ Use `pnpm mcp:codex-config` to print TOML blocks for `~/.codex/config.toml` that
 - Runbooks: `docs/RUNBOOKS.md`
 - Deployment: `docs/DEPLOYMENT.md`
 - Rollback: `docs/ROLLBACK.md`
-- OctoSpark mining log: `todo/octospark-mining.md`
 - API contract (generated): `apps/api/openapi.json`

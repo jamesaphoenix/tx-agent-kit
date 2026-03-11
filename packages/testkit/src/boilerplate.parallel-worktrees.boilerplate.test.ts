@@ -313,6 +313,16 @@ describe.sequential('boilerplate parallel-worktree meta tests', () => {
       )
       expect(firstMigration.exitCode).toBe(0)
 
+      const firstSchemas = runCommand(
+        'pnpm',
+        ['db:schemas:apply'],
+        {
+          DATABASE_URL: firstDatabaseUrl
+        },
+        migrateTimeoutMs
+      )
+      expect(firstSchemas.exitCode).toBe(0)
+
       const secondMigration = runCommand(
         'pnpm',
         ['db:migrate'],
@@ -322,6 +332,16 @@ describe.sequential('boilerplate parallel-worktree meta tests', () => {
         migrateTimeoutMs
       )
       expect(secondMigration.exitCode).toBe(0)
+
+      const secondSchemas = runCommand(
+        'pnpm',
+        ['db:schemas:apply'],
+        {
+          DATABASE_URL: secondDatabaseUrl
+        },
+        migrateTimeoutMs
+      )
+      expect(secondSchemas.exitCode).toBe(0)
 
       expect(await schemaExists(firstSchema)).toBe(true)
       expect(await schemaExists(secondSchema)).toBe(true)

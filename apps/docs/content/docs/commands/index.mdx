@@ -56,8 +56,10 @@ All commands are run from the monorepo root via `pnpm`. This is the complete ref
 | Command | Description |
 |---------|-------------|
 | `pnpm db:migrate` | Run Drizzle database migrations |
+| `pnpm db:schemas:generate` | Regenerate desired-state schema SQL artifacts |
+| `pnpm db:schemas:apply` | Apply desired-state schema SQL after migrations |
 | `pnpm db:trigger:new` | Scaffold a new database trigger with pgTAP test |
-| `pnpm db:test:reset` | Drop and recreate test database, rerun migrations |
+| `pnpm db:test:reset` | Reset mutable test DB state and reapply desired-state schemas |
 | `pnpm db:studio` | Launch Drizzle Studio for visual database inspection |
 | `pnpm worktree:ports` | Derive deterministic port assignments for a git worktree |
 

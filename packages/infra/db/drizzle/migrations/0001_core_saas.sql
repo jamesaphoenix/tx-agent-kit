@@ -106,7 +106,3 @@ CREATE TABLE IF NOT EXISTS credit_ledger (
 INSERT INTO roles (name)
 VALUES ('owner'), ('admin'), ('member')
 ON CONFLICT (name) DO NOTHING;
-
-INSERT INTO permissions (key)
-VALUES ('workspace.read'), ('workspace.write'), ('invite.manage'), ('task.manage')
-ON CONFLICT (key) DO NOTHING;

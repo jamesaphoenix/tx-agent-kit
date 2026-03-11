@@ -105,7 +105,9 @@ upsert_env_value() {
   local value="$3"
 
   if grep -Eq "^${key}=" "$file"; then
-    sed -i.bak "s|^${key}=.*|${key}=${value}|" "$file"
+    local escaped_value
+    escaped_value=$(printf '%s' "$value" | sed 's/[|&\\]/\\&/g')
+    sed -i.bak "s|^${key}=.*|${key}=${escaped_value}|" "$file"
   else
     printf '\n%s=%s\n' "$key" "$value" >> "$file"
   fi
@@ -142,6 +144,7 @@ cat > "$WORKTREE_PATH/run-migrations.sh" <<MIGRATE
 set -euo pipefail
 cd "$WORKTREE_PATH"
 pnpm db:migrate
+pnpm db:schemas:apply
 MIGRATE
 chmod +x "$WORKTREE_PATH/run-migrations.sh"
 

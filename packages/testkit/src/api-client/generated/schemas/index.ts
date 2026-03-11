@@ -23,6 +23,7 @@ export * from './authGoogleCallbackParams.js';
 export * from './authGoogleStart200.js';
 export * from './authMe200.js';
 export * from './authMe200PermissionsItem.js';
+export * from './authMe200RolesItem.js';
 export * from './authRefreshSession200.js';
 export * from './authRefreshSession200User.js';
 export * from './authRefreshSessionBody.js';

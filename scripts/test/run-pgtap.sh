@@ -7,6 +7,11 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$PROJECT_ROOT/scripts/lib/lock.sh"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-tx-agent-kit}"
 DB_NAME="${TX_AGENT_DB_NAME:-tx_agent_kit}"
+EXPECTED_DB_NAME="tx_agent_kit"
+if [[ "$DB_NAME" != "$EXPECTED_DB_NAME" ]]; then
+  echo "Refusing to run pgTAP against database '$DB_NAME'. Expected '$EXPECTED_DB_NAME'."
+  exit 1
+fi
 PGTAP_DIR="$PROJECT_ROOT/packages/infra/db/pgtap"
 LOCK_DIR="/tmp/${COMPOSE_PROJECT_NAME}-db-reset.lock"
 SKIP_SETUP="false"
@@ -33,6 +38,7 @@ trap 'lock_release "$LOCK_DIR"' EXIT
 if [[ "$SKIP_SETUP" != "true" ]]; then
   "$PROJECT_ROOT/scripts/start-dev-services.sh"
   pnpm db:migrate >/dev/null
+  pnpm db:schemas:apply >/dev/null
 fi
 
 POSTGRES_CONTAINER_ID="$(docker compose -p "$COMPOSE_PROJECT_NAME" ps -q postgres)"

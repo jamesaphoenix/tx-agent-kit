@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.27.4",
+    "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
     "@types/react": "~18.3.12",
     "babel-plugin-module-resolver": "^5.0.2",

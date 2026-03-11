@@ -3,3 +3,17 @@
 @import 'fumadocs-ui/css/preset.css';
 
 @source '../node_modules/fumadocs-ui/dist/**/*.js';
+
+@media (max-width: 720px) {
+  figure.shiki > div[class*='overflow-auto'] {
+    overflow-x: visible;
+  }
+
+  figure.shiki pre {
+    width: 100%;
+    min-width: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}

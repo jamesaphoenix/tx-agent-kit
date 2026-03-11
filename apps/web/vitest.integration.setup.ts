@@ -3,6 +3,7 @@ import { cleanup, configure } from '@testing-library/react'
 
 configure({ asyncUtilTimeout: 5000 })
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
+import { clearAuthToken } from './lib/auth-token'
 import { resolveWebIntegrationPort } from './integration/support/web-integration-harness'
 import { resetIntegrationRouterLocation } from './integration/support/next-router-context'
 import {
@@ -15,11 +16,12 @@ import {
   setupWebIntegrationSuite,
   teardownWebIntegrationSuite
 } from './integration/support/web-integration-context'
+import { sessionStore, sessionStoreInitialState } from './stores/session-store'
 
 const workerSlot = resolveVitestWorkerSlot()
 const workerOffset = resolveVitestWorkerOffset()
 const integrationApiPort = resolveWebIntegrationPort(workerSlot)
-const integrationApiBaseUrl = `http://127.0.0.1:${integrationApiPort}`
+const integrationApiBaseUrl = `http://localhost:${integrationApiPort}`
 
 if (process.env.WEB_INTEGRATION_DEBUG === '1') {
   process.stderr.write(
@@ -77,11 +79,15 @@ beforeEach(async () => {
   }
   resetIntegrationRouterLocation('/')
   vi.clearAllMocks()
+  clearAuthToken()
+  sessionStore.setState(() => sessionStoreInitialState)
   window.localStorage.clear()
 })
 
 afterEach(() => {
   cleanup()
+  clearAuthToken()
+  sessionStore.setState(() => sessionStoreInitialState)
   window.localStorage.clear()
 })
 

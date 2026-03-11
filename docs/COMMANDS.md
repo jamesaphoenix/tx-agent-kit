@@ -57,15 +57,17 @@
 
 ## DB + Worktrees
 - `pnpm db:migrate`: run Drizzle migrations.
+- `pnpm db:schemas:generate`: regenerate desired-state SQL under `packages/infra/db/schemas/`.
+- `pnpm db:schemas:apply`: apply desired-state schema SQL after migrations.
 - `pnpm db:trigger:new --name <trigger-name> --table <table> [--timing BEFORE|AFTER] [--events INSERT,UPDATE] [--level ROW|STATEMENT]`: scaffold migration + pgTAP contract for a custom trigger.
 - `pnpm tx db trigger new --name <trigger-name> --table <table> ...`: equivalent CLI form through the shared dispatcher.
-- `pnpm db:test:reset`: idempotently reset integration DB state without tearing down containers.
+- `pnpm db:test:reset`: idempotently reset integration DB state and reapply desired-state schemas without tearing down containers.
 - `pnpm worktree:ports <name>`: derive collision-aware deterministic local ports for a worktree (`WEB_PORT`, `API_PORT`, `MOBILE_PORT`, `WORKER_INSPECT_PORT`, observability UI ports).
 
 ## Deployment
 - `PUSH_IMAGES=1 pnpm deploy:build-images`: build and push API/worker images, then emit image artifact env file in `deploy/artifacts/`.
-- `pnpm deploy:migrate:staging`: run DB migrations with staging secrets from 1Password template.
-- `pnpm deploy:migrate:prod`: run DB migrations with production secrets from 1Password template.
+- `pnpm deploy:migrate:staging`: run DB migrations and desired-state schema reconciliation with staging secrets from 1Password template.
+- `pnpm deploy:migrate:prod`: run DB migrations and desired-state schema reconciliation with production secrets from 1Password template.
 - `pnpm deploy:staging [deploy/artifacts/images-<sha>.env]`: render staging env with `op inject`, deploy compose services, run smoke checks.
 - `pnpm deploy:prod [deploy/artifacts/images-<sha>.env]`: render production env with `op inject`, deploy compose services, run smoke checks.
 - `pnpm deploy:k8s:mac:staging [deploy/artifacts/images-<sha>.env]`: deploy the image artifact to Mac Studio `k3s` staging namespace/release, reconcile tunnel, and run smoke checks.

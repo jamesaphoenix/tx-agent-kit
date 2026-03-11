@@ -24,8 +24,9 @@ apps/web/app/
     terms/page.tsx         # Terms of Service
     privacy/page.tsx       # Privacy Policy
   (application)/           # Authenticated app (auth-guard layout)
-    layout.tsx             # Token check → redirect to /sign-in if missing
+    layout.tsx             # Session bootstrap → redirect to /sign-in when unauthenticated
     org/page.tsx           # Smart redirect → resolves org/team → dashboard
+    org/onboarding/page.tsx          # Organization onboarding wizard
     org/[orgId]/workspaces/page.tsx  # Team listing + create
     org/[orgId]/[teamId]/page.tsx    # Team dashboard
   sign-in/page.tsx         # Split-panel auth (form left, brand right)
@@ -42,6 +43,7 @@ apps/web/app/
 - `apps/web/components/StructuredData.tsx`: JSON-LD `<script>` renderer for Schema.org data.
 - `apps/web/app/sitemap.ts`: Sitemap with all marketing pages.
 - `apps/web/app/robots.ts`: Robots.txt (disallows authenticated routes).
+- `apps/web/lib/auth-token.ts`: in-memory access token boundary for the browser client; refresh persistence is restored through the API's HttpOnly refresh cookie.
 
 ## Packages
 
@@ -61,7 +63,8 @@ apps/web/app/
 
 ## Permissions System
 
-- Migration `0008_permission_seeding.sql` seeds `admin` and `member` roles with 17 permission actions.
+- `packages/contracts/src/permissions.ts` is the permission policy source of truth.
+- `packages/infra/db/schemas/permissions/reconcile_role_permissions.sql` is generated from the policy module and reapplied via `pnpm db:schemas:apply` to reconcile current desired-state role permissions.
 - Permission actions defined in `packages/contracts/src/literals.ts` (`permissionActions` + `PermissionAction` type).
-- Admin role gets all permissions; member role gets a safe subset (excludes `manage_organization`, `manage_billing`, `assign_roles`, `delete_teams`, `delete_workflows`, `export_analytics`, `manage_integrations`, `manage_api_keys`).
+- Owner and admin roles get all permissions; member role gets a safe subset (excludes `manage_organization`, `manage_organization_members`, `manage_billing`, `manage_team_members`, `assign_roles`, `delete_teams`, `delete_workflows`, `export_analytics`, `manage_integrations`, `manage_api_keys`).
 - Team CRUD in `apps/web/lib/client-api.ts`: `listTeams`, `getTeam`, `createTeam`, `updateTeam`, `removeTeam`.

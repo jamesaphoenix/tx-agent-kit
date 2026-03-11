@@ -1,6 +1,7 @@
--- 0010_ensure_invitation_identity_trigger.sql
--- Re-applies invitation identity normalization trigger to guarantee
--- it exists in every migrated schema/database state.
+-- 0013_backfill_invitation_identity_trigger.sql
+-- Ensures invitation identity normalization exists for databases where
+-- earlier invitation identity trigger migrations were already marked
+-- applied before trigger SQL was finalized.
 
 CREATE OR REPLACE FUNCTION normalize_invitation_identity_fn()
 RETURNS TRIGGER AS $$

@@ -40,6 +40,8 @@ const { data: organizations } = useListOrganizations()
 
 The request goes directly to `API_BASE_URL` (e.g., `http://localhost:4000`). There is no proxy layer or BFF. The web app is a pure client that communicates with the API over HTTP.
 
+On the web client, the short-lived access token is kept in memory and attached as a bearer header. Refresh persistence lives in an HttpOnly cookie, so session restoration happens through `/v1/auth/refresh` instead of browser storage.
+
 ### 2. API receives and validates
 
 The Effect HttpApi server receives the request, matches it to a route, and validates the input using `effect/Schema` contracts from `packages/contracts`:
@@ -176,6 +178,6 @@ To reinforce the architecture, the web app is explicitly prohibited from a set o
 | Querying the database directly | ESLint `no-restricted-imports` on `drizzle-orm` |
 | Running server-side code (no API routes, no middleware) | Structural invariant check |
 | Importing Effect or Drizzle | ESLint `no-restricted-imports` |
-| Reading `localStorage` outside `lib/auth-token.ts` | ESLint restriction |
+| Managing browser-visible auth token state outside `lib/auth-token.ts` | ESLint restriction + centralized auth-token module |
 | Using raw `fetch` instead of the typed API client | ESLint restriction |
 | Reading `window.location` directly instead of `lib/url-state.tsx` | ESLint restriction |

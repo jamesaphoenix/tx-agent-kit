@@ -1,4 +1,4 @@
--- 0012_reinstate_invitation_identity_trigger.sql
+-- 0014_reinstate_invitation_identity_trigger.sql
 -- Guarantees invitation email normalization + invitee binding trigger exists
 -- even for databases that previously skipped or dropped this trigger.
 

@@ -53,7 +53,8 @@ describe('AppProviders integration', () => {
       userId: randomUUID(),
       email: 'devtools-integration@example.com',
       roles: ['member'],
-      organizationId: undefined
+      organizationId: undefined,
+      permissions: []
     })
 
     await waitFor(() => {
@@ -97,7 +98,8 @@ describe('AppProviders integration', () => {
         userId: randomUUID(),
         email: `history-${index}@example.com`,
         roles: ['member'],
-        organizationId: undefined
+        organizationId: undefined,
+        permissions: []
       })
     }
 

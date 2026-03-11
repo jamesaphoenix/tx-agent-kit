@@ -96,7 +96,7 @@ create_worktree() {
   printf '\n'
   log_info "Next steps:"
   printf '  1) %s setup %s\n' "$0" "$branch_name"
-  printf '  2) cd worktrees/%s && pnpm db:migrate && pnpm dev\n' "$branch_name"
+  printf '  2) cd worktrees/%s && pnpm db:migrate && pnpm db:schemas:apply && pnpm dev\n' "$branch_name"
 }
 
 list_worktrees() {

@@ -1,4 +1,4 @@
--- 0013_restore_public_invitation_identity_trigger.sql
+-- 0015_restore_public_invitation_identity_trigger.sql
 -- Reinstates invitation identity normalization on the public schema even if
 -- earlier migrations were applied with a non-public search_path.
 -- In schema-prefixed integration databases, public tables may not exist; skip

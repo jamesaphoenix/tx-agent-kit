@@ -4,9 +4,6 @@ export interface OpenApiEnv {
   OPENAPI_SERVER_URL: string
 }
 
-export const getOpenApiEnv = (): OpenApiEnv => {
-  return {
-    OPENAPI_SERVER_URL:
-      process.env.OPENAPI_SERVER_URL ?? defaultOpenApiServerUrl
-  }
-}
+export const getOpenApiEnv = (): OpenApiEnv => ({
+  OPENAPI_SERVER_URL: process.env.OPENAPI_SERVER_URL ?? defaultOpenApiServerUrl
+})

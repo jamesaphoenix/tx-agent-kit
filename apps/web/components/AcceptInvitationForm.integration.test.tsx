@@ -1,7 +1,7 @@
 import React from 'react'
 import { writeAuthToken } from '@/lib/auth-token'
 import { clientApi } from '@/lib/client-api'
-import { createTeam, createUser } from '@tx-agent-kit/testkit'
+import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import { describe, expect, it, vi } from 'vitest'
 import { AcceptInvitationForm } from './AcceptInvitationForm'
 import { renderWithProviders, screen, userEvent, waitFor } from '../integration/test-utils'
@@ -23,7 +23,7 @@ describe('AcceptInvitationForm integration', () => {
       name: 'Accept Invitee'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Accept Invitation Organization'
     })
@@ -73,7 +73,7 @@ describe('AcceptInvitationForm integration', () => {
       name: 'Accept Invitee Invalid Token'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Accept Invalid Token Organization'
     })
@@ -133,7 +133,7 @@ describe('AcceptInvitationForm integration', () => {
       name: 'Accept Attacker Wrong User'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Accept Wrong User Organization'
     })
@@ -227,7 +227,7 @@ describe('AcceptInvitationForm integration', () => {
       name: 'Accept Invitee Reused Token'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Accept Reused Token Organization'
     })
@@ -291,7 +291,7 @@ describe('AcceptInvitationForm integration', () => {
       name: 'Accept Invitee Expired Token'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Accept Expired Token Organization'
     })

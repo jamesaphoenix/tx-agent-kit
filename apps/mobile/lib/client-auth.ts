@@ -1,13 +1,10 @@
+import { buildSignInPath, isAuthStatusError } from '@tx-agent-kit/contracts'
 import { clearAuthToken, clearRefreshToken, readAuthToken } from './auth-token'
-import { ApiClientError } from './client-api'
+import { clientApi } from './client-api'
 import { sessionStoreActions } from '../stores/session-store'
 
 interface RouterLike {
   replace: (path: string) => void
-}
-
-const buildSignInPath = (nextPath: string): string => {
-  return `/sign-in?next=${encodeURIComponent(nextPath)}`
 }
 
 export const ensureSessionOrRedirect = async (
@@ -20,6 +17,11 @@ export const ensureSessionOrRedirect = async (
     return true
   }
 
+  const restored = await clientApi.restoreSession()
+  if (restored) {
+    return true
+  }
+
   router.replace(buildSignInPath(nextPath))
   return false
 }
@@ -29,7 +31,7 @@ export const handleUnauthorizedApiError = async (
   router: RouterLike,
   nextPath: string
 ): Promise<boolean> => {
-  if (!(error instanceof ApiClientError) || (error.status !== 401 && error.status !== 403)) {
+  if (!isAuthStatusError(error)) {
     return false
   }
 

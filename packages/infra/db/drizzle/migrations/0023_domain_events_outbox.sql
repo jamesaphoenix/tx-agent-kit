@@ -1,4 +1,7 @@
-CREATE TYPE domain_event_status AS ENUM ('pending', 'processing', 'published', 'failed');
+DO $$ BEGIN
+  CREATE TYPE domain_event_status AS ENUM ('pending', 'processing', 'published', 'failed');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS domain_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

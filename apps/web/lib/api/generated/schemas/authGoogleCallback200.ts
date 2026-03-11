@@ -9,6 +9,6 @@ import type { AuthGoogleCallback200User } from './authGoogleCallback200User';
 
 export type AuthGoogleCallback200 = {
   token: string;
-  refreshToken: string;
+  refreshToken?: string;
   user: AuthGoogleCallback200User;
 };

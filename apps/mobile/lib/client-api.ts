@@ -1,3 +1,7 @@
+import {
+  createSessionRestorer,
+  restoreAuthenticatedPrincipal
+} from '@tx-agent-kit/contracts'
 import type {
   AuthPrincipal,
   AuthResponse,
@@ -14,7 +18,7 @@ import {
   writeAuthToken,
   writeRefreshToken
 } from './auth-token'
-import { api, getApiErrorMessage, getApiErrorStatus } from './axios'
+import { api, getApiErrorMessage, getApiErrorStatus, refreshAccessToken } from './axios'
 
 export class ApiClientError extends Error {
   readonly status: number | undefined
@@ -31,10 +35,45 @@ const fail = (error: unknown, fallback: string): never => {
   throw new ApiClientError(getApiErrorMessage(error, fallback), getApiErrorStatus(error))
 }
 
+const requireRefreshToken = (response: AuthResponse): string => {
+  if (typeof response.refreshToken !== 'string' || response.refreshToken.length === 0) {
+    throw new ApiClientError('Refresh token is missing from response')
+  }
+
+  return response.refreshToken
+}
+
 const persistAuthSession = async (response: AuthResponse): Promise<void> => {
   await writeAuthToken(response.token)
-  await writeRefreshToken(response.refreshToken)
+  await writeRefreshToken(requireRefreshToken(response))
 }
+
+const refreshSession = async (): Promise<void> => {
+  const refreshToken = await readRefreshToken()
+  if (!refreshToken) {
+    throw new ApiClientError('No refresh token is available')
+  }
+
+  try {
+    await refreshAccessToken()
+  } catch (error) {
+    if (getApiErrorStatus(error) === 401 || getApiErrorStatus(error) === 403) {
+      await clearAuthToken()
+      await clearRefreshToken()
+    }
+
+    return fail(error, 'Failed to refresh session')
+  }
+}
+
+const restoreSession = createSessionRestorer({
+  hasAccessToken: async () => (await readAuthToken()) !== null,
+  canRefreshSession: async () => {
+    const refreshToken = await readRefreshToken()
+    return typeof refreshToken === 'string' && refreshToken.length > 0
+  },
+  refreshSession: async () => clientApi.refreshSession()
+})
 
 export const clientApi = {
   signIn: async (input: SignInRequest): Promise<void> => {
@@ -70,26 +109,15 @@ export const clientApi = {
           Authorization: `Bearer ${token}`
         }
       })
-    } catch (error) {
-      void error
+    } catch {
+      // Sign-out is best-effort — intentionally swallowed
+      return
     }
   },
 
-  refreshSession: async (): Promise<void> => {
-    const refreshToken = await readRefreshToken()
-    if (!refreshToken) {
-      throw new ApiClientError('No refresh token is available')
-    }
+  refreshSession,
 
-    try {
-      const { data } = await api.post<AuthResponse>('/v1/auth/refresh', {
-        refreshToken
-      })
-      await persistAuthSession(data)
-    } catch (error) {
-      return fail(error, 'Failed to refresh session')
-    }
-  },
+  restoreSession,
 
   me: async (): Promise<AuthPrincipal> => {
     try {
@@ -155,3 +183,13 @@ export const clientApi = {
     }
   }
 }
+
+export const restoreCurrentPrincipal = async (): Promise<AuthPrincipal | null> =>
+  restoreAuthenticatedPrincipal({
+    restoreSession,
+    loadPrincipal: clientApi.me,
+    clearCredentialsOnAuthError: async () => {
+      await clearAuthToken()
+      await clearRefreshToken()
+    }
+  })

@@ -99,7 +99,7 @@ The following table summarizes the structural invariants:
 | Port files do not contain `export interface` declarations | `ports/*.ts` across all domains |
 | Domain record types are defined in `domain/` and imported by `ports/` | DDD layer boundaries |
 | No `repositories/` or `services/` directories | Inside `packages/core/src/domains/` |
-| Only `apps/web/lib/auth-token.ts` reads/writes `localStorage` | Entire `apps/web` tree |
+| Only `apps/web/lib/auth-token.ts` manages browser-visible auth token state | Entire `apps/web` tree |
 | Env reads go through dedicated env modules only | All source modules |
 | Test files follow colocated naming (`.test.ts`, `.integration.test.ts`) | Entire repo |
 | No `__tests__` directories, `.spec.ts`, or `.integration.ts` files | Entire repo |

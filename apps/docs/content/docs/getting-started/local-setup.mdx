@@ -68,9 +68,10 @@ Use `pnpm temporal:dev:status` to confirm the runtime is healthy.
 
 ```bash
 pnpm db:migrate
+pnpm db:schemas:apply
 ```
 
-This runs Drizzle migrations against your local PostgreSQL instance, creating all tables, triggers, and indexes.
+This runs Drizzle migrations against your local PostgreSQL instance, then reapplies desired-state SQL such as permission reconciliation.
 
 To verify the migration was successful:
 

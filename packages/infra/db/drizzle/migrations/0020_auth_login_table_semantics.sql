@@ -1,4 +1,4 @@
--- 0018_auth_login_table_semantics.sql
+-- 0020_auth_login_table_semantics.sql
 -- Clarify that auth_login_* artifacts are strictly for first-party SaaS login/authentication.
 
 BEGIN;

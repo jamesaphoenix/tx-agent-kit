@@ -1,20 +1,19 @@
 'use client'
 
-import type { AuthPrincipal, Organization, Team } from '@tx-agent-kit/contracts'
+import type { Organization, Team } from '@tx-agent-kit/contracts'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { DashboardShell } from '../../../../../components/DashboardShell'
+import { useCurrentPrincipal } from '../../../../../hooks/use-session-store'
 import { clientApi } from '../../../../../lib/client-api'
 import { handleUnauthorizedApiError } from '../../../../../lib/client-auth'
 
 interface DashboardState {
-  principal: AuthPrincipal | null
   organization: Organization | null
   team: Team | null
 }
 
 const emptyState: DashboardState = {
-  principal: null,
   organization: null,
   team: null
 }
@@ -23,6 +22,7 @@ export default function TeamDashboardPage() {
   const router = useRouter()
   const params = useParams<{ orgId: string; teamId: string }>()
   const { orgId, teamId } = params
+  const principal = useCurrentPrincipal()
   const [state, setState] = useState<DashboardState>(emptyState)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -31,12 +31,8 @@ export default function TeamDashboardPage() {
     setLoading(true)
     setError(null)
     try {
-      const [principal, organization, team] = await Promise.all([
-        clientApi.me(),
-        clientApi.getOrganization(orgId),
-        clientApi.getTeam(teamId)
-      ])
-      setState({ principal, organization, team })
+      const [organization, team] = await Promise.all([clientApi.getOrganization(orgId), clientApi.getTeam(teamId)])
+      setState({ organization, team })
     } catch (error_) {
       if (handleUnauthorizedApiError(error_, router, `/org/${orgId}/${teamId}`)) {
         return
@@ -70,8 +66,8 @@ export default function TeamDashboardPage() {
   return (
     <DashboardShell
       title={state.team?.name ?? 'Workspace dashboard'}
-      subtitle={state.principal ? `Signed in as ${state.principal.email}` : 'Loading profile...'}
-      principalEmail={state.principal?.email}
+      subtitle={principal ? `Signed in as ${principal.email}` : 'Loading profile...'}
+      principalEmail={principal?.email}
       orgId={orgId}
       teamId={teamId}
       metrics={metrics}

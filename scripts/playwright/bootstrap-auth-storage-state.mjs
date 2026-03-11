@@ -4,7 +4,9 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 
-const AUTH_TOKEN_STORAGE_KEY = 'tx-agent-kit.auth-token'
+const BROWSER_AUTH_SESSION_MODE_HEADER_NAME = 'x-tx-auth-session-mode'
+const BROWSER_AUTH_SESSION_MODE_HEADER_VALUE = 'browser-cookie'
+const REFRESH_COOKIE_NAME = 'tx-agent-kit.refresh-token'
 const DEFAULT_SITE_URL = 'http://localhost:3000'
 const DEFAULT_API_BASE_URL = 'http://localhost:4000'
 const DEFAULT_STORAGE_STATE_PATH = '.artifacts/playwright-mcp/storage-state.json'
@@ -81,6 +83,74 @@ const requestJson = async (url, init) => {
   return { response, payload }
 }
 
+const parseRefreshCookie = (response, apiBaseUrl) => {
+  const setCookie = response.headers.get('set-cookie')
+  if (!setCookie) {
+    throw new Error('Expected Set-Cookie header to include the refresh cookie')
+  }
+
+  const [cookiePart, ...attributeParts] = setCookie.split(';').map((part) => part.trim())
+  if (!cookiePart.startsWith(`${REFRESH_COOKIE_NAME}=`)) {
+    throw new Error(`Expected ${REFRESH_COOKIE_NAME} cookie, received: ${setCookie}`)
+  }
+
+  const value = cookiePart.slice(`${REFRESH_COOKIE_NAME}=`.length)
+  if (!value) {
+    throw new Error(`Expected ${REFRESH_COOKIE_NAME} cookie value, received: ${setCookie}`)
+  }
+
+  const cookieUrl = assertUrl(apiBaseUrl, 'PLAYWRIGHT_AUTH_API_BASE_URL')
+  let expires = -1
+  let sameSite = 'Lax'
+  let secure = cookieUrl.protocol === 'https:'
+  let httpOnly = true
+  let path = '/'
+
+  for (const attribute of attributeParts) {
+    const [rawName, rawValue = ''] = attribute.split('=')
+    const name = rawName.trim().toLowerCase()
+    const attributeValue = rawValue.trim()
+
+    if (name === 'max-age') {
+      const maxAgeSeconds = Number.parseInt(attributeValue, 10)
+      if (Number.isFinite(maxAgeSeconds)) {
+        expires = Math.floor(Date.now() / 1000) + maxAgeSeconds
+      }
+      continue
+    }
+
+    if (name === 'path' && attributeValue.length > 0) {
+      path = attributeValue
+      continue
+    }
+
+    if (name === 'samesite' && attributeValue.length > 0) {
+      sameSite = attributeValue
+      continue
+    }
+
+    if (name === 'secure') {
+      secure = true
+      continue
+    }
+
+    if (name === 'httponly') {
+      httpOnly = true
+    }
+  }
+
+  return {
+    name: REFRESH_COOKIE_NAME,
+    value,
+    domain: cookieUrl.hostname,
+    path,
+    expires,
+    httpOnly,
+    secure,
+    sameSite
+  }
+}
+
 const canIgnoreSignUpFailure = (status, message) => {
   if (status === 409) {
     return true
@@ -124,7 +194,9 @@ const main = async () => {
   const meUrl = buildUrl(apiBaseUrl, '/v1/auth/me')
 
   const commonHeaders = {
-    'content-type': 'application/json'
+    'content-type': 'application/json',
+    [BROWSER_AUTH_SESSION_MODE_HEADER_NAME]: BROWSER_AUTH_SESSION_MODE_HEADER_VALUE,
+    origin: siteOrigin
   }
 
   const signUp = await requestJson(signUpUrl, {
@@ -160,6 +232,8 @@ const main = async () => {
     throw new Error('Sign-in response did not contain a token')
   }
 
+  const refreshCookie = parseRefreshCookie(signIn.response, apiBaseUrl)
+
   const me = await requestJson(meUrl, {
     method: 'GET',
     headers: {
@@ -173,16 +247,11 @@ const main = async () => {
   }
 
   const storageState = {
-    cookies: [],
+    cookies: [refreshCookie],
     origins: [
       {
         origin: siteOrigin,
-        localStorage: [
-          {
-            name: AUTH_TOKEN_STORAGE_KEY,
-            value: token
-          }
-        ]
+        localStorage: []
       }
     ]
   }

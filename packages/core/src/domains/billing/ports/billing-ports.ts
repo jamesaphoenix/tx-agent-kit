@@ -8,11 +8,14 @@ import type {
   CreditEntryType,
   CreditLedgerEntryRecord,
   JsonObject,
+  StripeWebhookEvent,
   SubscriptionEventRecord,
   SubscriptionStatus,
   UsageCategory,
   UsageRecordRecord
 } from '../domain/billing-domain.js'
+
+export type { StripeWebhookEvent } from '../domain/billing-domain.js'
 
 export const BillingRepositoryKind = 'custom' as const
 
@@ -127,15 +130,6 @@ export class SubscriptionEventStorePort extends Context.Tag('SubscriptionEventSt
     markProcessed: (id: string) => Effect.Effect<SubscriptionEventRecord | null, unknown>
   }
 >() {}
-
-export interface StripeWebhookEvent {
-  id: string
-  type: string
-  payload: JsonObject
-  data: {
-    object: JsonObject
-  }
-}
 
 export class StripePort extends Context.Tag('StripePort')<
   StripePort,

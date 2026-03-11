@@ -1,10 +1,18 @@
 import { getClientHttpTelemetry } from '@tx-agent-kit/observability/client'
+import type { AuthResponse } from '@tx-agent-kit/contracts'
 import axios, {
   type AxiosError,
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig
 } from 'axios'
-import { readAuthToken } from './auth-token'
+import {
+  clearAuthToken,
+  clearRefreshToken,
+  readAuthToken,
+  readRefreshToken,
+  writeAuthToken,
+  writeRefreshToken
+} from './auth-token'
 import { getMobileEnv } from './env'
 
 const mobileEnv = getMobileEnv()
@@ -26,6 +34,11 @@ interface RequestTelemetryContext {
   readonly startedAtMs: number
   readonly method: string
   readonly path: string
+}
+
+interface ApiRequestConfig extends InternalAxiosRequestConfig {
+  _retryAuthRefresh?: boolean
+  _skipAuthRefresh?: boolean
 }
 
 const spanStatusCode = {
@@ -151,6 +164,71 @@ const attachAuthHeader = async (
   return startRequestTelemetry(config)
 }
 
+const authRefreshExcludedPaths = new Set([
+  '/v1/auth/sign-in',
+  '/v1/auth/sign-up',
+  '/v1/auth/refresh'
+])
+
+let refreshAccessTokenPromise: Promise<void> | null = null
+
+const refreshApi = axios.create({
+  baseURL: mobileEnv.API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+export const refreshAccessToken = async (): Promise<void> => {
+  if (refreshAccessTokenPromise !== null) {
+    return refreshAccessTokenPromise
+  }
+
+  refreshAccessTokenPromise = (async () => {
+    try {
+      const refreshToken = await readRefreshToken()
+      if (!refreshToken) {
+        throw new Error('No refresh token is available')
+      }
+
+      const { data } = await refreshApi.post<AuthResponse>('/v1/auth/refresh', {
+        refreshToken
+      })
+
+      await writeAuthToken(data.token)
+
+      if (typeof data.refreshToken === 'string' && data.refreshToken.length > 0) {
+        await writeRefreshToken(data.refreshToken)
+      }
+    } finally {
+      refreshAccessTokenPromise = null
+    }
+  })()
+
+  return refreshAccessTokenPromise
+}
+
+const shouldRetryWithRefresh = async (
+  config: ApiRequestConfig,
+  statusCode: number | undefined
+): Promise<boolean> => {
+  if (statusCode !== 401) {
+    return false
+  }
+
+  if (config._retryAuthRefresh || config._skipAuthRefresh) {
+    return false
+  }
+
+  const path = resolveRequestPath(config)
+  if (authRefreshExcludedPaths.has(path)) {
+    return false
+  }
+
+  const refreshToken = await readRefreshToken()
+  return typeof refreshToken === 'string' && refreshToken.length > 0
+}
+
 export const api = axios.create({
   baseURL: mobileEnv.API_BASE_URL,
   headers: {
@@ -164,14 +242,31 @@ api.interceptors.response.use(
     finishRequestTelemetry(response.config, response.status, undefined)
     return response
   },
-  (error: unknown) => {
+  async (error: unknown) => {
     if (axios.isAxiosError(error) && error.config) {
-      finishRequestTelemetry(error.config, error.response?.status, error)
+      const config = error.config as ApiRequestConfig
+      const statusCode = error.response?.status
+
+      if (await shouldRetryWithRefresh(config, statusCode)) {
+        finishRequestTelemetry(config, statusCode, error)
+
+        try {
+          await refreshAccessToken()
+          config._retryAuthRefresh = true
+          return await api(config)
+        } catch (catchError) {
+          const catchStatus = getApiErrorStatus(catchError)
+          if (catchStatus === 401 || catchStatus === 403) {
+            await clearAuthToken()
+            await clearRefreshToken()
+          }
+        }
+      } else {
+        finishRequestTelemetry(config, statusCode, error)
+      }
     }
 
-    const rejectionError =
-      error instanceof Error ? error : new Error('Mobile API client request failed.')
-    return Promise.reject(rejectionError)
+    throw error instanceof Error ? error : new Error('Mobile API client request failed.')
   }
 )
 

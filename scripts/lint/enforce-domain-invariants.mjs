@@ -1439,9 +1439,9 @@ const enforceCriticalIntegrationCoverage = () => {
       )
     }
 
-    if (!/\bcreateUser\s*\(/u.test(invitationsSource) || !/\bcreateTeam\s*\(/u.test(invitationsSource)) {
+    if (!/\bcreateUser\s*\(/u.test(invitationsSource) || !/\bcreateOrganization\s*\(/u.test(invitationsSource)) {
       fail(
-        'Invitations page integration suite must cover authenticated data flow setup via `createUser(...)` and `createTeam(...)`.'
+        'Invitations page integration suite must cover authenticated data flow setup via `createUser(...)` and `createOrganization(...)`.'
       )
     }
 
@@ -1467,9 +1467,9 @@ const enforceCriticalIntegrationCoverage = () => {
       )
     }
 
-    if (!/\bcreateUser\s*\(/u.test(organizationsSource) || !/\bcreateTeam\s*\(/u.test(organizationsSource)) {
+    if (!/\bcreateUser\s*\(/u.test(organizationsSource) || !/\bcreateOrganization\s*\(/u.test(organizationsSource)) {
       fail(
-        'Organizations page integration suite must cover authenticated data flow setup via `createUser(...)` and `createTeam(...)`.'
+        'Organizations page integration suite must cover authenticated data flow setup via `createUser(...)` and `createOrganization(...)`.'
       )
     }
   }
@@ -2048,16 +2048,10 @@ const enforceMigrationNamingConvention = () => {
     }
   }
 
-  // Check for duplicate prefixes (new migrations only — prefixes > 0026 are post-historical)
   const prefixes = migrationFiles.map((f) => f.slice(0, 4))
-  const knownDuplicatePrefixes = new Set(['0008', '0010'])
   const seen = new Set()
   for (let i = 0; i < prefixes.length; i++) {
     const prefix = prefixes[i]
-    if (knownDuplicatePrefixes.has(prefix)) {
-      seen.add(prefix)
-      continue
-    }
     if (seen.has(prefix)) {
       fail(
         `Duplicate migration prefix \`${prefix}\` found: \`${migrationFiles[i]}\`. Each migration must have a unique sequential prefix.`

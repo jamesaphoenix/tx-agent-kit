@@ -1,3 +1,4 @@
+import { authRefreshTokenKey } from '@tx-agent-kit/contracts'
 import * as Schema from 'effect/Schema'
 
 const requiredApiEnvShape = {
@@ -24,6 +25,9 @@ const requiredApiEnvShape = {
   SUBSCRIPTION_GUARD_ENABLED: Schema.optional(Schema.String),
   TRUST_PROXY: Schema.optional(Schema.String)
 } as const
+
+const authRefreshCookieName = authRefreshTokenKey
+const authRefreshCookieMaxAgeMs = 30 * 24 * 60 * 60 * 1000
 
 export const requiredApiEnvKeys = [
   'NODE_ENV',
@@ -103,6 +107,10 @@ const assertApiEnvInvariants = (env: ApiEnv): ApiEnv => {
 
   if (isProductionLike && env.API_CORS_ORIGIN === '*') {
     throw new Error('API_CORS_ORIGIN must not be wildcard (*) in production or staging.')
+  }
+
+  if (env.API_CORS_ORIGIN.length === 0) {
+    throw new Error('API_CORS_ORIGIN must not be empty.')
   }
 
   const googleOidcValues = [
@@ -216,4 +224,31 @@ export const getSubscriptionGuardEnabled = (): boolean => {
   }
 
   return true
+}
+
+export interface AuthRefreshCookieConfig {
+  name: string
+  options: {
+    httpOnly: true
+    maxAge: number
+    path: '/'
+    sameSite: 'lax'
+    secure: boolean
+  }
+}
+
+export const getAuthRefreshCookieConfig = (): AuthRefreshCookieConfig => {
+  const env = getApiEnv()
+  const isProductionLike = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging'
+
+  return {
+    name: authRefreshCookieName,
+    options: {
+      httpOnly: true,
+      maxAge: authRefreshCookieMaxAgeMs,
+      path: '/',
+      sameSite: 'lax',
+      secure: isProductionLike
+    }
+  }
 }

@@ -1,7 +1,7 @@
 import React from 'react'
 import { readAuthToken, writeAuthToken } from '@/lib/auth-token'
 import { clientApi } from '@/lib/client-api'
-import { createTeam, createUser } from '@tx-agent-kit/testkit'
+import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import { within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import InvitationsPage from './page'
@@ -42,7 +42,7 @@ describe('InvitationsPage integration', () => {
       name: 'Invitations Invitee'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invitations Integration Team'
     })
@@ -82,7 +82,7 @@ describe('InvitationsPage integration', () => {
       name: 'Invitations Owner Activity'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invitations Owner Activity Team'
     })
@@ -122,7 +122,7 @@ describe('InvitationsPage integration', () => {
       password: 'invitations-page-invitee-pass-12345',
       name: 'Invitations Page Invitee'
     })
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invitations Page Team'
     })
@@ -184,7 +184,7 @@ describe('InvitationsPage integration', () => {
       password: 'invitations-manual-invitee-pass-12345',
       name: 'Invitations Manual Invitee'
     })
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invitations Manual Team'
     })
@@ -223,7 +223,7 @@ describe('InvitationsPage integration', () => {
       password: 'invitations-auto-invitee-pass-12345',
       name: 'Invitations Auto Invitee'
     })
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invitations Auto Team'
     })

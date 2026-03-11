@@ -1,7 +1,7 @@
 import React from 'react'
 import { writeAuthToken } from '@/lib/auth-token'
 import { clientApi } from '@/lib/client-api'
-import { createTeam, createUser } from '@tx-agent-kit/testkit'
+import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import { describe, expect, it, vi } from 'vitest'
 import { CreateInvitationForm } from './CreateInvitationForm'
 import { renderWithProviders, screen, userEvent, waitFor } from '../integration/test-utils'
@@ -23,7 +23,7 @@ describe('CreateInvitationForm integration', () => {
       name: 'Invitee User'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invitation Organization'
     })
@@ -90,7 +90,7 @@ describe('CreateInvitationForm integration', () => {
       name: 'Invitee Forbidden'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invitation Forbidden Organization'
     })
@@ -134,7 +134,7 @@ describe('CreateInvitationForm integration', () => {
       name: 'Invite Owner Unknown Email'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invitation Unknown Email Organization'
     })

@@ -4,6 +4,7 @@ import type { Invitation, Organization } from '@tx-agent-kit/contracts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DashboardShell } from '../../components/DashboardShell'
+import { useCurrentPrincipal, useIsSessionReady } from '../../hooks/use-session-store'
 import { ensureSessionOrRedirect, handleUnauthorizedApiError } from '../../lib/client-auth'
 import { clientApi } from '../../lib/client-api'
 import { notify } from '../../lib/notify'
@@ -42,10 +43,11 @@ function formatDate(date: string | Date): string {
 
 export default function InvitationsPage() {
   const router = useRouter()
+  const isSessionReady = useIsSessionReady()
+  const principal = useCurrentPrincipal()
   const urlToken = useStringQueryParam('token')
   const [invitations, setInvitations] = useState<InvitationWithOrgName[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [principalEmail, setPrincipalEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [accepting, setAccepting] = useState(false)
@@ -68,10 +70,9 @@ export default function InvitationsPage() {
     setError(null)
 
     try {
-      const [invitationsPayload, organizationsPayload, principal] = await Promise.all([
+      const [invitationsPayload, organizationsPayload] = await Promise.all([
         clientApi.listInvitations(),
-        clientApi.listOrganizations(),
-        clientApi.me()
+        clientApi.listOrganizations()
       ])
 
       const orgMap = new Map(organizationsPayload.data.map((o) => [o.id, o.name]))
@@ -83,7 +84,6 @@ export default function InvitationsPage() {
         }))
       )
       setOrganizations(organizationsPayload.data)
-      setPrincipalEmail(principal.email)
     } catch (error_) {
       if (handleUnauthorizedApiError(error_, router, '/invitations')) {
         return
@@ -95,8 +95,12 @@ export default function InvitationsPage() {
   }, [router])
 
   useEffect(() => {
+    if (!isSessionReady) {
+      return
+    }
+
     void load()
-  }, [load])
+  }, [isSessionReady, load])
 
   useEffect(() => {
     if (!urlToken || autoAcceptAttempted.current || loading) {
@@ -212,7 +216,7 @@ export default function InvitationsPage() {
       <DashboardShell
         title="Invitations"
         subtitle="Processing invitation acceptance."
-        principalEmail={principalEmail}
+        principalEmail={principal?.email}
         metrics={metrics}
       >
         <section className="card" style={{ textAlign: 'center', padding: '3rem' }}>
@@ -227,7 +231,7 @@ export default function InvitationsPage() {
     <DashboardShell
       title="Invitations"
       subtitle="Send, accept, and revoke organization invitations from one command surface."
-      principalEmail={principalEmail}
+      principalEmail={principal?.email}
       metrics={metrics}
     >
       {error && <p className="error">{error}</p>}

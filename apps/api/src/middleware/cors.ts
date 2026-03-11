@@ -1,3 +1,4 @@
+import { browserAuthSessionModeHeaderName } from '@tx-agent-kit/contracts'
 import { getApiEnv } from '../config/env.js'
 
 const DEFAULT_CORS_ORIGINS = [
@@ -21,7 +22,7 @@ export const getCorsConfig = () => {
   return {
     allowedOrigins,
     allowedMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'] as const,
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', browserAuthSessionModeHeaderName],
     credentials: originEnv !== '*',
     maxAge: 3600
   }

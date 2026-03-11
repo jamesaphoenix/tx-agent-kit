@@ -85,7 +85,7 @@ All worktrees share the same Docker containers. The `docker-compose.yml` project
 
 ## Generated helper scripts
 
-The setup script generates two helper scripts inside the worktree. `run-migrations.sh` runs `pnpm db:migrate` inside the worktree context. `reset-worktree-schema.sh` drops and recreates the worktree's PostgreSQL schema.
+The setup script generates two helper scripts inside the worktree. `run-migrations.sh` runs `pnpm db:migrate` followed by `pnpm db:schemas:apply` inside the worktree context. `reset-worktree-schema.sh` drops and recreates the worktree's PostgreSQL schema.
 
 ## Port allocation internals
 

@@ -35,7 +35,9 @@ const listFilesRecursively = (rootDir) => {
 const toPascalCase = (value) =>
   value
     .split('.')
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .map((segment) =>
+      segment.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('')
+    )
     .join('')
 
 // ─── Read domainEventTypes from contracts ────────────────────────────
@@ -292,28 +294,23 @@ const retentionTableNames = retentionTableNamesMatch
   ? [...retentionTableNamesMatch[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
   : []
 
-const migrationDir = resolve(repoRoot, 'packages/infra/db/drizzle/migrations')
-const migrationFiles = existsSync(migrationDir)
-  ? readdirSync(migrationDir).filter((f) => f.endsWith('.sql'))
-  : []
-
-let retentionSettingsContent = ''
-for (const mFile of migrationFiles) {
-  const content = readUtf8(join(migrationDir, mFile))
-  if (content.includes('retention_settings')) {
-    retentionSettingsContent += content
-  }
-}
+const retentionSchemaPath = resolve(
+  repoRoot,
+  'packages/infra/db/schemas/system-settings/reconcile_retention_settings.sql'
+)
+const retentionSettingsContent = existsSync(retentionSchemaPath)
+  ? readUtf8(retentionSchemaPath)
+  : ''
 
 if (retentionTableNames.length > 0 && !retentionSettingsContent) {
   fail(
-    'No migration file contains a `retention_settings` seed. Ensure the system_settings migration exists and seeds retention defaults.'
+    'Missing `packages/infra/db/schemas/system-settings/reconcile_retention_settings.sql`. Generate desired-state schemas so retention defaults are reconciled from the current policy.'
   )
 } else {
   for (const tableName of retentionTableNames) {
     if (!retentionSettingsContent.includes(`"${tableName}"`)) {
       fail(
-        `Table '${tableName}' is in retentionTableNames but missing from the retention_settings seed in migrations.`
+        `Table '${tableName}' is in retentionTableNames but missing from the generated retention_settings reconcile schema.`
       )
     }
   }

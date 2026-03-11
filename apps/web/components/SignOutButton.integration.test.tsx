@@ -17,7 +17,8 @@ describe('SignOutButton integration', () => {
       userId: randomUUID(),
       email: 'signed-in-user@example.com',
       organizationId: undefined,
-      roles: ['member']
+      roles: ['member'],
+      permissions: []
     })
   })
 

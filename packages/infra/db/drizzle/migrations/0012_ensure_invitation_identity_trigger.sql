@@ -1,6 +1,6 @@
--- 0009_restore_invitation_identity_trigger.sql
--- Restores invitation email normalization + invitee binding trigger for
--- databases where previous migrations were applied without this trigger.
+-- 0012_ensure_invitation_identity_trigger.sql
+-- Re-applies invitation identity normalization trigger to guarantee
+-- it exists in every migrated schema/database state.
 
 CREATE OR REPLACE FUNCTION normalize_invitation_identity_fn()
 RETURNS TRIGGER AS $$

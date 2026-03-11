@@ -61,6 +61,9 @@
 ## Apply migrations
 `pnpm db:migrate`
 
+## Apply desired-state schemas
+`pnpm db:schemas:apply`
+
 ## Validate DB trigger contracts (pgTAP)
 `pnpm test:db:pgtap`
 
@@ -68,7 +71,7 @@
 1. Run `pnpm db:trigger:new --name <trigger-name> --table <table> [--timing BEFORE|AFTER] [--events INSERT,UPDATE] [--level ROW|STATEMENT]` (or `pnpm tx db trigger new ...`).
 2. Implement trigger function logic in the generated migration under `packages/infra/db/drizzle/migrations/`.
 3. Replace scaffold `fail(...)` assertion in the generated `packages/infra/db/pgtap/*.pgtap.sql` suite with concrete trigger assertions.
-4. Run `pnpm db:migrate` and `pnpm test:db:pgtap`.
+4. Run `pnpm db:migrate`, `pnpm db:schemas:apply`, and `pnpm test:db:pgtap`.
 
 ## Compute deterministic worktree ports
 `pnpm worktree:ports feature-my-branch`

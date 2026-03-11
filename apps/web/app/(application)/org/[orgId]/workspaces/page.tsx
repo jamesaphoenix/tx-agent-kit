@@ -4,6 +4,7 @@ import type { Team } from '@tx-agent-kit/contracts'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { DashboardShell } from '../../../../../components/DashboardShell'
+import { useCurrentPrincipal } from '../../../../../hooks/use-session-store'
 import { clientApi } from '../../../../../lib/client-api'
 import { handleUnauthorizedApiError } from '../../../../../lib/client-auth'
 import { notify } from '../../../../../lib/notify'
@@ -12,8 +13,8 @@ export default function WorkspacesPage() {
   const router = useRouter()
   const params = useParams<{ orgId: string }>()
   const orgId = params.orgId
+  const principal = useCurrentPrincipal()
   const [teams, setTeams] = useState<Team[]>([])
-  const [principalEmail, setPrincipalEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -23,12 +24,8 @@ export default function WorkspacesPage() {
     setLoading(true)
     setError(null)
     try {
-      const [result, principal] = await Promise.all([
-        clientApi.listTeams(orgId),
-        clientApi.me()
-      ])
+      const result = await clientApi.listTeams(orgId)
       setTeams(result.data)
-      setPrincipalEmail(principal.email)
     } catch (error_) {
       if (handleUnauthorizedApiError(error_, router, `/org/${orgId}/workspaces`)) {
         return
@@ -84,7 +81,7 @@ export default function WorkspacesPage() {
     <DashboardShell
       title="Workspace switchboard"
       subtitle="Choose a workspace or create a new one for this organization."
-      principalEmail={principalEmail}
+      principalEmail={principal?.email}
       orgId={orgId}
       teamId={teams[0]?.id}
       metrics={metrics}

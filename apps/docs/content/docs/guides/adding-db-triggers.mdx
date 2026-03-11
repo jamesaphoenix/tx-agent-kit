@@ -74,6 +74,7 @@ ROLLBACK;
 ```bash
 # Apply the migration
 pnpm db:migrate
+pnpm db:schemas:apply
 
 # Run pgTAP suites
 pnpm test:db:pgtap
@@ -95,5 +96,5 @@ Reference this trigger in `packages/infra/db/pgtap/*.sql`.
 After adding a trigger:
 
 ```bash
-pnpm db:migrate && pnpm test:db:pgtap && pnpm lint
+pnpm db:migrate && pnpm db:schemas:apply && pnpm test:db:pgtap && pnpm lint
 ```

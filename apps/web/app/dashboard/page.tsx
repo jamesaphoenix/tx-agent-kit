@@ -1,25 +1,18 @@
 'use client'
 
-import type { AuthPrincipal, Organization } from '@tx-agent-kit/contracts'
+import type { Organization } from '@tx-agent-kit/contracts'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DashboardShell } from '../../components/DashboardShell'
+import { useCurrentPrincipal, useIsSessionReady } from '../../hooks/use-session-store'
 import { ensureSessionOrRedirect, handleUnauthorizedApiError } from '../../lib/client-auth'
 import { clientApi } from '../../lib/client-api'
 
-interface DashboardState {
-  principal: AuthPrincipal | null
-  organizations: Organization[]
-}
-
-const emptyState: DashboardState = {
-  principal: null,
-  organizations: []
-}
-
 export default function DashboardPage() {
   const router = useRouter()
-  const [state, setState] = useState<DashboardState>(emptyState)
+  const isSessionReady = useIsSessionReady()
+  const principal = useCurrentPrincipal()
+  const [organizations, setOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,13 +25,8 @@ export default function DashboardPage() {
     setError(null)
 
     try {
-      const principal = await clientApi.me()
       const organizationPayload = await clientApi.listOrganizations()
-
-      setState({
-        principal,
-        organizations: organizationPayload.data
-      })
+      setOrganizations(organizationPayload.data)
     } catch (error_) {
       if (handleUnauthorizedApiError(error_, router, '/dashboard')) {
         return
@@ -51,20 +39,24 @@ export default function DashboardPage() {
   }, [router])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    if (!isSessionReady) {
+      return
+    }
 
-  const firstOrganization = state.organizations[0]
+    void load()
+  }, [isSessionReady, load])
+
+  const firstOrganization = organizations[0]
 
   const metrics = [
     {
       label: 'Organizations',
-      value: String(state.organizations.length)
+      value: String(organizations.length)
     },
     {
       label: 'Session',
-      value: state.principal ? 'Authenticated' : 'Checking',
-      tone: state.principal ? 'success' as const : 'warning' as const
+      value: principal ? 'Authenticated' : 'Checking',
+      tone: principal ? 'success' as const : 'warning' as const
     },
     {
       label: 'Sync',
@@ -76,8 +68,8 @@ export default function DashboardPage() {
   return (
     <DashboardShell
       title="Operations Dashboard"
-      subtitle={state.principal ? `Signed in as ${state.principal.email}` : 'Loading profile...'}
-      principalEmail={state.principal?.email}
+      subtitle={principal ? `Signed in as ${principal.email}` : 'Loading profile...'}
+      principalEmail={principal?.email}
       metrics={metrics}
     >
       {error && <p className="error">{error}</p>}
@@ -103,7 +95,7 @@ export default function DashboardPage() {
           <h2>Execution posture</h2>
           <p className="muted">System checks for auth, org context, and API health are active.</p>
           <ul className="dashboard-shell-checklist">
-            <li>{state.principal ? 'Authenticated principal detected' : 'Authenticating principal...'}</li>
+            <li>{principal ? 'Authenticated principal detected' : 'Authenticating principal...'}</li>
             <li>{loading ? 'Refreshing organization state' : 'Organization state synchronized'}</li>
             <li>Structured notifications enabled</li>
           </ul>

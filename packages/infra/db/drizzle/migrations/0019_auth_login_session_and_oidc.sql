@@ -1,4 +1,4 @@
--- 0017_auth_login_session_and_oidc.sql
+-- 0019_auth_login_session_and_oidc.sql
 -- Adds explicit auth-login session, refresh token, OIDC state, identity, and audit tables.
 
 DO $$

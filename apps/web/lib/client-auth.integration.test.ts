@@ -51,8 +51,14 @@ describe('client-auth integration', () => {
     })
   })
 
-  it('keeps authenticated sessions in place when a token exists', () => {
+  it('keeps authenticated sessions in place when bootstrap established a principal', () => {
     writeAuthToken('existing-token')
+    sessionStoreActions.setPrincipal({
+      userId: 'user-1',
+      email: 'member@example.com',
+      roles: ['member'],
+      permissions: []
+    })
     const router = createIntegrationRouterAdapter()
 
     const hasSession = ensureSessionOrRedirect(router, '/organizations')
@@ -83,7 +89,7 @@ describe('client-auth integration', () => {
       throw new Error(`Expected ApiClientError, received: ${String(unauthorizedError)}`)
     }
 
-    expect([401, 403]).toContain(unauthorizedError.status)
+    expect(unauthorizedError.status).toBe(401)
 
     const router = createIntegrationRouterAdapter()
     const redirected = handleUnauthorizedApiError(unauthorizedError, router, '/dashboard')

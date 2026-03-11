@@ -2,7 +2,7 @@ import React from 'react'
 import { randomUUID } from 'node:crypto'
 import { create, act } from 'react-test-renderer'
 import { describe, expect, it, vi } from 'vitest'
-import { createTeam, createUser } from '../../../packages/testkit/src/index.ts'
+import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import {
   createMobileFactoryContext,
   mobileIntegrationBaseUrl
@@ -78,7 +78,7 @@ describe('AcceptInvitationForm integration', () => {
       name: 'Mobile Accept Invitee'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: organizationName()
     })
@@ -151,7 +151,7 @@ describe('AcceptInvitationForm integration', () => {
       name: 'Mobile Accept Invitee Invalid Token'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: organizationName()
     })
@@ -247,7 +247,7 @@ describe('AcceptInvitationForm integration', () => {
       name: 'Mobile Accept Attacker Wrong User'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: organizationName()
     })
@@ -351,7 +351,7 @@ describe('AcceptInvitationForm integration', () => {
       name: 'Mobile Accept Invitee Reused Token'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: organizationName()
     })
@@ -451,7 +451,7 @@ describe('AcceptInvitationForm integration', () => {
       name: 'Mobile Accept Invitee Expired Token'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: organizationName()
     })

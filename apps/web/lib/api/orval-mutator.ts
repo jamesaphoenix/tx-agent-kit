@@ -1,4 +1,5 @@
 import type { AxiosError, AxiosRequestConfig } from 'axios'
+import { withBrowserAuthSessionMode } from '../auth-session-mode'
 import { api } from '../axios'
 
 export type ErrorType<Error> = AxiosError<Error>
@@ -9,7 +10,7 @@ export const customInstance = async <T>(
   options?: AxiosRequestConfig
 ): Promise<T> => {
   const controller = new AbortController()
-  const mergedConfig: AxiosRequestConfig = {
+  const mergedConfig = withBrowserAuthSessionMode({
     ...options,
     ...config,
     headers: {
@@ -17,7 +18,7 @@ export const customInstance = async <T>(
       ...config.headers
     },
     signal: controller.signal
-  }
+  })
 
   const promise = (async (): Promise<T> => {
     const { data } = await api<T>(mergedConfig)

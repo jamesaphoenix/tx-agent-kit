@@ -18,7 +18,7 @@ This is the complete list of mechanically enforced invariants. Each invariant is
 
 | Invariant | Description |
 |-----------|-------------|
-| Storage contract | Only `apps/web/lib/auth-token.ts` touches `localStorage` |
+| Auth-token contract | Only `apps/web/lib/auth-token.ts` manages browser-visible access token state; refresh persistence stays in an HttpOnly cookie |
 | Transport contract | `apps/web/lib` must not use `/api/*` proxy paths |
 | URL-state contract | `nuqs` usage centralized in `apps/web/lib/url-state.tsx` |
 | Notification contract | `sonner` usage centralized in `apps/web/lib/notify.tsx` |
@@ -74,7 +74,7 @@ This is the complete list of mechanically enforced invariants. Each invariant is
 | Idempotent workflow dispatch | Every `startChild`/`executeChild` call must include a `workflowId` containing `event.id` |
 | No payload `as` casts | `.payload as <Type>` is forbidden in worker files; use Schema decode |
 | Naming convention | Event type strings must match `^[a-z][a-z_]*\.[a-z][a-z_]*$` |
-| Retention settings parity | Every table in `retentionTableNames` must have a seed entry in the `retention_settings` migration |
+| Retention settings parity | Every table in `retentionTableNames` must have an entry in the generated `retention_settings` reconcile schema |
 | Insert helper enforcement | Inline `.insert(domainEvents).values(...)` outside `repositories/domain-events.ts` is banned; use `insertDomainEventInTransaction` |
 | Port-level write contract | Direct outbox repository access from service/application layers is banned; use `*WithEvent` port methods |
 

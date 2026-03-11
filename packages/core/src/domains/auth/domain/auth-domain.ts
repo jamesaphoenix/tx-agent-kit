@@ -1,4 +1,4 @@
-import type { PermissionAction } from '@tx-agent-kit/contracts'
+import type { OrgMemberRole, PermissionAction } from '@tx-agent-kit/contracts'
 
 export interface AuthUserRecord {
   id: string
@@ -42,6 +42,7 @@ export interface RefreshSessionCommand {
 
 export interface StartGoogleAuthCommand {
   ipAddress?: string
+  statePrefix?: string
 }
 
 export interface CompleteGoogleAuthCommand {
@@ -68,7 +69,7 @@ export interface AuthPrincipal {
   email: string
   sessionId?: string
   organizationId?: string
-  roles: ReadonlyArray<string>
+  roles: ReadonlyArray<OrgMemberRole>
   permissions?: ReadonlyArray<PermissionAction>
 }
 
@@ -101,7 +102,7 @@ export const toAuthUser = (row: AuthUserRecord): AuthUser => ({
 export const toAuthPrincipal = (
   payload: Pick<AuthSessionTokenPayload, 'sub' | 'email' | 'sid'> & {
     organizationId?: string
-    role?: string
+    role?: OrgMemberRole
     permissions?: ReadonlyArray<PermissionAction>
   }
 ): AuthPrincipal => ({
@@ -109,6 +110,6 @@ export const toAuthPrincipal = (
   email: payload.email,
   sessionId: payload.sid,
   organizationId: payload.organizationId,
-  roles: payload.role ? [payload.role] : ['member'],
+  roles: payload.role ? [payload.role] : [],
   permissions: payload.permissions ? [...payload.permissions] : undefined
 })

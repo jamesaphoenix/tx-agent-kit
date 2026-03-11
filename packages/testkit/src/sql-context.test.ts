@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSqlTestContext } from './sql-context.js'
+import { createSqlTestContext, migrationRequiresGlobalLock } from './sql-context.js'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -41,5 +41,32 @@ describe('sql test context headers', () => {
         baseDatabaseUrl: 'postgres://postgres:postgres@db.internal:5432/tx_agent_kit'
       })
     ).not.toThrow()
+  })
+})
+
+describe('sql migration lock classification', () => {
+  it('serializes migrations that touch shared database state', () => {
+    expect(
+      migrationRequiresGlobalLock({
+        name: '0001_core_saas.sql',
+        sql: 'CREATE EXTENSION IF NOT EXISTS "pgcrypto";'
+      })
+    ).toBe(true)
+
+    expect(
+      migrationRequiresGlobalLock({
+        name: '0015_restore_public_invitation_identity_trigger.sql',
+        sql: 'CREATE OR REPLACE FUNCTION public.normalize_invitation_identity_fn() RETURNS trigger AS $$ BEGIN RETURN NEW; END; $$ LANGUAGE plpgsql;'
+      })
+    ).toBe(true)
+  })
+
+  it('does not serialize schema-local migrations', () => {
+    expect(
+      migrationRequiresGlobalLock({
+        name: '0099_add_local_table.sql',
+        sql: 'CREATE TABLE IF NOT EXISTS users (id uuid primary key);'
+      })
+    ).toBe(false)
   })
 })

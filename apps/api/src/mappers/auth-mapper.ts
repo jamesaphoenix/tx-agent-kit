@@ -7,9 +7,16 @@ export const toApiAuthUser = (user: AuthUser) => ({
   createdAt: user.createdAt.toISOString()
 })
 
-export const toApiAuthSession = (session: AuthSession) => ({
+export interface ToApiAuthSessionOptions {
+  includeRefreshToken?: boolean
+}
+
+export const toApiAuthSession = (
+  session: AuthSession,
+  options: ToApiAuthSessionOptions = {}
+) => ({
   token: session.token,
-  refreshToken: session.refreshToken,
+  ...(options.includeRefreshToken === true ? { refreshToken: session.refreshToken } : {}),
   user: toApiAuthUser(session.user)
 })
 
@@ -17,6 +24,6 @@ export const toApiAuthPrincipal = (principal: AuthPrincipal) => ({
   userId: principal.userId,
   email: principal.email,
   organizationId: principal.organizationId,
-  roles: [...principal.roles],
-  permissions: principal.permissions ? [...principal.permissions] : undefined
+  roles: [...principal.roles] as AuthPrincipal['roles'],
+  permissions: principal.permissions ? [...principal.permissions] : []
 })

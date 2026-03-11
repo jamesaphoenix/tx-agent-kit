@@ -1,24 +1,29 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { readAuthToken } from '../../lib/auth-token'
+import { useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { readBrowserLocationState } from '../../lib/url-state'
+import { ensureSessionOrRedirect } from '../../lib/client-auth'
+import { useIsAuthenticated, useIsSessionReady } from '../../hooks/use-session-store'
 
 export default function ApplicationLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
-  const [ready, setReady] = useState(false)
+  const pathname = usePathname()
+  const isReady = useIsSessionReady()
+  const isAuthenticated = useIsAuthenticated()
+  const { search } = readBrowserLocationState()
+  const nextPath = search.length > 0 ? `${pathname}${search}` : pathname
 
   useEffect(() => {
-    const token = readAuthToken()
-    if (!token) {
-      router.replace('/sign-in')
+    if (!isReady) {
       return
     }
-    setReady(true)
-  }, [router])
 
-  if (!ready) {
+    void ensureSessionOrRedirect(router, nextPath)
+  }, [isAuthenticated, isReady, nextPath, router])
+
+  if (!isReady || !isAuthenticated) {
     return null
   }
 

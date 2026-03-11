@@ -100,6 +100,17 @@ const decodeWithSchema = <A, I>(schema: Schema.Schema<A, I>, value: unknown, con
   }
 }
 
+const requireRefreshToken = (
+  response: { refreshToken?: string },
+  context: string
+): string => {
+  if (typeof response.refreshToken !== 'string' || response.refreshToken.length === 0) {
+    throw new Error(`${context} response did not include a refresh token`)
+  }
+
+  return response.refreshToken
+}
+
 const deleteUserResponseSchema = Schema.Struct({
   deleted: Schema.Boolean
 })
@@ -142,8 +153,11 @@ export const createUser = async (
     throw new Error(`createUser failed (${response.status}): ${JSON.stringify(body)}`)
   }
 
+  const decoded = decodeWithSchema(authResponseSchema, body, 'createUser')
+
   return {
-    ...decodeWithSchema(authResponseSchema, body, 'createUser'),
+    ...decoded,
+    refreshToken: requireRefreshToken(decoded, 'createUser'),
     credentials: payload
   }
 }
@@ -163,7 +177,12 @@ export const loginUser = async (
     throw new Error(`loginUser failed (${response.status}): ${JSON.stringify(body)}`)
   }
 
-  return decodeWithSchema(authResponseSchema, body, 'loginUser')
+  const decoded = decodeWithSchema(authResponseSchema, body, 'loginUser')
+
+  return {
+    ...decoded,
+    refreshToken: requireRefreshToken(decoded, 'loginUser')
+  }
 }
 
 export const deleteUser = async (
@@ -185,7 +204,7 @@ export const deleteUser = async (
   return decodeWithSchema(deleteUserResponseSchema, body, 'deleteUser')
 }
 
-export const createTeam = async (
+export const createOrganization = async (
   context: ApiFactoryContext,
   options: CreateOrganizationOptions
 ): Promise<CreatedOrganization> => {
@@ -201,10 +220,10 @@ export const createTeam = async (
 
   const body = await parseJsonOrThrow(response)
   if (response.status !== 201) {
-    throw new Error(`createTeam failed (${response.status}): ${JSON.stringify(body)}`)
+    throw new Error(`createOrganization failed (${response.status}): ${JSON.stringify(body)}`)
   }
 
-  return decodeWithSchema(organizationSchema, body, 'createTeam')
+  return decodeWithSchema(organizationSchema, body, 'createOrganization')
 }
 
 export const createOrganizationAndTeam = async (
@@ -314,7 +333,7 @@ export const createUserWithOrg = async (
   }
 ): Promise<{ user: CreatedUserSession; org: CreatedOrganization; token: string }> => {
   const user = await createUser(context, options?.user)
-  const org = await createTeam(context, {
+  const org = await createOrganization(context, {
     token: user.token,
     name: options?.organization?.name
   })
@@ -339,7 +358,7 @@ export const createUserWithOrgAndInvitation = async (
   inviteeToken: string
 }> => {
   const owner = await createUser(context, options?.owner)
-  const org = await createTeam(context, {
+  const org = await createOrganization(context, {
     token: owner.token,
     name: options?.organization?.name
   })

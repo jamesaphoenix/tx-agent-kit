@@ -40,6 +40,12 @@ CREATE INDEX IF NOT EXISTS subscription_events_org_created_at_idx
 CREATE INDEX IF NOT EXISTS subscription_events_event_type_created_at_idx
   ON subscription_events (event_type, created_at);
 
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM credit_ledger WHERE amount !~ '^-?[0-9]+$') THEN
+    RAISE EXCEPTION 'credit_ledger.amount contains non-integer values — manual cleanup required before migration';
+  END IF;
+END $$;
+
 ALTER TABLE credit_ledger
   ALTER COLUMN amount TYPE bigint USING amount::bigint;
 

@@ -1,8 +1,10 @@
 'use client'
 
+import { restoreAuthenticatedPrincipal } from '@tx-agent-kit/contracts'
 import type { AuthProvider } from 'react-admin'
-import { clearAuthToken, readAuthToken } from '../auth-token'
+import { clearAuthToken } from '../auth-token'
 import { clientApi } from '../client-api'
+import { sessionStore, sessionStoreActions } from '../../stores/session-store'
 
 export const authProvider: AuthProvider = {
   login: async ({ username, password }) => {
@@ -17,21 +19,34 @@ export const authProvider: AuthProvider = {
   },
 
   checkError: ({ status }) => {
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       clearAuthToken()
+      sessionStoreActions.clear()
       return Promise.reject(new Error('Session expired'))
     }
 
     return Promise.resolve()
   },
 
-  checkAuth: () => {
-    const token = readAuthToken()
-    if (!token) {
-      return Promise.reject(new Error('Authentication required'))
+  checkAuth: async () => {
+    if (sessionStore.state.principal) {
+      return
     }
 
-    return Promise.resolve()
+    const principal = await restoreAuthenticatedPrincipal({
+      restoreSession: clientApi.restoreSession,
+      loadPrincipal: clientApi.me,
+      clearCredentialsOnAuthError: () => {
+        clearAuthToken()
+      }
+    })
+
+    if (principal === null) {
+      sessionStoreActions.clear()
+      throw new Error('Authentication required')
+    }
+
+    sessionStoreActions.setPrincipal(principal)
   },
 
   getIdentity: async () => {

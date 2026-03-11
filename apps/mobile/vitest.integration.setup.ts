@@ -1,4 +1,4 @@
-import { clearAuthToken } from './lib/auth-token'
+import { clearAuthToken, clearRefreshToken } from './lib/auth-token'
 import { sessionStoreActions } from './stores/session-store'
 import {
   mobileIntegrationBaseUrl,
@@ -20,6 +20,7 @@ beforeEach(async () => {
   integrationRuntime.__MOBILE_INTEGRATION_API_BASE_URL = mobileIntegrationBaseUrl
   await resetMobileIntegrationCase()
   await clearAuthToken()
+  await clearRefreshToken()
   sessionStoreActions.clear()
   vi.clearAllMocks()
 })

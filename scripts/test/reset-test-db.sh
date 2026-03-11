@@ -106,33 +106,10 @@ if [[ -z "$POSTGRES_CONTAINER_ID" ]]; then
 fi
 
 echo "Resetting test database state in '$DB_NAME'..."
-docker exec -i "$POSTGRES_CONTAINER_ID" psql -1 -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" <<'SQL'
-DO $$
-DECLARE
-  truncate_sql text;
-BEGIN
-  SELECT CASE
-    WHEN COUNT(*) = 0 THEN NULL
-    ELSE 'TRUNCATE TABLE ' || string_agg(format('%I.%I', schemaname, tablename), ', ') || ' RESTART IDENTITY CASCADE'
-  END
-  INTO truncate_sql
-  FROM pg_tables
-  WHERE schemaname = 'public'
-    AND tablename <> '__drizzle_migrations'
-    AND tablename <> '__tx_agent_migrations';
+pnpm --silent exec tsx ./scripts/test/render-reset-public-sql.ts |
+  docker exec -i "$POSTGRES_CONTAINER_ID" psql -1 -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME"
 
-  IF truncate_sql IS NOT NULL THEN
-    EXECUTE truncate_sql;
-  END IF;
-END $$;
-
-INSERT INTO roles (name)
-VALUES ('owner'), ('admin'), ('member')
-ON CONFLICT (name) DO NOTHING;
-
-INSERT INTO permissions (key)
-VALUES ('organization.read'), ('organization.write'), ('organization.manage'), ('invite.manage')
-ON CONFLICT (key) DO NOTHING;
-SQL
+echo "Reapplying desired-state schemas..."
+pnpm db:schemas:apply
 
 echo "Database reset complete."

@@ -26,7 +26,7 @@ Pages under `app/(website)/` are publicly accessible and wrapped in the `Website
 
 ### `(application)` — Authenticated App
 
-Pages under `app/(application)/` are behind an auth-guard layout that checks for a valid token and redirects to `/sign-in` if missing:
+Pages under `app/(application)/` are behind an auth-guard layout that waits for session bootstrap, restores via the API's HttpOnly refresh cookie when possible, and redirects to `/sign-in` if the browser is still unauthenticated:
 
 | Page | Path | Description |
 |------|------|-------------|
@@ -100,7 +100,15 @@ To prevent scattered usage of browser APIs and third-party libraries, the web ap
 
 ### Storage (`lib/auth-token.ts`)
 
-Only this module may read or write `localStorage`. All other modules access auth tokens through the exported functions.
+This module is the only browser-visible auth token boundary. The web app keeps the short-lived access token in memory only. Refresh persistence lives in an HttpOnly cookie set by the API. Other modules must use the exported read/write/clear helpers.
+
+### Auth Transport (`lib/client-api.ts`, `lib/axios.ts`)
+
+Browser auth uses a split model:
+
+- Sign-in/sign-up return an access token in JSON and set an HttpOnly refresh cookie for browser-origin requests.
+- Axios sends `withCredentials: true`, so `/v1/auth/refresh` can rotate the refresh cookie.
+- Session bootstrap restores the in-memory access token through `/v1/auth/refresh` before protected routes decide whether to redirect.
 
 ### URL State (`lib/url-state.tsx`)
 
@@ -133,7 +141,7 @@ The web app uses [Orval](https://orval.dev/) to generate typed API hooks from th
 pnpm api:client:generate
 ```
 
-This produces files under `apps/web/lib/api/generated/`. The generated client uses a custom Axios mutator defined in `apps/web/lib/api/orval-mutator.ts` that injects the auth token and points to `API_BASE_URL`.
+This produces files under `apps/web/lib/api/generated/`. The generated client uses a custom Axios mutator defined in `apps/web/lib/api/orval-mutator.ts` that injects the in-memory access token and points to `API_BASE_URL`.
 
 The Axios client in `apps/web/lib/axios.ts` must use `webEnv.API_BASE_URL` as its base URL. Proxy paths like `/api/*` are forbidden.
 

@@ -32,7 +32,7 @@ Within a few weeks of active development, the original structure is eroded. Shor
 | Domain code has no side effects | Lint ban on `Date.now`, `new Date`, `Math.random` in domain paths |
 | All web files are client components | Structural check: every `.tsx` in `apps/web/app` starts with `'use client'` |
 | Port files do not export interfaces | AST-level structural invariant check |
-| Only one file reads localStorage | ESLint restriction + structural check |
+| Only one file manages browser-visible auth token state | ESLint restriction + structural check |
 | No `console.*` in source | Lint ban; use `@tx-agent-kit/logging` instead |
 | No `process.env` in domain/services | Structural invariant: env reads only in dedicated env modules |
 | No `as any` in source | Lint rule across all source modules |

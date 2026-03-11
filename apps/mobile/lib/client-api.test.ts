@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
-import { readAuthToken } from './auth-token'
-import { api } from './axios'
+import { readAuthToken, readRefreshToken } from './auth-token'
+import * as axiosModule from './axios'
 import { ApiClientError, clientApi } from './client-api'
+
+const { api } = axiosModule
 
 vi.mock('expo-constants', () => ({
   default: {
@@ -107,7 +109,8 @@ describe('clientApi.me', () => {
     const principal = {
       userId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
       email: 'test@example.com',
-      roles: ['member']
+      roles: ['member'],
+      permissions: []
     }
     respondWith(200, principal)
 
@@ -126,6 +129,42 @@ describe('clientApi.me', () => {
       status: 401,
       name: 'ApiClientError'
     })
+  })
+})
+
+describe('clientApi.refreshSession', () => {
+  it('clears stored tokens when refresh is rejected with 401', async () => {
+    mockStore['tx-agent-kit.auth-token'] = 'expired-access-token'
+    mockStore['tx-agent-kit.refresh-token'] = 'expired-refresh-token'
+
+    const axiosError = Object.assign(new Error('Unauthorized'), {
+      isAxiosError: true,
+      response: { status: 401 }
+    })
+    vi.spyOn(axiosModule, 'refreshAccessToken').mockRejectedValueOnce(axiosError)
+
+    await expect(clientApi.refreshSession()).rejects.toThrow(ApiClientError)
+    await expect(readAuthToken()).resolves.toBeNull()
+    await expect(readRefreshToken()).resolves.toBeNull()
+  })
+})
+
+describe('clientApi.restoreSession', () => {
+  it('returns false when no refresh token is stored', async () => {
+    await expect(clientApi.restoreSession()).resolves.toBe(false)
+  })
+
+  it('refreshes and restores the session when only a refresh token is stored', async () => {
+    mockStore['tx-agent-kit.refresh-token'] = 'stored-refresh-token'
+
+    vi.spyOn(axiosModule, 'refreshAccessToken').mockImplementationOnce(async () => {
+      mockStore['tx-agent-kit.auth-token'] = 'jwt-restored-token'
+      mockStore['tx-agent-kit.refresh-token'] = 'rotated-refresh-token'
+    })
+
+    await expect(clientApi.restoreSession()).resolves.toBe(true)
+    await expect(readAuthToken()).resolves.toBe('jwt-restored-token')
+    await expect(readRefreshToken()).resolves.toBe('rotated-refresh-token')
   })
 })
 

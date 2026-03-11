@@ -35,10 +35,16 @@ trap 'rm -f "$RENDERED_ENV_FILE"' EXIT
 
 op inject -f -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
 
-set -a
-# shellcheck disable=SC1090
-source "$RENDERED_ENV_FILE"
-set +a
+# Export env vars in a subshell-safe way to avoid leaking set -a into the outer shell.
+(
+  set -a
+  # shellcheck disable=SC1090
+  source "$RENDERED_ENV_FILE"
+  set +a
 
-echo "Running DB migrations for $TARGET_ENV"
-pnpm --filter @tx-agent-kit/db db:migrate
+  echo "Running DB migrations for $TARGET_ENV"
+  pnpm --filter @tx-agent-kit/db db:migrate
+
+  echo "Applying desired-state DB schemas for $TARGET_ENV"
+  pnpm --filter @tx-agent-kit/db db:schemas:apply
+)

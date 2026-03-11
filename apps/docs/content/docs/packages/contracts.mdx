@@ -75,9 +75,9 @@ The contracts package also defines which tables are subject to automated retenti
 ```typescript
 export const retentionTableNames = [
   'auth_login_sessions',
-  'auth_refresh_tokens',
-  'auth_oidc_states',
-  'auth_password_reset_tokens',
+  'auth_login_refresh_tokens',
+  'auth_login_oidc_states',
+  'password_reset_tokens',
   'auth_login_audit_events',
   'subscription_events',
   'domain_events',
@@ -87,4 +87,4 @@ export const retentionTableNames = [
 export type RetentionTableName = (typeof retentionTableNames)[number]
 ```
 
-Every table in `retentionTableNames` must have a corresponding entry in the `retention_settings` seed within the migration files. The structural enforcement script `scripts/lint/enforce-domain-event-contracts.mjs` validates this parity at lint time.
+Every table in `retentionTableNames` must have a corresponding entry in the generated `retention_settings` reconcile schema. The structural enforcement script `scripts/lint/enforce-domain-event-contracts.mjs` validates this parity at lint time.

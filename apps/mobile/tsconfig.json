@@ -11,6 +11,12 @@
       "@/*": [
         "./*"
       ],
+      "@tx-agent-kit/contracts": [
+        "../../packages/contracts/src/index.ts"
+      ],
+      "@tx-agent-kit/testkit": [
+        "../../packages/testkit/src/index.ts"
+      ],
       "@tx-agent-kit/observability": [
         "../../packages/infra/observability/dist/index.js"
       ],

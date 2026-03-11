@@ -5,13 +5,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CreateOrganizationForm } from '../../components/CreateOrganizationForm'
 import { DashboardShell } from '../../components/DashboardShell'
+import { useCurrentPrincipal, useIsSessionReady } from '../../hooks/use-session-store'
 import { ensureSessionOrRedirect, handleUnauthorizedApiError } from '../../lib/client-auth'
 import { clientApi } from '../../lib/client-api'
 
 export default function OrganizationsPage() {
   const router = useRouter()
+  const isSessionReady = useIsSessionReady()
+  const principal = useCurrentPrincipal()
   const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [principalEmail, setPrincipalEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,12 +26,8 @@ export default function OrganizationsPage() {
     setError(null)
 
     try {
-      const [payload, principal] = await Promise.all([
-        clientApi.listOrganizations(),
-        clientApi.me()
-      ])
+      const payload = await clientApi.listOrganizations()
       setOrganizations(payload.data)
-      setPrincipalEmail(principal.email)
     } catch (error_) {
       if (handleUnauthorizedApiError(error_, router, '/organizations')) {
         return
@@ -42,8 +40,12 @@ export default function OrganizationsPage() {
   }, [router])
 
   useEffect(() => {
+    if (!isSessionReady) {
+      return
+    }
+
     void load()
-  }, [load])
+  }, [isSessionReady, load])
 
   const metrics = [
     {
@@ -61,7 +63,7 @@ export default function OrganizationsPage() {
     <DashboardShell
       title="Organizations"
       subtitle="Manage team boundaries and operational ownership."
-      principalEmail={principalEmail}
+      principalEmail={principal?.email}
       metrics={metrics}
     >
       {error && <p className="error">{error}</p>}

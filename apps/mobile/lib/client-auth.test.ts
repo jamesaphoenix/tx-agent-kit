@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readAuthToken, writeAuthToken } from './auth-token'
-import { ApiClientError } from './client-api'
+import { ApiClientError, clientApi } from './client-api'
 import { ensureSessionOrRedirect, handleUnauthorizedApiError } from './client-auth'
 import { sessionStoreActions } from '../stores/session-store'
 
@@ -25,6 +25,26 @@ vi.mock('../stores/session-store', () => ({
   }
 }))
 
+vi.mock('./client-api', () => {
+  class MockApiClientError extends Error {
+    readonly status: number | undefined
+
+    constructor(message: string, status?: number) {
+      super(message)
+      Object.setPrototypeOf(this, new.target.prototype)
+      this.name = 'ApiClientError'
+      this.status = status
+    }
+  }
+
+  return {
+    ApiClientError: MockApiClientError,
+    clientApi: {
+      restoreSession: vi.fn()
+    }
+  }
+})
+
 vi.mock('expo-constants', () => ({
   default: {
     expoConfig: {
@@ -42,6 +62,7 @@ describe('ensureSessionOrRedirect', () => {
     for (const key of Object.keys(mockStore)) {
       delete mockStore[key]
     }
+    vi.mocked(clientApi.restoreSession).mockReset()
   })
 
   it('returns true when a token exists', async () => {
@@ -54,7 +75,19 @@ describe('ensureSessionOrRedirect', () => {
     expect(router.replace).not.toHaveBeenCalled()
   })
 
+  it('restores the session from a stored refresh token when access token is missing', async () => {
+    vi.mocked(clientApi.restoreSession).mockResolvedValue(true)
+    const router = createMockRouter()
+
+    const result = await ensureSessionOrRedirect(router, '/dashboard')
+
+    expect(result).toBe(true)
+    expect(clientApi.restoreSession).toHaveBeenCalled()
+    expect(router.replace).not.toHaveBeenCalled()
+  })
+
   it('redirects to sign-in when no token', async () => {
+    vi.mocked(clientApi.restoreSession).mockResolvedValue(false)
     const router = createMockRouter()
 
     const result = await ensureSessionOrRedirect(router, '/dashboard')
@@ -64,6 +97,7 @@ describe('ensureSessionOrRedirect', () => {
   })
 
   it('encodes the next path parameter', async () => {
+    vi.mocked(clientApi.restoreSession).mockResolvedValue(false)
     const router = createMockRouter()
 
     await ensureSessionOrRedirect(router, '/organizations?tab=active')

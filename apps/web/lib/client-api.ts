@@ -1,3 +1,7 @@
+import {
+  createSessionRestorer,
+  restoreAuthenticatedPrincipal
+} from '@tx-agent-kit/contracts'
 import type {
   AuthPrincipal,
   AuthResponse,
@@ -22,11 +26,11 @@ import type {
 } from '@tx-agent-kit/contracts'
 import {
   clearAuthToken,
-  clearRefreshToken,
-  readRefreshToken,
-  writeAuthToken,
-  writeRefreshToken
+  readAuthToken,
+  withSerializedAuthRefresh,
+  writeAuthToken
 } from './auth-token'
+import { browserAuthSessionRequestConfig } from './auth-session-mode'
 import { api, getApiErrorMessage, getApiErrorStatus } from './axios'
 
 export class ApiClientError extends Error {
@@ -106,8 +110,31 @@ const fail = (error: unknown, fallback: string): never => {
 
 const persistAuthSession = (response: AuthResponse): void => {
   writeAuthToken(response.token)
-  writeRefreshToken(response.refreshToken)
 }
+
+const refreshSession = async (): Promise<void> => {
+  try {
+    const { data } = await api.post<AuthResponse>(
+      '/v1/auth/refresh',
+      {},
+      browserAuthSessionRequestConfig
+    )
+    persistAuthSession(data)
+  } catch (error) {
+    if (getApiErrorStatus(error) === 401 || getApiErrorStatus(error) === 403) {
+      clearAuthToken()
+    }
+
+    return fail(error, 'Failed to refresh session')
+  }
+}
+
+const restoreSession = createSessionRestorer({
+  hasAccessToken: () => readAuthToken() !== null,
+  canRefreshSession: () => true,
+  refreshSession: async () => clientApi.refreshSession(),
+  serializeRefresh: withSerializedAuthRefresh
+})
 
 const toListParams = (query: ListQuery | undefined): Record<string, string> => {
   const params: Record<string, string> = {}
@@ -145,7 +172,11 @@ const toListParams = (query: ListQuery | undefined): Record<string, string> => {
 export const clientApi = {
   signIn: async (input: SignInRequest): Promise<void> => {
     try {
-      const { data } = await api.post<AuthResponse>('/v1/auth/sign-in', input)
+      const { data } = await api.post<AuthResponse>(
+        '/v1/auth/sign-in',
+        input,
+        browserAuthSessionRequestConfig
+      )
       persistAuthSession(data)
     } catch (error) {
       return fail(error, 'Authentication failed')
@@ -154,7 +185,11 @@ export const clientApi = {
 
   signUp: async (input: SignUpRequest): Promise<void> => {
     try {
-      const { data } = await api.post<AuthResponse>('/v1/auth/sign-up', input)
+      const { data } = await api.post<AuthResponse>(
+        '/v1/auth/sign-up',
+        input,
+        browserAuthSessionRequestConfig
+      )
       persistAuthSession(data)
     } catch (error) {
       return fail(error, 'Sign-up failed')
@@ -164,29 +199,16 @@ export const clientApi = {
   signOut: async (): Promise<void> => {
     try {
       await api.post('/v1/auth/sign-out')
-    } catch (error) {
-      void error
-    }
-
-    clearAuthToken()
-    clearRefreshToken()
-  },
-
-  refreshSession: async (): Promise<void> => {
-    const refreshToken = readRefreshToken()
-    if (!refreshToken) {
-      throw new ApiClientError('No refresh token is available')
-    }
-
-    try {
-      const { data } = await api.post<AuthResponse>('/v1/auth/refresh', {
-        refreshToken
-      })
-      persistAuthSession(data)
-    } catch (error) {
-      return fail(error, 'Failed to refresh session')
+    } catch {
+      // Sign-out is best-effort — intentionally swallowed
+    } finally {
+      clearAuthToken()
     }
   },
+
+  refreshSession,
+
+  restoreSession,
 
   me: async (): Promise<AuthPrincipal> => {
     try {
@@ -450,3 +472,12 @@ export const clientApi = {
     }
   }
 }
+
+export const restoreCurrentPrincipal = async (): Promise<AuthPrincipal | null> =>
+  restoreAuthenticatedPrincipal({
+    restoreSession,
+    loadPrincipal: clientApi.me,
+    clearCredentialsOnAuthError: () => {
+      clearAuthToken()
+    }
+  })

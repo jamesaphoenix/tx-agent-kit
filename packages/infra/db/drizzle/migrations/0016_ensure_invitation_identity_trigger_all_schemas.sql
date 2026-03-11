@@ -1,6 +1,8 @@
--- 0014_ensure_invitation_identity_trigger_all_schemas.sql
--- Ensures invitation identity normalization trigger exists for both the
--- current schema and public schema (when tables exist in each).
+-- 0016_ensure_invitation_identity_trigger_all_schemas.sql
+-- Ensures invitation identity normalization trigger exists for the current
+-- schema. When the migration runs on the default public search_path, that
+-- still repairs public. Isolated test/worktree schemas must not mutate shared
+-- public objects.
 
 DO $$
 DECLARE
@@ -9,8 +11,16 @@ BEGIN
   FOR target_schema IN
     SELECT DISTINCT schema_name
     FROM (
-      VALUES (current_schema()), ('public')
+      VALUES (
+        current_schema()
+      ), (
+        CASE
+          WHEN current_schema() = 'public' THEN 'public'
+          ELSE NULL
+        END
+      )
     ) AS candidate_schemas(schema_name)
+    WHERE schema_name IS NOT NULL
   LOOP
     IF to_regclass(format('%I.users', target_schema)) IS NULL
       OR to_regclass(format('%I.invitations', target_schema)) IS NULL THEN

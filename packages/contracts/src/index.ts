@@ -1,6 +1,7 @@
 export * from './common.js'
 export * from './literals.js'
 export * from './auth.js'
+export * from './auth-client.js'
 export * from './organizations.js'
 export * from './invitations.js'
 export * from './teams.js'

@@ -79,9 +79,9 @@ export type SortOrder = (typeof sortOrders)[number]
 
 export const retentionTableNames = [
   'auth_login_sessions',
-  'auth_refresh_tokens',
-  'auth_oidc_states',
-  'auth_password_reset_tokens',
+  'auth_login_refresh_tokens',
+  'auth_login_oidc_states',
+  'password_reset_tokens',
   'auth_login_audit_events',
   'subscription_events',
   'domain_events',

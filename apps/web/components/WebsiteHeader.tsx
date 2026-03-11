@@ -2,16 +2,13 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { readAuthToken } from '../lib/auth-token'
 import { config } from '../config'
+import { useIsAuthenticated, useIsSessionReady } from '../hooks/use-session-store'
 
 export function WebsiteHeader() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
-
-  useEffect(() => {
-    setIsAuthenticated(readAuthToken() !== null)
-  }, [])
+  const isReady = useIsSessionReady()
+  const isAuthenticated = useIsAuthenticated()
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 8)
@@ -30,14 +27,20 @@ export function WebsiteHeader() {
         <nav className="website-nav">
           <Link href="/blog" className="website-nav-link">Blog</Link>
           <Link href="/pricing" className="website-nav-link">Pricing</Link>
-          {isAuthenticated ? (
-            <Link href="/org" className="website-nav-cta">Go to app</Link>
-          ) : (
-            <>
-              <Link href="/sign-in" className="website-nav-link">Sign in</Link>
-              <Link href="/sign-up" className="website-nav-cta">Get started</Link>
-            </>
-          )}
+          {(() => {
+            if (isReady && isAuthenticated) {
+              return <Link href="/org" className="website-nav-cta">Go to app</Link>
+            }
+            if (isReady) {
+              return (
+                <>
+                  <Link href="/sign-in" className="website-nav-link">Sign in</Link>
+                  <Link href="/sign-up" className="website-nav-cta">Get started</Link>
+                </>
+              )
+            }
+            return <span className="website-nav-link" aria-hidden="true">...</span>
+          })()}
         </nav>
       </div>
     </header>

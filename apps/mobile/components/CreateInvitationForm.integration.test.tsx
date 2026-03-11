@@ -2,7 +2,7 @@ import React from 'react'
 import { randomUUID } from 'node:crypto'
 import { create, act } from 'react-test-renderer'
 import { describe, expect, it, vi } from 'vitest'
-import { createTeam, createUser } from '../../../packages/testkit/src/index.ts'
+import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import { createMobileFactoryContext } from '../integration/support/mobile-integration-context'
 import { waitFor } from '../integration/support/wait-for'
 import { writeAuthToken } from '../lib/auth-token'
@@ -39,7 +39,7 @@ describe('CreateInvitationForm integration', () => {
       name: 'Mobile Invite Target'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: organizationName()
     })
@@ -103,7 +103,7 @@ describe('CreateInvitationForm integration', () => {
       name: 'Mobile Invite Unauth Target'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: organizationName()
     })
@@ -172,7 +172,7 @@ describe('CreateInvitationForm integration', () => {
       name: 'Mobile Invite Target Forbidden'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: organizationName()
     })
@@ -235,7 +235,7 @@ describe('CreateInvitationForm integration', () => {
       name: 'Mobile Invite Owner Unknown Email'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: organizationName()
     })

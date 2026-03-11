@@ -1,5 +1,9 @@
+import {
+  browserAuthSessionModeHeaderName,
+  browserAuthSessionModeHeaderValue
+} from '@tx-agent-kit/contracts'
 import { signSessionToken } from '@tx-agent-kit/auth'
-import { createDbAuthContext, createTeam, createUser, type ApiFactoryContext } from '@tx-agent-kit/testkit'
+import { createDbAuthContext, createOrganization, createUser, type ApiFactoryContext } from '@tx-agent-kit/testkit'
 import { Effect } from 'effect'
 import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
@@ -48,6 +52,12 @@ const authRateLimitIdentifierMaxRequests = parsePositiveInt(
   authRateLimitMaxRequests
 )
 const integrationAuthSecret = 'integration-auth-secret-minimum-32-chars'
+const savedEnvValues = {
+  AUTH_SECRET: process.env.AUTH_SECRET,
+  AUTH_RATE_LIMIT_WINDOW_MS: process.env.AUTH_RATE_LIMIT_WINDOW_MS,
+  AUTH_RATE_LIMIT_MAX_REQUESTS: process.env.AUTH_RATE_LIMIT_MAX_REQUESTS,
+  AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: process.env.AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS
+}
 process.env.AUTH_SECRET = integrationAuthSecret
 process.env.AUTH_RATE_LIMIT_WINDOW_MS = String(authRateLimitWindowMs)
 process.env.AUTH_RATE_LIMIT_MAX_REQUESTS = String(authRateLimitMaxRequests)
@@ -323,6 +333,26 @@ const requestJson = async <T>(path: string, caseName: string, init?: RequestInit
   return { response, body }
 }
 
+const readCookieHeader = (response: Response): string => {
+  const setCookie = response.headers.get('set-cookie')
+
+  if (!setCookie) {
+    throw new Error('Expected Set-Cookie header to be present')
+  }
+
+  const cookieHeader = setCookie.split(';', 1)[0]
+  if (!cookieHeader) {
+    throw new Error(`Expected cookie header value, received: ${setCookie}`)
+  }
+
+  return cookieHeader
+}
+
+const browserCookieAuthHeaders = {
+  [browserAuthSessionModeHeaderName]: browserAuthSessionModeHeaderValue,
+  origin: 'http://localhost:3000'
+} as const
+
 beforeAll(async () => {
   oidcTestProvider = await createOidcTestProvider({
     callbackUrl: `${dbAuthContext.baseUrl}/v1/auth/google/callback`,
@@ -346,6 +376,14 @@ afterAll(async () => {
   await dbAuthContext.teardown()
   if (oidcTestProvider) {
     await oidcTestProvider.stop()
+  }
+
+  for (const [key, value] of Object.entries(savedEnvValues)) {
+    if (value === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = value
+    }
   }
 })
 
@@ -411,7 +449,7 @@ describe('api integration', () => {
     expect(me.response.status).toBe(200)
     expect(me.body.userId).toBeTruthy()
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token,
       name: 'Integration Organization'
     })
@@ -527,6 +565,87 @@ describe('api integration', () => {
     expect(me.response.status).toBe(200)
     expect(me.body.userId).toBe(createdUser.user.id)
     expect(me.body.email).toBe(createdUser.user.email)
+  })
+
+  it('uses HttpOnly refresh cookies for browser-origin auth flows', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const createdUser = await createUser(factoryContext, {
+      email: 'browser-cookie-sign-in@example.com',
+      password: 'browser-cookie-pass-12345',
+      name: 'Browser Cookie User'
+    })
+
+    const signIn = await requestJson<{ token: string; refreshToken?: string; user: { email: string } }>(
+      '/v1/auth/sign-in',
+      'auth-sign-in-browser-cookie',
+      {
+        method: 'POST',
+        headers: browserCookieAuthHeaders,
+        body: JSON.stringify({
+          email: createdUser.user.email,
+          password: 'browser-cookie-pass-12345'
+        })
+      }
+    )
+
+    expect(signIn.response.status).toBe(200)
+    expect(signIn.body.token).toBeTruthy()
+    expect(signIn.body.refreshToken).toBeUndefined()
+
+    const initialCookieHeader = readCookieHeader(signIn.response)
+    expect(initialCookieHeader).toContain('tx-agent-kit.refresh-token=')
+
+    const refreshed = await requestJson<{ token: string; refreshToken?: string; user: { email: string } }>(
+      '/v1/auth/refresh',
+      'auth-refresh-browser-cookie',
+      {
+        method: 'POST',
+        headers: {
+          cookie: initialCookieHeader,
+          ...browserCookieAuthHeaders
+        },
+        body: JSON.stringify({})
+      }
+    )
+
+    expect(refreshed.response.status).toBe(200)
+    expect(refreshed.body.token).toBeTruthy()
+    expect(refreshed.body.refreshToken).toBeUndefined()
+    expect(readCookieHeader(refreshed.response)).not.toBe(initialCookieHeader)
+  })
+
+  it('does not infer browser-cookie auth mode from Origin alone', async () => {
+    if (!factoryContext) {
+      throw new Error('Factory context was not initialized')
+    }
+
+    const createdUser = await createUser(factoryContext, {
+      email: 'origin-alone-sign-in@example.com',
+      password: 'origin-alone-pass-12345',
+      name: 'Origin Alone User'
+    })
+
+    const signIn = await requestJson<{ token: string; refreshToken?: string; user: { email: string } }>(
+      '/v1/auth/sign-in',
+      'auth-sign-in-origin-alone',
+      {
+        method: 'POST',
+        headers: {
+          origin: 'http://localhost:3000'
+        },
+        body: JSON.stringify({
+          email: createdUser.user.email,
+          password: 'origin-alone-pass-12345'
+        })
+      }
+    )
+
+    expect(signIn.response.status).toBe(200)
+    expect(signIn.body.token).toBeTruthy()
+    expect(signIn.body.refreshToken).toBeTruthy()
   })
 
   it('rotates refresh tokens and revokes session on sign-out', async () => {
@@ -857,7 +976,7 @@ describe('api integration', () => {
     })
     const callbackBody = await callbackResponse.json() as {
       token: string
-      refreshToken: string
+      refreshToken?: string
       user: { id: string; email: string }
     }
 
@@ -866,6 +985,8 @@ describe('api integration', () => {
     expect(callbackBody.refreshToken).toBeTruthy()
     expect(callbackBody.user.email).toBe(existingUser.user.email)
     expect(callbackBody.user.id).toBe(existingUser.user.id)
+    // S5 fix: non-browser OIDC callbacks no longer set refresh cookies
+    expect(callbackResponse.headers.get('set-cookie')).toBeNull()
 
     const me = await requestJson<{ userId: string; email: string }>(
       '/v1/auth/me',
@@ -913,6 +1034,62 @@ describe('api integration', () => {
     })
 
     expect(linkedIdentityCount).toBe(1)
+  })
+
+  it('uses cookie-managed session mode for Google OIDC when explicitly requested at start', async () => {
+    const googleStart = await requestJson<{ authorizationUrl: string; state: string; expiresAt: string }>(
+      '/v1/auth/google/start',
+      'google-auth-browser-cookie-start',
+      {
+        method: 'GET',
+        headers: browserCookieAuthHeaders
+      }
+    )
+
+    expect(googleStart.response.status).toBe(200)
+    expect(googleStart.body.state.startsWith('bc_')).toBe(true)
+
+    const providerAuthorization = await fetch(googleStart.body.authorizationUrl, {
+      redirect: 'manual'
+    })
+    expect(providerAuthorization.status).toBe(302)
+    const callbackUrl = providerAuthorization.headers.get('location')
+    if (!callbackUrl) {
+      throw new Error('Google test provider did not return a callback redirect URL')
+    }
+
+    const callbackResponse = await fetch(callbackUrl, {
+      headers: dbAuthContext.testContext.headersForCase('google-auth-browser-cookie-callback')
+    })
+    const callbackBody = await callbackResponse.json() as {
+      token: string
+      refreshToken?: string
+      user: { email: string }
+    }
+
+    expect(callbackResponse.status).toBe(200)
+    expect(callbackBody.token).toBeTruthy()
+    expect(callbackBody.refreshToken).toBeUndefined()
+
+    const callbackCookieHeader = readCookieHeader(callbackResponse)
+    expect(callbackCookieHeader).toContain('tx-agent-kit.refresh-token=')
+
+    const refreshed = await requestJson<{ token: string; refreshToken?: string; user: { email: string } }>(
+      '/v1/auth/refresh',
+      'google-auth-browser-cookie-refresh',
+      {
+        method: 'POST',
+        headers: {
+          cookie: callbackCookieHeader,
+          ...browserCookieAuthHeaders
+        },
+        body: JSON.stringify({})
+      }
+    )
+
+    expect(refreshed.response.status).toBe(200)
+    expect(refreshed.body.token).toBeTruthy()
+    expect(refreshed.body.refreshToken).toBeUndefined()
   })
 
   it('rejects Google OIDC callback when state is invalid', async () => {
@@ -1509,7 +1686,7 @@ describe('api integration', () => {
       name: 'Organization Mutation Member'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Organization Mutation Team'
     })
@@ -1700,12 +1877,12 @@ describe('api integration', () => {
       name: 'Batch Outside Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Batch Organization'
     })
 
-    const outsideOrganization = await createTeam(factoryContext, {
+    const outsideOrganization = await createOrganization(factoryContext, {
       token: outsideOwner.token,
       name: 'Outside Organization'
     })
@@ -2019,7 +2196,7 @@ describe('api integration', () => {
       name: 'Organization Trigger Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Organization Trigger Team'
     })
@@ -2058,7 +2235,7 @@ describe('api integration', () => {
       name: 'Invitee'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invite Scope Organization'
     })
@@ -2130,12 +2307,12 @@ describe('api integration', () => {
       name: 'Invitee Invite Filter'
     })
 
-    const organizationOne = await createTeam(factoryContext, {
+    const organizationOne = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invite Filter Organization One'
     })
 
-    const organizationTwo = await createTeam(factoryContext, {
+    const organizationTwo = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invite Filter Organization Two'
     })
@@ -2277,7 +2454,7 @@ describe('api integration', () => {
       name: 'Target Roles'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Role Guard Organization'
     })
@@ -2348,7 +2525,7 @@ describe('api integration', () => {
       name: 'Invitee Member Conflict'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invite Member Conflict Organization'
     })
@@ -2428,7 +2605,7 @@ describe('api integration', () => {
       name: 'Attacker Identity'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Identity Guard Organization'
     })
@@ -2519,7 +2696,7 @@ describe('api integration', () => {
       name: 'Invitee Idempotent'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Idempotent Invitation Organization'
     })
@@ -2633,7 +2810,7 @@ describe('api integration', () => {
       name: 'Invitee Expired Invite'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Expired Invitation Organization'
     })
@@ -2851,7 +3028,7 @@ describe('api integration', () => {
       name: 'Delete Owner'
     })
 
-    await createTeam(factoryContext, {
+    await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Owner Delete Guard Organization'
     })
@@ -2921,7 +3098,7 @@ describe('api integration', () => {
       name: 'Permissions Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Permissions Team'
     })
@@ -3015,12 +3192,12 @@ describe('api integration', () => {
       name: 'Permissions Recent Membership'
     })
 
-    const firstOrganization = await createTeam(factoryContext, {
+    const firstOrganization = await createOrganization(factoryContext, {
       token: user.token,
       name: 'Permissions First Organization'
     })
 
-    const secondOrganization = await createTeam(factoryContext, {
+    const secondOrganization = await createOrganization(factoryContext, {
       token: user.token,
       name: 'Permissions Second Organization'
     })
@@ -3097,7 +3274,7 @@ describe('api integration', () => {
       name: 'Billing Authz Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Billing Authz Team'
     })
@@ -3286,7 +3463,7 @@ describe('api integration', () => {
       name: 'Billing Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Billing Team'
     })
@@ -3381,7 +3558,7 @@ describe('api integration', () => {
       name: 'Billing Portal No Customer Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Billing Portal No Customer Team'
     })
@@ -3416,7 +3593,7 @@ describe('api integration', () => {
       name: 'Billing Invalid Usage Date Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Billing Invalid Usage Date Team'
     })
@@ -3482,7 +3659,7 @@ describe('api integration', () => {
       name: 'Webhook Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Webhook Team'
     })
@@ -3582,7 +3759,7 @@ describe('api integration', () => {
       name: 'Guard Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Guard Team'
     })
@@ -3627,7 +3804,7 @@ describe('api integration', () => {
         name: 'Guard Disabled Owner'
       })
 
-      const guardDisabledOrganization = await createTeam(guardDisabledFactoryContext, {
+      const guardDisabledOrganization = await createOrganization(guardDisabledFactoryContext, {
         token: guardDisabledOwner.token,
         name: 'Guard Disabled Team'
       })
@@ -3673,7 +3850,7 @@ describe('api integration', () => {
       name: 'Usage Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Usage Team'
     })
@@ -3764,7 +3941,7 @@ describe('api integration', () => {
       name: 'Invoice Success Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Invoice Success Team'
     })
@@ -3844,7 +4021,7 @@ describe('api integration', () => {
       name: 'Sub Deleted Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Sub Deleted Team'
     })
@@ -3924,7 +4101,7 @@ describe('api integration', () => {
       name: 'Payment Failed Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Payment Failed Team'
     })
@@ -3997,7 +4174,7 @@ describe('api integration', () => {
       name: 'No Resurrect Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'No Resurrect Team'
     })
@@ -4060,7 +4237,7 @@ describe('api integration', () => {
       name: 'Checkout Complete Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Checkout Complete Team'
     })
@@ -4129,7 +4306,7 @@ describe('api integration', () => {
       name: 'Sub Created Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Sub Created Team'
     })
@@ -4194,7 +4371,7 @@ describe('api integration', () => {
       name: 'Team CRUD Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Team CRUD Organization'
     })
@@ -4359,12 +4536,12 @@ describe('api integration', () => {
       name: 'Team Isolation Owner B'
     })
 
-    const orgA = await createTeam(factoryContext, {
+    const orgA = await createOrganization(factoryContext, {
       token: ownerA.token,
       name: 'Team Isolation Org A'
     })
 
-    const orgB = await createTeam(factoryContext, {
+    const orgB = await createOrganization(factoryContext, {
       token: ownerB.token,
       name: 'Team Isolation Org B'
     })
@@ -4457,12 +4634,12 @@ describe('api integration', () => {
       name: 'Cross Org Team Owner B'
     })
 
-    const orgA = await createTeam(factoryContext, {
+    const orgA = await createOrganization(factoryContext, {
       token: ownerA.token,
       name: 'Cross Org Team Org A'
     })
 
-    await createTeam(factoryContext, {
+    await createOrganization(factoryContext, {
       token: ownerB.token,
       name: 'Cross Org Team Org B'
     })
@@ -4545,7 +4722,7 @@ describe('api integration', () => {
       name: 'Concurrent Accept Invitee'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Concurrent Accept Organization'
     })
@@ -4628,12 +4805,12 @@ describe('api integration', () => {
       name: 'Cross Org Mutation Owner B'
     })
 
-    const orgA = await createTeam(factoryContext, {
+    const orgA = await createOrganization(factoryContext, {
       token: ownerA.token,
       name: 'Cross Org Mutation Target'
     })
 
-    await createTeam(factoryContext, {
+    await createOrganization(factoryContext, {
       token: ownerB.token,
       name: 'Cross Org Mutation Attacker Org'
     })
@@ -4693,7 +4870,7 @@ describe('api integration', () => {
       name: 'No Resurrect Fail Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'No Resurrect Fail Team'
     })
@@ -4792,7 +4969,7 @@ describe('api integration', () => {
       name: 'Trial To Active Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Trial To Active Team'
     })
@@ -4876,7 +5053,7 @@ describe('api integration', () => {
       name: 'Onboarding Data Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Onboarding Data Team'
     })
@@ -4962,7 +5139,7 @@ describe('api integration', () => {
       headers: {
         origin: 'http://localhost:3000',
         'access-control-request-method': 'POST',
-        'access-control-request-headers': 'content-type,authorization',
+        'access-control-request-headers': `content-type,authorization,${browserAuthSessionModeHeaderName}`,
         ...dbAuthContext.testContext.headersForCase('cors-allowed-preflight')
       }
     })
@@ -4975,7 +5152,7 @@ describe('api integration', () => {
       headers: {
         origin: 'https://evil.attacker.example',
         'access-control-request-method': 'POST',
-        'access-control-request-headers': 'content-type,authorization',
+        'access-control-request-headers': `content-type,authorization,${browserAuthSessionModeHeaderName}`,
         ...dbAuthContext.testContext.headersForCase('cors-disallowed-preflight')
       }
     })
@@ -5035,7 +5212,7 @@ describe('api integration', () => {
       name: 'PastDue To Cancel Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'PastDue To Cancel Team'
     })
@@ -5145,7 +5322,7 @@ describe('api integration', () => {
       name: 'Recovery Flow Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Recovery Flow Team'
     })
@@ -5256,7 +5433,7 @@ describe('api integration', () => {
       name: 'PastDue Access Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'PastDue Access Team'
     })
@@ -5322,7 +5499,7 @@ describe('api integration', () => {
       name: 'Unpaid Guard Owner'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Unpaid Guard Team'
     })

@@ -1,7 +1,8 @@
+import { authRefreshTokenKey } from '@tx-agent-kit/contracts'
 import * as SecureStore from 'expo-secure-store'
 
 const AUTH_TOKEN_STORAGE_KEY = 'tx-agent-kit.auth-token'
-const REFRESH_TOKEN_STORAGE_KEY = 'tx-agent-kit.refresh-token'
+const REFRESH_TOKEN_STORAGE_KEY = authRefreshTokenKey
 
 export const readAuthToken = async (): Promise<string | null> => {
   return SecureStore.getItemAsync(AUTH_TOKEN_STORAGE_KEY)

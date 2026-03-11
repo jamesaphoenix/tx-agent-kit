@@ -66,6 +66,8 @@
     "temporal:dev:status": "./scripts/temporal/status.sh",
     "worktree:ports": "./scripts/worktree/derive-ports.sh",
     "db:migrate": "pnpm --filter @tx-agent-kit/db db:migrate",
+    "db:schemas:generate": "pnpm --filter @tx-agent-kit/db db:schemas:generate",
+    "db:schemas:apply": "pnpm --filter @tx-agent-kit/db db:schemas:apply",
     "db:trigger:new": "node ./scripts/tx-cli.mjs db:trigger:new",
     "db:test:reset": "./scripts/test/reset-test-db.sh",
     "db:studio": "pnpm --filter @tx-agent-kit/db db:studio",

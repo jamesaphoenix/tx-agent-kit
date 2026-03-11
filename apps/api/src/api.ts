@@ -1,11 +1,14 @@
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from '@effect/platform'
 import { createLogger } from '@tx-agent-kit/logging'
 import {
+  authPrincipalSchema,
+  authResponseSchema,
   billingSettingsSchema,
   createCheckoutSessionSchema,
   createPortalSessionSchema,
   forgotPasswordRequestSchema,
   forgotPasswordResponseSchema,
+  googleAuthCallbackRequestSchema,
   googleAuthStartResponseSchema,
   invitationAssignableRoles,
   invitationStatuses,
@@ -17,8 +20,10 @@ import {
   rolePermissionMapSchema,
   resetPasswordRequestSchema,
   resetPasswordResponseSchema,
+  signInRequestSchema,
   signOutAllResponseSchema,
   signOutResponseSchema,
+  signUpRequestSchema,
   sortOrders,
   subscriptionStatuses,
   updateBillingSettingsSchema,
@@ -86,41 +91,17 @@ const paginatedResponseSchema = <A, I, R>(itemSchema: Schema.Schema<A, I, R>) =>
     prevCursor: Schema.NullOr(Schema.String)
   })
 
-const AuthUser = Schema.Struct({
-  id: Schema.String,
-  email: Schema.String,
-  name: Schema.String,
-  createdAt: Schema.String
-})
+const AuthResponse = authResponseSchema
 
-const AuthResponse = Schema.Struct({
-  token: Schema.String,
-  refreshToken: Schema.String,
-  user: AuthUser
-})
-
-const PrincipalResponse = Schema.Struct({
-  userId: Schema.String,
-  email: Schema.String,
-  organizationId: Schema.optional(Schema.String),
-  roles: Schema.Array(Schema.String),
-  permissions: Schema.optional(Schema.Array(Schema.Literal(...permissionActions)))
-})
+const PrincipalResponse = authPrincipalSchema
 
 const DeleteMeResponse = Schema.Struct({
   deleted: Schema.Boolean
 })
 
-const SignUpBody = Schema.Struct({
-  email: Schema.String,
-  password: Schema.String,
-  name: Schema.String
-})
+const SignUpBody = signUpRequestSchema
 
-const SignInBody = Schema.Struct({
-  email: Schema.String,
-  password: Schema.String
-})
+const SignInBody = signInRequestSchema
 
 const ForgotPasswordBody = forgotPasswordRequestSchema
 
@@ -140,10 +121,7 @@ const SignOutAllResponse = signOutAllResponseSchema
 
 const GoogleAuthStartResponse = googleAuthStartResponseSchema
 
-const GoogleAuthCallbackParams = Schema.Struct({
-  code: Schema.String,
-  state: Schema.String
-})
+const GoogleAuthCallbackParams = googleAuthCallbackRequestSchema
 
 const Organization = Schema.Struct({
   id: Schema.String,
@@ -315,6 +293,7 @@ const StripeWebhookResponse = Schema.Struct({
 })
 
 const PermissionMapResponse = rolePermissionMapSchema
+const GoogleAuthCallbackResponse = authResponseSchema
 
 const MyPermissionsResponse = Schema.Struct({
   organizationId: Schema.optional(Schema.String),
@@ -339,7 +318,7 @@ export const AuthGroup = HttpApiGroup.make('auth')
   .add(
     HttpApiEndpoint.get('googleCallback', '/v1/auth/google/callback')
       .setUrlParams(GoogleAuthCallbackParams)
-      .addSuccess(AuthResponse)
+      .addSuccess(GoogleAuthCallbackResponse)
   )
   .add(
     HttpApiEndpoint.post('forgotPassword', '/v1/auth/forgot-password')

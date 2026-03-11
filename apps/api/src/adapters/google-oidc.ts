@@ -38,17 +38,22 @@ const getGoogleOidcRuntime = async (): Promise<GoogleOidcRuntime> => {
   if (!cachedRuntime || cachedRuntimeKey !== runtimeKey) {
     cachedRuntimeKey = runtimeKey
     cachedRuntime = (async () => {
-      const issuer = await Issuer.discover(config.issuerUrl)
-      const client = new issuer.Client({
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        redirect_uris: [config.callbackUrl],
-        response_types: ['code']
-      })
+      try {
+        const issuer = await Issuer.discover(config.issuerUrl)
+        const client = new issuer.Client({
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          redirect_uris: [config.callbackUrl],
+          response_types: ['code']
+        })
 
-      return {
-        client,
-        callbackUrl: config.callbackUrl
+        return {
+          client,
+          callbackUrl: config.callbackUrl
+        }
+      } catch (error) {
+        cachedRuntime = null
+        throw error
       }
     })()
   }
@@ -73,14 +78,14 @@ const normalizeEmailVerified = (value: unknown): boolean => {
 }
 
 export const GoogleOidcPortLive = Layer.succeed(GoogleOidcPort, {
-  startAuthorization: (input: { ipAddress: string | null }) =>
+  startAuthorization: (input: { ipAddress: string | null; statePrefix?: string }) =>
     Effect.gen(function* () {
       const runtime = yield* Effect.tryPromise({
         try: () => getGoogleOidcRuntime(),
         catch: () => new Error('Failed to initialize Google OIDC client')
       })
 
-      const state = generators.state()
+      const state = `${input.statePrefix ?? ''}${generators.state()}`
       const nonce = generators.nonce()
       const codeVerifier = generators.codeVerifier()
       const codeChallenge = generators.codeChallenge(codeVerifier)

@@ -1,10 +1,17 @@
 import { context, trace } from '@opentelemetry/api'
+import {
+  applySqlFiles,
+  applySqlMigration,
+  ensureMigrationTable,
+  getMigrationFiles,
+  getSchemaFiles,
+  resolveRepoRoot,
+  type SqlFile
+} from '@tx-agent-kit/db'
 import type { Effect } from 'effect'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-import process from 'node:process'
 import { Client } from 'pg'
 import { getTestkitEnv } from './env.js'
+import { filterResettableTableNames } from './reset-plan.js'
 import {
   buildSchemaDatabaseUrl,
   buildSchemaName,
@@ -37,8 +44,21 @@ export interface SqlTestContext {
   withEffectContext: <A, E, R>(effect: Effect.Effect<A, E, R>, caseName: string) => Effect.Effect<A, E, R>
 }
 
-const migrationsRelativePath = 'packages/infra/db/drizzle/migrations'
+export type SqlMigrationFile = SqlFile
+
 const localDatabaseHosts = new Set(['localhost', '127.0.0.1', '::1'])
+const globalMigrationLockId = 4_602_001
+const sharedMigrationNameSet = new Set([
+  '0001_core_saas.sql',
+  '0015_restore_public_invitation_identity_trigger.sql',
+  '0016_ensure_invitation_identity_trigger_all_schemas.sql'
+])
+const sharedMigrationPatterns = [
+  /\bcreate extension\b/iu,
+  /\balter extension\b/iu,
+  /\bdrop extension\b/iu,
+  /\bpublic\./iu
+]
 
 const quoteIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
 
@@ -61,26 +81,6 @@ const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
       Array.isArray(value) ? value.join(',') : value
     ])
   )
-}
-
-const resolveRepoRoot = (start = process.cwd()): string => {
-  let current = resolve(start)
-
-  for (;;) {
-    const migrationDir = resolve(current, migrationsRelativePath)
-    const workspaceFile = resolve(current, 'pnpm-workspace.yaml')
-
-    if (existsSync(migrationDir) && existsSync(workspaceFile)) {
-      return current
-    }
-
-    const parent = resolve(current, '..')
-    if (parent === current) {
-      throw new Error(`Could not resolve repository root from ${start}`)
-    }
-
-    current = parent
-  }
 }
 
 const assertSafeDatabaseUrl = (
@@ -111,20 +111,16 @@ const assertSafeDatabaseUrl = (
   )
 }
 
-const getMigrationFiles = (repoRoot: string): ReadonlyArray<{ name: string; sql: string }> => {
-  const migrationDir = resolve(repoRoot, migrationsRelativePath)
-  const fileNames = readdirSync(migrationDir)
-    .filter((fileName) => fileName.endsWith('.sql'))
-    .sort((left, right) => left.localeCompare(right))
-
-  return fileNames.map((name) => ({
-    name,
-    sql: readFileSync(resolve(migrationDir, name), 'utf8')
-  }))
-}
-
 const createBaseClient = (baseDatabaseUrl: string): Client =>
   new Client({ connectionString: baseDatabaseUrl })
+
+export const migrationRequiresGlobalLock = (migration: SqlMigrationFile): boolean => {
+  if (sharedMigrationNameSet.has(migration.name)) {
+    return true
+  }
+
+  return sharedMigrationPatterns.some((pattern) => pattern.test(migration.sql))
+}
 
 const ensureSchema = async (client: Client, schemaName: string): Promise<void> => {
   await client.query(`CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(schemaName)}`)
@@ -133,17 +129,6 @@ const ensureSchema = async (client: Client, schemaName: string): Promise<void> =
 const setSearchPath = async (client: Client, schemaName: string): Promise<void> => {
   await client.query(`SET search_path TO ${quoteIdentifier(schemaName)}, public`)
 }
-
-const ensureMigrationTable = async (client: Client): Promise<void> => {
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS __tx_agent_migrations (
-      name text PRIMARY KEY,
-      applied_at timestamptz NOT NULL DEFAULT now()
-    )
-  `)
-}
-
-const globalMigrationLockId = 4_602_001
 
 const withGlobalMigrationLock = async <A>(
   client: Client,
@@ -155,24 +140,6 @@ const withGlobalMigrationLock = async <A>(
     return await callback()
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [globalMigrationLockId])
-  }
-}
-
-const seedIfPresent = async (client: Client, tableNames: ReadonlySet<string>): Promise<void> => {
-  if (tableNames.has('roles')) {
-    await client.query(`
-      INSERT INTO roles (name)
-      VALUES ('owner'), ('admin'), ('member')
-      ON CONFLICT (name) DO NOTHING
-    `)
-  }
-
-  if (tableNames.has('permissions')) {
-    await client.query(`
-      INSERT INTO permissions (key)
-      VALUES ('organization.read'), ('organization.write'), ('organization.manage'), ('invite.manage')
-      ON CONFLICT (key) DO NOTHING
-    `)
   }
 }
 
@@ -188,6 +155,8 @@ export const createSqlTestContext = (
   assertSafeDatabaseUrl(baseDatabaseUrl, allowUnsafeDatabaseUrl)
   const schemaDatabaseUrl = buildSchemaDatabaseUrl(baseDatabaseUrl, schemaName)
   const repoRoot = options.repoRoot ?? resolveRepoRoot()
+  const schemaFiles = getSchemaFiles(repoRoot)
+  let mutableTableNames: ReadonlyArray<string> | null = null
 
   const withBaseClient = async <A>(callback: (client: Client) => Promise<A>): Promise<A> => {
     const client = createBaseClient(baseDatabaseUrl)
@@ -205,33 +174,53 @@ export const createSqlTestContext = (
       await ensureSchema(client, schemaName)
       await setSearchPath(client, schemaName)
       await ensureMigrationTable(client)
-      return callback(client)
+      return await callback(client)
     })
+
+  const resolveMutableTableNames = async (client: Client): Promise<ReadonlyArray<string>> => {
+    if (mutableTableNames !== null) {
+      return mutableTableNames
+    }
+
+    const tables = await client.query<{ tablename: string }>(
+      `
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = $1
+      `,
+      [schemaName]
+    )
+
+    mutableTableNames = filterResettableTableNames(
+      tables.rows.map((row) => row.tablename)
+    )
+
+    return mutableTableNames
+  }
 
   const setup = async (): Promise<void> => {
     const migrationFiles = getMigrationFiles(repoRoot)
 
     await withSchemaClient(async (client) => {
-      await withGlobalMigrationLock(client, async () => {
-        const applied = await client.query<{ name: string }>('SELECT name FROM __tx_agent_migrations')
-        const appliedSet = new Set(applied.rows.map((row) => row.name))
+      const applied = await client.query<{ name: string }>('SELECT name FROM __tx_agent_migrations')
+      const appliedSet = new Set(applied.rows.map((row) => row.name))
 
-        for (const migration of migrationFiles) {
-          if (appliedSet.has(migration.name)) {
-            continue
-          }
-
-          await client.query('BEGIN')
-          try {
-            await client.query(migration.sql)
-            await client.query('INSERT INTO __tx_agent_migrations (name) VALUES ($1)', [migration.name])
-            await client.query('COMMIT')
-          } catch (error) {
-            await client.query('ROLLBACK')
-            throw error
-          }
+      for (const migration of migrationFiles) {
+        if (appliedSet.has(migration.name)) {
+          continue
         }
-      })
+
+        if (migrationRequiresGlobalLock(migration)) {
+          await withGlobalMigrationLock(client, async () => applySqlMigration(client, migration))
+        } else {
+          await applySqlMigration(client, migration)
+        }
+
+        appliedSet.add(migration.name)
+      }
+
+      await applySqlFiles(client, schemaFiles)
+      mutableTableNames = await resolveMutableTableNames(client)
     })
 
     await reset()
@@ -243,26 +232,17 @@ export const createSqlTestContext = (
       await client.query(`SET lock_timeout TO '5s'`)
       await client.query(`SET statement_timeout TO '30s'`)
 
-      const tables = await client.query<{ tablename: string }>(
-        `
-          SELECT tablename
-          FROM pg_tables
-          WHERE schemaname = $1
-            AND tablename <> '__tx_agent_migrations'
-        `,
-        [schemaName]
-      )
+      const tableNames = await resolveMutableTableNames(client)
 
-      const tableNames = new Set(tables.rows.map((row) => row.tablename))
-      if (tables.rows.length > 0) {
-        const qualified = tables.rows
-          .map((row) => `${quoteIdentifier(schemaName)}.${quoteIdentifier(row.tablename)}`)
+      if (tableNames.length > 0) {
+        const qualified = tableNames
+          .map((tableName) => `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}`)
           .join(', ')
 
         await client.query(`TRUNCATE TABLE ${qualified} RESTART IDENTITY CASCADE`)
       }
 
-      await seedIfPresent(client, tableNames)
+      await applySqlFiles(client, schemaFiles)
     })
   }
 

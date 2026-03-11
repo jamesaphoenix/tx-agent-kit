@@ -1,6 +1,6 @@
 import React from 'react'
 import { writeAuthToken } from '@/lib/auth-token'
-import { createTeam, createUser } from '@tx-agent-kit/testkit'
+import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import { describe, expect, it } from 'vitest'
 import { createWebFactoryContext } from '../integration/support/web-integration-context'
 import { renderWithProviders, screen, waitFor } from '../integration/test-utils'
@@ -16,7 +16,7 @@ describe('PermissionsGate integration', () => {
       name: 'Permissions Gate Owner'
     })
 
-    await createTeam(factoryContext, {
+    await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Permissions Gate Owner Team'
     })
@@ -53,7 +53,7 @@ describe('PermissionsGate integration', () => {
       name: 'Permissions Gate Member'
     })
 
-    const organization = await createTeam(factoryContext, {
+    const organization = await createOrganization(factoryContext, {
       token: owner.token,
       name: 'Permissions Gate Member Team'
     })

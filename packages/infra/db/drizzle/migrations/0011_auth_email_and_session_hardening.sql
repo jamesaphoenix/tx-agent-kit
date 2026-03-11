@@ -1,4 +1,4 @@
--- 0010_auth_email_and_session_hardening.sql
+-- 0011_auth_email_and_session_hardening.sql
 -- Adds case-insensitive/canonical email enforcement for users and
 -- session invalidation support via password_changed_at.
 
