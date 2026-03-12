@@ -28,7 +28,7 @@
     "nuqs": "^2.8.9",
     "react": "19.2.0",
     "react-admin": "^5.14.3",
-    "react-dom": "19.2.0",
+    "react-dom": "19.2.4",
     "react-select": "^5.10.2",
     "sonner": "^2.0.7"
   },
@@ -39,7 +39,7 @@
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
     "@types/react": "~18.3.12",
-    "@types/react-dom": "~18.3.0",
+    "@types/react-dom": "~19.2.3",
     "jsdom": "^28.1.0",
     "orval": "^8.1.0"
   }
