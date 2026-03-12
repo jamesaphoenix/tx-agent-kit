@@ -59,8 +59,32 @@ const sharedMigrationPatterns = [
   /\bdrop extension\b/iu,
   /\bpublic\./iu
 ]
+const dropFunctionPattern =
+  /(DROP FUNCTION IF EXISTS\s+)(?:(("(?:""|[^"])+?"|[A-Za-z_][A-Za-z0-9_$]*))\s*\.\s*)?((?:"(?:""|[^"])+?"|[A-Za-z_][A-Za-z0-9_$]*))(\s*\(\s*\)\s*CASCADE\s*;)/giu
 
 const quoteIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
+
+export const scopeUnqualifiedFunctionDropsToSchema = (
+  sql: string,
+  schemaName: string
+): string =>
+  sql.replaceAll(
+    dropFunctionPattern,
+    (
+      statement: string,
+      prefix: string,
+      schemaQualifier: string | undefined,
+      _schemaIdentifier: string | undefined,
+      functionName: string,
+      suffix: string
+    ) => {
+      if (schemaQualifier) {
+        return statement
+      }
+
+      return `${prefix}${quoteIdentifier(schemaName)}.${functionName}${suffix}`
+    }
+  )
 
 const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
   if (!headers) {
@@ -210,10 +234,15 @@ export const createSqlTestContext = (
           continue
         }
 
+        const scopedMigration: SqlMigrationFile = {
+          name: migration.name,
+          sql: scopeUnqualifiedFunctionDropsToSchema(migration.sql, schemaName)
+        }
+
         if (migrationRequiresGlobalLock(migration)) {
-          await withGlobalMigrationLock(client, async () => applySqlMigration(client, migration))
+          await withGlobalMigrationLock(client, async () => applySqlMigration(client, scopedMigration))
         } else {
-          await applySqlMigration(client, migration)
+          await applySqlMigration(client, scopedMigration)
         }
 
         appliedSet.add(migration.name)

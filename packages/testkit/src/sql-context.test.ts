@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSqlTestContext, migrationRequiresGlobalLock } from './sql-context.js'
+import {
+  createSqlTestContext,
+  migrationRequiresGlobalLock,
+  scopeUnqualifiedFunctionDropsToSchema
+} from './sql-context.js'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -68,5 +72,25 @@ describe('sql migration lock classification', () => {
         sql: 'CREATE TABLE IF NOT EXISTS users (id uuid primary key);'
       })
     ).toBe(false)
+  })
+})
+
+describe('schema-local migration scoping', () => {
+  it('scopes unqualified function drops to the isolated schema', () => {
+    const rewrittenSql = scopeUnqualifiedFunctionDropsToSchema(
+      'DROP FUNCTION IF EXISTS normalize_invitation_identity_fn() CASCADE;',
+      'test_schema'
+    )
+
+    expect(rewrittenSql).toBe(
+      'DROP FUNCTION IF EXISTS "test_schema".normalize_invitation_identity_fn() CASCADE;'
+    )
+  })
+
+  it('preserves already-qualified function drops', () => {
+    const originalSql =
+      'DROP FUNCTION IF EXISTS public.normalize_invitation_identity_fn() CASCADE;'
+
+    expect(scopeUnqualifiedFunctionDropsToSchema(originalSql, 'test_schema')).toBe(originalSql)
   })
 })
