@@ -13,7 +13,6 @@
   "dependencies": {
     "fumadocs-core": "^16.6.8",
     "fumadocs-mdx": "^14.2.9",
-    "fumadocs-openapi": "^10.3.14",
     "fumadocs-ui": "^16.6.8",
     "next": "16.1.6",
     "react": "19.2.0",
@@ -25,6 +24,8 @@
     "@types/node": "^22.18.6",
     "@types/react": "~18.3.12",
     "@types/react-dom": "~18.3.0",
+    "postcss": "8.5.8",
+    "postcss-load-config": "6.0.1",
     "tailwindcss": "^4.1.4",
     "typescript": "^5.9.3",
     "zod": "^4.3.6"

@@ -1,0 +1,92 @@
+{
+  "$schema": "./node_modules/knip/schema.json",
+  // Keep the default baseline focused on dependency and file hygiene.
+  // Export/type reporting can be added later once the dependency baseline is clean.
+  "exclude": [
+    "exports",
+    "nsExports",
+    "types",
+    "nsTypes",
+    "classMembers",
+    "enumMembers",
+    "duplicates"
+  ],
+  "ignoreFiles": [
+    "**/dist/**",
+    "**/.next/**",
+    "**/.turbo/**",
+    "**/.vitest/**",
+    "**/coverage/**",
+    "**/generated/**",
+    "apps/docs/public/llms*.txt"
+  ],
+  "ignoreUnresolved": ["next"],
+  "ignoreIssues": {
+    "apps/mobile/app.config.js": ["unlisted"],
+    "apps/mobile/app.json": ["unlisted"],
+    "apps/mobile/lib/api/orval-mutator.ts": ["files"],
+    "apps/web/lib/api/orval-mutator.ts": ["files"],
+    "packages/testkit/src/render-runtime-values.ts": ["files"],
+    "packages/testkit/src/api-client/test-mutator.ts": ["files"]
+  },
+  "workspaces": {
+    ".": {
+      "entry": [
+        "eslint.config.js",
+        "scripts/**/*.{sh,mjs,ts}",
+        "vitest*.ts",
+        "tsconfig*.json"
+      ],
+      "project": [
+        "eslint.config.js",
+        "scripts/**/*.{sh,mjs,ts}",
+        "vitest*.ts",
+        "tsconfig*.json"
+      ]
+    },
+    "apps/api": {
+      "entry": ["src/server.ts", "src/openapi.ts"]
+    },
+    "apps/docs": {
+      "entry": [
+        "app/**/*.{ts,tsx}",
+        "source.config.ts",
+        "mdx-components.tsx",
+        "next.config.mjs",
+        "postcss.config.mjs",
+        "scripts/**/*.ts"
+      ]
+    },
+    "apps/mobile": {
+      "entry": [
+        "app.config.js",
+        "metro.config.js",
+        "orval.config.ts",
+        "vitest.integration.config.ts",
+        "vitest.integration.setup.ts"
+      ],
+      "ignoreDependencies": ["@babel/core", "react-native-web"]
+    },
+    "apps/web": {
+      "entry": ["orval.config.ts", "vitest.integration.global-setup.ts"],
+      "ignoreDependencies": ["@emotion/react", "@emotion/styled", "@mui/material"]
+    },
+    "apps/worker": {
+      "entry": [
+        "src/workflows.ts",
+        "src/temporal-cloud-mtls.ts",
+        "src/temporal-connectivity.ts"
+      ]
+    },
+    "packages/infra/observability": {
+      "entry": ["vitest.integration.config.ts"]
+    },
+    "packages/testkit": {
+      "entry": ["orval.config.ts"]
+    },
+    "packages/tooling/vitest-config": {
+      "entry": ["integration.ts", "unit.ts", "workers.ts"],
+      "project": ["*.ts"]
+    }
+  }
+}

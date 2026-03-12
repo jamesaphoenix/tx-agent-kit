@@ -1,0 +1,10 @@
+{
+  "threshold": 5,
+  "reporters": ["console"],
+  "gitignore": true,
+  "ignore": [
+    "**/dist/**",
+    "**/.next/**",
+    "**/generated/**"
+  ]
+}

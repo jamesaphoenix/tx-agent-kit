@@ -19,7 +19,10 @@
 - `pnpm scaffold:crud --domain <domain> --entity <entity> [--plural <plural>] [--dry-run] [--force] [--with-db]`: generate `domain -> ports -> application/adapters -> routes -> tests` scaffold (and optional DB artifacts).
 
 ## Quality Gates
-- `pnpm lint`: full lint gate (`eslint` + structural/runtime invariants + shell invariants).
+- `pnpm lint`: full lint gate (`eslint` + structural/runtime invariants + shell invariants + scoped `jscpd` duplication check).
+- `pnpm lint:knip`: run the Knip audit baseline (report-only, compact output).
+- `pnpm lint:knip:strict`: run the same Knip audit but fail on findings.
+- `pnpm lint:jscpd`: run the duplication gate scoped to `apps/api/src`, `packages/core/src`, and `scripts`.
 - `pnpm type-check`: workspace TypeScript checks.
 - `pnpm test`: workspace unit tests.
 - `pnpm test:integration`: single Vitest workspace integration run with global setup (infra + DB reset + pgTAP once).

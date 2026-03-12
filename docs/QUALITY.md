@@ -16,7 +16,9 @@
 - Run database contract suites via `pnpm test:db:pgtap`.
 - API integration harness is standardized via `createDbAuthContext(...)` (no manual process spawning in API integration suites).
 - API harness callers must resolve `apiCwd` via `fileURLToPath(import.meta.url)` (never `process.cwd()`), so root-workspace integration runs stay deterministic.
-- Run invariant checks via `pnpm lint` (`eslint` + `scripts/lint/enforce-domain-invariants.mjs` + `scripts/lint/enforce-web-client-contracts.mjs` + `scripts/lint/enforce-route-kind-contracts.mjs` + `scripts/lint/enforce-source-type-safety.mjs` + `scripts/lint/enforce-compose-runtime-contracts.mjs` + `scripts/lint/enforce-tsconfig-alignment.mjs` + `scripts/lint/enforce-domain-event-contracts.mjs` + shell invariants).
+- Run invariant checks via `pnpm lint` (`eslint` + `scripts/lint/enforce-domain-invariants.mjs` + `scripts/lint/enforce-web-client-contracts.mjs` + `scripts/lint/enforce-route-kind-contracts.mjs` + `scripts/lint/enforce-source-type-safety.mjs` + `scripts/lint/enforce-compose-runtime-contracts.mjs` + `scripts/lint/enforce-tsconfig-alignment.mjs` + `scripts/lint/enforce-domain-event-contracts.mjs` + shell invariants + scoped `jscpd`).
+- Run `pnpm lint:knip` for a workspace-aware unused dependency/file audit. Use `pnpm lint:knip:strict` when you want findings to fail the command.
+- Run `pnpm lint:jscpd` for the scoped duplication budget on `apps/api/src`, `packages/core/src`, and `scripts` (current threshold: `5%`).
 
 ## Domain Invariants
 
