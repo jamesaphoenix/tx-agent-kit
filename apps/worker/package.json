@@ -15,7 +15,7 @@
     "test:integration:temporal": "vitest run -c vitest.temporal.integration.config.ts"
   },
   "dependencies": {
-    "@sentry/node": "^10.41.0",
+    "@sentry/node": "^10.43.0",
     "@temporalio/client": "^1.13.1",
     "@temporalio/common": "^1.13.1",
     "@temporalio/worker": "^1.13.1",
