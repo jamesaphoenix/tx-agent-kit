@@ -27,6 +27,29 @@
    - Default is `PROMETHEUS_URL=http://host.docker.internal:9090` so the MCP container can reach host Prometheus.
    - On Linux, wrapper adds `--add-host=host.docker.internal:host-gateway`; override `PROMETHEUS_URL` if your target differs.
    - `pnpm mcp:jaeger` reads `JAEGER_URL`, `JAEGER_PROTOCOL`, and optional `JAEGER_PORT`.
+   - `pnpm mcp:langfuse` is a Langfuse Public API curl wrapper and reads `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`.
+
+## Langfuse (AI trace observability)
+1. Langfuse runs as part of `pnpm infra:ensure` (Docker Compose `infra` profile).
+2. Local UI: `http://localhost:3200` — login with `admin@localhost.dev` / `admin`.
+3. Enable trace export: set `LANGFUSE_ENABLED=true` in `.env`.
+4. Local API keys are headless-initialized: `pk-lf-local-dev` / `sk-lf-local-dev`.
+5. AI tracing utilities:
+   - `tracedCallModel`: wraps `callModel` with OTel spans + token usage attributes.
+   - `withAgentStep`: creates a named span around an Effect computation.
+   - `withAgentTrace`: wraps an entire multi-agent run in a root trace span.
+6. Production: set `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` to Langfuse Cloud values.
+7. Run AI integration tests: `pnpm test:ai:integration` (requires `OPENROUTER_API_KEY`).
+8. To record fresh cassettes during AI integration runs: `VCR_MODE=record pnpm test:ai:integration`.
+
+## Langfuse troubleshooting
+- Langfuse not starting:
+  - Check service logs: `docker compose -p tx-agent-kit logs langfuse-web langfuse-worker`
+  - Check for local port conflicts on `3200` before restarting infra.
+- Health check: `curl http://localhost:3200/api/public/health`
+- View Langfuse logs: `docker compose -p tx-agent-kit logs langfuse-web langfuse-worker`
+- Reset Langfuse data: `docker compose -p tx-agent-kit down && docker volume rm tx-agent-kit_langfuse_postgres_data tx-agent-kit_langfuse_clickhouse_data`
+- Switch to Langfuse Cloud: update `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY` in `.env`.
 
 ## Agent Browser Auth (Playwright CLI)
 1. Keep root `.env` credentials sourced via 1Password (`op://...`), never plaintext secrets in source-controlled files.
