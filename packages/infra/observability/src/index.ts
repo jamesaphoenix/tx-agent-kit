@@ -1,3 +1,4 @@
+import { LangfuseSpanProcessor } from '@langfuse/otel'
 import { diag, DiagConsoleLogger, DiagLogLevel, metrics, trace } from '@opentelemetry/api'
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http'
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http'
@@ -6,9 +7,15 @@ import { resourceFromAttributes } from '@opentelemetry/resources'
 import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs'
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { NodeSDK } from '@opentelemetry/sdk-node'
+import { BatchSpanProcessor, type SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import {
   ATTR_SERVICE_NAME
 } from '@opentelemetry/semantic-conventions'
+
+import { getLangfuseEnv, getObservabilityEnv } from './env.js'
+import { getOrCreateNodeServiceMetrics } from './metrics-registry.js'
+
+export { getLangfuseEnv, type LangfuseEnv } from './env.js'
 
 /**
  * Stable semantic convention for deployment environment.
@@ -16,8 +23,6 @@ import {
  * @see https://opentelemetry.io/docs/specs/semconv/resource/deployment-environment/
  */
 const ATTR_DEPLOYMENT_ENVIRONMENT_NAME = 'deployment.environment.name'
-import { getObservabilityEnv } from './env.js'
-import { getOrCreateNodeServiceMetrics } from './metrics-registry.js'
 
 let telemetrySdk: NodeSDK | undefined
 
@@ -50,15 +55,33 @@ export const startTelemetry = (serviceName: string): void => {
           )
         ]
 
+  const spanProcessors: SpanProcessor[] = [
+    new BatchSpanProcessor(
+      new OTLPTraceExporter({
+        url: `${env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`
+      })
+    )
+  ]
+
+  const langfuseEnv = getLangfuseEnv()
+  if (langfuseEnv.LANGFUSE_ENABLED) {
+    spanProcessors.push(
+      new LangfuseSpanProcessor({
+        publicKey: langfuseEnv.LANGFUSE_PUBLIC_KEY,
+        secretKey: langfuseEnv.LANGFUSE_SECRET_KEY,
+        baseUrl: langfuseEnv.LANGFUSE_BASE_URL,
+        environment: env.NODE_ENV
+      })
+    )
+  }
+
   telemetrySdk = new NodeSDK({
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: serviceName,
       [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: env.NODE_ENV
     }),
     ...(logRecordProcessors ? { logRecordProcessors } : {}),
-    traceExporter: new OTLPTraceExporter({
-      url: `${env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`
-    }),
+    spanProcessors,
     metricReader: new PeriodicExportingMetricReader({
       exporter: new OTLPMetricExporter({
         url: `${env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/metrics`

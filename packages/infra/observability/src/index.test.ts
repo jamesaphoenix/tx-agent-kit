@@ -50,6 +50,25 @@ const getObservabilityEnvMock = vi.fn(() => ({
   NODE_ENV: 'staging'
 }))
 
+const getLangfuseEnvMock = vi.fn(() => ({
+  LANGFUSE_ENABLED: false,
+  LANGFUSE_PUBLIC_KEY: '',
+  LANGFUSE_SECRET_KEY: '',
+  LANGFUSE_BASE_URL: 'http://localhost:3200'
+}))
+
+const batchSpanProcessorConstructorMock = vi.fn(function MockBatchSpanProcessor(
+  exporter: unknown
+) {
+  return { exporter }
+})
+
+const langfuseSpanProcessorConstructorMock = vi.fn(function MockLangfuseSpanProcessor(
+  options: unknown
+) {
+  return { options }
+})
+
 vi.mock('@opentelemetry/api', () => ({
   diag: {
     setLogger: diagSetLoggerMock
@@ -94,8 +113,17 @@ vi.mock('@opentelemetry/sdk-node', () => ({
   NodeSDK: nodeSdkConstructorMock
 }))
 
+vi.mock('@opentelemetry/sdk-trace-base', () => ({
+  BatchSpanProcessor: batchSpanProcessorConstructorMock
+}))
+
+vi.mock('@langfuse/otel', () => ({
+  LangfuseSpanProcessor: langfuseSpanProcessorConstructorMock
+}))
+
 vi.mock('./env.js', () => ({
-  getObservabilityEnv: getObservabilityEnvMock
+  getObservabilityEnv: getObservabilityEnvMock,
+  getLangfuseEnv: getLangfuseEnvMock
 }))
 
 describe('telemetry lifecycle', () => {

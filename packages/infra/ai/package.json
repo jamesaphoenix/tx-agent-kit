@@ -9,13 +9,17 @@
     "build": "tsc -b",
     "type-check": "tsc -b --pretty false",
     "lint": "eslint src --max-warnings=0",
-    "test": "vitest run -c vitest.config.ts"
+    "test": "vitest run -c vitest.config.ts",
+    "test:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
+    "@langfuse/tracing": "^4.0.0",
     "@openrouter/sdk": "^0.9.11",
+    "@opentelemetry/api": "^1.9.0",
     "effect": "^3.19.19"
   },
   "devDependencies": {
+    "@tx-agent-kit/observability": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*"
   }
 }

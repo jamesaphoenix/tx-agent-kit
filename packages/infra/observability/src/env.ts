@@ -9,6 +9,13 @@ export interface ObservabilityEnv {
   NODE_ENV: string
 }
 
+export interface LangfuseEnv {
+  LANGFUSE_ENABLED: boolean
+  LANGFUSE_PUBLIC_KEY: string
+  LANGFUSE_SECRET_KEY: string
+  LANGFUSE_BASE_URL: string
+}
+
 export interface ClientObservabilityEnv {
   OTEL_EXPORTER_OTLP_ENDPOINT: string
   NODE_ENV: string
@@ -24,6 +31,15 @@ export const getObservabilityEnv = (): ObservabilityEnv => {
       process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? defaultOtelEndpoint,
     OTEL_LOGS_EXPORTER: logsExporter === 'none' ? 'none' : 'otlp',
     NODE_ENV: process.env.NODE_ENV ?? defaultNodeEnv
+  }
+}
+
+export const getLangfuseEnv = (): LangfuseEnv => {
+  return {
+    LANGFUSE_ENABLED: process.env.LANGFUSE_ENABLED === 'true',
+    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY ?? '',
+    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY ?? '',
+    LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL ?? 'http://localhost:3200'
   }
 }
 

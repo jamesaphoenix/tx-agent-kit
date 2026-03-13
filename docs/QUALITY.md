@@ -82,6 +82,7 @@
 - No payload `as` casts: `.payload as <Type>` is forbidden in worker source; use Schema decode.
 - Event type naming convention: strings must match `^[a-z][a-z_]*\.[a-z][a-z_]*$`.
 - Retention settings completeness: every table in `retentionTableNames` must appear in the generated `retention_settings` reconcile schema.
+- Financial audit trail governance: `usage_records` and `credit_ledger` must never have retention policies; they are financial audit trails. Metered usage continues reporting to Stripe during `past_due` status (Stripe needs accurate usage to calculate recovery invoices).
 - Domain event insert helper: inline `.insert(domainEvents).values(...)` outside `repositories/domain-events.ts` is banned; use `insertDomainEventInTransaction`.
 - Naming derivation: the enforcement script derives names via dot-split PascalCase (e.g., `organization.created` → `OrganizationCreatedEventPayload` / `OrganizationCreatedEventPayloadSchema`).
 
