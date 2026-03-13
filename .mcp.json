@@ -15,6 +15,10 @@
     "supabase": {
       "type": "stdio",
       "command": "./scripts/mcp/supabase.sh"
+    },
+    "langfuse-local": {
+      "type": "stdio",
+      "command": "./scripts/mcp/langfuse.sh"
     }
   }
 }

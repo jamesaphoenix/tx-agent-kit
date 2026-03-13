@@ -2,7 +2,7 @@
 
 ## Core Development
 - `pnpm env:configure`: idempotently configure `.env` for local development.
-- `pnpm infra:ensure`: idempotently start shared Docker infra and wait for health.
+- `pnpm infra:ensure`: idempotently start shared Docker infra (including Langfuse) and wait for health.
 - `INFRA_READY_TIMEOUT_SECONDS=300 pnpm infra:ensure`: override infra readiness timeout window (default `120` seconds).
 - `pnpm temporal:dev:up`: start local Temporal CLI server (no-op when `TEMPORAL_RUNTIME_MODE != cli`).
 - `pnpm temporal:dev:down`: stop local Temporal CLI server managed by repo scripts.
@@ -98,11 +98,21 @@
 - `pnpm mcp:jaeger`: start Jaeger MCP.
 - `pnpm mcp:context7`: start Context7 MCP.
 - `pnpm mcp:supabase`: start Supabase MCP (requires `SUPABASE_ACCESS_TOKEN`).
+- `pnpm mcp:langfuse -- help`: show Langfuse Public API helper commands (`health`, `traces`, `trace`, `observations`, `scores`).
 - `pnpm playwright:auth:bootstrap`: create/sign-in bootstrap user via real auth API and write Playwright storage state.
 - `op run --env-file=.env -- pnpm playwright:auth:bootstrap`: recommended 1Password-backed auth bootstrap flow.
 - `pnpm mcp:codex-config`: print Codex MCP TOML blocks wired to local wrappers.
 - `PROMETHEUS_URL=http://host.docker.internal:9090 pnpm mcp:prometheus`: point containerized Prometheus MCP at host Prometheus (default).
 - `JAEGER_URL=http://localhost JAEGER_PORT=16686 pnpm mcp:jaeger`: host-mode Jaeger MCP defaults (use either host+port or URL with embedded port).
+- `LANGFUSE_BASE_URL=http://localhost:3200 pnpm mcp:langfuse -- health`: local Langfuse health check with default local API keys.
+
+## AI Tracing (Langfuse)
+- `pnpm infra:ensure`: starts Langfuse as part of shared local infra.
+- Langfuse UI: `http://localhost:3200` (admin@localhost.dev / admin).
+- `pnpm test:ai:integration`: runs AI integration tests.
+- `VCR_MODE=record pnpm test:ai:integration`: records fresh cassettes for AI integration tests.
+- Enable trace export: set `LANGFUSE_ENABLED=true` in `.env`.
+- Production: set `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` to Langfuse Cloud values.
 
 ## Diagnostics
 - `pnpm test:run-silent`: verify `scripts/run-silent.sh` behavior.
