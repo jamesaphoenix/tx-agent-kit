@@ -149,7 +149,7 @@ services:
     ports:
       - '8969:8969'
     healthcheck:
-      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:8969 || exit 1']
+      test: ['CMD-SHELL', 'bash -c "echo > /dev/tcp/localhost/8969" || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -198,6 +198,7 @@ services:
     volumes:
       - langfuse_clickhouse_data:/var/lib/clickhouse
       - langfuse_clickhouse_logs:/var/log/clickhouse-server
+      - ./monitoring/local/clickhouse/keeper-config.xml:/etc/clickhouse-server/config.d/keeper-config.xml:ro
     healthcheck:
       test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1']
       interval: 10s
@@ -255,7 +256,7 @@ services:
       LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-local-dev
       LANGFUSE_INIT_USER_EMAIL: admin@localhost.dev
       LANGFUSE_INIT_USER_NAME: Admin
-      LANGFUSE_INIT_USER_PASSWORD: admin
+      LANGFUSE_INIT_USER_PASSWORD: adminadmin
     ports:
       - '3200:3000'
     depends_on:
