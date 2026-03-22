@@ -17,18 +17,18 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@effect/experimental": "^0.58.0",
-    "@effect/platform": "^0.94.5",
-    "@effect/sql": "^0.49.0",
-    "@effect/sql-pg": "^0.50.3",
+    "@effect/experimental": "^0.60.0",
+    "@effect/platform": "^0.96.0",
+    "@effect/sql": "^0.51.0",
+    "@effect/sql-pg": "^0.52.0",
     "@tx-agent-kit/contracts": "workspace:*",
     "drizzle-orm": "^1.0.0-beta.9",
-    "effect": "^3.19.19",
-    "pg": "^8.19.0"
+    "effect": "^3.21.0",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*",
-    "@types/pg": "^8.18.0",
+    "@types/pg": "^8.20.0",
     "drizzle-kit": "^1.0.0-beta.9"
   }
 }
