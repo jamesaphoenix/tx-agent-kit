@@ -1,5 +1,3 @@
-# <domain>
-
 Agent-first starter for Effect HTTP + Temporal + Next.js + Drizzle.
 
 This repository uses an agent-first workflow inspired by OpenAI's Harness Engineering post (February 11, 2026).
@@ -23,6 +21,9 @@ This repository uses an agent-first workflow inspired by OpenAI's Harness Engine
 | MCP servers | `.mcp.json` + `scripts/mcp/*` |
 | Skills | `.claude/skills/*` |
 | CRUD scaffold skill | `.claude/skills/golden-path-crud/SKILL.md` |
+
+## tx CLI
+Run `tx` in agent shells as `source ~/.zshrc >/dev/null 2>&1; eval 'tx <subcommand> ...'`.
 
 ## Stack
 - `apps/web`: Client-only Next.js SPA (no SSR, no `app/api`)
@@ -89,6 +90,15 @@ Full command catalog: `docs/COMMANDS.md`
 - Enable export by setting `LANGFUSE_ENABLED=true`.
 - Local vs Cloud switch requires only changing `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`.
 - For AI integration test patterns and cassette workflows, use `.claude/skills/ai-vcr-test/SKILL.md`.
+
+## Sentry Spotlight (Local Dev Observability)
+- Starts automatically with `pnpm infra:ensure` (part of the `infra` Docker profile).
+- Enabled by default: `SENTRY_SPOTLIGHT=true` in `.env.example`. Works without a real Sentry DSN (uses placeholder `https://spotlight@local/0`).
+- Native desktop app alternative: download from https://spotlightjs.com/, then stop the Docker container to free port `8969`.
+- All three app layers (web, api, worker) forward errors + traces to Spotlight when enabled.
+- MCP server `spotlight-local` exposes `search_errors`, `search_logs`, `search_traces`, `get_traces` for AI-assisted debugging. Fails fast with a clear message if the sidecar is not running.
+- `pnpm dev:open` opens the Spotlight UI alongside other dashboards.
+- Full docs: `apps/docs/content/docs/observability/spotlight.mdx`.
 
 ## Mechanical Enforcement
 - ESLint: `packages/tooling/eslint-config/` (modular configs)

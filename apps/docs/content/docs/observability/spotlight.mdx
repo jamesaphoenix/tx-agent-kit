@@ -14,47 +14,24 @@ Sentry Spotlight is an open-source local development tool that captures errors, 
 
 ## Quick start
 
-### 1. Enable Spotlight
-
-Add to your `.env`:
+Spotlight starts automatically as part of the local infrastructure. If you have `SENTRY_SPOTLIGHT=true` in your `.env` (the default in `.env.example`), everything works out of the box:
 
 ```bash
-SENTRY_SPOTLIGHT=true
+pnpm infra:ensure   # starts Spotlight alongside Postgres, Jaeger, etc.
+pnpm dev            # apps detect SENTRY_SPOTLIGHT=true and forward events
 ```
 
-This is the only env variable required. If no Sentry DSN is configured for a layer, a placeholder DSN (`https://spotlight@local/0`) is used automatically so events still flow to Spotlight.
+Open the UI at `http://localhost:8969` or via `pnpm dev:open`.
 
-### 2. Start the Spotlight sidecar
+### Using the native desktop app instead
 
-**Option A — Native desktop app (preferred)**
-
-Download from [spotlightjs.com](https://spotlightjs.com/) and run it. It listens on port `8969`.
-
-**Option B — Docker**
+If you prefer the [Spotlight desktop app](https://spotlightjs.com/) over the Docker container, stop the container first to free port `8969`:
 
 ```bash
-docker compose --profile spotlight up -d
+docker compose -p tx-agent-kit stop spotlight
 ```
 
-This starts the `ghcr.io/getsentry/spotlight:latest` image on port `8969`. Use the `spotlight` profile to avoid port conflicts with the native app.
-
-### 3. Run your apps
-
-```bash
-pnpm dev
-```
-
-All three layers (web, API, worker) automatically detect `SENTRY_SPOTLIGHT=true` and forward errors and traces to `http://localhost:8969`.
-
-### 4. Open the UI
-
-Navigate to `http://localhost:8969` or run:
-
-```bash
-pnpm dev:open
-```
-
-This opens Spotlight alongside the other local dev dashboards (Jaeger, Grafana, etc.).
+Then run the native app — it listens on the same port, so no config changes are needed.
 
 ## How it works
 
@@ -85,7 +62,7 @@ When Spotlight is enabled, `tracesSampleRate` is set to `1.0` (100% of traces ca
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SENTRY_SPOTLIGHT` | `false` | Master switch — set to `true` or `1` to enable |
+| `SENTRY_SPOTLIGHT` | `true` | Master switch — set to `true` or `1` to enable |
 | `SENTRY_DSN` | — | Web layer real DSN (optional) |
 | `API_SENTRY_DSN` | — | API layer real DSN (optional) |
 | `WORKER_SENTRY_DSN` | — | Worker layer real DSN (optional) |

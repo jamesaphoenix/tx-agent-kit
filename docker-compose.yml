@@ -140,6 +140,21 @@ services:
       - loki
     profiles: ['infra']
 
+  # Sentry Spotlight sidecar — local dev observability (errors, traces, logs).
+  # Uses port 8969. Starts automatically with `pnpm infra:ensure`.
+  # If you run the native Spotlight desktop app instead, stop this container
+  # first to avoid port conflicts.
+  spotlight:
+    image: ghcr.io/getsentry/spotlight:latest
+    ports:
+      - '8969:8969'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:8969 || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: ['infra']
+
   redis:
     image: redis:8.6.0-alpine3.23
     command: ['redis-server', '--appendonly', 'yes']

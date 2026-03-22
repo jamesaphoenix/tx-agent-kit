@@ -15,6 +15,7 @@ JAEGER_UI_PORT="${JAEGER_UI_PORT:-16686}"
 LOKI_PORT="${LOKI_PORT:-3100}"
 REDIS_PORT="${REDIS_PORT:-6379}"
 LANGFUSE_PORT="${LANGFUSE_PORT:-3200}"
+SPOTLIGHT_PORT="${SPOTLIGHT_PORT:-8969}"
 INFRA_READY_TIMEOUT_SECONDS="${INFRA_READY_TIMEOUT_SECONDS:-120}"
 
 cd "$PROJECT_ROOT"
@@ -67,6 +68,7 @@ check_redis() {
   [[ -n "$container_id" ]] && docker exec "$container_id" redis-cli ping >/dev/null 2>&1
 }
 check_langfuse() { check_http_endpoint "http://localhost:${LANGFUSE_PORT}/api/public/health"; }
+check_spotlight() { check_http_endpoint "http://localhost:${SPOTLIGHT_PORT}"; }
 
 service_running() {
   local service="$1"
@@ -120,7 +122,8 @@ all_healthy() {
   check_jaeger &&
   check_loki &&
   check_redis &&
-  check_langfuse
+  check_langfuse &&
+  check_spotlight
 }
 
 compose_up_with_recovery() {
@@ -183,6 +186,7 @@ assert_port_not_conflicted "jaeger" "16686" "$JAEGER_UI_PORT" "Jaeger"
 assert_port_not_conflicted "loki" "3100" "$LOKI_PORT" "Loki"
 assert_port_not_conflicted "redis" "6379" "$REDIS_PORT" "Redis"
 assert_port_not_conflicted "langfuse-web" "3000" "$LANGFUSE_PORT" "Langfuse"
+assert_port_not_conflicted "spotlight" "8969" "$SPOTLIGHT_PORT" "Spotlight"
 
 echo "Starting infrastructure via Docker Compose project '$COMPOSE_PROJECT_NAME'..."
 if ! compose_up_with_recovery; then
@@ -199,6 +203,7 @@ for ((i = 1; i <= INFRA_READY_TIMEOUT_SECONDS; i++)); do
     echo "Jaeger:       http://localhost:${JAEGER_UI_PORT}"
     echo "Redis:        localhost:${REDIS_PORT}"
     echo "Langfuse:     http://localhost:${LANGFUSE_PORT}"
+    echo "Spotlight:    http://localhost:${SPOTLIGHT_PORT}"
     exit 0
   fi
 
