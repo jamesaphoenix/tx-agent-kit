@@ -60,6 +60,7 @@
     "mcp:context7": "./scripts/mcp/context7.sh",
     "mcp:supabase": "./scripts/mcp/supabase.sh",
     "mcp:langfuse": "./scripts/mcp/langfuse.sh",
+    "mcp:spotlight": "./scripts/mcp/spotlight.sh",
     "playwright:auth:bootstrap": "node ./scripts/playwright/bootstrap-auth-storage-state.mjs",
     "mcp:codex-config": "./scripts/mcp/codex-config.sh",
     "tx": "node ./scripts/tx-cli.mjs",

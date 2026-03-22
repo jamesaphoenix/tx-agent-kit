@@ -5,15 +5,9 @@
   "type": "module",
   "files": [
     "base.json",
-    "node.json",
-    "nextjs.json",
-    "react-native.json",
     "package.json"
   ],
   "exports": {
-    "./base.json": "./base.json",
-    "./node.json": "./node.json",
-    "./nextjs.json": "./nextjs.json",
-    "./react-native.json": "./react-native.json"
+    "./base.json": "./base.json"
   }
 }
