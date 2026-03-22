@@ -49,3 +49,7 @@ Web and mobile deployments are managed outside the compose stack; configure thei
 - Mobile initializes Sentry in `apps/mobile/app/_layout.tsx` using `apps/mobile/lib/sentry.ts`.
 
 All three initializers are idempotent and safe to call multiple times.
+
+## Local Development with Spotlight
+
+For local error visibility without a Sentry account, enable [Sentry Spotlight](/docs/observability/spotlight). Set `SENTRY_SPOTLIGHT=true` in your `.env` and run the Spotlight sidecar — all three layers forward errors and traces to `http://localhost:8969`.

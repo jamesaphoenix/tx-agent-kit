@@ -1,0 +1,151 @@
+---
+title: Sentry Spotlight
+description: Local-only error and trace viewer for development — no Sentry account required
+---
+
+Sentry Spotlight is an open-source local development tool that captures errors, traces, and logs from all three app layers (web, API, worker) and displays them in a browser UI on `http://localhost:8969`. It requires no Sentry account and no remote DSN — everything stays on your machine.
+
+## Why use Spotlight?
+
+- **Zero signup**: No Sentry project or account needed for local dev.
+- **Full-stack visibility**: Errors, traces, and logs from web, API, and worker all appear in one place.
+- **AI-assisted debugging**: An MCP server exposes Spotlight data to AI agents for automated triage.
+- **No production overhead**: Spotlight is local-only. Production deployments are unaffected.
+
+## Quick start
+
+### 1. Enable Spotlight
+
+Add to your `.env`:
+
+```bash
+SENTRY_SPOTLIGHT=true
+```
+
+This is the only env variable required. If no Sentry DSN is configured for a layer, a placeholder DSN (`https://spotlight@local/0`) is used automatically so events still flow to Spotlight.
+
+### 2. Start the Spotlight sidecar
+
+**Option A — Native desktop app (preferred)**
+
+Download from [spotlightjs.com](https://spotlightjs.com/) and run it. It listens on port `8969`.
+
+**Option B — Docker**
+
+```bash
+docker compose --profile spotlight up -d
+```
+
+This starts the `ghcr.io/getsentry/spotlight:latest` image on port `8969`. Use the `spotlight` profile to avoid port conflicts with the native app.
+
+### 3. Run your apps
+
+```bash
+pnpm dev
+```
+
+All three layers (web, API, worker) automatically detect `SENTRY_SPOTLIGHT=true` and forward errors and traces to `http://localhost:8969`.
+
+### 4. Open the UI
+
+Navigate to `http://localhost:8969` or run:
+
+```bash
+pnpm dev:open
+```
+
+This opens Spotlight alongside the other local dev dashboards (Jaeger, Grafana, etc.).
+
+## How it works
+
+```
+Browser (web)  ──┐
+API server     ──┼──▶  Spotlight sidecar (port 8969)  ──▶  Browser UI
+Worker         ──┘         /stream endpoint
+```
+
+Each app layer initializes Sentry with `spotlight: true`. The Sentry SDK sends event envelopes to the Spotlight sidecar's `/stream` HTTP endpoint. Spotlight stores them in memory and renders them in its web UI.
+
+### Dual-path delivery
+
+When both Spotlight and a real Sentry DSN are configured, events flow to **both** destinations. This lets you test production Sentry integration while still seeing events locally:
+
+| `SENTRY_SPOTLIGHT` | Layer DSN set? | Events go to |
+|---------------------|----------------|--------------|
+| `false` | No | Nowhere (no-op) |
+| `false` | Yes | Remote Sentry only |
+| `true` | No | Spotlight only (placeholder DSN) |
+| `true` | Yes | Both Spotlight and remote Sentry |
+
+### Trace sampling
+
+When Spotlight is enabled, `tracesSampleRate` is set to `1.0` (100% of traces captured). When disabled, it defaults to `0` — no trace overhead in production unless explicitly configured via DSN.
+
+## Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SENTRY_SPOTLIGHT` | `false` | Master switch — set to `true` or `1` to enable |
+| `SENTRY_DSN` | — | Web layer real DSN (optional) |
+| `API_SENTRY_DSN` | — | API layer real DSN (optional) |
+| `WORKER_SENTRY_DSN` | — | Worker layer real DSN (optional) |
+
+When `SENTRY_SPOTLIGHT=true` and no layer-specific DSN is set, each layer uses the placeholder DSN `https://spotlight@local/0` so Sentry initializes and forwards events to the local sidecar.
+
+## Per-layer wiring
+
+All three layers follow the same pattern: lazy-load the Sentry module, check for Spotlight/DSN, and initialize with `spotlight: true` when enabled.
+
+| Layer | Init module | Called from |
+|-------|-------------|------------|
+| Web | `apps/web/lib/sentry.ts` | `AppProviders` component |
+| API | `apps/api/src/observability/sentry.ts` | `apps/api/src/server-lib.ts` |
+| Worker | `apps/worker/src/observability/sentry.ts` | `apps/worker/src/index.ts` |
+
+Each initializer is idempotent and safe to call multiple times. When neither Spotlight nor a DSN is configured, initialization is a no-op.
+
+## MCP server for AI debugging
+
+Spotlight exposes an MCP server for programmatic access by AI agents:
+
+```bash
+pnpm mcp:spotlight
+```
+
+This runs `@spotlightjs/spotlight mcp` against `http://localhost:8969` and provides four tools:
+
+| Tool | Purpose |
+|------|---------|
+| `search_errors` | Find exceptions and crashes |
+| `search_logs` | Find application log entries |
+| `search_traces` | Find performance traces |
+| `get_traces` | Retrieve full trace details by ID |
+
+The MCP server is configured in `.mcp.json` as `spotlight-local` and runs via `scripts/mcp/spotlight.sh`.
+
+## Integration tests
+
+The Spotlight integration is tested at `packages/infra/observability/src/spotlight.integration.test.ts`. Tests verify HTTP connectivity to port `8969`, Sentry envelope POST to `/stream`, and batch envelope handling. Tests auto-skip when the sidecar is not running.
+
+Each app layer also has its own Sentry integration tests that verify Spotlight placeholder DSN initialization and dual-path delivery.
+
+## Relationship to OpenTelemetry
+
+Spotlight and the OpenTelemetry stack (Jaeger, Prometheus, Grafana) serve complementary roles:
+
+| Concern | Tool | Signal |
+|---------|------|--------|
+| Errors and exceptions | **Spotlight** | Sentry error events |
+| Distributed traces | **Jaeger** | OTLP spans via OTEL Collector |
+| Metrics | **Prometheus + Grafana** | OTLP metrics via OTEL Collector |
+| Structured logs | **Loki + Grafana** | Stdout via Promtail |
+
+Spotlight captures Sentry-specific error context (breadcrumbs, stack traces, user context) that the OTEL pipeline does not. Use Spotlight for error triage and Jaeger for latency analysis.
+
+## Related pages
+
+| Page | Description |
+|------|-------------|
+| [Sentry (Optional)](/docs/apps/sentry) | Production Sentry setup and DSN configuration |
+| [Monitoring Stack](/docs/observability/monitoring-stack) | Jaeger, Prometheus, Grafana, and Loki |
+| [Tracing](/docs/observability/tracing) | OpenTelemetry distributed tracing |
