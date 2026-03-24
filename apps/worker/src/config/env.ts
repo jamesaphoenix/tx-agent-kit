@@ -25,6 +25,7 @@ export interface WorkerEnv {
   TEMPORAL_TLS_CLIENT_CERT_PEM: string | undefined
   TEMPORAL_TLS_CLIENT_KEY_PEM: string | undefined
   WORKER_SENTRY_DSN: string | undefined
+  SENTRY_SPOTLIGHT: boolean
   RESEND_API_KEY: string | undefined
   RESEND_FROM_EMAIL: string | undefined
   WEB_BASE_URL: string | undefined
@@ -211,6 +212,7 @@ export const getWorkerEnv = (): WorkerEnv => {
       parseOptionalStringEnv(process.env.TEMPORAL_TLS_CLIENT_KEY_PEM)
     ),
     WORKER_SENTRY_DSN: parseOptionalStringEnv(process.env.WORKER_SENTRY_DSN),
+    SENTRY_SPOTLIGHT: parseBooleanEnv(process.env.SENTRY_SPOTLIGHT, false),
     RESEND_API_KEY: parseOptionalStringEnv(process.env.RESEND_API_KEY),
     RESEND_FROM_EMAIL: parseOptionalStringEnv(process.env.RESEND_FROM_EMAIL),
     WEB_BASE_URL: parseOptionalStringEnv(process.env.WEB_BASE_URL)

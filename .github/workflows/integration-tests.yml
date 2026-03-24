@@ -39,6 +39,8 @@ env:
   STRIPE_PRO_METERED_PRICE_ID: ''
   SUBSCRIPTION_GUARD_ENABLED: 'true'
   TRUST_PROXY: 'false'
+  API_SENTRY_DSN: ''
+  SENTRY_SPOTLIGHT: 'false'
 
 jobs:
   integration:

@@ -1,5 +1,7 @@
 import { getWebEnv } from './env'
 
+const spotlightPlaceholderDsn = 'https://spotlight@local/0'
+
 let isInitialized = false
 let initializationPromise: Promise<boolean> | null = null
 
@@ -13,16 +15,20 @@ export const initializeWebSentry = (): Promise<boolean> => {
   }
 
   const env = getWebEnv()
-  if (!env.SENTRY_DSN) {
+  const spotlightEnabled = env.SENTRY_SPOTLIGHT
+  const dsn = env.SENTRY_DSN ?? (spotlightEnabled ? spotlightPlaceholderDsn : undefined)
+
+  if (!dsn) {
     return Promise.resolve(false)
   }
 
   initializationPromise = (async () => {
     const Sentry = await import('@sentry/browser')
     Sentry.init({
-      dsn: env.SENTRY_DSN,
+      dsn,
       environment: env.NODE_ENV,
-      tracesSampleRate: 0
+      tracesSampleRate: spotlightEnabled ? 1.0 : 0,
+      spotlight: spotlightEnabled
     })
 
     isInitialized = true

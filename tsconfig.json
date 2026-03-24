@@ -26,6 +26,7 @@
     { "path": "./packages/core" },
     { "path": "./packages/infra/logging" },
     { "path": "./packages/infra/observability" },
+    { "path": "./packages/infra/storage" },
     { "path": "./packages/temporal-client" },
     { "path": "./apps/api" },
     { "path": "./apps/worker" },

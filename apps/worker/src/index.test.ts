@@ -87,6 +87,7 @@ vi.mock('./config/env.js', () => ({
     TEMPORAL_TLS_CLIENT_CERT_PEM: undefined,
     TEMPORAL_TLS_CLIENT_KEY_PEM: undefined,
     WORKER_SENTRY_DSN: 'https://worker@sentry.example.com/123',
+    SENTRY_SPOTLIGHT: false,
     RESEND_API_KEY: undefined,
     RESEND_FROM_EMAIL: undefined,
     WEB_BASE_URL: undefined

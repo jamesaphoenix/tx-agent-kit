@@ -1,4 +1,4 @@
-import type { WorkerEnv } from '../config/env.js'
+import type { ApiEnv } from '../config/env.js'
 
 const spotlightPlaceholderDsn = 'https://spotlight@local/0'
 
@@ -26,7 +26,16 @@ const resolveSentryModule = async (): Promise<SentryNodeModule> => {
   return sentryModule
 }
 
-export const initializeWorkerSentry = async (env: WorkerEnv): Promise<boolean> => {
+const parseBooleanString = (value: string | undefined): boolean => {
+  if (!value) {
+    return false
+  }
+
+  const normalized = value.trim().toLowerCase()
+  return normalized === 'true' || normalized === '1'
+}
+
+export const initializeApiSentry = async (env: ApiEnv): Promise<boolean> => {
   if (isInitialized) {
     return false
   }
@@ -35,8 +44,8 @@ export const initializeWorkerSentry = async (env: WorkerEnv): Promise<boolean> =
     return initializationPromise
   }
 
-  const spotlightEnabled = env.SENTRY_SPOTLIGHT
-  const dsn = env.WORKER_SENTRY_DSN ?? (spotlightEnabled ? spotlightPlaceholderDsn : undefined)
+  const spotlightEnabled = parseBooleanString(env.SENTRY_SPOTLIGHT)
+  const dsn = env.API_SENTRY_DSN ?? (spotlightEnabled ? spotlightPlaceholderDsn : undefined)
 
   if (!dsn) {
     return false
@@ -72,7 +81,7 @@ export const initializeWorkerSentry = async (env: WorkerEnv): Promise<boolean> =
   })()
 }
 
-export const captureWorkerException = (error: unknown): void => {
+export const captureApiException = (error: unknown): void => {
   if (!isInitialized || !sentryModule) {
     return
   }
@@ -80,7 +89,7 @@ export const captureWorkerException = (error: unknown): void => {
   sentryModule.captureException(error)
 }
 
-export const flushWorkerSentry = async (): Promise<void> => {
+export const flushApiSentry = async (): Promise<void> => {
   if (!isInitialized || !sentryModule) {
     return
   }
@@ -88,7 +97,7 @@ export const flushWorkerSentry = async (): Promise<void> => {
   await sentryModule.flush(2000)
 }
 
-export const _resetWorkerSentryForTest = (): void => {
+export const _resetApiSentryForTest = (): void => {
   isInitialized = false
   initializationPromise = null
   sentryModule = null

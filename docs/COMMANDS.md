@@ -105,6 +105,17 @@
 - `PROMETHEUS_URL=http://host.docker.internal:9090 pnpm mcp:prometheus`: point containerized Prometheus MCP at host Prometheus (default).
 - `JAEGER_URL=http://localhost JAEGER_PORT=16686 pnpm mcp:jaeger`: host-mode Jaeger MCP defaults (use either host+port or URL with embedded port).
 - `LANGFUSE_BASE_URL=http://localhost:3200 pnpm mcp:langfuse -- health`: local Langfuse health check with default local API keys.
+- `pnpm mcp:spotlight`: start Spotlight MCP (connects to local Spotlight sidecar for AI-assisted debugging).
+- `SPOTLIGHT_PORT=8969 pnpm mcp:spotlight`: override Spotlight sidecar port.
+
+## Sentry Spotlight (Local Dev Observability)
+- Spotlight UI: `http://localhost:8969` (errors, traces, logs — no Sentry account needed).
+- Enable: set `SENTRY_SPOTLIGHT=true` in `.env`. Spotlight is part of `pnpm infra:ensure` Docker stack.
+- When `SENTRY_SPOTLIGHT=true` and no Sentry DSN is set, a local placeholder DSN is used automatically.
+- When `SENTRY_SPOTLIGHT=true` with a real DSN, events flow to both Spotlight and the remote Sentry project.
+- Spotlight MCP tools: `search_errors`, `search_logs`, `search_traces`, `get_traces` — exposed via `spotlight-local` MCP server.
+- `SPOTLIGHT_PORT=8969`: override Spotlight port (default 8969).
+- `pnpm dev:open` opens the Spotlight UI alongside other dev dashboards.
 
 ## AI Tracing (Langfuse)
 - `pnpm infra:ensure`: starts Langfuse as part of shared local infra.

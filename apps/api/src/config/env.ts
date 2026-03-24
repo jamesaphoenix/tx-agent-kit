@@ -23,7 +23,9 @@ const requiredApiEnvShape = {
   STRIPE_PRO_PRICE_ID: Schema.optional(Schema.String),
   STRIPE_PRO_METERED_PRICE_ID: Schema.optional(Schema.String),
   SUBSCRIPTION_GUARD_ENABLED: Schema.optional(Schema.String),
-  TRUST_PROXY: Schema.optional(Schema.String)
+  TRUST_PROXY: Schema.optional(Schema.String),
+  API_SENTRY_DSN: Schema.optional(Schema.String),
+  SENTRY_SPOTLIGHT: Schema.optional(Schema.String)
 } as const
 
 const authRefreshCookieName = authRefreshTokenKey

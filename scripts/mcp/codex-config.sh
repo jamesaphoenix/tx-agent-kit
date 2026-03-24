@@ -21,4 +21,7 @@ command = "${ROOT_DIR}/scripts/mcp/supabase.sh"
 
 [mcp_servers.playwright]
 command = "${ROOT_DIR}/scripts/mcp/playwright.sh"
+
+[mcp_servers.spotlight-local]
+command = "${ROOT_DIR}/scripts/mcp/spotlight.sh"
 TOML

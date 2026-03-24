@@ -1795,6 +1795,7 @@ const enforceNoDirectProcessEnvInSource = () => {
     'packages/infra/logging/src/env.ts',
     'packages/infra/observability/src/env.ts',
     'packages/infra/ai/src/env.ts',
+    'packages/infra/storage/src/env.ts',
     'packages/testkit/src/env.ts'
   ])
 

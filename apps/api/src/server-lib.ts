@@ -28,6 +28,7 @@ import {
 } from '@tx-agent-kit/core'
 import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
+import { flushApiSentry, initializeApiSentry } from './observability/sentry.js'
 import { Effect, Layer } from 'effect'
 import { createServer } from 'node:http'
 import { TxAgentApi } from './api.js'
@@ -141,6 +142,18 @@ export const main = (): void => {
     )
   }
 
+  void (async () => {
+    try {
+      await initializeApiSentry(env)
+    } catch (sentryError: unknown) {
+      logger.error(
+        'Failed to initialize Sentry.',
+        { host, port },
+        sentryError instanceof Error ? sentryError : new Error(String(sentryError))
+      )
+    }
+  })()
+
   let shuttingDown = false
   const shutdown = (signal: string) => {
     if (shuttingDown) {
@@ -157,7 +170,7 @@ export const main = (): void => {
 
     void (async () => {
       try {
-        await stopTelemetry()
+        await Promise.all([stopTelemetry(), flushApiSentry()])
       } catch (telemetryError) {
         logger.error(
           'Telemetry shutdown error.',

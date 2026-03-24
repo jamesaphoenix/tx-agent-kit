@@ -53,6 +53,7 @@ TEMPORAL_CLI_ADDRESS="$(read_env_or_default "TEMPORAL_CLI_ADDRESS" "127.0.0.1")"
 GRAFANA_PORT="$(read_env_or_default "GRAFANA_PORT" "3001")"
 PROMETHEUS_PORT="$(read_env_or_default "PROMETHEUS_PORT" "9090")"
 JAEGER_UI_PORT="$(read_env_or_default "JAEGER_UI_PORT" "16686")"
+SPOTLIGHT_PORT="$(read_env_or_default "SPOTLIGHT_PORT" "8969")"
 
 if [[ "$MOBILE_DASHBOARD_PATH" != /* ]]; then
   MOBILE_DASHBOARD_PATH="/${MOBILE_DASHBOARD_PATH}"
@@ -70,6 +71,7 @@ URLS=(
   "http://localhost:${GRAFANA_PORT}"
   "http://localhost:${PROMETHEUS_PORT}"
   "http://localhost:${JAEGER_UI_PORT}"
+  "http://localhost:${SPOTLIGHT_PORT}"
 )
 
 if open_urls_in_browser "Brave Browser" "${URLS[@]}"; then

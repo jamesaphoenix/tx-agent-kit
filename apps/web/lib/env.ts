@@ -8,6 +8,7 @@ export interface WebEnv {
   NODE_ENV: string
   SITE_URL: string
   SENTRY_DSN: string | undefined
+  SENTRY_SPOTLIGHT: boolean
 }
 
 let cachedEnv: WebEnv | null = null
@@ -42,7 +43,11 @@ export const getWebEnv = (): WebEnv => {
     SITE_URL:
       process.env.NEXT_PUBLIC_SITE_URL ??
       'http://localhost:3000',
-    SENTRY_DSN: parseOptionalString(process.env.NEXT_PUBLIC_SENTRY_DSN)
+    SENTRY_DSN: parseOptionalString(process.env.NEXT_PUBLIC_SENTRY_DSN),
+    SENTRY_SPOTLIGHT:
+      (process.env.NEXT_PUBLIC_SENTRY_SPOTLIGHT ?? process.env.SENTRY_SPOTLIGHT ?? '')
+        .trim()
+        .toLowerCase() === 'true'
   }
 
   return cachedEnv

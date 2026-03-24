@@ -2,35 +2,23 @@ import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  _resetWorkerSentryForTest,
-  captureWorkerException,
-  flushWorkerSentry,
-  initializeWorkerSentry
+  _resetApiSentryForTest,
+  captureApiException,
+  flushApiSentry,
+  initializeApiSentry
 } from './sentry.js'
 
 const defaultSpotlightUrl = 'http://localhost:8969'
 
-const baseEnv = {
+const baseApiEnv = {
   NODE_ENV: 'test',
+  API_PORT: '4000',
+  API_HOST: '0.0.0.0',
   DATABASE_URL: 'postgresql://localhost:5432/test',
-  OUTBOX_POLL_BATCH_SIZE: 50,
-  OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
-  OUTBOX_PRUNE_RETENTION_DAYS: 30,
-  TEMPORAL_RUNTIME_MODE: 'cli' as const,
-  TEMPORAL_ADDRESS: 'localhost:7233',
-  TEMPORAL_NAMESPACE: 'default',
-  TEMPORAL_TASK_QUEUE: 'tx-agent-kit',
-  TEMPORAL_API_KEY: undefined,
-  TEMPORAL_TLS_ENABLED: false,
-  TEMPORAL_TLS_SERVER_NAME: undefined,
-  TEMPORAL_TLS_CA_CERT_PEM: undefined,
-  TEMPORAL_TLS_CLIENT_CERT_PEM: undefined,
-  TEMPORAL_TLS_CLIENT_KEY_PEM: undefined,
-  WORKER_SENTRY_DSN: undefined,
-  SENTRY_SPOTLIGHT: false,
-  RESEND_API_KEY: undefined,
-  RESEND_FROM_EMAIL: undefined,
-  WEB_BASE_URL: undefined
+  AUTH_SECRET: 'test-secret-at-least-32-characters-long',
+  API_CORS_ORIGIN: 'http://localhost:3000',
+  API_SENTRY_DSN: undefined as string | undefined,
+  SENTRY_SPOTLIGHT: undefined as string | undefined
 }
 
 const probeSpotlight = async (): Promise<boolean> => {
@@ -92,30 +80,30 @@ const startLocalSentrySink = async (): Promise<{
   }
 }
 
-describe('worker sentry integration', () => {
+describe('api sentry integration', () => {
   beforeEach(() => {
-    _resetWorkerSentryForTest()
+    _resetApiSentryForTest()
   })
 
-  it('is a no-op when WORKER_SENTRY_DSN is not configured and spotlight is off', async () => {
-    const initialized = await initializeWorkerSentry(baseEnv)
+  it('is a no-op when API_SENTRY_DSN is not configured and spotlight is off', async () => {
+    const initialized = await initializeApiSentry(baseApiEnv)
 
-    captureWorkerException(new Error('no-op'))
-    await flushWorkerSentry()
+    captureApiException(new Error('no-op'))
+    await flushApiSentry()
 
     expect(initialized).toBe(false)
   })
 
-  it('initializes and flushes against a local sink when WORKER_SENTRY_DSN is configured', async () => {
+  it('initializes and flushes against a local sink when API_SENTRY_DSN is configured', async () => {
     const sentrySink = await startLocalSentrySink()
     try {
-      const initialized = await initializeWorkerSentry({
-        ...baseEnv,
-        WORKER_SENTRY_DSN: sentrySink.dsn
+      const initialized = await initializeApiSentry({
+        ...baseApiEnv,
+        API_SENTRY_DSN: sentrySink.dsn
       })
 
-      captureWorkerException(new Error('integration-capture'))
-      await flushWorkerSentry()
+      captureApiException(new Error('integration-capture'))
+      await flushApiSentry()
 
       expect(initialized).toBe(true)
       expect(sentrySink.getRequestCount()).toBeGreaterThan(0)
@@ -125,33 +113,33 @@ describe('worker sentry integration', () => {
   })
 
   it('initializes with spotlight placeholder DSN when SENTRY_SPOTLIGHT is true and no DSN', async () => {
-    const initialized = await initializeWorkerSentry({
-      ...baseEnv,
-      SENTRY_SPOTLIGHT: true
+    const initialized = await initializeApiSentry({
+      ...baseApiEnv,
+      SENTRY_SPOTLIGHT: 'true'
     })
 
     expect(initialized).toBe(true)
   })
 })
 
-describe('worker sentry spotlight integration', () => {
+describe('api sentry spotlight integration', () => {
   beforeEach(() => {
-    _resetWorkerSentryForTest()
+    _resetApiSentryForTest()
   })
 
   it.skipIf(!spotlightReachable)(
     'initializes with spotlight and delivers events to real sidecar',
     async () => {
-      const initialized = await initializeWorkerSentry({
-        ...baseEnv,
-        SENTRY_SPOTLIGHT: true
+      const initialized = await initializeApiSentry({
+        ...baseApiEnv,
+        SENTRY_SPOTLIGHT: 'true'
       })
 
       expect(initialized).toBe(true)
 
-      const marker = `worker-spotlight-${randomUUID()}`
-      captureWorkerException(new Error(marker))
-      await flushWorkerSentry()
+      const marker = `api-spotlight-${randomUUID()}`
+      captureApiException(new Error(marker))
+      await flushApiSentry()
     }
   )
 
@@ -160,17 +148,17 @@ describe('worker sentry spotlight integration', () => {
     async () => {
       const sentrySink = await startLocalSentrySink()
       try {
-        const initialized = await initializeWorkerSentry({
-          ...baseEnv,
-          WORKER_SENTRY_DSN: sentrySink.dsn,
-          SENTRY_SPOTLIGHT: true
+        const initialized = await initializeApiSentry({
+          ...baseApiEnv,
+          API_SENTRY_DSN: sentrySink.dsn,
+          SENTRY_SPOTLIGHT: 'true'
         })
 
         expect(initialized).toBe(true)
 
-        const marker = `worker-spotlight-dsn-${randomUUID()}`
-        captureWorkerException(new Error(marker))
-        await flushWorkerSentry()
+        const marker = `api-spotlight-dsn-${randomUUID()}`
+        captureApiException(new Error(marker))
+        await flushApiSentry()
 
         expect(sentrySink.getRequestCount()).toBeGreaterThan(0)
       } finally {
