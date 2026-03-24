@@ -83,7 +83,41 @@ The deploy script:
 1. Renders env from `op inject`
 2. Injects `API_IMAGE` and `WORKER_IMAGE`
 3. Runs `docker compose pull` and `up -d --remove-orphans`
-4. Runs smoke checks when `RUN_SMOKE=1` (default)
+4. Optionally reconciles/checks Cloudflare tunnel when `RUN_TUNNEL_RECONCILE=1`
+5. Runs smoke checks when `RUN_SMOKE=1` (default)
+
+### Cloudflare Tunnel for Compose Deploys
+Tunnel integration is opt-in for compose deploys (off by default, unlike K8s which defaults to on).
+Enable it by setting `RUN_TUNNEL_RECONCILE=1` alongside the required Cloudflare env vars:
+
+```bash
+RUN_TUNNEL_RECONCILE=1 \
+CLOUDFLARE_TUNNEL_ID=<tunnel-uuid> \
+CLOUDFLARE_TUNNEL_CREDENTIALS_FILE=<path-to-credentials.json> \
+CLOUDFLARE_TUNNEL_HOST_STAGING=api-staging.example.com \
+pnpm deploy:staging deploy/artifacts/images-<git-sha>.env
+```
+
+Compose upstream defaults to `http://127.0.0.1:4000` (the mapped API port).
+K8s upstream defaults to `http://127.0.0.1:32080` (staging) / `32081` (prod).
+
+Control variables:
+- `RUN_TUNNEL_RECONCILE=1` enables tunnel config reconciliation (requires `cloudflared` CLI).
+- `TUNNEL_RECONCILE_MODE` overrides reconcile mode (defaults to the deploy target env).
+- `RUN_TUNNEL_CHECK=0` reconciles tunnel but skips health check.
+- `RUN_TUNNEL_CHECK_SOFT_FAIL=1` keeps deploy green when tunnel health check fails.
+- `TUNNEL_CHECK_MODE` overrides health check mode (defaults to the deploy target env).
+
+### Compose Deploy Integration Tests
+Automated tests validate the compose deployment path:
+
+```bash
+# Fast tests (compose file validation, script argument handling, image builds):
+pnpm test:integration --filter testkit
+
+# Full E2E (requires 1Password session, Docker, valid env template):
+RUN_COMPOSE_E2E=1 pnpm test:integration --filter testkit
+```
 
 ## Deploy Kubernetes (Mac `k3s` + Optional GKE)
 Deploy from the same image artifact used by Compose:

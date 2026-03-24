@@ -13,6 +13,7 @@ export interface TestkitEnv {
   RUN_LIVE_TUNNEL_INTEGRATION: string | undefined
   RUN_LIVE_TUNNEL_NEGATIVE_INTEGRATION: string | undefined
   LIVE_TUNNEL_MODE: string | undefined
+  RUN_COMPOSE_E2E: string | undefined
 }
 
 export const getTestkitEnv = (): TestkitEnv => {
@@ -32,7 +33,8 @@ export const getTestkitEnv = (): TestkitEnv => {
     RUN_LIVE_TUNNEL_INTEGRATION: process.env.RUN_LIVE_TUNNEL_INTEGRATION,
     RUN_LIVE_TUNNEL_NEGATIVE_INTEGRATION:
       process.env.RUN_LIVE_TUNNEL_NEGATIVE_INTEGRATION,
-    LIVE_TUNNEL_MODE: process.env.LIVE_TUNNEL_MODE
+    LIVE_TUNNEL_MODE: process.env.LIVE_TUNNEL_MODE,
+    RUN_COMPOSE_E2E: process.env.RUN_COMPOSE_E2E
   }
 }
 

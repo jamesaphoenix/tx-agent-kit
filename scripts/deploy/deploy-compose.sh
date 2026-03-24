@@ -77,8 +77,30 @@ op inject -f -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
 export DEPLOY_ENV_FILE="$RENDERED_ENV_FILE"
 
 echo "Deploying $TARGET_ENV with compose file $COMPOSE_FILE"
-docker compose -f "$COMPOSE_FILE" --env-file "$RENDERED_ENV_FILE" pull
+if [[ "${SKIP_PULL:-0}" != "1" ]]; then
+  docker compose -f "$COMPOSE_FILE" --env-file "$RENDERED_ENV_FILE" pull
+fi
 docker compose -f "$COMPOSE_FILE" --env-file "$RENDERED_ENV_FILE" up -d --remove-orphans
+
+# ── Cloudflare tunnel reconcile + check ──────────────────────
+# Opt-in for compose deploys (default off). K8s path defaults to on.
+# Set RUN_TUNNEL_RECONCILE=1 to enable. Requires cloudflared, CLOUDFLARE_TUNNEL_ID,
+# and CLOUDFLARE_TUNNEL_CREDENTIALS_FILE.
+if [[ "${RUN_TUNNEL_RECONCILE:-0}" == "1" ]]; then
+  reconcile_mode="${TUNNEL_RECONCILE_MODE:-$TARGET_ENV}"
+  check_mode="${TUNNEL_CHECK_MODE:-$TARGET_ENV}"
+  "$SCRIPT_DIR/tunnel/reconcile.sh" "$reconcile_mode"
+  if [[ "${RUN_TUNNEL_CHECK:-1}" == "1" ]]; then
+    if ! "$SCRIPT_DIR/tunnel/check.sh" "$check_mode"; then
+      if [[ "${RUN_TUNNEL_CHECK_SOFT_FAIL:-0}" == "1" ]]; then
+        echo "Cloudflare tunnel health check failed; continuing because RUN_TUNNEL_CHECK_SOFT_FAIL=1"
+      else
+        echo "Cloudflare tunnel health check failed"
+        exit 1
+      fi
+    fi
+  fi
+fi
 
 if [[ "${RUN_SMOKE:-1}" == "1" ]]; then
   API_EXTERNAL_BASE_URL=""

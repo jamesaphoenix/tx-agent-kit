@@ -1,6 +1,7 @@
 {
   "extends": "./packages/tooling/typescript-config/base.json",
   "compilerOptions": {
+    "ignoreDeprecations": "5.0",
     "baseUrl": ".",
     "paths": {
       "@tx-agent-kit/ai": ["packages/infra/ai/src/index.ts"],
@@ -11,6 +12,7 @@
       "@tx-agent-kit/logging": ["packages/infra/logging/src/index.ts"],
       "@tx-agent-kit/observability": ["packages/infra/observability/src/index.ts"],
       "@tx-agent-kit/observability/*": ["packages/infra/observability/src/*"],
+      "@tx-agent-kit/storage": ["packages/infra/storage/src/index.ts"],
       "@tx-agent-kit/testkit": ["packages/testkit/src/index.ts"],
       "@tx-agent-kit/temporal-client": ["packages/temporal-client/src/index.ts"]
     }
