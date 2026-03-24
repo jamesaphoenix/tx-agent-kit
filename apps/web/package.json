@@ -28,7 +28,7 @@
     "nuqs": "^2.8.9",
     "react": "19.2.0",
     "react-admin": "^5.14.3",
-    "react-dom": "19.2.0",
+    "react-dom": "19.2.4",
     "react-select": "^5.10.2",
     "sonner": "^2.0.7"
   },
