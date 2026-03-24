@@ -411,7 +411,7 @@ jobs:
           node-version: 22
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
       - name: Install 1Password CLI
-        uses: 1password/install-cli-action@143a85f84a90555d121cde2ff5872e393a47ab9f
+        uses: 1password/install-cli-action@9a0c9dd934086b7ab1d90115d455bda1c53c2bdb
       - name: Verify 1Password CLI access
         shell: bash
         env:
