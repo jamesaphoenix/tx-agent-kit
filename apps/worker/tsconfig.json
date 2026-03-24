@@ -9,6 +9,7 @@
     { "path": "../../packages/infra/db" },
     { "path": "../../packages/infra/logging" },
     { "path": "../../packages/infra/observability" },
-    { "path": "../../packages/temporal-client" }
+    { "path": "../../packages/temporal-client" },
+    { "path": "../../packages/infra/storage" }
   ]
 }

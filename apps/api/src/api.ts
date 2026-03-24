@@ -295,6 +295,43 @@ const StripeWebhookResponse = Schema.Struct({
 const PermissionMapResponse = rolePermissionMapSchema
 const GoogleAuthCallbackResponse = authResponseSchema
 
+const GenerateUploadUrlBody = Schema.Struct({
+  key: Schema.String,
+  contentType: Schema.String,
+  expiresIn: Schema.optional(Schema.Number)
+})
+
+const GenerateDownloadUrlBody = Schema.Struct({
+  key: Schema.String,
+  expiresIn: Schema.optional(Schema.Number)
+})
+
+const DeleteObjectBody = Schema.Struct({
+  key: Schema.String
+})
+
+const ListObjectsParams = Schema.Struct({
+  prefix: Schema.optional(Schema.String)
+})
+
+const PresignedUrlResponse = Schema.Struct({
+  url: Schema.String
+})
+
+const ListObjectsResponse = Schema.Struct({
+  keys: Schema.Array(Schema.String)
+})
+
+const ObjectMetadataResponse = Schema.Struct({
+  key: Schema.String,
+  contentType: Schema.NullOr(Schema.String),
+  contentLength: Schema.NullOr(Schema.Number),
+  lastModified: Schema.NullOr(Schema.String),
+  etag: Schema.NullOr(Schema.String)
+})
+
+const ObjectKeyParam = HttpApiSchema.param('key', Schema.String)
+
 const MyPermissionsResponse = Schema.Struct({
   organizationId: Schema.optional(Schema.String),
   role: Schema.optional(Schema.Literal(...orgMemberRoles)),
@@ -445,6 +482,32 @@ export const PermissionsGroup = HttpApiGroup.make('permissions')
       .addSuccess(MyPermissionsResponse)
   )
 
+export const StorageGroup = HttpApiGroup.make('storage')
+  .add(
+    HttpApiEndpoint.post('generateUploadUrl', '/v1/storage/upload-url')
+      .setPayload(GenerateUploadUrlBody)
+      .addSuccess(PresignedUrlResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('generateDownloadUrl', '/v1/storage/download-url')
+      .setPayload(GenerateDownloadUrlBody)
+      .addSuccess(PresignedUrlResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('deleteObject', '/v1/storage/delete')
+      .setPayload(DeleteObjectBody)
+      .addSuccess(DeletedResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('listObjects', '/v1/storage/objects')
+      .setUrlParams(ListObjectsParams)
+      .addSuccess(ListObjectsResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getObjectMetadata')`/v1/storage/objects/${ObjectKeyParam}/metadata`
+      .addSuccess(ObjectMetadataResponse)
+  )
+
 export class TxAgentApi extends HttpApi.make('tx-agent-kit')
   .addError(BadRequest, { status: 400 })
   .addError(Unauthorized, { status: 401 })
@@ -457,4 +520,5 @@ export class TxAgentApi extends HttpApi.make('tx-agent-kit')
   .add(OrganizationsGroup)
   .add(TeamsGroup)
   .add(BillingGroup)
-  .add(PermissionsGroup) {}
+  .add(PermissionsGroup)
+  .add(StorageGroup) {}

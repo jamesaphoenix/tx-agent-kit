@@ -38,8 +38,8 @@
     "@testing-library/user-event": "^14.6.1",
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
-    "@types/react": "~18.3.12",
-    "@types/react-dom": "~18.3.0",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
     "jsdom": "^28.1.0",
     "orval": "^8.1.0"
   }

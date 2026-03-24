@@ -143,4 +143,7 @@ const makeStorageService = (): StorageService => {
   }
 }
 
-export const StorageLive = Layer.succeed(Storage, makeStorageService())
+export const StorageLive = Layer.effect(
+  Storage,
+  Effect.sync(() => makeStorageService())
+)

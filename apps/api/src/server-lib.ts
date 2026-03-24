@@ -47,6 +47,8 @@ import { HealthLive } from './routes/health.js'
 import { OrganizationsLive } from './routes/organizations.js'
 import { PermissionsLive } from './routes/permissions.js'
 import { TeamsLive } from './routes/teams.js'
+import { StorageLive as StorageRouteLive } from './routes/storage.js'
+import { StorageLive as StorageServiceLive } from '@tx-agent-kit/storage'
 
 const logger = createLogger('tx-agent-kit-api').child('server')
 
@@ -56,7 +58,8 @@ const ApiLive = HttpApiBuilder.api(TxAgentApi).pipe(
   Layer.provide(OrganizationsLive),
   Layer.provide(TeamsLive),
   Layer.provide(BillingLive),
-  Layer.provide(PermissionsLive)
+  Layer.provide(PermissionsLive),
+  Layer.provide(StorageRouteLive)
 )
 
 const MiddlewareLive = Layer.mergeAll(
@@ -98,7 +101,8 @@ const PortDependenciesLive = Layer.mergeAll(
   BillingGuardPortLive,
   ClockPortLive,
   TeamStorePortLive,
-  TeamOrganizationMembershipPortLive
+  TeamOrganizationMembershipPortLive,
+  StorageServiceLive
 )
 
 const ServiceDependenciesLive = Layer.mergeAll(

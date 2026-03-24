@@ -1,5 +1,6 @@
 import { createLogger } from '@tx-agent-kit/logging'
 import { domainEventsRepository } from '@tx-agent-kit/db'
+import { Storage, StorageLive } from '@tx-agent-kit/storage'
 import { Effect } from 'effect'
 import { getWorkerEnv } from './config/env.js'
 
@@ -198,6 +199,56 @@ export const activities = {
       )
       throw error
     }
+  }
+}
+
+export interface StorageDeleteResult {
+  deleted: number
+  failed: number
+}
+
+const runStorageEffect = <A>(effect: Effect.Effect<A, unknown, Storage>): Promise<A> =>
+  Effect.runPromise(
+    effect.pipe(
+      Effect.provide(StorageLive),
+      Effect.mapError((e) => {
+        const message = e instanceof Error ? e.message : String(e)
+        return new Error(message, { cause: e instanceof Error ? e : undefined })
+      })
+    )
+  )
+
+export const storageActivities = {
+  deleteStorageObjects: async (keys: ReadonlyArray<string>): Promise<StorageDeleteResult> => {
+    let deleted = 0
+    let failed = 0
+
+    for (const key of keys) {
+      try {
+        await runStorageEffect(
+          Effect.gen(function* () {
+            const storage = yield* Storage
+            yield* storage.deleteObject(key)
+          })
+        )
+        deleted++
+      } catch (error) {
+        failed++
+        logger.error('Failed to delete storage object.', { key }, error instanceof Error ? error : new Error(String(error)))
+      }
+    }
+
+    logger.info('Storage object deletion complete.', { deleted, failed, total: keys.length })
+    return { deleted, failed }
+  },
+
+  listStorageObjects: async (prefix: string): Promise<ReadonlyArray<string>> => {
+    return await runStorageEffect(
+      Effect.gen(function* () {
+        const storage = yield* Storage
+        return yield* storage.listObjects(prefix)
+      })
+    )
   }
 }
 
