@@ -7,6 +7,7 @@
     "organizations",
     "teams",
     "billing",
-    "permissions"
+    "permissions",
+    "storage"
   ]
 }

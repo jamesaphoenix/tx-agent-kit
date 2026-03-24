@@ -1,0 +1,140 @@
+---
+title: Storage API Endpoints
+description: HTTP endpoints for generating presigned URLs, listing objects, and managing stored files
+---
+
+All storage endpoints require authentication via a Bearer token in the `Authorization` header.
+
+## `POST /v1/storage/upload-url`
+
+Generate a presigned URL for uploading a file directly to R2.
+
+### Request body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | `string` | Yes | Object key (path) in the bucket |
+| `contentType` | `string` | Yes | MIME type of the file being uploaded |
+| `expiresIn` | `number` | No | URL expiry in seconds (default: 3600) |
+
+### Response
+
+```json
+{
+  "url": "https://....r2.cloudflarestorage.com/octospark-dev/org-123/avatar.png?X-Amz-Signature=..."
+}
+```
+
+### Client usage
+
+```typescript
+// 1. Get presigned URL from API
+const { url } = await api.post('/v1/storage/upload-url', {
+  key: 'org-123/avatar.png',
+  contentType: 'image/png'
+})
+
+// 2. Upload directly to R2
+await fetch(url, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'image/png' },
+  body: fileBlob
+})
+```
+
+## `POST /v1/storage/download-url`
+
+Generate a presigned URL for downloading a file from R2.
+
+### Request body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | `string` | Yes | Object key to download |
+| `expiresIn` | `number` | No | URL expiry in seconds (default: 3600) |
+
+### Response
+
+```json
+{
+  "url": "https://....r2.cloudflarestorage.com/octospark-dev/org-123/avatar.png?X-Amz-Signature=..."
+}
+```
+
+## `POST /v1/storage/delete`
+
+Delete an object from the bucket.
+
+### Request body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | `string` | Yes | Object key to delete |
+
+### Response
+
+```json
+{
+  "deleted": true
+}
+```
+
+## `GET /v1/storage/objects`
+
+List objects in the bucket, optionally filtered by prefix.
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `prefix` | query | `string` | No | Filter objects by key prefix |
+
+### Response
+
+```json
+{
+  "keys": [
+    "org-123/avatar.png",
+    "org-123/banner.jpg"
+  ]
+}
+```
+
+## `GET /v1/storage/objects/{key}/metadata`
+
+Get metadata for a specific object.
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `key` | path | `string` | Yes | Object key |
+
+### Response
+
+```json
+{
+  "key": "org-123/avatar.png",
+  "contentType": "image/png",
+  "contentLength": 204800,
+  "lastModified": "2026-03-24T12:00:00.000Z",
+  "etag": "\"abc123\""
+}
+```
+
+## Error responses
+
+All endpoints return standard error responses:
+
+| Status | Description |
+|--------|-------------|
+| `400` | Invalid request or storage operation failed |
+| `401` | Missing or invalid Bearer token |
+| `500` | Internal server error |
+
+## Related pages
+
+| Page | Description |
+|------|-------------|
+| [Storage Overview](/docs/storage) | Architecture and upload flow |
+| [Configuration](/docs/storage/configuration) | Environment variables and credentials |

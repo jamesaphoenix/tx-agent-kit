@@ -1,0 +1,89 @@
+---
+title: Storage
+description: Cloudflare R2 object storage with S3-compatible presigned URL generation and Effect service layer.
+---
+
+# Storage (`packages/infra/storage`)
+
+The storage package provides an Effect service layer over Cloudflare R2 using the AWS S3 SDK. It handles presigned URL generation, object deletion, listing, and metadata retrieval.
+
+## Usage
+
+```typescript
+import { Storage, StorageLive } from '@tx-agent-kit/storage'
+import { Effect } from 'effect'
+
+const program = Effect.gen(function* () {
+  const storage = yield* Storage
+
+  const uploadUrl = yield* storage.generateUploadUrl('org/file.png', 'image/png')
+  const downloadUrl = yield* storage.generateDownloadUrl('org/file.png')
+  const keys = yield* storage.listObjects('org/')
+  const metadata = yield* storage.getObjectMetadata('org/file.png')
+  yield* storage.deleteObject('org/old-file.png')
+
+  return { uploadUrl, downloadUrl, keys, metadata }
+})
+
+// Provide the live layer
+Effect.runPromise(program.pipe(Effect.provide(StorageLive)))
+```
+
+## Service interface
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `generateUploadUrl` | `key`, `contentType`, `expiresIn?` | `string` | Presigned PUT URL |
+| `generateDownloadUrl` | `key`, `expiresIn?` | `string` | Presigned GET URL |
+| `deleteObject` | `key` | `void` | Delete a stored object |
+| `listObjects` | `prefix?` | `readonly string[]` | List object keys |
+| `getObjectMetadata` | `key` | `ObjectMetadata` | Content type, size, etag, last modified |
+
+All methods return `Effect.Effect<T, StorageError>`.
+
+## Effect integration
+
+The package exports a `Storage` Context.Tag and a `StorageLive` Layer:
+
+```typescript
+// In server-lib.ts or activity code
+import { StorageLive } from '@tx-agent-kit/storage'
+
+// Add to port dependencies
+const PortDependenciesLive = Layer.mergeAll(
+  // ... other ports
+  StorageLive
+)
+```
+
+`StorageLive` uses `Layer.effect` for lazy initialization. The S3 client is created on first use, not at import time. This allows test files to import the package without needing R2 credentials.
+
+## Environment configuration
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `R2_ACCESS_KEY_ID` | Yes | none | S3-compatible access key |
+| `R2_SECRET_ACCESS_KEY` | Yes | none | S3-compatible secret key |
+| `R2_BUCKET_NAME` | No | `octospark-dev` | Target bucket |
+| `R2_ENDPOINT` | No | R2 S3 API URL | S3 endpoint |
+| `R2_ACCOUNT_ID` | No | Account ID | Cloudflare account |
+
+## Testing
+
+Unit tests mock the S3 client. Integration tests run against the real R2 dev bucket:
+
+```bash
+# Unit tests (no credentials needed)
+pnpm --filter @tx-agent-kit/storage test
+
+# Integration tests (requires R2 credentials)
+op run --env-file=.env.dev -- pnpm --filter @tx-agent-kit/storage test:integration
+```
+
+## Related pages
+
+| Page | Description |
+|------|-------------|
+| [Storage Overview](/docs/storage) | Architecture and upload flow |
+| [Storage Configuration](/docs/storage/configuration) | Environment variables and 1Password |
+| [Storage API Endpoints](/docs/storage/api-endpoints) | HTTP routes |

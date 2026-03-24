@@ -1,0 +1,76 @@
+---
+title: Worker Activities
+description: Temporal worker activities for background storage operations like cleanup and listing
+---
+
+The worker exposes storage activities for background processing tasks that should not block API requests. These activities are registered alongside the existing domain event activities in `apps/worker/src/activities.ts`.
+
+## Available activities
+
+### `deleteStorageObjects`
+
+Batch-delete objects from R2. Processes each key individually and reports success/failure counts. A single failed deletion does not abort the batch.
+
+```typescript
+const result = await deleteStorageObjects([
+  'org-123/old-avatar.png',
+  'org-123/temp-upload.jpg'
+])
+// { deleted: 2, failed: 0 }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `keys` | `ReadonlyArray<string>` | Object keys to delete |
+| Returns: `deleted` | `number` | Successfully deleted count |
+| Returns: `failed` | `number` | Failed deletion count |
+
+### `listStorageObjects`
+
+List objects matching a prefix. Useful for finding orphaned files or building cleanup batches.
+
+```typescript
+const keys = await listStorageObjects('org-123/')
+// ['org-123/avatar.png', 'org-123/banner.jpg']
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `prefix` | `string` | Key prefix to filter by |
+| Returns | `ReadonlyArray<string>` | Matching object keys |
+
+## Usage in workflows
+
+Activities are called from Temporal workflows via `proxyActivities`:
+
+```typescript
+import { proxyActivities } from '@temporalio/workflow'
+import type { storageActivities } from './activities.js'
+
+const { deleteStorageObjects, listStorageObjects } = proxyActivities<typeof storageActivities>({
+  startToCloseTimeout: '60 seconds',
+  retry: {
+    maximumAttempts: 3,
+    initialInterval: '2 seconds'
+  }
+})
+
+export async function cleanupOrganizationFiles(orgId: string): Promise<void> {
+  const keys = await listStorageObjects(`${orgId}/`)
+  if (keys.length > 0) {
+    await deleteStorageObjects(keys)
+  }
+}
+```
+
+## Error handling
+
+- `deleteStorageObjects` catches errors per-key and logs failures. The activity itself does not throw unless every deletion fails.
+- `listStorageObjects` throws if the R2 API call fails, causing Temporal to retry per the workflow's retry policy.
+
+## Related pages
+
+| Page | Description |
+|------|-------------|
+| [Storage Overview](/docs/storage) | Architecture and design decisions |
+| [Worker App](/docs/apps/worker) | Temporal worker setup and activity registration |

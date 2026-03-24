@@ -1,0 +1,85 @@
+---
+title: Storage Configuration
+description: Environment variables, 1Password setup, and R2 bucket configuration for Cloudflare storage
+---
+
+## Environment variables
+
+All storage configuration lives in `packages/infra/storage/src/env.ts`. The `getStorageEnv()` function reads these values from `process.env`.
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `R2_ACCESS_KEY_ID` | Yes | none | S3-compatible access key from R2 API token |
+| `R2_SECRET_ACCESS_KEY` | Yes | none | S3-compatible secret key from R2 API token |
+| `R2_BUCKET_NAME` | No | `octospark-dev` | Target bucket name |
+| `R2_ENDPOINT` | No | `https://{ACCOUNT_ID}.r2.cloudflarestorage.com` | S3 API endpoint |
+| `R2_ACCOUNT_ID` | No | `dc05faaea8d5f25755d84e55fe3a7d67` | Cloudflare account ID |
+
+`R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` are always required. The remaining variables have sensible defaults for the dev environment.
+
+## 1Password integration
+
+Credentials are stored in the `octospark-services` vault with separate items per environment.
+
+```bash
+# Read dev credentials
+op read "op://octospark-services/dev/R2_ACCESS_KEY_ID"
+op read "op://octospark-services/dev/R2_SECRET_ACCESS_KEY"
+
+# Inject into a command
+op run --env-file=.env.dev -- pnpm dev
+```
+
+### Vault structure
+
+| Vault | Item | Fields |
+|-------|------|--------|
+| `octospark-services` | `dev` | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`, `R2_ACCOUNT_ID` |
+| `octospark-services` | `staging` | Same fields, bucket = `octospark-staging` |
+| `octospark-services` | `prod` | Same fields, bucket = `octospark-prod` |
+
+The same R2 API token works across all environments because it is scoped to all buckets on the Cloudflare account.
+
+## R2 buckets
+
+Three buckets are provisioned via Wrangler CLI:
+
+```bash
+wrangler r2 bucket create octospark-dev
+wrangler r2 bucket create octospark-staging
+wrangler r2 bucket create octospark-prod
+```
+
+Verify with `wrangler r2 bucket list`.
+
+## Local development
+
+Set the R2 credentials in your `.env` file or inject them via 1Password before running the API or worker:
+
+```bash
+# Option 1: Add to .env (gitignored)
+R2_ACCESS_KEY_ID=your-key
+R2_SECRET_ACCESS_KEY=your-secret
+
+# Option 2: Inject from 1Password
+op run --env-file=.env.dev -- pnpm dev
+```
+
+The storage package throws a clear error if credentials are missing, guiding you to set them up.
+
+## S3 client configuration
+
+The underlying `S3Client` is configured for R2 compatibility:
+
+| Setting | Value | Reason |
+|---------|-------|--------|
+| `region` | `auto` | Required by R2 |
+| `forcePathStyle` | `true` | Ensures bucket name is in the URL path |
+| `endpoint` | `R2_ENDPOINT` env var | Points to the R2 S3 API |
+
+## Related pages
+
+| Page | Description |
+|------|-------------|
+| [Storage Overview](/docs/storage) | Architecture and design decisions |
+| [Secrets Management](/docs/infrastructure/secrets-management) | 1Password CLI patterns |
