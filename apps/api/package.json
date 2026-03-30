@@ -15,16 +15,16 @@
     "test:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
-    "@effect/platform": "^0.94.4",
-    "@effect/platform-node": "^0.104.1",
-    "@sentry/node": "^10.41.0",
+    "@effect/platform": "^0.96.0",
+    "@effect/platform-node": "^0.106.0",
+    "@sentry/node": "^10.46.0",
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/core": "workspace:*",
     "@tx-agent-kit/db": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
     "@tx-agent-kit/observability": "workspace:*",
     "@tx-agent-kit/storage": "workspace:*",
-    "effect": "^3.19.19",
+    "effect": "^3.21.0",
     "openid-client": "^5.7.1",
     "stripe": "^19.2.0"
   },
@@ -32,6 +32,6 @@
     "@tx-agent-kit/auth": "workspace:*",
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
-    "jose": "^6.1.0"
+    "jose": "^6.2.2"
   }
 }
