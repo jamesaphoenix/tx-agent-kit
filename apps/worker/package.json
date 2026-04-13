@@ -15,16 +15,16 @@
     "test:integration:temporal": "vitest run -c vitest.temporal.integration.config.ts"
   },
   "dependencies": {
-    "@sentry/node": "^10.41.0",
-    "@temporalio/client": "^1.13.1",
-    "@temporalio/common": "^1.13.1",
-    "@temporalio/worker": "^1.13.1",
-    "@temporalio/workflow": "^1.13.1",
+    "@sentry/node": "^10.48.0",
+    "@temporalio/client": "^1.16.0",
+    "@temporalio/common": "^1.16.0",
+    "@temporalio/worker": "^1.16.0",
+    "@temporalio/workflow": "^1.16.0",
     "@tx-agent-kit/db": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
     "@tx-agent-kit/observability": "workspace:*",
     "@tx-agent-kit/storage": "workspace:*",
-    "effect": "^3.19.19"
+    "effect": "^3.21.0"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*"
