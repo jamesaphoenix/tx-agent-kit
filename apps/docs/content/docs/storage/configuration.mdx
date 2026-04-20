@@ -11,7 +11,7 @@ All storage configuration lives in `packages/infra/storage/src/env.ts`. The `get
 |----------|----------|---------|-------------|
 | `R2_ACCESS_KEY_ID` | Yes | none | S3-compatible access key from R2 API token |
 | `R2_SECRET_ACCESS_KEY` | Yes | none | S3-compatible secret key from R2 API token |
-| `R2_BUCKET_NAME` | No | `octospark-dev` (shared) | Target bucket name |
+| `R2_BUCKET_NAME` | No | a shared dev bucket | Target bucket name |
 | `R2_ENDPOINT` | No | derived from `R2_ACCOUNT_ID` | S3 API endpoint, auto-composed as `https://{ACCOUNT_ID}.r2.cloudflarestorage.com` when unset |
 | `R2_ACCOUNT_ID` | No | (local dev default) | Cloudflare account ID |
 
@@ -19,20 +19,22 @@ All storage configuration lives in `packages/infra/storage/src/env.ts`. The `get
 
 ## 1Password integration
 
-`tx-agent-kit` uses a **two-vault split** (see [Secrets Management](/docs/infrastructure/secrets-management#vault-organization) for the full rule):
+Secrets use a **two-vault split** (see [Secrets Management](/docs/infrastructure/secrets-management#vault-organization) for the full rule):
 
-- **`api-keys` (account-level)** — `R2_ACCOUNT_ID` lives here because it identifies the Cloudflare account itself and is shared across every project.
-- **`octospark-services/<env>` (per-project, bucket-scoped)** — `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` live here because R2 IAM credentials are bucket-scoped and should stay with the owning project. Until `tx-agent-kit` provisions its own bucket, it shares the `octospark-dev` bucket and borrows those credentials.
+- **`api-keys` (account-level)** — `R2_ACCOUNT_ID` lives here because it identifies the Cloudflare account itself and is shared across every project that uses R2 on the same account.
+- **`<project-services>/<env>` (per-project, bucket-scoped)** — `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` live here because R2 IAM tokens are bucket-scoped and should stay with the project that owns the bucket.
+
+New apps bootstrapped from this boilerplate commonly borrow an existing bucket's credentials until they provision their own. In that case the `<project-services>` vault referenced in the `.env.example` is the **bucket owner's** vault, not the new app's — that's intentional. When the new app creates its own bucket, it rotates to its own vault.
 
 ```bash
 # Read the centralized account ID
 op read "op://api-keys/Cloudflare/account_id"
 
-# Read the shared dev credentials (bucket-scoped)
-op read "op://octospark-services/dev/R2_ACCESS_KEY_ID"
-op read "op://octospark-services/dev/R2_SECRET_ACCESS_KEY"
+# Read the bucket-owning project's credentials
+op read "op://<project-services>/dev/R2_ACCESS_KEY_ID"
+op read "op://<project-services>/dev/R2_SECRET_ACCESS_KEY"
 
-# Generate a local .env from the template
+# Generate a local .env from the committed template
 op inject -i .env.example -o .env
 ```
 
@@ -40,25 +42,27 @@ op inject -i .env.example -o .env
 
 ```bash
 R2_ACCOUNT_ID=op://api-keys/Cloudflare/account_id
-R2_ACCESS_KEY_ID=op://octospark-services/dev/R2_ACCESS_KEY_ID
-R2_SECRET_ACCESS_KEY=op://octospark-services/dev/R2_SECRET_ACCESS_KEY
-R2_BUCKET_NAME=octospark-dev
+R2_ACCESS_KEY_ID=op://<project-services>/dev/R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY=op://<project-services>/dev/R2_SECRET_ACCESS_KEY
+R2_BUCKET_NAME=<bucket-name>
 R2_ENDPOINT=
 ```
 
+Check the actual `.env.example` at the root of the repo for the concrete vault and bucket in use today.
+
 ## Bucket strategy
 
-| Bucket | Status | Owner |
-|--------|--------|-------|
-| `octospark-dev` | Shared across projects for local dev + CI integration tests | Shared |
-| `tx-agent-kit-staging` | Not yet provisioned | — |
-| `tx-agent-kit-prod` | Not yet provisioned | — |
+| Bucket | When to use |
+|--------|-------------|
+| An existing shared dev bucket | Day-one local dev + CI integration tests while you're still spiking features |
+| `<your-app>-staging` | A project-owned bucket for staging deploys |
+| `<your-app>-prod` | A project-owned bucket for production |
 
-Before going to production, provision project-specific buckets via Wrangler and rotate into `tx-agent-kit-services/<env>` credentials:
+Before going to production, provision project-specific buckets via Wrangler and rotate into `<your-app>-services/<env>` credentials:
 
 ```bash
-wrangler r2 bucket create tx-agent-kit-staging
-wrangler r2 bucket create tx-agent-kit-prod
+wrangler r2 bucket create <your-app>-staging
+wrangler r2 bucket create <your-app>-prod
 ```
 
 Verify with `wrangler r2 bucket list`.
