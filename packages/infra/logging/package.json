@@ -12,7 +12,7 @@
     "test": "vitest run -c vitest.config.ts"
   },
   "dependencies": {
-    "@opentelemetry/api-logs": "^0.214.0"
+    "@opentelemetry/api-logs": "^0.215.0"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*"

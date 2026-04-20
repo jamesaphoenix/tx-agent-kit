@@ -16,7 +16,7 @@
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/db": "workspace:*",
     "@tx-agent-kit/storage": "workspace:*",
-    "effect": "^3.21.0"
+    "effect": "^3.21.1"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*"

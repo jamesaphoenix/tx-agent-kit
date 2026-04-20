@@ -15,7 +15,7 @@
     "test:integration:temporal": "vitest run -c vitest.temporal.integration.config.ts"
   },
   "dependencies": {
-    "@sentry/node": "^10.48.0",
+    "@sentry/node": "^10.49.0",
     "@temporalio/client": "^1.16.0",
     "@temporalio/common": "^1.16.0",
     "@temporalio/worker": "^1.16.0",
@@ -28,7 +28,7 @@
     "@tx-agent-kit/observability": "workspace:*",
     "@tx-agent-kit/storage": "workspace:*",
     "@tx-agent-kit/stripe": "workspace:*",
-    "effect": "^3.21.0",
+    "effect": "^3.21.1",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
