@@ -11,41 +11,52 @@ All storage configuration lives in `packages/infra/storage/src/env.ts`. The `get
 |----------|----------|---------|-------------|
 | `R2_ACCESS_KEY_ID` | Yes | none | S3-compatible access key from R2 API token |
 | `R2_SECRET_ACCESS_KEY` | Yes | none | S3-compatible secret key from R2 API token |
-| `R2_BUCKET_NAME` | No | `tx-agent-kit-dev` | Target bucket name |
-| `R2_ENDPOINT` | No | `https://{ACCOUNT_ID}.r2.cloudflarestorage.com` | S3 API endpoint |
-| `R2_ACCOUNT_ID` | No | `your-cloudflare-account-id` | Cloudflare account ID |
+| `R2_BUCKET_NAME` | No | `octospark-dev` (shared) | Target bucket name |
+| `R2_ENDPOINT` | No | derived from `R2_ACCOUNT_ID` | S3 API endpoint, auto-composed as `https://{ACCOUNT_ID}.r2.cloudflarestorage.com` when unset |
+| `R2_ACCOUNT_ID` | No | (local dev default) | Cloudflare account ID |
 
-`R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` are always required. The remaining variables have sensible defaults for the dev environment.
+`R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` are always required. `R2_ENDPOINT` is derived from `R2_ACCOUNT_ID` at runtime when not explicitly set.
 
 ## 1Password integration
 
-Credentials are stored in the `tx-agent-kit-services` vault with separate items per environment.
+`tx-agent-kit` uses a **two-vault split** (see [Secrets Management](/docs/infrastructure/secrets-management#vault-organization) for the full rule):
+
+- **`api-keys` (account-level)** — `R2_ACCOUNT_ID` lives here because it identifies the Cloudflare account itself and is shared across every project.
+- **`octospark-services/<env>` (per-project, bucket-scoped)** — `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` live here because R2 IAM credentials are bucket-scoped and should stay with the owning project. Until `tx-agent-kit` provisions its own bucket, it shares the `octospark-dev` bucket and borrows those credentials.
 
 ```bash
-# Read dev credentials
-op read "op://tx-agent-kit-services/dev/R2_ACCESS_KEY_ID"
-op read "op://tx-agent-kit-services/dev/R2_SECRET_ACCESS_KEY"
+# Read the centralized account ID
+op read "op://api-keys/Cloudflare/account_id"
 
-# Inject into a command
-op run --env-file=.env.dev -- pnpm dev
+# Read the shared dev credentials (bucket-scoped)
+op read "op://octospark-services/dev/R2_ACCESS_KEY_ID"
+op read "op://octospark-services/dev/R2_SECRET_ACCESS_KEY"
+
+# Generate a local .env from the template
+op inject -i .env.example -o .env
 ```
 
-### Vault structure
-
-| Vault | Item | Fields |
-|-------|------|--------|
-| `tx-agent-kit-services` | `dev` | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`, `R2_ACCOUNT_ID` |
-| `tx-agent-kit-services` | `staging` | Same fields, bucket = `tx-agent-kit-staging` |
-| `tx-agent-kit-services` | `prod` | Same fields, bucket = `tx-agent-kit-prod` |
-
-The same R2 API token works across all environments because it is scoped to all buckets on the Cloudflare account.
-
-## R2 buckets
-
-Three buckets are provisioned via Wrangler CLI:
+### Matching references in `.env.example`
 
 ```bash
-wrangler r2 bucket create tx-agent-kit-dev
+R2_ACCOUNT_ID=op://api-keys/Cloudflare/account_id
+R2_ACCESS_KEY_ID=op://octospark-services/dev/R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY=op://octospark-services/dev/R2_SECRET_ACCESS_KEY
+R2_BUCKET_NAME=octospark-dev
+R2_ENDPOINT=
+```
+
+## Bucket strategy
+
+| Bucket | Status | Owner |
+|--------|--------|-------|
+| `octospark-dev` | Shared across projects for local dev + CI integration tests | Shared |
+| `tx-agent-kit-staging` | Not yet provisioned | — |
+| `tx-agent-kit-prod` | Not yet provisioned | — |
+
+Before going to production, provision project-specific buckets via Wrangler and rotate into `tx-agent-kit-services/<env>` credentials:
+
+```bash
 wrangler r2 bucket create tx-agent-kit-staging
 wrangler r2 bucket create tx-agent-kit-prod
 ```
@@ -57,12 +68,12 @@ Verify with `wrangler r2 bucket list`.
 Set the R2 credentials in your `.env` file or inject them via 1Password before running the API or worker:
 
 ```bash
-# Option 1: Add to .env (gitignored)
-R2_ACCESS_KEY_ID=your-key
-R2_SECRET_ACCESS_KEY=your-secret
+# Preferred: generate .env from the op:// template
+op inject -i .env.example -o .env
+pnpm dev
 
-# Option 2: Inject from 1Password
-op run --env-file=.env.dev -- pnpm dev
+# Or: inject on demand for a single command
+op run --env-file=.env -- pnpm dev
 ```
 
 The storage package throws a clear error if credentials are missing, guiding you to set them up.

@@ -1,5 +1,5 @@
 const defaultAccountId = 'dc05faaea8d5f25755d84e55fe3a7d67'
-const defaultBucketName = 'tx-agent-kit-dev'
+const defaultBucketName = 'octospark-dev'
 const testAccessKeyId = 'test-r2-access-key-id'
 const testSecretAccessKey = 'test-r2-secret-access-key'
 
