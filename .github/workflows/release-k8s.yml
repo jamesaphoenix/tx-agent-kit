@@ -60,7 +60,7 @@ jobs:
       artifact_name: ${{ steps.artifact.outputs.name }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 22
       - name: Enable pnpm
@@ -107,7 +107,7 @@ jobs:
       artifact_name: ${{ steps.artifact.outputs.name }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 22
       - name: Enable pnpm
@@ -176,7 +176,7 @@ jobs:
       RUN_TUNNEL_CHECK_SOFT_FAIL: '0'
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 22
       - name: Enable pnpm
@@ -299,7 +299,7 @@ jobs:
       RUN_TUNNEL_CHECK_SOFT_FAIL: '0'
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 22
       - name: Enable pnpm
@@ -422,7 +422,7 @@ jobs:
       GCP_BILLING_ACCOUNT_ID: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 22
       - name: Enable pnpm
