@@ -11,20 +11,20 @@ All storage configuration lives in `packages/infra/storage/src/env.ts`. The `get
 |----------|----------|---------|-------------|
 | `R2_ACCESS_KEY_ID` | Yes | none | S3-compatible access key from R2 API token |
 | `R2_SECRET_ACCESS_KEY` | Yes | none | S3-compatible secret key from R2 API token |
-| `R2_BUCKET_NAME` | No | `octospark-dev` | Target bucket name |
+| `R2_BUCKET_NAME` | No | `tx-agent-kit-dev` | Target bucket name |
 | `R2_ENDPOINT` | No | `https://{ACCOUNT_ID}.r2.cloudflarestorage.com` | S3 API endpoint |
-| `R2_ACCOUNT_ID` | No | `dc05faaea8d5f25755d84e55fe3a7d67` | Cloudflare account ID |
+| `R2_ACCOUNT_ID` | No | `your-cloudflare-account-id` | Cloudflare account ID |
 
 `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` are always required. The remaining variables have sensible defaults for the dev environment.
 
 ## 1Password integration
 
-Credentials are stored in the `octospark-services` vault with separate items per environment.
+Credentials are stored in the `tx-agent-kit-services` vault with separate items per environment.
 
 ```bash
 # Read dev credentials
-op read "op://octospark-services/dev/R2_ACCESS_KEY_ID"
-op read "op://octospark-services/dev/R2_SECRET_ACCESS_KEY"
+op read "op://tx-agent-kit-services/dev/R2_ACCESS_KEY_ID"
+op read "op://tx-agent-kit-services/dev/R2_SECRET_ACCESS_KEY"
 
 # Inject into a command
 op run --env-file=.env.dev -- pnpm dev
@@ -34,9 +34,9 @@ op run --env-file=.env.dev -- pnpm dev
 
 | Vault | Item | Fields |
 |-------|------|--------|
-| `octospark-services` | `dev` | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`, `R2_ACCOUNT_ID` |
-| `octospark-services` | `staging` | Same fields, bucket = `octospark-staging` |
-| `octospark-services` | `prod` | Same fields, bucket = `octospark-prod` |
+| `tx-agent-kit-services` | `dev` | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`, `R2_ACCOUNT_ID` |
+| `tx-agent-kit-services` | `staging` | Same fields, bucket = `tx-agent-kit-staging` |
+| `tx-agent-kit-services` | `prod` | Same fields, bucket = `tx-agent-kit-prod` |
 
 The same R2 API token works across all environments because it is scoped to all buckets on the Cloudflare account.
 
@@ -45,9 +45,9 @@ The same R2 API token works across all environments because it is scoped to all 
 Three buckets are provisioned via Wrangler CLI:
 
 ```bash
-wrangler r2 bucket create octospark-dev
-wrangler r2 bucket create octospark-staging
-wrangler r2 bucket create octospark-prod
+wrangler r2 bucket create tx-agent-kit-dev
+wrangler r2 bucket create tx-agent-kit-staging
+wrangler r2 bucket create tx-agent-kit-prod
 ```
 
 Verify with `wrangler r2 bucket list`.

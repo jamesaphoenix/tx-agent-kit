@@ -9,9 +9,13 @@ export interface WebEnv {
   SITE_URL: string
   SENTRY_DSN: string | undefined
   SENTRY_SPOTLIGHT: boolean
+  STRIPE_PUBLISHABLE_KEY: string | undefined
 }
 
 let cachedEnv: WebEnv | null = null
+
+/** Reset cached env — used by integration test setup to apply test-specific env vars. */
+export const resetWebEnvCache = (): void => { cachedEnv = null }
 
 const parseOptionalString = (value: string | undefined): string | undefined => {
   if (typeof value !== 'string') {
@@ -44,6 +48,7 @@ export const getWebEnv = (): WebEnv => {
       process.env.NEXT_PUBLIC_SITE_URL ??
       'http://localhost:3000',
     SENTRY_DSN: parseOptionalString(process.env.NEXT_PUBLIC_SENTRY_DSN),
+    STRIPE_PUBLISHABLE_KEY: parseOptionalString(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
     SENTRY_SPOTLIGHT:
       (process.env.NEXT_PUBLIC_SENTRY_SPOTLIGHT ?? process.env.SENTRY_SPOTLIGHT ?? '')
         .trim()

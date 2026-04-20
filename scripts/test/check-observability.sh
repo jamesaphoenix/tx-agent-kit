@@ -127,10 +127,18 @@ prometheus_metric_for_job_positive() {
 
 loki_has_smoke_log_for_service() {
   local service_name="$1"
+  # Loki 3.6.x dropped the `/loki/api/v1/query` (instant) endpoint for
+  # log-range queries — it now returns 404. Use `/loki/api/v1/query_range`
+  # with an explicit `start` time so the server returns every log line
+  # in the window. The smoke marker substring check lives on the JS side.
+  local start_nanos
+  start_nanos="$(node -e 'process.stdout.write(String((Date.now()-10*60*1000)*1e6))')"
   local selector="{service_name=\"${service_name}\"} |= \"${SMOKE_LOG_MARKER}\""
-  local query="sum(count_over_time(${selector} [5m]))"
   local response
-  response="$(curl_with_timeouts -sS --get "http://localhost:${LOKI_PORT}/loki/api/v1/query" --data-urlencode "query=${query}")"
+  response="$(curl_with_timeouts -sS --get "http://localhost:${LOKI_PORT}/loki/api/v1/query_range" \
+    --data-urlencode "query=${selector}" \
+    --data-urlencode "start=${start_nanos}" \
+    --data-urlencode "limit=5")"
   RESPONSE_JSON="$response" node <<'NODE'
 let payload
 try {
@@ -138,9 +146,11 @@ try {
 } catch {
   process.exit(1)
 }
-const rawValue = payload?.data?.result?.[0]?.value?.[1] ?? '0'
-const parsed = Number.parseFloat(rawValue)
-process.exit(Number.isFinite(parsed) && parsed > 0 ? 0 : 1)
+const streams = payload?.data?.result ?? []
+// query_range returns an array of streams; each stream has `values: [[ts, line], ...]`.
+// Any non-empty stream means the smoke marker was ingested.
+const hasMatch = streams.some((s) => Array.isArray(s.values) && s.values.length > 0)
+process.exit(hasMatch ? 0 : 1)
 NODE
 }
 
@@ -170,6 +180,49 @@ done
 if [[ "$readiness_failed" -ne 0 ]]; then
   exit 1
 fi
+
+# Content validation: the readiness checks above accept ANY HTTP 2xx/3xx,
+# which is true even when another process (e.g. a Next.js dev server)
+# has hijacked the port. Catch that explicitly now by asserting the
+# body shape Loki and Prometheus return from their canonical endpoints.
+# The smoke-telemetry retry loop below assumes these endpoints are
+# actually the right services; a port hijack would otherwise make the
+# loop spin until the 60s timeout with an unhelpful error message.
+validate_loki_endpoint() {
+  local body
+  body="$(curl_with_timeouts -sS -L "http://localhost:${LOKI_PORT}/ready" || true)"
+  # Loki's /ready returns exactly the string "ready\n" (see
+  # https://grafana.com/docs/loki/latest/reference/api/#identify-ready-loki-instance).
+  # Anything else means we're not talking to Loki.
+  if [[ "$body" != "ready" && "$body" != *"ready"* ]]; then
+    echo "Observability validation failed: http://localhost:${LOKI_PORT}/ready did not return Loki's 'ready' marker."
+    echo "Response body preview: $(printf '%s' "$body" | head -c 200)"
+    echo
+    echo "This usually means another process has hijacked port ${LOKI_PORT}. Check:"
+    echo "  lsof -P -iTCP:${LOKI_PORT} -sTCP:LISTEN"
+    echo
+    echo "Fix: set LOKI_HOST_PORT to a free port and restart infra."
+    echo "  LOKI_HOST_PORT=3101 pnpm infra:ensure"
+    echo "  LOKI_HOST_PORT=3101 LOKI_PORT=3101 pnpm test:integration ..."
+    exit 1
+  fi
+}
+
+validate_prometheus_endpoint() {
+  local body
+  body="$(curl_with_timeouts -sS -L "http://localhost:${PROMETHEUS_PORT}/-/healthy" || true)"
+  # Prometheus /-/healthy returns "Prometheus Server is Healthy.\n".
+  if [[ "$body" != *"Prometheus"* ]]; then
+    echo "Observability validation failed: http://localhost:${PROMETHEUS_PORT}/-/healthy did not return Prometheus' healthy marker."
+    echo "Response body preview: $(printf '%s' "$body" | head -c 200)"
+    echo
+    echo "This usually means another process has hijacked port ${PROMETHEUS_PORT}."
+    exit 1
+  fi
+}
+
+validate_loki_endpoint
+validate_prometheus_endpoint
 
 emit_smoke_telemetry node "$API_SERVICE_NAME"
 emit_smoke_telemetry node "$WORKER_SERVICE_NAME"

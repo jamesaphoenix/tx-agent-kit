@@ -5,14 +5,15 @@ import { useRouter } from 'next/navigation'
 import { clientApi } from '../lib/client-api'
 import { notify } from '../lib/notify'
 import { sessionStoreActions } from '../stores/session-store'
+import { Button } from '@/components/ui/button'
 
 export function SignOutButton() {
   const router = useRouter()
   const [pending, setPending] = useState(false)
 
   return (
-    <button
-      className="secondary"
+    <Button
+      variant="outline"
       type="button"
       disabled={pending}
       onClick={() => {
@@ -32,6 +33,6 @@ export function SignOutButton() {
       }}
     >
       {pending ? 'Signing out...' : 'Sign out'}
-    </button>
+    </Button>
   )
 }

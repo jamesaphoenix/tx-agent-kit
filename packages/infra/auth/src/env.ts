@@ -23,8 +23,13 @@ const parseBcryptRounds = (rawValue: string | undefined): number => {
 }
 
 export const getAuthEnv = (): AuthEnv => {
+  const authSecret = process.env.AUTH_SECRET
+  if (!authSecret) {
+    throw new Error('AUTH_SECRET environment variable is required')
+  }
+
   return {
-    AUTH_SECRET: process.env.AUTH_SECRET ?? '',
+    AUTH_SECRET: authSecret,
     AUTH_BCRYPT_ROUNDS: parseBcryptRounds(process.env.AUTH_BCRYPT_ROUNDS),
     AUTH_ACCESS_TOKEN_TTL: process.env.AUTH_ACCESS_TOKEN_TTL?.trim() ?? defaultAccessTokenTtl
   }

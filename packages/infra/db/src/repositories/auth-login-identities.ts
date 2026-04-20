@@ -1,27 +1,12 @@
 import { and, eq } from 'drizzle-orm'
 import type { AuthLoginProvider } from '@tx-agent-kit/contracts'
-import { Effect, Schema } from 'effect'
-import { DB, provideDB } from '../client.js'
-import {
-  authLoginIdentityRowSchema,
-  type AuthLoginIdentityRowShape
-} from '../effect-schemas/auth-login-identities.js'
-import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
+import { Effect } from 'effect'
+import { authLoginIdentityRowSchema } from '../effect-schemas/auth-login-identities.js'
 import { authLoginIdentities } from '../schema.js'
+import { withDb, decodeFirst } from './repo-helpers.js'
+import { createOptionalDecoder } from './sql-helpers.js'
 
-const decodeAuthLoginIdentityRow = Schema.decodeUnknown(authLoginIdentityRowSchema)
-
-const decodeNullableAuthLoginIdentity = (
-  value: unknown
-): Effect.Effect<AuthLoginIdentityRowShape | null, DbError> => {
-  if (value === null || value === undefined) {
-    return Effect.succeed(null)
-  }
-
-  return decodeAuthLoginIdentityRow(value).pipe(
-    Effect.mapError((error) => dbDecodeFailed('auth login identity row decode failed', error))
-  )
-}
+const decode = createOptionalDecoder(authLoginIdentityRowSchema, 'auth login identity row')
 
 export const authLoginIdentitiesRepository = {
   create: (input: {
@@ -31,9 +16,8 @@ export const authLoginIdentitiesRepository = {
     email: string
     emailVerified: boolean
   }) =>
-    provideDB(
+    withDb('Failed to create auth login identity', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .insert(authLoginIdentities)
           .values({
@@ -46,14 +30,13 @@ export const authLoginIdentitiesRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullableAuthLoginIdentity(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to create auth login identity', error))),
+    ),
 
   findByProviderSubject: (provider: AuthLoginProvider, providerSubject: string) =>
-    provideDB(
+    withDb('Failed to find auth login identity by provider subject', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .select()
           .from(authLoginIdentities)
@@ -66,14 +49,13 @@ export const authLoginIdentitiesRepository = {
           .limit(1)
           .execute()
 
-        return yield* decodeNullableAuthLoginIdentity(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to find auth login identity by provider subject', error))),
+    ),
 
   findByUserProvider: (userId: string, provider: AuthLoginProvider) =>
-    provideDB(
+    withDb('Failed to find auth login identity by user provider', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .select()
           .from(authLoginIdentities)
@@ -81,21 +63,20 @@ export const authLoginIdentitiesRepository = {
           .limit(1)
           .execute()
 
-        return yield* decodeNullableAuthLoginIdentity(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to find auth login identity by user provider', error))),
+    ),
 
   deleteByUserProvider: (userId: string, provider: AuthLoginProvider) =>
-    provideDB(
+    withDb('Failed to delete auth login identity', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .delete(authLoginIdentities)
           .where(and(eq(authLoginIdentities.userId, userId), eq(authLoginIdentities.provider, provider)))
           .returning()
           .execute()
 
-        return yield* decodeNullableAuthLoginIdentity(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to delete auth login identity', error)))
+    )
 }

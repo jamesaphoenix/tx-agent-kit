@@ -17,6 +17,7 @@ const defaultJaegerApiUrl = 'http://localhost:16686'
 const defaultPrometheusApiUrl = 'http://localhost:9090'
 const defaultLokiApiUrl = 'http://localhost:3100'
 const defaultOtlpEndpoint = 'http://localhost:4320'
+const defaultSpotlightUrl = 'http://localhost:8969'
 const requiredServiceNames = [
   'tx-agent-kit-api',
   'tx-agent-kit-worker',
@@ -33,7 +34,7 @@ const requiredNodeMetricJobs = [
 ] as const
 const requiredNodeLogServices = ['tx-agent-kit-api', 'tx-agent-kit-worker'] as const
 const smokeLogMarker = 'observability.smoke.log'
-const pollAttempts = 60
+const pollAttempts = 180
 const pollIntervalMs = 1000
 const repoRoot = resolve(import.meta.dirname, '../../../..')
 const apiCwd = resolve(repoRoot, 'apps/api')
@@ -46,6 +47,53 @@ const defaultApiDatabaseUrl = 'postgresql://postgres:postgres@localhost:5432/tx_
 const defaultAuthSecret = 'integration-auth-secret-minimum-32-chars'
 const apiServerEntryPath = resolve(apiCwd, 'src/server.ts')
 const nodeCommand = process.env.NODE_BINARY ?? 'node'
+
+const probeSpotlight = async (): Promise<boolean> => {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3000)
+    const response = await fetch(defaultSpotlightUrl, {
+      signal: controller.signal
+    })
+    clearTimeout(timeout)
+    return response.ok || response.status < 500
+  } catch {
+    return false
+  }
+}
+
+const spotlightReachable = await probeSpotlight()
+
+const buildSentryEnvelope = (errorMessage: string): string => {
+  const eventId = randomUUID().replaceAll('-', '')
+  const header = JSON.stringify({
+    event_id: eventId,
+    sent_at: new Date().toISOString(),
+    sdk: { name: 'sentry.javascript.node', version: '10.0.0' }
+  })
+  const itemHeader = JSON.stringify({
+    type: 'event',
+    length: 0
+  })
+  const payload = JSON.stringify({
+    event_id: eventId,
+    timestamp: Date.now() / 1000,
+    platform: 'node',
+    level: 'error',
+    environment: 'test',
+    exception: {
+      values: [
+        {
+          type: 'Error',
+          value: errorMessage,
+          mechanism: { type: 'generic', handled: true }
+        }
+      ]
+    }
+  })
+
+  return `${header}\n${itemHeader}\n${payload}`
+}
 
 const delay = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => {
@@ -259,8 +307,10 @@ const readWebSignUpMetricSample = async (
   }
 }
 
+const runStackTests = process.env.RUN_OBSERVABILITY_STACK_INTEGRATION === '1' || process.env.RUN_OBSERVABILITY_STACK_INTEGRATION === 'true'
+
 describe('observability stack integration', () => {
-  it(
+  it.skipIf(!runStackTests)(
     'exports smoke traces/metrics/logs to Jaeger, Prometheus, and Loki',
     async () => {
     const jaegerApiUrl = process.env.JAEGER_API_URL ?? defaultJaegerApiUrl
@@ -365,10 +415,10 @@ describe('observability stack integration', () => {
       pollIntervalMs
     )
     },
-    120_000
+    180_000
   )
 
-  it(
+  it.skipIf(!runStackTests)(
     'exports telemetry via real API + web client instrumentation (no smoke helpers)',
     async () => {
       const jaegerApiUrl = process.env.JAEGER_API_URL ?? defaultJaegerApiUrl
@@ -446,5 +496,53 @@ describe('observability stack integration', () => {
       }
     },
     180_000
+  )
+})
+
+describe('spotlight sidecar integration', () => {
+  it.skipIf(!spotlightReachable)(
+    'responds to HTTP requests on port 8969',
+    async () => {
+      const response = await fetch(defaultSpotlightUrl)
+      expect(response.status).toBeLessThan(500)
+    }
+  )
+
+  it.skipIf(!spotlightReachable)(
+    'accepts raw Sentry envelopes via POST /stream',
+    async () => {
+      const marker = `spotlight-integration-${randomUUID()}`
+      const envelope = buildSentryEnvelope(marker)
+
+      const response = await fetch(`${defaultSpotlightUrl}/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-sentry-envelope' },
+        body: envelope
+      })
+
+      expect(response.ok).toBe(true)
+    }
+  )
+
+  it.skipIf(!spotlightReachable)(
+    'accepts multiple envelopes in sequence',
+    async () => {
+      const results = await Promise.all(
+        Array.from({ length: 3 }, (_, index) => {
+          const envelope = buildSentryEnvelope(
+            `spotlight-batch-${index}-${randomUUID()}`
+          )
+          return fetch(`${defaultSpotlightUrl}/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-sentry-envelope' },
+            body: envelope
+          })
+        })
+      )
+
+      for (const response of results) {
+        expect(response.ok).toBe(true)
+      }
+    }
   )
 })

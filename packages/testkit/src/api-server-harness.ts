@@ -185,7 +185,8 @@ export const createApiServerHarness = (
         DATABASE_URL: options.testContext.schemaDatabaseUrl,
         API_CORS_ORIGIN: corsOrigin,
         AUTH_RATE_LIMIT_MAX_REQUESTS: '200',
-        AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '200'
+        AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '200',
+        DB_POOL_MAX: '5'
       },
       stdio: detached ? 'ignore' : ['ignore', 'pipe', 'pipe'],
       detached

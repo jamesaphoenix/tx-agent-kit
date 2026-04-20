@@ -42,6 +42,30 @@ describe('db errors', () => {
     expect(error.message).toContain('auth_login_identities_provider_subject_unique')
   })
 
+  it('maps org-wide pending invitation unique violations to a specific db error code', () => {
+    const error = toDbError('Failed to create invitation', {
+      code: '23505',
+      constraint: 'invitations_org_email_orgwide_pending_unique',
+      message: 'duplicate key value violates unique constraint "invitations_org_email_orgwide_pending_unique"'
+    })
+
+    expect(error.code).toBe('DB_INVITATION_ORGWIDE_PENDING_UNIQUE_VIOLATION')
+    expect(error.constraint).toBe('invitations_org_email_orgwide_pending_unique')
+    expect(error.message).toContain('invitations_org_email_orgwide_pending_unique')
+  })
+
+  it('maps workspace-scoped pending invitation unique violations to a specific db error code', () => {
+    const error = toDbError('Failed to create invitation', {
+      code: '23505',
+      constraint: 'invitations_org_email_team_pending_unique',
+      message: 'duplicate key value violates unique constraint "invitations_org_email_team_pending_unique"'
+    })
+
+    expect(error.code).toBe('DB_INVITATION_TEAM_PENDING_UNIQUE_VIOLATION')
+    expect(error.constraint).toBe('invitations_org_email_team_pending_unique')
+    expect(error.message).toContain('invitations_org_email_team_pending_unique')
+  })
+
   it('falls back to query-failed for non-unique postgres errors', () => {
     const error = toDbError('Failed to create record', {
       code: '22001',

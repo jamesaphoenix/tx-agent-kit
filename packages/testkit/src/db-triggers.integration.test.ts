@@ -71,7 +71,7 @@ describe('database triggers integration', () => {
       await client.query(
         `
           INSERT INTO org_members (organization_id, user_id, role)
-          VALUES ($1, $2, 'owner')
+          VALUES ($1, $2, 'admin')
         `,
         [organizationId, inviterId]
       )

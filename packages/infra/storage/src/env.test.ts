@@ -51,7 +51,7 @@ describe('getStorageEnv', () => {
 
     expect(env.R2_ACCOUNT_ID).toBe('dc05faaea8d5f25755d84e55fe3a7d67')
     expect(env.R2_ENDPOINT).toBe('https://dc05faaea8d5f25755d84e55fe3a7d67.r2.cloudflarestorage.com')
-    expect(env.R2_BUCKET_NAME).toBe('octospark-dev')
+    expect(env.R2_BUCKET_NAME).toBe('tx-agent-kit-dev')
   })
 
   it('throws in production when credentials are missing', async () => {
@@ -71,6 +71,35 @@ describe('getStorageEnv', () => {
 
     expect(() => getStorageEnv()).toThrow(
       'R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be set in production and staging environments'
+    )
+  })
+
+  it('uses deterministic test credentials when credentials are missing in test', async () => {
+    process.env.NODE_ENV = 'test'
+    process.env.R2_ACCOUNT_ID = ''
+    process.env.R2_BUCKET_NAME = ''
+    process.env.R2_ENDPOINT = ''
+
+    const getStorageEnv = await loadGetStorageEnv()
+    const env = getStorageEnv()
+
+    expect(env).toEqual({
+      R2_ACCOUNT_ID: 'dc05faaea8d5f25755d84e55fe3a7d67',
+      R2_ACCESS_KEY_ID: 'test-r2-access-key-id',
+      R2_SECRET_ACCESS_KEY: 'test-r2-secret-access-key',
+      R2_BUCKET_NAME: 'tx-agent-kit-dev',
+      R2_ENDPOINT: 'https://dc05faaea8d5f25755d84e55fe3a7d67.r2.cloudflarestorage.com'
+    })
+  })
+
+  it('throws in test when only one credential is set', async () => {
+    process.env.NODE_ENV = 'test'
+    process.env.R2_ACCESS_KEY_ID = 'test-key'
+
+    const getStorageEnv = await loadGetStorageEnv()
+
+    expect(() => getStorageEnv()).toThrow(
+      'R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY are required'
     )
   })
 

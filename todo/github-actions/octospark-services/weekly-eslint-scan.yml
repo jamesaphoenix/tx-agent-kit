@@ -47,7 +47,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          LINEAR_TEAM_ID: b38ce839-a7c9-4dc0-8c08-2776062db0bd # OctoSpark team
+          LINEAR_TEAM_ID: b38ce839-a7c9-4dc0-8c08-2776062db0bd # tx-agent-kit team
           SAMPLE_SIZE: 50
         run: pnpm --filter @repo/automation-utils eslint-scanner
 

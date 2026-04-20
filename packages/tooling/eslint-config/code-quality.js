@@ -85,6 +85,8 @@ export const codeQualityConfig = [
       '**/*.test.tsx',
       '**/*.integration.test.ts',
       '**/*.integration.test.tsx',
+      '**/test-*.ts',
+      '**/test-*.tsx',
       'apps/api/src/server-lib.ts',
       'apps/api/src/openapi.ts',
       'apps/worker/src/index.ts',

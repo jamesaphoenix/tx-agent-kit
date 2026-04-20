@@ -1,18 +1,27 @@
 import { authLoginOidcStatesRepository } from '@tx-agent-kit/db'
 import { GoogleOidcPort } from '@tx-agent-kit/core'
-import { Effect, Layer } from 'effect'
-import { Issuer, generators, type Client } from 'openid-client'
+import { Effect, Layer, Option } from 'effect'
+import * as oidc from 'openid-client'
 import { getGoogleOidcConfig } from '../config/env.js'
 
 const oidcStateTtlMs = 10 * 60 * 1000
 
 interface GoogleOidcRuntime {
-  client: Client
+  configuration: oidc.Configuration
   callbackUrl: string
+}
+
+type OidcConfigurationMutator = (configuration: oidc.Configuration) => void
+
+interface OidcLocalTestingExports {
+  allowInsecureRequests: OidcConfigurationMutator
 }
 
 let cachedRuntime: Promise<GoogleOidcRuntime> | null = null
 let cachedRuntimeKey = ''
+
+const allowHttpOidcDiscoveryForLocal = (): OidcConfigurationMutator =>
+  (oidc as OidcLocalTestingExports)['allowInsecureRequests']
 
 const resolveRuntimeKey = (): string => {
   const config = getGoogleOidcConfig()
@@ -39,16 +48,23 @@ const getGoogleOidcRuntime = async (): Promise<GoogleOidcRuntime> => {
     cachedRuntimeKey = runtimeKey
     cachedRuntime = (async () => {
       try {
-        const issuer = await Issuer.discover(config.issuerUrl)
-        const client = new issuer.Client({
-          client_id: config.clientId,
-          client_secret: config.clientSecret,
-          redirect_uris: [config.callbackUrl],
-          response_types: ['code']
-        })
+        const discoveryOptions = config.issuerUrl.startsWith('http://')
+          ? { execute: [allowHttpOidcDiscoveryForLocal()] }
+          : undefined
+        const configuration = await oidc.discovery(
+          new URL(config.issuerUrl),
+          config.clientId,
+          {
+            client_secret: config.clientSecret,
+            redirect_uris: [config.callbackUrl],
+            response_types: ['code']
+          },
+          oidc.ClientSecretBasic(config.clientSecret),
+          discoveryOptions
+        )
 
         return {
-          client,
+          configuration,
           callbackUrl: config.callbackUrl
         }
       } catch (error) {
@@ -82,16 +98,16 @@ export const GoogleOidcPortLive = Layer.succeed(GoogleOidcPort, {
     Effect.gen(function* () {
       const runtime = yield* Effect.tryPromise({
         try: () => getGoogleOidcRuntime(),
-        catch: () => new Error('Failed to initialize Google OIDC client')
+        catch: (cause) => new Error(`Failed to initialize Google OIDC client: ${cause instanceof Error ? cause.message : String(cause)}`)
       })
 
-      const state = `${input.statePrefix ?? ''}${generators.state()}`
-      const nonce = generators.nonce()
-      const codeVerifier = generators.codeVerifier()
-      const codeChallenge = generators.codeChallenge(codeVerifier)
+      const state = `${input.statePrefix ?? ''}${oidc.randomState()}`
+      const nonce = oidc.randomNonce()
+      const codeVerifier = oidc.randomPKCECodeVerifier()
+      const codeChallenge = yield* Effect.promise(() => oidc.calculatePKCECodeChallenge(codeVerifier))
       const expiresAt = new Date(Date.now() + oidcStateTtlMs)
 
-      const created = yield* authLoginOidcStatesRepository.create({
+      yield* authLoginOidcStatesRepository.create({
         provider: 'google',
         state,
         nonce,
@@ -99,13 +115,15 @@ export const GoogleOidcPortLive = Layer.succeed(GoogleOidcPort, {
         redirectUri: runtime.callbackUrl,
         requesterIp: input.ipAddress,
         expiresAt
-      }).pipe(Effect.mapError(() => new Error('Failed to persist Google OIDC state')))
+      }).pipe(
+        Effect.mapError((cause) => new Error(`Failed to persist Google OIDC state: ${cause instanceof Error ? cause.message : String(cause)}`)),
+        Effect.flatMap(Option.match({
+          onNone: () => Effect.fail(new Error('Failed to persist Google OIDC state')),
+          onSome: Effect.succeed
+        }))
+      )
 
-      if (!created) {
-        return yield* Effect.fail(new Error('Failed to persist Google OIDC state'))
-      }
-
-      const authorizationUrl = runtime.client.authorizationUrl({
+      const authorizationUrl = oidc.buildAuthorizationUrl(runtime.configuration, {
         scope: 'openid email profile',
         response_type: 'code',
         redirect_uri: runtime.callbackUrl,
@@ -116,7 +134,7 @@ export const GoogleOidcPortLive = Layer.succeed(GoogleOidcPort, {
       })
 
       return {
-        authorizationUrl,
+        authorizationUrl: authorizationUrl.href,
         state,
         expiresAt
       }
@@ -126,35 +144,38 @@ export const GoogleOidcPortLive = Layer.succeed(GoogleOidcPort, {
     Effect.gen(function* () {
       const consumedState = yield* authLoginOidcStatesRepository
         .consumeActiveByProviderAndState('google', input.state)
-        .pipe(Effect.mapError(() => new Error('Failed to consume Google OIDC state')))
-
-      if (!consumedState) {
-        return yield* Effect.fail(new Error('Invalid or expired Google OIDC state'))
-      }
+        .pipe(
+          Effect.mapError((cause) => new Error(`Failed to consume Google OIDC state: ${cause instanceof Error ? cause.message : String(cause)}`)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(new Error('Invalid or expired Google OIDC state')),
+            onSome: Effect.succeed
+          }))
+        )
 
       const runtime = yield* Effect.tryPromise({
         try: () => getGoogleOidcRuntime(),
-        catch: () => new Error('Failed to initialize Google OIDC client')
+        catch: (cause) => new Error(`Failed to initialize Google OIDC client: ${cause instanceof Error ? cause.message : String(cause)}`)
       })
+
+      const currentUrl = new URL(runtime.callbackUrl)
+      currentUrl.searchParams.set('code', input.code)
+      currentUrl.searchParams.set('state', consumedState.state)
 
       const tokenSet = yield* Effect.tryPromise({
         try: () =>
-          runtime.client.callback(
-            runtime.callbackUrl,
-            {
-              code: input.code,
-              state: consumedState.state
-            },
-            {
-              nonce: consumedState.nonce,
-              state: consumedState.state,
-              code_verifier: consumedState.codeVerifier
-            }
-          ),
-        catch: () => new Error('Failed to complete Google OIDC callback')
+          oidc.authorizationCodeGrant(runtime.configuration, currentUrl, {
+            expectedNonce: consumedState.nonce,
+            expectedState: consumedState.state,
+            pkceCodeVerifier: consumedState.codeVerifier
+          }),
+        catch: (cause) => new Error(`Failed to complete Google OIDC callback: ${cause instanceof Error ? cause.message : String(cause)}`)
       })
 
       const claims = tokenSet.claims()
+      if (!claims) {
+        return yield* Effect.fail(new Error('Google OIDC callback did not include an ID token'))
+      }
+
       const subject = claims.sub
       const email = claims.email
       const name = claims.name

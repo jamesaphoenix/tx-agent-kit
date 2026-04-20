@@ -7,6 +7,7 @@ import { promiseConfig } from './packages/tooling/eslint-config/promise.js'
 import { testingConfig } from './packages/tooling/eslint-config/testing.js'
 import { typeSafetyConfig } from './packages/tooling/eslint-config/type-safety.js'
 import { unicornConfig } from './packages/tooling/eslint-config/unicorn.js'
+import { webUiConfig } from './packages/tooling/eslint-config/web-ui.js'
 
 export default [
   {
@@ -23,7 +24,8 @@ export default [
       'apps/mobile/babel.config.js',
       'apps/mobile/vitest.component-setup.ts',
       'apps/docs/**',
-      'packages/testkit/src/api-client/generated/**'
+      'packages/testkit/src/api-client/generated/**',
+      '**/postcss.config.mjs'
     ]
   },
   ...baseConfig,
@@ -32,6 +34,7 @@ export default [
   ...effectConsistencyConfig,
   ...promiseConfig,
   ...testingConfig,
+  ...webUiConfig,
   ...boundariesConfig,
   ...typeSafetyConfig,
   ...unicornConfig,

@@ -15,7 +15,7 @@ describe('SignOutButton integration', () => {
     writeAuthToken('integration-sign-out-token')
     sessionStoreActions.setPrincipal({
       userId: randomUUID(),
-      email: 'signed-in-user@example.com',
+      email: `signed-in-user-${randomUUID()}@example.com`,
       organizationId: undefined,
       roles: ['member'],
       permissions: []

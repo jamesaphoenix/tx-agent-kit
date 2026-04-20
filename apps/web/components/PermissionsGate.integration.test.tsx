@@ -11,8 +11,6 @@ describe('PermissionsGate integration', () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'permissions-gate-owner@example.com',
-      password: 'permissions-gate-owner-pass-12345',
       name: 'Permissions Gate Owner'
     })
 
@@ -42,14 +40,10 @@ describe('PermissionsGate integration', () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'permissions-gate-member-owner@example.com',
-      password: 'permissions-gate-member-owner-pass-12345',
       name: 'Permissions Gate Member Owner'
     })
 
     const member = await createUser(factoryContext, {
-      email: 'permissions-gate-member@example.com',
-      password: 'permissions-gate-member-pass-12345',
       name: 'Permissions Gate Member'
     })
 

@@ -106,6 +106,12 @@ const enforceWebClientOnlyContracts = () => {
         return false
       }
 
+      // (website) route group pages are server-rendered (SSR) for SEO and
+      // must remain Server Components so they can export `metadata`.
+      if (normalized.includes('/(website)/')) {
+        return false
+      }
+
       return true
     })
 
@@ -196,6 +202,38 @@ const enforceWebClientOnlyContracts = () => {
     if (!isUrlStateWrapper && /from\s+['"]nuqs(?:\/[^'"]*)?['"]/u.test(source)) {
       fail(
         `Direct nuqs imports are forbidden outside \`apps/web/lib/url-state.tsx\`: \`${relativePath}\`.`
+      )
+    }
+  }
+
+  // ── Orval enforcement: non-auth source files must not import clientApi ──
+  // Auth files are exempt because signIn/signUp/signOut have token side effects.
+  // Integration tests are exempt because they use clientApi for imperative setup/assert.
+  const orvalExemptFiles = new Set([
+    'apps/web/lib/client-api.ts',
+    'apps/web/lib/client-api.test.ts',
+    'apps/web/lib/client-auth.ts',
+    'apps/web/lib/react-admin/auth-provider.ts',
+    'apps/web/components/AuthForm.tsx',
+    'apps/web/components/SignOutButton.tsx',
+    'apps/web/components/ResetPasswordForm.tsx',
+    'apps/web/components/ForgotPasswordForm.tsx',
+    'apps/web/components/providers/AuthBootstrapProvider.tsx',
+    'apps/web/components/AppSidebar.tsx'
+  ])
+
+  for (const sourceFile of webSourceFiles) {
+    const relativePath = toPosix(relative(repoRoot, sourceFile))
+
+    if (orvalExemptFiles.has(relativePath)) continue
+    if (relativePath.includes('.test.') || relativePath.includes('.integration.test.')) continue
+    if (relativePath.includes('/__tests__/')) continue
+
+    const source = readUtf8(sourceFile)
+    if (/from\s+['"](?:\.\.\/)*lib\/client-api['"]/u.test(source) || /from\s+['"]@\/lib\/client-api['"]/u.test(source)) {
+      fail(
+        `Use Orval-generated hooks from \`lib/api/generated/\` instead of \`clientApi\`: \`${relativePath}\`. ` +
+        'Only auth components (AuthForm, SignOutButton, etc.) are exempt.'
       )
     }
   }

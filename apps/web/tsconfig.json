@@ -10,10 +10,16 @@
       "@tx-agent-kit/core": ["../../packages/core/src/index.ts"],
       "@tx-agent-kit/db": ["../../packages/infra/db/src/index.ts"],
       "@tx-agent-kit/logging": ["../../packages/infra/logging/src/index.ts"],
-      "@tx-agent-kit/observability": ["../../packages/infra/observability/dist/index.js"],
-      "@tx-agent-kit/observability/*": ["../../packages/infra/observability/dist/*"],
+      "@tx-agent-kit/observability": [
+        "../../packages/infra/observability/dist/index.js"
+      ],
+      "@tx-agent-kit/observability/*": [
+        "../../packages/infra/observability/dist/*"
+      ],
       "@tx-agent-kit/testkit": ["../../packages/testkit/src/index.ts"],
-      "@tx-agent-kit/temporal-client": ["../../packages/temporal-client/src/index.ts"]
+      "@tx-agent-kit/temporal-client": [
+        "../../packages/temporal-client/src/index.ts"
+      ]
     },
     "typeRoots": ["./node_modules/@types", "../../node_modules/@types"],
     "types": ["node", "react", "react-dom"]

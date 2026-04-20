@@ -48,6 +48,8 @@ This script copies `.env.example` to `.env` (if it does not exist) and upserts a
 | `TEMPORAL_ADDRESS` | `localhost:7233` |
 | `TEMPORAL_TASK_QUEUE` | `tx-agent-kit` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` |
+| `LANGFUSE_BASE_URL` | `http://localhost:3003` |
+| `LANGFUSE_PUBLIC_KEY` | local placeholder key |
 
 The script is idempotent. Running it again updates existing keys without duplicating them.
 
@@ -57,7 +59,9 @@ The script is idempotent. Running it again updates existing keys without duplica
 pnpm infra:ensure
 ```
 
-This starts all Docker Compose services under the `infra` profile and waits for health checks to pass. Services include PostgreSQL, Redis, the OTEL collector, Jaeger, Prometheus, Grafana, and Loki.
+This starts all Docker Compose services under the `infra` profile and waits for health checks to pass. Services include PostgreSQL, Redis, the OTEL collector, Jaeger, Prometheus, Grafana, Loki, Spotlight, and Langfuse.
+
+Langfuse local bootstrap runs as part of `pnpm infra:ensure`. It ensures the local `tx-agent-kit Local` organization, project, and `dev@tx-agent-kit.local` owner account exist and resets the local password to `tx-agent-kit-local-langfuse`.
 
 If infrastructure is already running, the command exits immediately. See [Docker Stack](/docs/infrastructure/docker-stack) for service details.
 
@@ -136,7 +140,7 @@ If you specifically want browser preview, run `pnpm dev:mobile:web` so Expo serv
 pnpm dev:open
 ```
 
-Run this after `pnpm dev` is up. It opens local app/dev dashboards (web, mobile Metro status, API Swagger, Temporal UI, Grafana, Prometheus, Jaeger) in Brave Browser with a Google Chrome fallback.
+Run this after `pnpm dev` is up. It opens local app/dev dashboards (web, mobile Metro status, API Swagger, Temporal UI, Grafana, Prometheus, Jaeger, Langfuse, Spotlight) in Brave Browser with a Google Chrome fallback.
 
 ## Verifying the setup
 
@@ -163,6 +167,9 @@ pnpm temporal:dev:status
 
 # Open Grafana dashboards
 open http://localhost:3001
+
+# Open Langfuse LLM traces
+open http://localhost:3003
 ```
 
 ## Rebuilding contracts

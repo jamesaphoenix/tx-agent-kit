@@ -226,7 +226,7 @@ describe('CreateInvitationForm integration', () => {
     expect(onCreated).not.toHaveBeenCalled()
   })
 
-  it('surfaces an error when inviting an email without an existing account', async () => {
+  it('creates a pending invitation when inviting an email without an existing account', async () => {
     const factoryContext = createMobileFactoryContext()
 
     const owner = await createUser(factoryContext, {
@@ -263,9 +263,7 @@ describe('CreateInvitationForm integration', () => {
       findByType(tree.root, 'TouchableOpacity').at(-1)?.props.onPress()
     })
 
-    await waitFor(() =>
-      hasText(tree.root, /failed to send invitation|must already have an account|invalid/i)
-    )
+    await waitFor(() => onCreated.mock.calls.length === 1)
 
     const invitationCount = await factoryContext.testContext.withSchemaClient(async (client) => {
       const result = await client.query<{ count: string | number }>(
@@ -282,7 +280,6 @@ describe('CreateInvitationForm integration', () => {
       return typeof rawCount === 'number' ? rawCount : Number.parseInt(rawCount ?? '0', 10)
     })
 
-    expect(invitationCount).toBe(0)
-    expect(onCreated).not.toHaveBeenCalled()
+    expect(invitationCount).toBe(1)
   })
 })

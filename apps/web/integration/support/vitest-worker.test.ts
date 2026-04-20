@@ -127,7 +127,7 @@ describe('resolveVitestWorkerSlot', () => {
 
     const { resolveVitestWorkerSlot } = await import('./vitest-worker')
 
-    expect(() => resolveVitestWorkerSlot()).toThrowError(
+    expect(() => resolveVitestWorkerSlot()).toThrow(
       /Unable to claim a web integration worker slot/
     )
   })

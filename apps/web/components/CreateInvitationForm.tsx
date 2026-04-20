@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
-import { clientApi } from '../lib/client-api'
+import type { InvitationAssignableRole } from '@tx-agent-kit/contracts'
+import { useState, type SyntheticEvent } from 'react'
+import { useOrganizationsCreateInvitation } from '../lib/api/generated/organizations/organizations'
 import { notify } from '../lib/notify'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 interface OrganizationOption {
   id: string
@@ -18,70 +22,74 @@ export function CreateInvitationForm({
 }) {
   const [organizationId, setOrganizationId] = useState(organizations[0]?.id ?? '')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'admin' | 'member'>('member')
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
+  const [role, setRole] = useState<InvitationAssignableRole>('member')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const mutation = useOrganizationsCreateInvitation({
+    mutation: {
+      onSuccess: () => {
+        setEmail('')
+        setErrorMessage(null)
+        notify.success('Invitation sent')
+        void onCreated?.()
+      },
+      onError: (error) => {
+        setErrorMessage(notify.apiError(error, 'Failed to send invitation'))
+      }
+    }
+  })
+
+  const onSubmit = (event: SyntheticEvent<HTMLFormElement, SubmitEvent>) => {
     event.preventDefault()
-
+    setErrorMessage(null)
     if (!organizationId) {
-      const message = 'Create an organization first'
-      setError(message)
-      notify.error(message)
+      notify.error('Create an organization first')
       return
     }
-
-    setPending(true)
-    setError(null)
-
-    try {
-      await clientApi.createInvitation({ organizationId, email, role })
-      setEmail('')
-      notify.success('Invitation sent')
-      await onCreated?.()
-      setPending(false)
-    } catch (error_) {
-      const message = error_ instanceof Error ? error_.message : 'Failed to send invitation'
-      setError(message)
-      notify.error(message)
-      setPending(false)
-    }
+    mutation.mutate({
+      data: { organizationId, email, role }
+    })
   }
 
   return (
-    <form
-      className="stack"
-      onSubmit={(event) => {
-        void onSubmit(event)
-      }}
-    >
-      <h3>Invite teammate</h3>
-      <label className="stack">
-        <span>Organization</span>
-        <select value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
+    <form className="space-y-3" onSubmit={onSubmit}>
+      <h3 className="text-base font-semibold">Invite teammate</h3>
+      <div className="space-y-2">
+        <Label htmlFor="invitation-organization">Organization</Label>
+        <select
+          id="invitation-organization"
+          value={organizationId}
+          onChange={(event) => setOrganizationId(event.target.value)}
+          className="flex h-8 w-full items-center rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
           {organizations.map((organization) => (
             <option key={organization.id} value={organization.id}>{organization.name}</option>
           ))}
         </select>
-      </label>
+      </div>
 
-      <label className="stack">
-        <span>Email</span>
-        <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-      </label>
+      <div className="space-y-2">
+        <Label htmlFor="invitation-email">Email</Label>
+        <Input id="invitation-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+      </div>
 
-      <label className="stack">
-        <span>Role</span>
-        <select value={role} onChange={(event) => setRole(event.target.value as 'admin' | 'member')}>
+      <div className="space-y-2">
+        <Label>Role</Label>
+        <select
+          value={role}
+          onChange={(event) => setRole(event.target.value as InvitationAssignableRole)}
+          className="flex h-8 w-full items-center rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
           <option value="member">Member</option>
           <option value="admin">Admin</option>
         </select>
-      </label>
+      </div>
 
-      {error && <p className="error">{error}</p>}
+      {errorMessage ? (
+        <p className="text-sm text-destructive" role="alert">{errorMessage}</p>
+      ) : null}
 
-      <button type="submit" disabled={pending}>{pending ? 'Sending...' : 'Send invitation'}</button>
+      <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Sending...' : 'Send invitation'}</Button>
     </form>
   )
 }

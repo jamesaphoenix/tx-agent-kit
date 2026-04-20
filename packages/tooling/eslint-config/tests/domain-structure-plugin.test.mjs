@@ -321,6 +321,64 @@ test('pure-domain-no-effect-imports allows effect imports outside domain layer',
   assert.equal(messages.length, 0)
 })
 
+test('enforce-api-error-message reports generic notify.error in catch handlers with an error parameter', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-api-error-message',
+    filePath: 'apps/web/components/example.tsx',
+    code: [
+      "import { notify } from '@/lib/notify'",
+      'export const Example = async () => {',
+      '  try {',
+      '    throw new Error("boom")',
+      '  } catch (error) {',
+      "    notify.error('Failed to save example')",
+      '  }',
+      '}'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 1)
+  assert.match(messages[0].message, /notify\.apiError\(error, 'Fallback message'\)/)
+})
+
+test('enforce-api-error-message reports generic notify.error in onError callbacks with an error parameter', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-api-error-message',
+    filePath: 'apps/web/components/example.tsx',
+    code: [
+      "import { notify } from '@/lib/notify'",
+      'const mutation = {',
+      '  onError: (error) => {',
+      "    notify.error('Failed to save example')",
+      '  }',
+      '}',
+      'export { mutation }'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 1)
+  assert.match(messages[0].message, /notify\.apiError\(error, 'Fallback message'\)/)
+})
+
+test('enforce-api-error-message allows notify.apiError in catch handlers', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-api-error-message',
+    filePath: 'apps/web/components/example.tsx',
+    code: [
+      "import { notify } from '@/lib/notify'",
+      'export const Example = async () => {',
+      '  try {',
+      '    throw new Error("boom")',
+      '  } catch (error) {',
+      "    notify.apiError(error, 'Failed to save example')",
+      '  }',
+      '}'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 0)
+})
+
 test('pure-domain-no-infra-imports reports db imports in domain layer', async () => {
   const messages = await runRule({
     ruleName: 'pure-domain-no-infra-imports',
@@ -671,4 +729,173 @@ test('core-adapters-use-db-row-mappers ignores index barrel files', async () => 
   })
 
   assert.equal(messages.length, 0)
+})
+
+test('core-adapters-use-db-row-mappers allows type-only db imports (extends pattern)', async () => {
+  const messages = await runRule({
+    ruleName: 'core-adapters-use-db-row-mappers',
+    filePath: 'packages/core/src/domains/assets/adapters/assets-adapters.ts',
+    code: [
+      "import type { TeamMediaAssetRowShape } from '@tx-agent-kit/db'",
+      "import { mediaAssetsRepository } from '@tx-agent-kit/db'",
+      'export const x = mediaAssetsRepository'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 0)
+})
+
+// ── enforce-domain-extends-row-shape ──────────────────────────────
+
+test('enforce-domain-extends-row-shape reports domain records without db import', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-domain-extends-row-shape',
+    filePath: 'packages/core/src/domains/task/domain/task-domain.ts',
+    code: [
+      'export interface TaskRecord {',
+      '  id: string',
+      '  name: string',
+      '}'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 1)
+  assert.match(messages[0].message, /must extend or alias a row shape/)
+})
+
+test('enforce-domain-extends-row-shape allows domain records with db type import', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-domain-extends-row-shape',
+    filePath: 'packages/core/src/domains/task/domain/task-domain.ts',
+    code: [
+      "import type { TaskRowShape } from '@tx-agent-kit/db'",
+      'export type TaskRecord = TaskRowShape'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 0)
+})
+
+test('enforce-domain-extends-row-shape ignores files without Record declarations', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-domain-extends-row-shape',
+    filePath: 'packages/core/src/domains/task/domain/task-domain.ts',
+    code: [
+      'export interface CreateTaskCommand {',
+      '  name: string',
+      '}'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 0)
+})
+
+test('enforce-domain-extends-row-shape ignores non-domain files', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-domain-extends-row-shape',
+    filePath: 'packages/core/src/domains/task/adapters/task-adapters.ts',
+    code: [
+      'export interface TaskRecord {',
+      '  id: string',
+      '}'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 0)
+})
+
+test('enforce-domain-extends-row-shape flags standalone interface without extends or DTO suffix', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-domain-extends-row-shape',
+    filePath: 'packages/core/src/domains/organization/domain/organization-domain.ts',
+    code: [
+      "import type { InvitationRowShape } from '@tx-agent-kit/db'",
+      'export interface Invitation {',
+      '  id: string',
+      '  email: string',
+      '}'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 1)
+  assert.match(messages[0].message, /Standalone `interface Invitation` is not allowed/)
+})
+
+test('enforce-domain-extends-row-shape allows Command suffix interfaces', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-domain-extends-row-shape',
+    filePath: 'packages/core/src/domains/organization/domain/organization-domain.ts',
+    code: [
+      'export interface CreateInvitationCommand {',
+      '  email: string',
+      '  role: string',
+      '}'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 0)
+})
+
+test('enforce-domain-extends-row-shape allows interface with extends clause', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-domain-extends-row-shape',
+    filePath: 'packages/core/src/domains/assets/domain/assets-domain.ts',
+    code: [
+      "import type { MediaAssetRowShape } from '@tx-agent-kit/db'",
+      'export interface MediaAssetRecord extends Omit<MediaAssetRowShape, "id"> {',
+      '  id: string',
+      '}'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 0)
+})
+
+test('enforce-domain-extends-row-shape allows type alias to another type', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-domain-extends-row-shape',
+    filePath: 'packages/core/src/domains/organization/domain/organization-domain.ts',
+    code: [
+      "import type { InvitationRowShape } from '@tx-agent-kit/db'",
+      'export type InvitationRecord = InvitationRowShape'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 0)
+})
+
+test('enforce-domain-extends-row-shape flags object-literal type without DTO suffix', async () => {
+  const messages = await runRule({
+    ruleName: 'enforce-domain-extends-row-shape',
+    filePath: 'packages/core/src/domains/organization/domain/organization-domain.ts',
+    code: [
+      'export type Invitation = {',
+      '  id: string',
+      '  email: string',
+      '}'
+    ].join('\n')
+  })
+
+  assert.equal(messages.length, 1)
+  assert.match(messages[0].message, /Standalone object-literal type `Invitation` is not allowed/)
+})
+
+test('enforce-domain-extends-row-shape allows all DTO suffix patterns', async () => {
+  const suffixes = [
+    'Input', 'Options', 'Context', 'Config', 'Params', 'Result',
+    'Event', 'Payload', 'Summary', 'Settings', 'Session', 'Principal'
+  ]
+  for (const suffix of suffixes) {
+    const messages = await runRule({
+      ruleName: 'enforce-domain-extends-row-shape',
+      filePath: 'packages/core/src/domains/task/domain/task-domain.ts',
+      code: [
+        `export interface Create${suffix} {`,
+        '  name: string',
+        '}'
+      ].join('\n')
+    })
+
+    assert.equal(messages.length, 0, `Expected ${suffix} suffix to be allowed`)
+  }
 })

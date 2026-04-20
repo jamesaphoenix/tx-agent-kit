@@ -12,14 +12,10 @@ describe('AcceptInvitationForm integration', () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'accept-owner@example.com',
-      password: 'accept-owner-pass-12345',
       name: 'Accept Owner'
     })
 
     const invitee = await createUser(factoryContext, {
-      email: 'accept-invitee@example.com',
-      password: 'accept-invitee-pass-12345',
       name: 'Accept Invitee'
     })
 
@@ -62,14 +58,10 @@ describe('AcceptInvitationForm integration', () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'accept-owner-invalid-token@example.com',
-      password: 'accept-owner-pass-12345',
       name: 'Accept Owner Invalid Token'
     })
 
     const invitee = await createUser(factoryContext, {
-      email: 'accept-invitee-invalid-token@example.com',
-      password: 'accept-invitee-pass-12345',
       name: 'Accept Invitee Invalid Token'
     })
 
@@ -116,20 +108,14 @@ describe('AcceptInvitationForm integration', () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'accept-owner-wrong-user@example.com',
-      password: 'accept-owner-pass-12345',
       name: 'Accept Owner Wrong User'
     })
 
     const invitee = await createUser(factoryContext, {
-      email: 'accept-invitee-wrong-user@example.com',
-      password: 'accept-invitee-pass-12345',
       name: 'Accept Invitee Wrong User'
     })
 
     const attacker = await createUser(factoryContext, {
-      email: 'accept-attacker-wrong-user@example.com',
-      password: 'accept-attacker-pass-12345',
       name: 'Accept Attacker Wrong User'
     })
 
@@ -216,14 +202,10 @@ describe('AcceptInvitationForm integration', () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'accept-owner-reused-token@example.com',
-      password: 'accept-owner-pass-12345',
       name: 'Accept Owner Reused Token'
     })
 
     const invitee = await createUser(factoryContext, {
-      email: 'accept-invitee-reused-token@example.com',
-      password: 'accept-invitee-pass-12345',
       name: 'Accept Invitee Reused Token'
     })
 
@@ -280,14 +262,10 @@ describe('AcceptInvitationForm integration', () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'accept-owner-expired-token@example.com',
-      password: 'accept-owner-pass-12345',
       name: 'Accept Owner Expired Token'
     })
 
     const invitee = await createUser(factoryContext, {
-      email: 'accept-invitee-expired-token@example.com',
-      password: 'accept-invitee-pass-12345',
       name: 'Accept Invitee Expired Token'
     })
 

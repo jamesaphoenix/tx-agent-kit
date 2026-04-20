@@ -8,7 +8,7 @@ export default function WebsiteLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <WebsiteHeader />
-      {children}
+      <div className="pt-14">{children}</div>
       <WebsiteFooter />
     </>
   )

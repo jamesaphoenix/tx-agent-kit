@@ -1,27 +1,12 @@
 import { and, eq, gt, isNull, lt, or, sql } from 'drizzle-orm'
 import type { AuthLoginProvider } from '@tx-agent-kit/contracts'
-import { Effect, Schema } from 'effect'
-import { DB, provideDB } from '../client.js'
-import {
-  authLoginSessionRowSchema,
-  type AuthLoginSessionRowShape
-} from '../effect-schemas/auth-login-sessions.js'
-import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
+import { Effect } from 'effect'
+import { authLoginSessionRowSchema } from '../effect-schemas/auth-login-sessions.js'
 import { authLoginAuditEvents, authLoginSessions } from '../schema.js'
+import { withDb, decodeFirst } from './repo-helpers.js'
+import { createOptionalDecoder } from './sql-helpers.js'
 
-const decodeAuthLoginSessionRow = Schema.decodeUnknown(authLoginSessionRowSchema)
-
-const decodeNullableAuthLoginSession = (
-  value: unknown
-): Effect.Effect<AuthLoginSessionRowShape | null, DbError> => {
-  if (value === null || value === undefined) {
-    return Effect.succeed(null)
-  }
-
-  return decodeAuthLoginSessionRow(value).pipe(
-    Effect.mapError((error) => dbDecodeFailed('auth login session row decode failed', error))
-  )
-}
+const decode = createOptionalDecoder(authLoginSessionRowSchema, 'auth login session row')
 
 export const authLoginSessionsRepository = {
   create: (input: {
@@ -31,9 +16,8 @@ export const authLoginSessionsRepository = {
     createdUserAgent: string | null
     expiresAt: Date
   }) =>
-    provideDB(
+    withDb('Failed to create auth login session', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .insert(authLoginSessions)
           .values({
@@ -48,14 +32,13 @@ export const authLoginSessionsRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullableAuthLoginSession(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to create auth login session', error))),
+    ),
 
   findActiveById: (id: string) =>
-    provideDB(
+    withDb('Failed to find active auth login session', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const nowExpression = sql`now()`
         const rows = yield* db
           .select({
@@ -80,14 +63,13 @@ export const authLoginSessionsRepository = {
           .limit(1)
           .execute()
 
-        return yield* decodeNullableAuthLoginSession(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to find active auth login session', error))),
+    ),
 
   touchById: (id: string) =>
-    provideDB(
+    withDb('Failed to touch auth login session', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .update(authLoginSessions)
           .set({
@@ -104,12 +86,11 @@ export const authLoginSessionsRepository = {
 
         return rows.length > 0
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to touch auth login session', error))),
+    ),
 
   revokeById: (id: string) =>
-    provideDB(
+    withDb('Failed to revoke auth login session', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .update(authLoginSessions)
           .set({
@@ -121,12 +102,11 @@ export const authLoginSessionsRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke auth login session', error))),
+    ),
 
   revokeAllForUser: (userId: string) =>
-    provideDB(
+    withDb('Failed to revoke all auth login sessions for user', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .update(authLoginSessions)
           .set({
@@ -138,12 +118,11 @@ export const authLoginSessionsRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke all auth login sessions for user', error))),
+    ),
 
   pruneExpired: (olderThan: Date) =>
-    provideDB(
+    withDb('Failed to prune expired auth login sessions', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .delete(authLoginSessions)
           .where(
@@ -160,12 +139,11 @@ export const authLoginSessionsRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to prune expired auth login sessions', error))),
+    ),
 
   pruneAuditEvents: (olderThan: Date) =>
-    provideDB(
+    withDb('Failed to prune auth login audit events', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .delete(authLoginAuditEvents)
           .where(lt(authLoginAuditEvents.createdAt, olderThan))
@@ -174,5 +152,5 @@ export const authLoginSessionsRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to prune auth login audit events', error)))
+    )
 }

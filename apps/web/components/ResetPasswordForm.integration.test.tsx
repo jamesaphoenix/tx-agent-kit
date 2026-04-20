@@ -1,5 +1,5 @@
 import React from 'react'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { createUser } from '@tx-agent-kit/testkit'
 import { describe, expect, it } from 'vitest'
 import { readIntegrationRouterLocation } from '../integration/support/next-router-context'
@@ -18,12 +18,12 @@ describe('ResetPasswordForm integration', () => {
   it('resets password and redirects to sign-in', async () => {
     const factoryContext = createWebFactoryContext()
     const created = await createUser(factoryContext, {
-      email: 'reset-password-form@example.com',
+      email: `reset-password-form-${randomUUID()}@example.com`,
       password: 'reset-password-old-12345',
       name: 'Reset Password Form User'
     })
 
-    const rawToken = 'web-integration-reset-token'
+    const rawToken = `web-integration-reset-token-${randomUUID()}`
     const tokenHash = createHash('sha256').update(rawToken, 'utf8').digest('hex')
 
     await factoryContext.testContext.withSchemaClient(async (client) => {

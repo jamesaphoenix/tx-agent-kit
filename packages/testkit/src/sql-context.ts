@@ -151,7 +151,18 @@ const ensureSchema = async (client: Client, schemaName: string): Promise<void> =
 }
 
 const setSearchPath = async (client: Client, schemaName: string): Promise<void> => {
-  await client.query(`SET search_path TO ${quoteIdentifier(schemaName)}, public`)
+  // Include DATABASE_SCHEMA (set by worktree setup.sh to e.g. `wt_<name>`) in the
+  // fallback chain so direct-SQL test seeds fall through to the shared schema
+  // where the running API server actually reads/writes. Without this, tests on
+  // worktrees that do `withSchemaClient(INSERT ...)` land the rows in an empty
+  // sub-schema while the API is looking at `wt_<name>`.
+  const fallbackSchema = getTestkitEnv().DATABASE_SCHEMA
+  const identifiers = [quoteIdentifier(schemaName)]
+  if (fallbackSchema && fallbackSchema !== schemaName && fallbackSchema !== 'public') {
+    identifiers.push(quoteIdentifier(fallbackSchema))
+  }
+  identifiers.push('public')
+  await client.query(`SET search_path TO ${identifiers.join(', ')}`)
 }
 
 const withGlobalMigrationLock = async <A>(

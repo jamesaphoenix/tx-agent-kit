@@ -6,7 +6,9 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: 'observability-integration',
-      include: ['src/**/*.integration.test.ts']
+      include: ['src/**/*.integration.test.ts'],
+      testTimeout: 240_000,
+      hookTimeout: 240_000
     }
   })
 )

@@ -8,7 +8,7 @@ export interface CreateTeamFactoryOptions {
   id?: string
   name?: string
   website?: string | null
-  brandSettings?: { primaryColor?: string; logoUrl?: string; metadata?: Record<string, string> } | null
+  brandSettings?: { colors: { primary: string; secondary: string; accent: string; background: string; text: string }; brandGuidelines: string; industry: string; targetAudience: string } | null
   createdAt?: Date
   updatedAt?: Date
 }

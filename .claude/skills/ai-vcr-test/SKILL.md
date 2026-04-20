@@ -47,11 +47,11 @@ Cassette directories live **next to the test files**, not in a central location.
 ```
 packages/infra/ai/src/__tests__/
   __cassettes__/
-    langfuse-sequential/
+    otel-sequential/
       planner-call-a1b2c3d4.json
       critic-call-e5f6a7b8.json
       finalizer-call-c9d0e1f2.json
-  langfuse-sequential.integration.test.ts
+  otel-sequential.integration.test.ts
 ```
 
 ### Scrubbing
@@ -60,7 +60,6 @@ Before writing cassettes, the scrubber strips secrets:
 
 - `Authorization` headers → `[REDACTED]`
 - `OPENROUTER_API_KEY` values → `[REDACTED]`
-- `LANGFUSE_SECRET_KEY` values → `[REDACTED]`
 - Any key matching `/key|secret|token|password/i` in metadata → `[REDACTED]`
 
 Configurable via `ScrubRule[]` passed to VCR options.
@@ -839,7 +838,7 @@ if (command === 'clear') {
 
 ```bash
 pnpm vcr:clear                              # wipe ALL cassettes
-pnpm vcr:clear --suite langfuse-sequential   # wipe one suite
+pnpm vcr:clear --suite otel-sequential   # wipe one suite
 pnpm vcr:clear --pattern "planner*"          # wipe by glob
 pnpm vcr:list                                # list all with age + size
 pnpm vcr:list --stale 30                     # show cassettes > 30 days old
@@ -898,7 +897,7 @@ CI should set `VCR_MODE=replay` to ensure tests never hit real APIs.
 | `packages/testkit/src/vcr/scrubber.ts` | Strip secrets from recorded responses |
 | `packages/testkit/src/vcr/with-vcr.ts` | Core `withVcr<T>()` caching wrapper |
 | `packages/testkit/src/vcr/cli.ts` | Cache manager CLI (`vcr:clear`, `vcr:list`) |
-| `packages/infra/ai/src/__tests__/langfuse-sequential.integration.test.ts` | Multi-step agent pipeline test (conversion target) |
+| `packages/infra/ai/src/__tests__/otel-sequential.integration.test.ts` | Multi-step agent pipeline test (conversion target) |
 | `packages/infra/ai/src/tracing.integration.test.ts` | Tracing infrastructure test (conversion target) |
 | `packages/infra/ai/src/tracing.ts` | `tracedCallModel`, `withAgentStep`, `withAgentTrace` |
 | `packages/infra/ai/src/openrouter.ts` | OpenRouter client + `callModel` |

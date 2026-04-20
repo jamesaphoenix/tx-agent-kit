@@ -1,10 +1,12 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { type FormEvent, useState } from 'react'
+import { type SyntheticEvent, useState } from 'react'
 import { clientApi } from '../lib/client-api'
 import { notify } from '../lib/notify'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
 
 export function ResetPasswordForm({ token }: { token: string | null }) {
   const router = useRouter()
@@ -16,7 +18,9 @@ export function ResetPasswordForm({ token }: { token: string | null }) {
   const isTokenMissing = !token || token.trim() === ''
   const tokenError = isTokenMissing ? 'Reset token is missing or invalid' : null
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (
+    event: SyntheticEvent<HTMLFormElement, SubmitEvent>
+  ) => {
     event.preventDefault()
     setError(null)
 
@@ -42,9 +46,8 @@ export function ResetPasswordForm({ token }: { token: string | null }) {
       notify.success('Password updated. Please sign in.')
       router.replace('/sign-in')
     } catch (submitError) {
-      const reason = submitError instanceof Error ? submitError.message : 'Password reset failed'
+      const reason = notify.apiError(submitError, 'Password reset failed')
       setError(reason)
-      notify.error(reason)
     } finally {
       setPending(false)
     }
@@ -52,14 +55,15 @@ export function ResetPasswordForm({ token }: { token: string | null }) {
 
   return (
     <form
-      className="stack"
+      className="space-y-4"
       onSubmit={(event) => {
         void onSubmit(event)
       }}
     >
-      <label className="stack">
-        <span>New password</span>
-        <input
+      <div className="space-y-2">
+        <Label htmlFor="reset-password">New password</Label>
+        <Input
+          id="reset-password"
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
@@ -69,11 +73,12 @@ export function ResetPasswordForm({ token }: { token: string | null }) {
           required
           disabled={isTokenMissing}
         />
-      </label>
+      </div>
 
-      <label className="stack">
-        <span>Confirm password</span>
-        <input
+      <div className="space-y-2">
+        <Label htmlFor="reset-confirm-password">Confirm password</Label>
+        <Input
+          id="reset-confirm-password"
           type="password"
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
@@ -83,26 +88,22 @@ export function ResetPasswordForm({ token }: { token: string | null }) {
           required
           disabled={isTokenMissing}
         />
-      </label>
+      </div>
 
       {tokenError && (
-        <p className="error" role="alert">
+        <p className="text-sm text-destructive" role="alert">
           {tokenError}
         </p>
       )}
       {error && (
-        <p className="error" role="alert">
+        <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
       )}
 
-      <button type="submit" disabled={pending || isTokenMissing}>
+      <Button className="w-full" type="submit" disabled={pending || isTokenMissing}>
         {pending ? 'Updating...' : 'Update password'}
-      </button>
-
-      <p className="muted">
-        Return to <Link href="/sign-in">sign in</Link>
-      </p>
+      </Button>
     </form>
   )
 }

@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
-import { clientApi } from '../lib/client-api'
+import { useState, type SyntheticEvent } from 'react'
+import { useOrganizationsAcceptInvitation } from '../lib/api/generated/organizations/organizations'
 import { notify } from '../lib/notify'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 export function AcceptInvitationForm({
   onAccepted
@@ -11,42 +13,31 @@ export function AcceptInvitationForm({
 }) {
   const [token, setToken] = useState('')
   const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setPending(true)
-    setError(null)
-    setMessage(null)
-
-    try {
-      await clientApi.acceptInvitation(token)
-      setToken('')
-      setMessage('Invitation accepted successfully')
-      notify.success('Invitation accepted')
-      await onAccepted?.()
-      setPending(false)
-    } catch (error_) {
-      const message = error_ instanceof Error ? error_.message : 'Failed to accept invitation'
-      setError(message)
-      notify.error(message)
-      setPending(false)
+  const mutation = useOrganizationsAcceptInvitation({
+    mutation: {
+      onSuccess: () => {
+        setToken('')
+        setMessage('Invitation accepted successfully')
+        notify.success('Invitation accepted')
+        void onAccepted?.()
+      },
+      onError: () => { notify.error('Failed to accept invitation') }
     }
+  })
+
+  const onSubmit = (event: SyntheticEvent<HTMLFormElement, SubmitEvent>) => {
+    event.preventDefault()
+    mutation.mutate({ token })
   }
 
   return (
-    <form
-      className="stack"
-      onSubmit={(event) => {
-        void onSubmit(event)
-      }}
-    >
-      <h3>Accept invitation</h3>
-      <input value={token} onChange={(event) => setToken(event.target.value)} placeholder="Paste invitation token" required />
-      {error && <p className="error">{error}</p>}
+    <form className="space-y-3" onSubmit={onSubmit}>
+      <h3 className="text-base font-semibold">Accept invitation</h3>
+      <Input value={token} onChange={(event) => setToken(event.target.value)} placeholder="Paste invitation token" required />
+      {mutation.error && <p className="text-sm text-destructive">Failed to accept invitation</p>}
       {message && <p>{message}</p>}
-      <button type="submit" disabled={pending}>{pending ? 'Accepting...' : 'Accept invitation'}</button>
+      <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Accepting...' : 'Accept invitation'}</Button>
     </form>
   )
 }

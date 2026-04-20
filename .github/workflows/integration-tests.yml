@@ -28,6 +28,7 @@ env:
   AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '100'
   RESEND_API_KEY: ''
   RESEND_FROM_EMAIL: ''
+  RESEND_WEBHOOK_SECRET: ''
   WEB_BASE_URL: http://localhost:3000
   GOOGLE_OIDC_ISSUER_URL: http://localhost:65535
   GOOGLE_OIDC_CLIENT_ID: ci-google-client-id
@@ -35,12 +36,21 @@ env:
   GOOGLE_OIDC_CALLBACK_URL: http://localhost:4100/v1/auth/google/callback
   STRIPE_SECRET_KEY: ''
   STRIPE_WEBHOOK_SECRET: ''
+  STRIPE_TRY_ME_PRICE_ID: ''
+  STRIPE_TRY_ME_METERED_PRICE_ID: ''
   STRIPE_PRO_PRICE_ID: ''
   STRIPE_PRO_METERED_PRICE_ID: ''
+  STRIPE_AGENCY_PRICE_ID: ''
+  STRIPE_AGENCY_METERED_PRICE_ID: ''
   SUBSCRIPTION_GUARD_ENABLED: 'true'
   TRUST_PROXY: 'false'
   API_SENTRY_DSN: ''
   SENTRY_SPOTLIGHT: 'false'
+  R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+  R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
 jobs:
   integration:
@@ -50,12 +60,15 @@ jobs:
     env:
       WORKTREE_SETUP_BATCH_MAX_LATENCY_MS: '60000'
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
-      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: 22
-          cache: 'pnpm'
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.28.0 --activate
+          pnpm --version
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Verify generated DB schemas are current

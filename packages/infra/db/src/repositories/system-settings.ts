@@ -1,10 +1,10 @@
 import { eq, sql } from 'drizzle-orm'
-import { Effect, Schema } from 'effect'
-import { DB, provideDB } from '../client.js'
+import { Effect, Option, Schema } from 'effect'
 import { systemSettingRowSchema } from '../effect-schemas/system-settings.js'
-import { dbDecodeFailed, toDbError } from '../errors.js'
+import { dbDecodeFailed } from '../errors.js'
 import type { JsonObject } from '../schema.js'
 import { systemSettings } from '../schema.js'
+import { withDb } from './repo-helpers.js'
 
 const decodeSystemSettingRow = Schema.decodeUnknown(systemSettingRowSchema)
 
@@ -36,9 +36,8 @@ const isRetentionSettings = (value: JsonObject): value is JsonObject & Retention
 
 export const systemSettingsRepository = {
   get: (key: string) =>
-    provideDB(
+    withDb('Failed to get system setting', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .select()
           .from(systemSettings)
@@ -47,19 +46,19 @@ export const systemSettingsRepository = {
           .execute()
 
         if (!rows[0]) {
-          return null
+          return Option.none()
         }
 
         return yield* decodeSystemSettingRow(rows[0]).pipe(
+          Effect.map(Option.some),
           Effect.mapError((error) => dbDecodeFailed('system setting row decode failed', error))
         )
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to get system setting', error))),
+    ),
 
   upsert: (key: string, value: JsonObject, description?: string | null) =>
-    provideDB(
+    withDb('Failed to upsert system setting', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .insert(systemSettings)
           .values({
@@ -90,12 +89,11 @@ export const systemSettingsRepository = {
           Effect.mapError((error) => dbDecodeFailed('system setting row decode failed', error))
         )
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to upsert system setting', error))),
+    ),
 
   getRetentionSettings: () =>
-    provideDB(
+    withDb('Failed to get retention settings', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .select()
           .from(systemSettings)
@@ -116,5 +114,5 @@ export const systemSettingsRepository = {
 
         return jsonValue as RetentionSettings
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to get retention settings', error)))
+    )
 }

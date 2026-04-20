@@ -59,5 +59,17 @@ export const authProvider: AuthProvider = {
     }
   },
 
-  getPermissions: () => Promise.resolve<string[]>([])
+  getPermissions: () => {
+    const principal = sessionStore.state.principal
+
+    if (!principal) {
+      return Promise.resolve(['authenticated'])
+    }
+
+    // Returns the user's org-level roles so react-admin consumers can gate UI elements.
+    // This does NOT replace server-side authorization — the API must scope responses
+    // to the caller's own organizations. A system-level admin concept is needed to
+    // properly restrict the admin panel to platform administrators.
+    return Promise.resolve(['authenticated', ...principal.roles])
+  }
 }

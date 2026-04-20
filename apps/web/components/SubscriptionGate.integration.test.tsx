@@ -67,8 +67,6 @@ describe('SubscriptionGate integration', () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'subscription-gate-owner@example.com',
-      password: 'subscription-gate-owner-pass-12345',
       name: 'Subscription Gate Owner'
     })
 
@@ -102,8 +100,6 @@ describe('SubscriptionGate integration', () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'subscription-gate-inactive-owner@example.com',
-      password: 'subscription-gate-inactive-owner-pass-12345',
       name: 'Subscription Gate Inactive Owner'
     })
 

@@ -1,8 +1,8 @@
 import type { orgMembers } from '../schema.js'
 import {
-  orgMemberRoles,
+  memberRoles,
   membershipTypes,
-  type OrgMemberRole,
+  type MemberRole,
   type MembershipType
 } from '@tx-agent-kit/contracts'
 import { generateId, generateTimestamp } from './factory-helpers.js'
@@ -14,7 +14,7 @@ export interface CreateOrgMemberFactoryOptions {
   userId: string
   id?: string
   roleId?: string | null
-  role?: OrgMemberRole
+  role?: MemberRole
   membershipType?: MembershipType
   createdAt?: Date
   updatedAt?: Date
@@ -28,7 +28,7 @@ export const createOrgMemberFactory = (
     organizationId: options.organizationId,
     userId: options.userId,
     roleId: options.roleId ?? null,
-    role: options.role ?? orgMemberRoles[2],
+    role: options.role ?? memberRoles[1],
     membershipType: options.membershipType ?? membershipTypes[0],
     createdAt: options.createdAt ?? generateTimestamp(),
     updatedAt: options.updatedAt ?? generateTimestamp()

@@ -6,7 +6,8 @@ import type { AuthPrincipal } from '@tx-agent-kit/contracts'
 import { getAuthEnv } from './env.js'
 
 export class AuthError extends Schema.TaggedError<AuthError>()('AuthError', {
-  message: Schema.String
+  message: Schema.String,
+  cause: Schema.optional(Schema.Unknown)
 }) {}
 
 export interface SessionTokenPayload extends JWTPayload {
@@ -30,13 +31,13 @@ const getSecret = (): Uint8Array => {
 export const hashPassword = (plain: string): Effect.Effect<string, AuthError> =>
   Effect.tryPromise({
     try: async () => bcrypt.hash(plain, getAuthEnv().AUTH_BCRYPT_ROUNDS),
-    catch: () => new AuthError({ message: 'Failed to hash password' })
+    catch: (cause) => new AuthError({ message: 'Failed to hash password', cause })
   })
 
 export const verifyPassword = (plain: string, hash: string): Effect.Effect<boolean, AuthError> =>
   Effect.tryPromise({
     try: async () => bcrypt.compare(plain, hash),
-    catch: () => new AuthError({ message: 'Failed to verify password' })
+    catch: (cause) => new AuthError({ message: 'Failed to verify password', cause })
   })
 
 export const signSessionToken = (
@@ -50,8 +51,13 @@ export const signSessionToken = (
         .setIssuedAt()
         .setExpirationTime(getAuthEnv().AUTH_ACCESS_TOKEN_TTL)
         .sign(getSecret()),
-    catch: () => new AuthError({ message: 'Failed to sign session token' })
+    catch: (error) => new AuthError({ message: `Failed to sign session token: ${error instanceof Error ? error.message : String(error)}` })
   })
+
+// NOTE: The catch handler above intentionally includes the original error message.
+// This was added after a debugging session where AUTH_SECRET was too short (28 chars < 32 minimum)
+// and the error was silently swallowed, producing an opaque "Failed to create access token"
+// error with no indication of the root cause.
 
 export const verifySessionToken = (token: string): Effect.Effect<SessionTokenPayload, AuthError> =>
   Effect.tryPromise({
@@ -71,10 +77,15 @@ export const verifySessionToken = (token: string): Effect.Effect<SessionTokenPay
         sid
       } as SessionTokenPayload
     },
-    catch: () => new AuthError({ message: 'Invalid session token' })
+    catch: (cause) => new AuthError({ message: 'Invalid session token', cause })
   })
 
-export const toPrincipal = (payload: SessionTokenPayload): AuthPrincipal => ({
+/**
+ * Returns a partial principal from token claims only. Does NOT include actual
+ * roles/permissions — use AuthService.getPrincipalFromToken for full principal
+ * resolution.
+ */
+export const toPartialPrincipal = (payload: SessionTokenPayload): AuthPrincipal => ({
   userId: payload.sub,
   email: payload.email,
   roles: ['member'],

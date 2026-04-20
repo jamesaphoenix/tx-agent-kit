@@ -1,18 +1,20 @@
 {
   "extends": "./packages/tooling/typescript-config/base.json",
   "compilerOptions": {
-    "ignoreDeprecations": "5.0",
     "baseUrl": ".",
     "paths": {
+      "@/*": ["apps/web/*"],
       "@tx-agent-kit/ai": ["packages/infra/ai/src/index.ts"],
       "@tx-agent-kit/auth": ["packages/infra/auth/src/index.ts"],
       "@tx-agent-kit/contracts": ["packages/contracts/src/index.ts"],
       "@tx-agent-kit/core": ["packages/core/src/index.ts"],
       "@tx-agent-kit/db": ["packages/infra/db/src/index.ts"],
+      "@tx-agent-kit/email": ["packages/infra/email/src/index.ts"],
       "@tx-agent-kit/logging": ["packages/infra/logging/src/index.ts"],
       "@tx-agent-kit/observability": ["packages/infra/observability/src/index.ts"],
       "@tx-agent-kit/observability/*": ["packages/infra/observability/src/*"],
       "@tx-agent-kit/storage": ["packages/infra/storage/src/index.ts"],
+      "@tx-agent-kit/stripe": ["packages/infra/stripe/src/index.ts"],
       "@tx-agent-kit/testkit": ["packages/testkit/src/index.ts"],
       "@tx-agent-kit/temporal-client": ["packages/temporal-client/src/index.ts"]
     }

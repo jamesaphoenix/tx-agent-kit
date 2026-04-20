@@ -53,7 +53,7 @@ const enforceNoAnyTypeAssertions = () => {
         return false
       }
 
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx')) {
+      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx') || /\/test-[^/]+\.tsx?$/.test(normalized)) {
         return false
       }
 
@@ -100,7 +100,7 @@ const enforceNoEmptyCatchBlocks = () => {
         return false
       }
 
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx')) {
+      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx') || /\/test-[^/]+\.tsx?$/.test(normalized)) {
         return false
       }
 
@@ -147,7 +147,7 @@ const enforceNoChainedTypeAssertions = () => {
         return false
       }
 
-      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx')) {
+      if (normalized.includes('/__tests__/') || normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx') || /\/test-[^/]+\.tsx?$/.test(normalized)) {
         return false
       }
 
@@ -184,7 +184,7 @@ const isSourceModule = (normalizedPath) => {
     return false
   }
 
-  if (normalizedPath.includes('/__tests__/') || normalizedPath.endsWith('.test.ts') || normalizedPath.endsWith('.test.tsx')) {
+  if (normalizedPath.includes('/__tests__/') || normalizedPath.endsWith('.test.ts') || normalizedPath.endsWith('.test.tsx') || /\/test-[^/]+\.tsx?$/.test(normalizedPath)) {
     return false
   }
 

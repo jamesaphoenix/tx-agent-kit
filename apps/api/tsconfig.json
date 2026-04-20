@@ -12,6 +12,8 @@
     { "path": "../../packages/testkit" },
     { "path": "../../packages/infra/logging" },
     { "path": "../../packages/infra/observability" },
-    { "path": "../../packages/infra/storage" }
+    { "path": "../../packages/infra/storage" },
+    { "path": "../../packages/infra/email" },
+    { "path": "../../packages/infra/stripe" }
   ]
 }

@@ -150,11 +150,15 @@ const waitForRefreshLockRelease = async (): Promise<void> => {
   })
 }
 
+// The generic T is preserved for contract compatibility with createSessionRestorer.
+// In practice, all callers pass () => Promise<void> callbacks — the second caller's
+// callback is never executed (deduplication), so the return value is meaningless.
 export const withSerializedAuthRefresh = async <T>(
   callback: () => Promise<T>
 ): Promise<T> => {
   if (serializedAuthRefreshPromise !== null) {
-    return serializedAuthRefreshPromise as Promise<T>
+    await serializedAuthRefreshPromise
+    return undefined as T // Second caller's callback is never executed
   }
 
   const refreshPromise = (async () => {

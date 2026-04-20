@@ -357,7 +357,7 @@ acceptance_criteria:
 |----|-------------|
 | NFR-030 | Structured logging via `@tx-agent-kit/logging` (no `console.*`) |
 | NFR-031 | OpenTelemetry spans for key operations |
-| NFR-032 | Langfuse tracing for AI operations (if applicable) |
+| NFR-032 | OTel tracing for AI operations (if applicable) |
 
 ## Data Retention
 

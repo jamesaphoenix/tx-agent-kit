@@ -32,3 +32,139 @@ export const OrganizationCreatedEventPayloadSchema = Schema.Struct({
 })
 
 export type OrganizationCreatedEventPayload = Schema.Schema.Type<typeof OrganizationCreatedEventPayloadSchema>
+
+export const OrganizationDeletedEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.String,
+  organizationName: Schema.String,
+  deletedByUserId: Schema.String
+})
+
+export type OrganizationDeletedEventPayload = Schema.Schema.Type<typeof OrganizationDeletedEventPayloadSchema>
+
+export const TeamDeletedEventPayloadSchema = Schema.Struct({
+  teamId: Schema.String,
+  teamName: Schema.String,
+  organizationId: Schema.String,
+  deletedByUserId: Schema.String
+})
+
+export type TeamDeletedEventPayload = Schema.Schema.Type<typeof TeamDeletedEventPayloadSchema>
+
+// --- Billing domain event payload schemas ---
+// Shapes mirror the authoritative cross-domain event contract at
+// `packages/core/src/domains/billing/domain/billing-events.ts`.
+
+export const BillingCreditsPurchasedEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  amountDecimillicents: Schema.Number,
+  stripeEventId: Schema.String
+})
+
+export type BillingCreditsPurchasedEventPayload = Schema.Schema.Type<typeof BillingCreditsPurchasedEventPayloadSchema>
+
+export const BillingCreditsRechargedEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  amountDecimillicents: Schema.Number,
+  stripePaymentIntentId: Schema.String
+})
+
+export type BillingCreditsRechargedEventPayload = Schema.Schema.Type<typeof BillingCreditsRechargedEventPayloadSchema>
+
+export const BillingCreditsLowBalanceEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  currentBalanceDecimillicents: Schema.Number,
+  thresholdDecimillicents: Schema.Number
+})
+
+export type BillingCreditsLowBalanceEventPayload = Schema.Schema.Type<typeof BillingCreditsLowBalanceEventPayloadSchema>
+
+export const BillingUsageCapWarningEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  percentUsed: Schema.Number,
+  capDecimillicents: Schema.Number
+})
+
+export type BillingUsageCapWarningEventPayload = Schema.Schema.Type<typeof BillingUsageCapWarningEventPayloadSchema>
+
+export const BillingUsageCapExceededEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  capDecimillicents: Schema.Number
+})
+
+export type BillingUsageCapExceededEventPayload = Schema.Schema.Type<typeof BillingUsageCapExceededEventPayloadSchema>
+
+export const BillingPaymentFailedEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  stripeEventId: Schema.String,
+  gracePeriodEndsAt: Schema.String
+})
+
+export type BillingPaymentFailedEventPayload = Schema.Schema.Type<typeof BillingPaymentFailedEventPayloadSchema>
+
+export const BillingDisputeCreatedEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  stripeEventId: Schema.String,
+  chargeAmountDecimillicents: Schema.Number
+})
+
+export type BillingDisputeCreatedEventPayload = Schema.Schema.Type<typeof BillingDisputeCreatedEventPayloadSchema>
+
+export const BillingDisputeResolvedEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  outcome: Schema.Literal('won', 'lost')
+})
+
+export type BillingDisputeResolvedEventPayload = Schema.Schema.Type<typeof BillingDisputeResolvedEventPayloadSchema>
+
+export const BillingSubscriptionCancelledEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID
+})
+
+export type BillingSubscriptionCancelledEventPayload = Schema.Schema.Type<typeof BillingSubscriptionCancelledEventPayloadSchema>
+
+export const BillingRechargeRequiresActionEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  attemptId: Schema.UUID,
+  amountDecimillicents: Schema.Number,
+  stripePaymentIntentId: Schema.String,
+  clientSecret: Schema.String
+})
+
+export type BillingRechargeRequiresActionEventPayload = Schema.Schema.Type<typeof BillingRechargeRequiresActionEventPayloadSchema>
+
+export const BillingCreditsRefundedEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  amountDecimillicents: Schema.Number,
+  stripeEventId: Schema.String,
+  stripeChargeId: Schema.String
+})
+
+export type BillingCreditsRefundedEventPayload = Schema.Schema.Type<typeof BillingCreditsRefundedEventPayloadSchema>
+
+export const BillingWelcomeCreditGrantedEventPayloadSchema = Schema.Struct({
+  organizationId: Schema.UUID,
+  amountDecimillicents: Schema.Number,
+  plan: Schema.Literal('try_me', 'pro', 'agency'),
+  stripeEventId: Schema.String
+})
+
+export type BillingWelcomeCreditGrantedEventPayload = Schema.Schema.Type<typeof BillingWelcomeCreditGrantedEventPayloadSchema>
+
+export const AssetsThumbnailRequestedEventPayloadSchema = Schema.Struct({
+  assetId: Schema.UUID,
+  teamId: Schema.UUID
+})
+
+export type AssetsThumbnailRequestedEventPayload = Schema.Schema.Type<typeof AssetsThumbnailRequestedEventPayloadSchema>
+
+export const EmailCampaignsEnrollmentTriggeredEventPayloadSchema = Schema.Struct({
+  campaignId: Schema.UUID,
+  userId: Schema.UUID,
+  userEmail: Schema.String,
+  userName: Schema.String,
+  enrollmentId: Schema.UUID,
+  triggerEventType: Schema.String,
+  triggerEventId: Schema.String
+})
+
+export type EmailCampaignsEnrollmentTriggeredEventPayload = Schema.Schema.Type<typeof EmailCampaignsEnrollmentTriggeredEventPayloadSchema>

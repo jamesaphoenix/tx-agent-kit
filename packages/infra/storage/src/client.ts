@@ -33,6 +33,14 @@ export interface StorageService {
     expiresIn?: number
   ): Effect.Effect<string, StorageError>
 
+  putObject(
+    key: string,
+    body: Uint8Array,
+    contentType: string
+  ): Effect.Effect<void, StorageError>
+
+  getObject(key: string): Effect.Effect<Uint8Array, StorageError>
+
   deleteObject(key: string): Effect.Effect<void, StorageError>
 
   listObjects(prefix?: string): Effect.Effect<readonly string[], StorageError>
@@ -88,6 +96,48 @@ const makeStorageService = (): StorageService => {
           new StorageError({
             code: 'STORAGE_PRESIGN_DOWNLOAD_FAILED',
             message: `Failed to generate download URL for ${key}: ${cause instanceof Error ? cause.message : String(cause)}`
+          })
+      }),
+
+    putObject: (key, body, contentType) =>
+      Effect.tryPromise({
+        try: async () => {
+          await s3Client.send(
+            new PutObjectCommand({
+              Bucket: bucket,
+              Key: key,
+              Body: body,
+              ContentType: contentType
+            })
+          )
+        },
+        catch: (cause) =>
+          new StorageError({
+            code: 'STORAGE_UPLOAD_FAILED',
+            message: `Failed to upload ${key}: ${cause instanceof Error ? cause.message : String(cause)}`
+          })
+      }),
+
+    getObject: (key) =>
+      Effect.tryPromise({
+        try: async () => {
+          const response = await s3Client.send(
+            new GetObjectCommand({ Bucket: bucket, Key: key })
+          )
+          const body = response.Body
+          if (!body) {
+            return new Uint8Array()
+          }
+          const streamBody = body as { transformToByteArray?: () => Promise<Uint8Array> }
+          if (typeof streamBody.transformToByteArray === 'function') {
+            return await streamBody.transformToByteArray()
+          }
+          throw new Error('Object body cannot be converted to bytes')
+        },
+        catch: (cause) =>
+          new StorageError({
+            code: 'STORAGE_DOWNLOAD_FAILED',
+            message: `Failed to download ${key}: ${cause instanceof Error ? cause.message : String(cause)}`
           })
       }),
 

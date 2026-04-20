@@ -6,23 +6,16 @@ import type {
   AuthPrincipal,
   AuthResponse,
   BillingSettings,
-  CreateCheckoutSessionInput,
-  CreatePortalSessionInput,
   CreateOrganizationRequest,
   CreateTeamRequest,
   ForgotPasswordRequest,
+  InvitationAssignableRole,
   Invitation,
-  OrgMemberRole,
   Organization,
-  PermissionAction,
   ResetPasswordRequest,
   SignInRequest,
   SignUpRequest,
-  Team,
-  UpdateBillingSettingsInput,
-  UpdateOrganizationRequest,
-  UsageCategory,
-  UsageSummary
+  Team
 } from '@tx-agent-kit/contracts'
 import {
   clearAuthToken,
@@ -59,10 +52,25 @@ export interface PaginatedResponse<T> {
   prevCursor: string | null
 }
 
-export interface MyPermissionsResponse {
-  organizationId?: string
-  role?: OrgMemberRole
-  permissions: PermissionAction[]
+export interface ReviewToken {
+  id: string
+  teamId: string
+  token: string
+  expiresAt: string
+  revokedAt: string | null
+  permissions: string[]
+  reviewerName: string | null
+  reviewerEmail: string | null
+  lastAccessedAt: string | null
+  createdBy: string
+  createdAt: string
+}
+
+export interface ReviewTokenValidation {
+  valid: boolean
+  token?: ReviewToken
+  teamId?: string
+  permissions?: string[]
 }
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
@@ -264,24 +272,6 @@ export const clientApi = {
     }
   },
 
-  updateOrganization: async (id: string, input: UpdateOrganizationRequest): Promise<Organization> => {
-    try {
-      const { data } = await api.patch<Organization>(`/v1/organizations/${encodeURIComponent(id)}`, input)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to update organization')
-    }
-  },
-
-  removeOrganization: async (id: string): Promise<{ deleted: true }> => {
-    try {
-      const { data } = await api.delete<{ deleted: true }>(`/v1/organizations/${encodeURIComponent(id)}`)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to delete organization')
-    }
-  },
-
   listInvitations: async (query?: ListQuery): Promise<PaginatedResponse<Invitation>> => {
     try {
       const { data } = await api.get<unknown>('/v1/invitations', {
@@ -293,46 +283,16 @@ export const clientApi = {
     }
   },
 
-  getInvitation: async (id: string): Promise<Invitation> => {
-    try {
-      const { data } = await api.get<Invitation>(`/v1/invitations/${encodeURIComponent(id)}`)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to fetch invitation')
-    }
-  },
-
   createInvitation: async (input: {
     organizationId: string
     email: string
-    role: 'admin' | 'member'
+    role: InvitationAssignableRole
   }): Promise<Invitation> => {
     try {
       const { data } = await api.post<Invitation>('/v1/invitations', input)
       return data
     } catch (error) {
       return fail(error, 'Failed to send invitation')
-    }
-  },
-
-  updateInvitation: async (id: string, input: {
-    role?: 'admin' | 'member'
-    status?: 'pending' | 'accepted' | 'revoked' | 'expired'
-  }): Promise<Invitation> => {
-    try {
-      const { data } = await api.patch<Invitation>(`/v1/invitations/${encodeURIComponent(id)}`, input)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to update invitation')
-    }
-  },
-
-  removeInvitation: async (id: string): Promise<{ deleted: true }> => {
-    try {
-      const { data } = await api.delete<{ deleted: true }>(`/v1/invitations/${encodeURIComponent(id)}`)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to revoke invitation')
     }
   },
 
@@ -344,6 +304,26 @@ export const clientApi = {
       return data
     } catch (error) {
       return fail(error, 'Failed to accept invitation')
+    }
+  },
+
+  uploadAssetContent: async (input: {
+    teamId: string
+    uploadId: string
+    file: File
+  }): Promise<void> => {
+    try {
+      await api.put(
+        `/v1/teams/${encodeURIComponent(input.teamId)}/uploads/${encodeURIComponent(input.uploadId)}/content`,
+        input.file,
+        {
+          headers: {
+            'Content-Type': input.file.type || 'application/octet-stream'
+          }
+        }
+      )
+    } catch (error) {
+      return fail(error, 'Failed to upload file')
     }
   },
 
@@ -376,24 +356,6 @@ export const clientApi = {
     }
   },
 
-  updateTeam: async (id: string, input: { name?: string }): Promise<Team> => {
-    try {
-      const { data } = await api.patch<Team>(`/v1/teams/${encodeURIComponent(id)}`, input)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to update team')
-    }
-  },
-
-  removeTeam: async (id: string): Promise<{ deleted: true }> => {
-    try {
-      const { data } = await api.delete<{ deleted: true }>(`/v1/teams/${encodeURIComponent(id)}`)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to delete team')
-    }
-  },
-
   getBillingSettings: async (organizationId: string): Promise<BillingSettings> => {
     try {
       const { data } = await api.get<BillingSettings>(`/v1/organizations/${encodeURIComponent(organizationId)}/billing`)
@@ -403,72 +365,31 @@ export const clientApi = {
     }
   },
 
-  updateBillingSettings: async (
-    organizationId: string,
-    input: UpdateBillingSettingsInput
-  ): Promise<BillingSettings> => {
+  // ── Test helpers (used by integration tests for imperative setup/assert) ──
+
+  createReviewToken: async (
+    teamId: string,
+    input: { permissions: string[]; reviewerName?: string; reviewerEmail?: string; expiresInDays?: number }
+  ): Promise<ReviewToken> => {
     try {
-      const { data } = await api.patch<BillingSettings>(
-        `/v1/organizations/${encodeURIComponent(organizationId)}/billing`,
+      const { data } = await api.post<ReviewToken>(
+        `/v1/teams/${encodeURIComponent(teamId)}/review-tokens`,
         input
       )
       return data
     } catch (error) {
-      return fail(error, 'Failed to update billing settings')
+      return fail(error, 'Failed to create review token')
     }
   },
 
-  createCheckoutSession: async (input: CreateCheckoutSessionInput): Promise<{ id: string; url: string }> => {
+  revokeReviewToken: async (teamId: string, tokenId: string): Promise<{ deleted: boolean }> => {
     try {
-      const { data } = await api.post<{ id: string; url: string }>('/v1/billing/checkout', input)
+      const { data } = await api.delete<{ deleted: boolean }>(
+        `/v1/teams/${encodeURIComponent(teamId)}/review-tokens/${encodeURIComponent(tokenId)}`
+      )
       return data
     } catch (error) {
-      return fail(error, 'Failed to create checkout session')
-    }
-  },
-
-  createPortalSession: async (input: CreatePortalSessionInput): Promise<{ id: string; url: string }> => {
-    try {
-      const { data } = await api.post<{ id: string; url: string }>('/v1/billing/portal', input)
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to create billing portal session')
-    }
-  },
-
-  getUsageSummary: async (
-    organizationId: string,
-    input: { category: UsageCategory; periodStart?: string; periodEnd?: string }
-  ): Promise<UsageSummary> => {
-    try {
-      const { data } = await api.get<UsageSummary>(`/v1/organizations/${encodeURIComponent(organizationId)}/usage`, {
-        params: {
-          category: input.category,
-          periodStart: input.periodStart,
-          periodEnd: input.periodEnd
-        }
-      })
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to fetch usage summary')
-    }
-  },
-
-  getPermissionMap: async (): Promise<Record<OrgMemberRole, ReadonlyArray<PermissionAction>>> => {
-    try {
-      const { data } = await api.get<Record<OrgMemberRole, ReadonlyArray<PermissionAction>>>('/v1/permissions')
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to fetch permission map')
-    }
-  },
-
-  getMyPermissions: async (): Promise<MyPermissionsResponse> => {
-    try {
-      const { data } = await api.get<MyPermissionsResponse>('/v1/permissions/me')
-      return data
-    } catch (error) {
-      return fail(error, 'Failed to fetch resolved permissions')
+      return fail(error, 'Failed to revoke review token')
     }
   }
 }

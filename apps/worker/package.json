@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "dev": "bash -lc 'set -a; [[ -f ../../.env ]] && source ../../.env; set +a; export NODE_OPTIONS=\"--inspect=${WORKER_INSPECT_PORT:-9229}\"; exec tsx watch src/index.ts'",
+    "dev": "bash -lc 'set -a; [[ -f ../../.env ]] && source ../../.env; set +a; export NODE_OPTIONS=\"--inspect=${WORKER_INSPECT_PORT:-9229}\"; lsof -ti :${WORKER_INSPECT_PORT:-9229} | xargs kill -9 2>/dev/null; exec tsx watch src/index.ts'",
     "build": "tsc -b",
     "type-check": "tsc -b --pretty false",
     "lint": "eslint src --max-warnings=0",
@@ -15,18 +15,24 @@
     "test:integration:temporal": "vitest run -c vitest.temporal.integration.config.ts"
   },
   "dependencies": {
-    "@sentry/node": "^10.41.0",
-    "@temporalio/client": "^1.13.1",
-    "@temporalio/common": "^1.13.1",
-    "@temporalio/worker": "^1.13.1",
-    "@temporalio/workflow": "^1.13.1",
+    "@sentry/node": "^10.48.0",
+    "@temporalio/client": "^1.16.0",
+    "@temporalio/common": "^1.16.0",
+    "@temporalio/worker": "^1.16.0",
+    "@temporalio/workflow": "^1.16.0",
+    "@tx-agent-kit/contracts": "workspace:*",
+    "@tx-agent-kit/core": "workspace:*",
     "@tx-agent-kit/db": "workspace:*",
+    "@tx-agent-kit/email": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
     "@tx-agent-kit/observability": "workspace:*",
     "@tx-agent-kit/storage": "workspace:*",
-    "effect": "^3.19.19"
+    "@tx-agent-kit/stripe": "workspace:*",
+    "effect": "^3.21.0",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*"
   }
 }

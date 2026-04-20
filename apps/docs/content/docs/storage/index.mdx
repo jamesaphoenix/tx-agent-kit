@@ -53,16 +53,16 @@ Each environment uses a dedicated R2 bucket. The same API token (scoped to all b
 
 | Environment | Bucket | When used |
 |-------------|--------|-----------|
-| Development | `octospark-dev` | Local dev, CI |
-| Staging | `octospark-staging` | Pre-production testing |
-| Production | `octospark-prod` | Live traffic |
+| Development | `tx-agent-kit-dev` | Local dev, CI |
+| Staging | `tx-agent-kit-staging` | Pre-production testing |
+| Production | `tx-agent-kit-prod` | Live traffic |
 
 ## Key design decisions
 
 - **No local emulator.** All environments hit real R2. This eliminates environment parity issues and leverages R2's generous free tier (10 GB storage, 10M reads/month).
 - **Presigned URLs only.** Files never pass through the API server. Clients upload and download directly from R2.
 - **Lazy initialization.** The `StorageLive` layer defers S3 client creation until first use, so importing the package in tests does not require credentials.
-- **1Password for credentials.** R2 access keys are stored in the `octospark-services` vault and injected via `op://` references.
+- **1Password for credentials.** R2 access keys are stored in the `tx-agent-kit-services` vault and injected via `op://` references.
 
 ## Related pages
 

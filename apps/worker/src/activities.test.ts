@@ -6,6 +6,8 @@ class MockStorage extends Context.Tag('@tx-agent-kit/storage/Storage')<
   {
     generateUploadUrl(key: string, contentType: string, expiresIn?: number): Effect.Effect<string>
     generateDownloadUrl(key: string, expiresIn?: number): Effect.Effect<string>
+    putObject(key: string, body: Uint8Array, contentType: string): Effect.Effect<void>
+    getObject(key: string): Effect.Effect<Uint8Array>
     deleteObject(key: string): Effect.Effect<void>
     listObjects(prefix?: string): Effect.Effect<readonly string[]>
     getObjectMetadata(key: string): Effect.Effect<{
@@ -22,6 +24,8 @@ vi.mock('@tx-agent-kit/storage', () => {
   const mockService = {
     generateUploadUrl: () => Effect.succeed('https://mock-upload-url.com'),
     generateDownloadUrl: () => Effect.succeed('https://mock-download-url.com'),
+    putObject: () => Effect.void,
+    getObject: () => Effect.succeed(new Uint8Array([1, 2, 3])),
     deleteObject: () => Effect.void,
     listObjects: (prefix: string | undefined) =>
       Effect.succeed(prefix === 'test/' ? ['test/file1.png', 'test/file2.png'] : []),

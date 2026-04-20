@@ -11,7 +11,8 @@ const envKeys = [
   'OTEL_EXPORTER_OTLP_ENDPOINT',
   'NEXT_PUBLIC_NODE_ENV',
   'NODE_ENV',
-  'NEXT_PUBLIC_SENTRY_DSN'
+  'NEXT_PUBLIC_SENTRY_DSN',
+  'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY'
 ] as const
 
 const clearEnvOverrides = (): void => {
@@ -32,6 +33,7 @@ describe('getWebEnv', () => {
     mutableProcessEnv.NEXT_PUBLIC_NODE_ENV = 'staging'
     mutableProcessEnv.NEXT_PUBLIC_SENTRY_DSN =
       'https://public@sentry.example.com/123'
+    mutableProcessEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
 
     const { getWebEnv: freshGetWebEnv } = await import('./env')
     const env = freshGetWebEnv()
@@ -40,6 +42,7 @@ describe('getWebEnv', () => {
     expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe('https://otel.example.com')
     expect(env.NODE_ENV).toBe('staging')
     expect(env.SENTRY_DSN).toBe('https://public@sentry.example.com/123')
+    expect(env.STRIPE_PUBLISHABLE_KEY).toBe('pk_test_123')
   })
 
   it('falls back to non-public values', async () => {
@@ -65,6 +68,7 @@ describe('getWebEnv', () => {
     expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(defaultOtelEndpoint)
     expect(env.NODE_ENV).toBe(defaultNodeEnv)
     expect(env.SENTRY_DSN).toBeUndefined()
+    expect(env.STRIPE_PUBLISHABLE_KEY).toBeUndefined()
   })
 
   it('returns cached object on repeated calls', async () => {
@@ -72,6 +76,7 @@ describe('getWebEnv', () => {
     mutableProcessEnv.NEXT_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT = 'https://cache-otel.example.com'
     mutableProcessEnv.NEXT_PUBLIC_NODE_ENV = 'preview'
     mutableProcessEnv.NEXT_PUBLIC_SENTRY_DSN = 'https://cache@sentry.example.com/789'
+    mutableProcessEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = 'pk_test_cache'
 
     const { getWebEnv: freshGetWebEnv } = await import('./env')
     const first = freshGetWebEnv()
@@ -80,6 +85,7 @@ describe('getWebEnv', () => {
       'https://changed-otel.example.com'
     mutableProcessEnv.NEXT_PUBLIC_NODE_ENV = 'production'
     mutableProcessEnv.NEXT_PUBLIC_SENTRY_DSN = 'https://changed@sentry.example.com/999'
+    mutableProcessEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = 'pk_test_changed'
     const second = freshGetWebEnv()
 
     expect(first).toBe(second)
@@ -87,5 +93,6 @@ describe('getWebEnv', () => {
     expect(second.OTEL_EXPORTER_OTLP_ENDPOINT).toBe('https://cache-otel.example.com')
     expect(second.NODE_ENV).toBe('preview')
     expect(second.SENTRY_DSN).toBe('https://cache@sentry.example.com/789')
+    expect(second.STRIPE_PUBLISHABLE_KEY).toBe('pk_test_cache')
   })
 })

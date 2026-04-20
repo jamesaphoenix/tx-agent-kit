@@ -21,6 +21,7 @@ All commands are run from the monorepo root via `pnpm`. This is the complete ref
 | `pnpm env:configure` | Seed `.env` file with local development defaults (idempotent) |
 | `pnpm infra:ensure` | Start Docker infrastructure services (idempotent, shared across worktrees) |
 | `pnpm infra:down` | Stop Docker infrastructure and remove volumes |
+| `pnpm langfuse:ensure-local` | Verify and repair the local Langfuse org/project/user bootstrap |
 | `pnpm openapi:generate` | Generate OpenAPI spec from API route definitions |
 | `pnpm api:client:generate` | Regenerate web + mobile API client hooks from OpenAPI spec |
 | `pnpm mobile:generate:api` | Regenerate mobile API client from OpenAPI spec |
@@ -116,9 +117,9 @@ Most quality gates have both quiet and full variants:
 
 The quiet variants run the same checks as the full variants; they only differ in output verbosity.
 
-## Integration test locking
+## Parallel integration runs across worktrees
 
-Integration tests are guarded by a file lock at `/tmp/tx-agent-kit-integration.lock`. This prevents overlapping integration test runs from clobbering each other's database state. If a previous run was interrupted, the lock file is automatically cleaned up by the next run.
+Integration tests run in parallel across git worktrees without file locking. `scripts/worktree/setup.sh` allocates a deterministic `WORKTREE_PORT_OFFSET` per worktree, and `scripts/test/vitest-global-setup.ts` binds the shared integration API server to `4100 + offset`. Each worktree also gets its own Postgres schema, so database state is already isolated.
 
 ## CLI tool
 

@@ -1,0 +1,87 @@
+---
+title: Langfuse
+description: Local and deployed LLM tracing with Langfuse
+---
+
+Langfuse is the LLM observability backend. It receives only LLM/GenAI spans from `@tx-agent-kit/observability`; standard OpenTelemetry traces continue through the OTEL collector to Jaeger locally and GCP in deployed environments.
+
+## Local development
+
+Local Langfuse runs in the Docker Compose `infra` profile:
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Langfuse UI | `http://localhost:3003` | LLM trace viewer |
+| Langfuse worker | `http://localhost:3030/api/health` | Ingestion and background jobs |
+
+`pnpm infra:ensure` starts the Langfuse web, worker, Postgres, ClickHouse, MinIO, and Redis services. After the containers are healthy, it runs:
+
+```bash
+scripts/langfuse/ensure-local-bootstrap.sh
+```
+
+The script verifies and repairs the local bootstrap state inside the Langfuse Postgres volume:
+
+| Resource | Local value |
+|----------|-------------|
+| Organization | `tx-agent-kit Local` |
+| Project | `tx-agent-kit Local` |
+| User | `dev@tx-agent-kit.local` |
+| Password | `tx-agent-kit-local-langfuse` |
+| Role | `OWNER` on the organization and project |
+
+Sign in at `http://localhost:3003/auth/sign-in` with the local user above. Social sign-in can create a separate local Langfuse user without access to the seeded organization; use the seeded email/password account for local development.
+
+## Bootstrap configuration
+
+Docker Compose passes Langfuse headless initialization variables to `langfuse-web`:
+
+```yaml
+LANGFUSE_INIT_ORG_ID: tx-agent-kit-local
+LANGFUSE_INIT_ORG_NAME: tx-agent-kit Local
+LANGFUSE_INIT_PROJECT_ID: tx-agent-kit-local
+LANGFUSE_INIT_PROJECT_NAME: tx-agent-kit Local
+LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-00000000-0000-4000-8000-000000000000}
+LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-00000000-0000-4000-8000-000000000000}
+LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-dev@tx-agent-kit.local}
+LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-tx-agent-kit-local-langfuse}
+```
+
+Langfuse creates these resources on first boot. The repository bootstrap script then makes the setup deterministic for existing local volumes by resetting the local dev user's password and ensuring project membership.
+
+Run the bootstrap manually if you need to repair local Langfuse without restarting the full stack:
+
+```bash
+pnpm langfuse:ensure-local
+```
+
+## Application configuration
+
+Local `.env` defaults point application LLM traces at the local Langfuse instance:
+
+| Variable | Local default |
+|----------|---------------|
+| `LANGFUSE_ENABLED` | `true` |
+| `LANGFUSE_BASE_URL` | `http://localhost:3003` |
+| `LANGFUSE_HOST` | `http://localhost:3003` |
+| `LANGFUSE_PUBLIC_KEY` | `pk-lf-00000000-0000-4000-8000-000000000000` |
+| `LANGFUSE_SECRET_KEY` | `sk-lf-00000000-0000-4000-8000-000000000000` |
+| `LANGFUSE_SAMPLE_RATE` | `1` |
+
+If you change local Langfuse API keys after a volume already exists, `pnpm infra:ensure` will fail with a key mismatch. Align `.env` with the existing local key or recreate only the local Langfuse volumes.
+
+## Staging and production
+
+Staging and production use Langfuse Cloud credentials from 1Password. Application services send LLM spans to Langfuse Cloud, while standard OTEL traces remain on the normal OTEL/GCP path.
+
+Do not put Langfuse secrets in committed `.env` files. Use `op://` references in environment templates and inject them through the deployment scripts.
+
+## Verification
+
+The Langfuse integration tests cover both local and deployed configuration modes and enforce the span boundary:
+
+```bash
+pnpm test:integration:quiet --filter observability -- packages/infra/observability/src/langfuse.integration.test.ts
+```
+
+The tests assert that LLM generation spans are exportable to Langfuse and non-LLM spans, including database spans, are not exported to Langfuse.

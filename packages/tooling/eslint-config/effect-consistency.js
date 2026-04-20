@@ -11,7 +11,8 @@ export const effectConsistencyConfig = [
     files: ['packages/core/src/**/*.ts', 'apps/api/src/**/*.ts'],
     ignores: [
       '**/*.test.ts',
-      '**/*.integration.test.ts'
+      '**/*.integration.test.ts',
+      '**/test-*.ts'
     ],
     rules: {
       'no-restricted-syntax': [

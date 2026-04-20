@@ -1,36 +1,40 @@
 'use client'
 
-import type { Invitation, Organization } from '@tx-agent-kit/contracts'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import type { InvitationAssignableRole } from '@tx-agent-kit/contracts'
+import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { DashboardShell } from '../../components/DashboardShell'
 import { useCurrentPrincipal, useIsSessionReady } from '../../hooks/use-session-store'
-import { ensureSessionOrRedirect, handleUnauthorizedApiError } from '../../lib/client-auth'
-import { clientApi } from '../../lib/client-api'
 import { notify } from '../../lib/notify'
 import { useStringQueryParam } from '../../lib/url-state'
-
-type InvitationWithOrgName = Invitation & { organizationName: string }
-
-const statusColors: Record<string, string> = {
-  pending: 'var(--warning, #f59e0b)',
-  accepted: 'var(--success, #10b981)',
-  revoked: 'var(--muted, #6b7280)',
-  expired: 'var(--muted, #6b7280)'
-}
+import {
+  useOrganizationsListInvitations,
+  useOrganizationsListOrganizations,
+  getOrganizationsListInvitationsQueryKey,
+  getOrganizationsListOrganizationsQueryKey,
+  organizationsAcceptInvitation,
+  organizationsCreateInvitation,
+  organizationsRemoveInvitation
+} from '../../lib/api/generated/organizations/organizations'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 
 function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      className="invitation-status-badge"
-      style={{
-        color: statusColors[status] ?? 'var(--muted)',
-        borderColor: statusColors[status] ?? 'var(--muted)'
-      }}
-    >
-      {status}
-    </span>
-  )
+  switch (status) {
+    case 'pending':
+      return <Badge variant="outline" className="border-yellow-500 bg-yellow-50 text-yellow-700">{status}</Badge>
+    case 'accepted':
+      return <Badge variant="outline" className="border-green-500 bg-green-50 text-green-700">{status}</Badge>
+    case 'revoked':
+      return <Badge variant="outline" className="border-red-500 bg-red-50 text-red-700">{status}</Badge>
+    case 'expired':
+      return <Badge variant="outline" className="border-gray-400 bg-gray-50 text-gray-500">{status}</Badge>
+    default:
+      return <Badge variant="outline">{status}</Badge>
+  }
 }
 
 function formatDate(date: string | Date): string {
@@ -45,171 +49,197 @@ export default function InvitationsPage() {
   const router = useRouter()
   const isSessionReady = useIsSessionReady()
   const principal = useCurrentPrincipal()
+  const queryClient = useQueryClient()
   const urlToken = useStringQueryParam('token')
-  const [invitations, setInvitations] = useState<InvitationWithOrgName[]>([])
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [accepting, setAccepting] = useState(false)
-  const [revoking, setRevoking] = useState<string | null>(null)
   const autoAcceptAttempted = useRef(false)
+
+  const [accepting, setAccepting] = useState(false)
+  const [acceptingInvitationId, setAcceptingInvitationId] = useState<string | null>(null)
+  const [acceptingOrganizationId, setAcceptingOrganizationId] = useState<string | null>(null)
+  const [revoking, setRevoking] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const [inviteOrgId, setInviteOrgId] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
+  const [inviteRole, setInviteRole] = useState<InvitationAssignableRole>('member')
   const [invitePending, setInvitePending] = useState(false)
-
   const [manualToken, setManualToken] = useState('')
 
-  const load = useCallback(async (): Promise<void> => {
-    if (!ensureSessionOrRedirect(router, '/invitations')) {
-      return
-    }
+  // ── Queries ──────────────────────────────────────────────────────────
+  const invitationsQuery = useOrganizationsListInvitations(undefined, {
+    query: { enabled: isSessionReady }
+  })
+  const orgsQuery = useOrganizationsListOrganizations(undefined, {
+    query: { enabled: isSessionReady }
+  })
 
-    setLoading(true)
-    setError(null)
+  const invitations = invitationsQuery.data?.data ?? []
+  const organizations = orgsQuery.data?.data ?? []
+  const loading = invitationsQuery.isLoading
 
-    try {
-      const [invitationsPayload, organizationsPayload] = await Promise.all([
-        clientApi.listInvitations(),
-        clientApi.listOrganizations()
-      ])
+  const orgMap = new Map(organizations.map((o) => [o.id, o.name]))
+  const invitationsWithOrg = invitations.map((inv) => ({
+    ...inv,
+    organizationName: orgMap.get(inv.organizationId) ?? 'Organization invitation'
+  }))
 
-      const orgMap = new Map(organizationsPayload.data.map((o) => [o.id, o.name]))
+  const invalidateInvitations = () =>
+    queryClient.invalidateQueries({ queryKey: getOrganizationsListInvitationsQueryKey() })
+  const invalidateOrganizationContext = () =>
+    queryClient.invalidateQueries({ queryKey: getOrganizationsListOrganizationsQueryKey() })
 
-      setInvitations(
-        invitationsPayload.data.map((inv) => ({
-          ...inv,
-          organizationName: orgMap.get(inv.organizationId) ?? 'Unknown organization'
-        }))
-      )
-      setOrganizations(organizationsPayload.data)
-    } catch (error_) {
-      if (handleUnauthorizedApiError(error_, router, '/invitations')) {
-        return
-      }
-      setError(error_ instanceof Error ? error_.message : 'Failed to load invitations')
-    } finally {
-      setLoading(false)
-    }
-  }, [router])
-
+  // ── Auto-accept from URL token ───────────────────────────────────────
   useEffect(() => {
-    if (!isSessionReady) {
-      return
-    }
-
-    void load()
-  }, [isSessionReady, load])
-
-  useEffect(() => {
-    if (!urlToken || autoAcceptAttempted.current || loading) {
-      return
-    }
-
+    if (!urlToken || autoAcceptAttempted.current || loading) {return}
     autoAcceptAttempted.current = true
-    const pendingInvitation = invitations.find((inv) => inv.token === urlToken)
+
+    const pendingInvitation = invitationsWithOrg.find((inv) => inv.token === urlToken)
     const accept = async () => {
       setAccepting(true)
       try {
-        await clientApi.acceptInvitation(urlToken)
+        await organizationsAcceptInvitation(urlToken)
         notify.success('Invitation accepted! Redirecting...')
-        await load()
+        void invalidateInvitations()
+        void invalidateOrganizationContext()
         if (pendingInvitation) {
           router.push(`/org/${pendingInvitation.organizationId}/workspaces`)
         } else {
           router.push('/org')
         }
-      } catch (error_) {
-        const message = error_ instanceof Error ? error_.message : 'Failed to accept invitation'
-        notify.error(message)
-        setError(message)
+      } catch {
+        setError('Failed to accept invitation')
+        notify.error('Failed to accept invitation')
       } finally {
         setAccepting(false)
       }
     }
     void accept()
-  }, [urlToken, loading, invitations, load, router])
+  }, [urlToken, loading])
 
   const handleAcceptManual = async () => {
-    if (!manualToken.trim()) {
-      return
-    }
+    if (!manualToken.trim()) {return}
     setAccepting(true)
     setError(null)
     try {
-      await clientApi.acceptInvitation(manualToken.trim())
+      await organizationsAcceptInvitation(manualToken.trim())
       setManualToken('')
       notify.success('Invitation accepted')
-      await load()
-    } catch (error_) {
-      const message = error_ instanceof Error ? error_.message : 'Failed to accept invitation'
-      setError(message)
-      notify.error(message)
+      void invalidateInvitations()
+      void invalidateOrganizationContext()
+    } catch {
+      setError('Failed to accept invitation')
+      notify.error('Failed to accept invitation')
     } finally {
       setAccepting(false)
+    }
+  }
+
+  const handleAcceptInvitation = async (invitation: { id: string; token: string; organizationId: string }) => {
+    setAcceptingInvitationId(invitation.id)
+    setError(null)
+    try {
+      await organizationsAcceptInvitation(invitation.token)
+      notify.success('Invitation accepted')
+      void invalidateInvitations()
+      void invalidateOrganizationContext()
+      router.push(`/org/${invitation.organizationId}/workspaces`)
+    } catch {
+      setError('Failed to accept invitation')
+      notify.error('Failed to accept invitation')
+    } finally {
+      setAcceptingInvitationId(null)
+    }
+  }
+
+  const handleAcceptOrganizationInvitations = async (organizationId: string) => {
+    const matchingInvitations = pendingInvitations.filter((invitation) => invitation.organizationId === organizationId)
+    if (matchingInvitations.length === 0) {return}
+
+    setAcceptingOrganizationId(organizationId)
+    setError(null)
+    try {
+      const results = await Promise.allSettled(
+        matchingInvitations.map((invitation) => organizationsAcceptInvitation(invitation.token))
+      )
+      const acceptedCount = results.filter((result) => result.status === 'fulfilled').length
+      const failedCount = results.length - acceptedCount
+
+      void invalidateInvitations()
+      void invalidateOrganizationContext()
+
+      if (acceptedCount > 0) {
+        if (failedCount > 0) {
+          notify.info(
+            `${acceptedCount} invitation${acceptedCount === 1 ? '' : 's'} accepted; ${failedCount} could not be accepted`
+          )
+        } else {
+          notify.success(
+            acceptedCount === 1
+              ? 'Invitation accepted'
+              : `${acceptedCount} invitations accepted`
+          )
+        }
+        router.push(`/org/${organizationId}/workspaces`)
+        return
+      }
+
+      setError('Failed to accept invitations')
+      notify.error('Failed to accept invitations')
+    } catch {
+      setError('Failed to accept invitations')
+      notify.error('Failed to accept invitations')
+    } finally {
+      setAcceptingOrganizationId(null)
     }
   }
 
   const handleRevoke = async (invitationId: string) => {
     setRevoking(invitationId)
     try {
-      await clientApi.removeInvitation(invitationId)
+      await organizationsRemoveInvitation(invitationId)
       notify.success('Invitation revoked')
-      await load()
-    } catch (error_) {
-      const message = error_ instanceof Error ? error_.message : 'Failed to revoke invitation'
-      notify.error(message)
+      void invalidateInvitations()
+    } catch {
+      notify.error('Failed to revoke invitation')
     } finally {
       setRevoking(null)
     }
   }
 
-  const handleInvite = async (event: React.FormEvent) => {
+  const handleInvite = async (event: SyntheticEvent<HTMLFormElement, SubmitEvent>) => {
     event.preventDefault()
-    if (!inviteOrgId || !inviteEmail.trim()) {
-      return
-    }
+    if (!inviteOrgId || !inviteEmail.trim()) {return}
 
     setInvitePending(true)
     setError(null)
     try {
-      await clientApi.createInvitation({
+      await organizationsCreateInvitation({
         organizationId: inviteOrgId,
         email: inviteEmail.trim(),
         role: inviteRole
       })
       setInviteEmail('')
       notify.success('Invitation sent')
-      await load()
-    } catch (error_) {
-      const message = error_ instanceof Error ? error_.message : 'Failed to send invitation'
-      setError(message)
-      notify.error(message)
+      void invalidateInvitations()
+    } catch {
+      notify.error('Failed to send invitation')
     } finally {
       setInvitePending(false)
     }
   }
 
-  const pendingInvitations = invitations.filter((inv) => inv.status === 'pending')
-  const pastInvitations = invitations.filter((inv) => inv.status !== 'pending')
-
-  const metrics = [
-    {
-      label: 'Pending invites',
-      value: String(pendingInvitations.length),
-      tone: pendingInvitations.length > 0 ? 'warning' as const : 'success' as const
-    },
-    {
-      label: 'Organizations',
-      value: String(organizations.length)
-    },
-    {
-      label: 'Pipeline',
-      value: accepting ? 'Processing' : 'Live',
-      tone: accepting ? 'warning' as const : 'success' as const
+  const pendingInvitations = invitationsWithOrg.filter((inv) => inv.status === 'pending')
+  const pastInvitations = invitationsWithOrg.filter((inv) => inv.status !== 'pending')
+  const pendingInvitationCountsByOrg = pendingInvitations.reduce<Map<string, number>>((counts, invitation) => {
+    counts.set(invitation.organizationId, (counts.get(invitation.organizationId) ?? 0) + 1)
+    return counts
+  }, new Map())
+  const firstPendingInvitationIdByOrg = pendingInvitations.reduce<Map<string, string>>((firstIds, invitation) => {
+    if (!firstIds.has(invitation.organizationId)) {
+      firstIds.set(invitation.organizationId, invitation.id)
     }
-  ]
+    return firstIds
+  }, new Map())
 
   if (accepting && urlToken) {
     return (
@@ -217,11 +247,10 @@ export default function InvitationsPage() {
         title="Invitations"
         subtitle="Processing invitation acceptance."
         principalEmail={principal?.email}
-        metrics={metrics}
       >
-        <section className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <h2>Accepting invitation...</h2>
-          <p className="muted">Please wait while we process your invitation.</p>
+        <section className="rounded-xl border border-border bg-white p-12 shadow-sm text-center">
+          <h2 className="text-base font-semibold">Accepting invitation...</h2>
+          <p className="text-sm text-muted-foreground">Please wait while we process your invitation.</p>
         </section>
       </DashboardShell>
     )
@@ -232,115 +261,145 @@ export default function InvitationsPage() {
       title="Invitations"
       subtitle="Send, accept, and revoke organization invitations from one command surface."
       principalEmail={principal?.email}
-      metrics={metrics}
     >
-      {error && <p className="error">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <section className="card stack">
-        <h2>Invitation activity</h2>
-        <p className="muted">Manage invite flow for each organization and route accepted invites into workspaces.</p>
+      <section className="rounded-xl border border-border bg-white p-6 shadow-sm space-y-3 mb-6">
+        <h2 className="text-base font-semibold">Invitation activity</h2>
+        <p className="text-sm text-muted-foreground">Manage invite flow for each organization and route accepted invites into workspaces.</p>
       </section>
 
-      <div className="dashboard-shell-grid">
-        <section className="card">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className="rounded-xl border border-border bg-white p-6 shadow-sm">
           <form
-            className="stack"
+            className="space-y-3"
             onSubmit={(event) => { void handleInvite(event) }}
           >
-            <h3>Invite a teammate</h3>
-            <p className="muted" style={{ fontSize: '0.875rem' }}>
+            <h3 className="text-base font-semibold">Invite a teammate</h3>
+            <p className="text-sm text-muted-foreground">
               They will receive an invitation token and can join immediately.
             </p>
 
-            <label className="stack">
-              <span>Organization</span>
+            <div className="space-y-2">
+              <Label htmlFor="invite-organization">Organization</Label>
               <select
+                id="invite-organization"
                 value={inviteOrgId}
                 onChange={(event) => setInviteOrgId(event.target.value)}
+                className="flex h-8 w-full items-center rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <option value="">Select organization</option>
                 {organizations.map((org) => (
                   <option key={org.id} value={org.id}>{org.name}</option>
                 ))}
               </select>
-            </label>
+            </div>
 
-            <label className="stack">
-              <span>Email address</span>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="invite-email">Email address</Label>
+              <Input
+                id="invite-email"
                 type="email"
                 value={inviteEmail}
                 onChange={(event) => setInviteEmail(event.target.value)}
                 placeholder="colleague@example.com"
                 required
               />
-            </label>
+            </div>
 
-            <label className="stack">
-              <span>Role</span>
+            <div className="space-y-2">
+              <Label>Role</Label>
               <select
                 value={inviteRole}
-                onChange={(event) => setInviteRole(event.target.value as 'admin' | 'member')}
+                onChange={(event) => setInviteRole(event.target.value as InvitationAssignableRole)}
+                className="flex h-8 w-full items-center rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <option value="member">Member</option>
                 <option value="admin">Admin</option>
               </select>
-            </label>
+            </div>
 
-            <button type="submit" disabled={invitePending || !inviteOrgId}>
+            <Button type="submit" disabled={invitePending || !inviteOrgId}>
               {invitePending ? 'Sending...' : 'Send invitation'}
-            </button>
+            </Button>
           </form>
         </section>
 
-        <section className="card">
-          <div className="stack">
-            <h3>Accept invitation token</h3>
-            <p className="muted" style={{ fontSize: '0.875rem' }}>
+        <section className="rounded-xl border border-border bg-white p-6 shadow-sm">
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold">Accept invitation token</h3>
+            <p className="text-sm text-muted-foreground">
               Paste a token from email to join the target organization.
             </p>
-            <input
+            <Input
               value={manualToken}
               onChange={(event) => setManualToken(event.target.value)}
               placeholder="Paste invitation token"
             />
-            <button
+            <Button
               type="button"
               disabled={accepting || !manualToken.trim()}
               onClick={() => { void handleAcceptManual() }}
             >
-              {accepting ? 'Accepting...' : 'Accept invitation'}
-            </button>
+              {accepting ? 'Accepting...' : 'Accept token'}
+            </Button>
           </div>
         </section>
       </div>
 
       {pendingInvitations.length > 0 && (
-        <section className="card stack">
-          <h2>Pending invitations</h2>
-          <div className="invitation-list">
+        <section className="rounded-xl border border-border bg-white p-6 shadow-sm space-y-3 mt-6">
+          <h2 className="text-base font-semibold">Pending invitations</h2>
+          <div className="space-y-3">
             {pendingInvitations.map((inv) => (
-              <div key={inv.id} className="invitation-card">
-                <div className="invitation-card-main">
-                  <div className="invitation-card-info">
-                    <strong>{inv.email}</strong>
-                    <span className="muted">{inv.organizationName}</span>
+              <div key={inv.id} data-testid="invitation-row" className="flex items-center justify-between gap-4 rounded-md border px-4 py-3">
+                <div className="flex flex-col gap-1">
+                  <div className="flex flex-col">
+                    <strong className="text-sm">{inv.email}</strong>
+                    <span className="text-sm text-muted-foreground">{inv.organizationName}</span>
                   </div>
-                  <div className="invitation-card-meta">
-                    <span className="invitation-role">{inv.role}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{inv.role}</Badge>
+                    <Badge variant={inv.teamId ? 'secondary' : 'outline'}>
+                      {inv.teamId ? 'Workspace scoped' : 'All workspaces'}
+                    </Badge>
                     <StatusBadge status={inv.status} />
-                    <span className="muted">{formatDate(inv.createdAt)}</span>
+                    <span className="text-sm text-muted-foreground">{formatDate(inv.createdAt)}</span>
                   </div>
                 </div>
-                <div className="invitation-card-actions">
-                  <button
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {firstPendingInvitationIdByOrg.get(inv.organizationId) === inv.id &&
+                    (pendingInvitationCountsByOrg.get(inv.organizationId) ?? 0) > 1 ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={acceptingOrganizationId === inv.organizationId}
+                        onClick={() => { void handleAcceptOrganizationInvitations(inv.organizationId) }}
+                      >
+                        {acceptingOrganizationId === inv.organizationId
+                          ? 'Accepting...'
+                          : 'Accept all invitations from this organization'}
+                      </Button>
+                    ) : null}
+                  <Button
                     type="button"
-                    className="btn-sm btn-danger"
-                    disabled={revoking === inv.id}
+                    variant="default"
+                    size="sm"
+                    disabled={acceptingInvitationId === inv.id || acceptingOrganizationId === inv.organizationId}
+                    onClick={() => { void handleAcceptInvitation(inv) }}
+                  >
+                    {acceptingInvitationId === inv.id ? 'Accepting...' : 'Accept invitation'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    disabled={revoking === inv.id || acceptingOrganizationId === inv.organizationId}
                     onClick={() => { void handleRevoke(inv.id) }}
                   >
                     {revoking === inv.id ? 'Revoking...' : 'Revoke'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -348,30 +407,30 @@ export default function InvitationsPage() {
         </section>
       )}
 
-      <section className="card stack">
-        <h2>Invitation history</h2>
+      <section className="rounded-xl border border-border bg-white p-6 shadow-sm space-y-3 mt-6">
+        <h2 className="text-base font-semibold">Invitation history</h2>
         {loading && invitations.length === 0 && (
-          <p className="muted">Loading...</p>
+          <p className="text-sm text-muted-foreground">Loading...</p>
         )}
         {!(loading && invitations.length === 0) && pastInvitations.length === 0 && pendingInvitations.length === 0 && (
-          <p className="muted">No invitations yet.</p>
+          <p className="text-sm text-muted-foreground">No invitations yet.</p>
         )}
         {!(loading && invitations.length === 0) && pastInvitations.length === 0 && pendingInvitations.length > 0 && (
-          <p className="muted">No past invitations.</p>
+          <p className="text-sm text-muted-foreground">No past invitations.</p>
         )}
         {pastInvitations.length > 0 && (
-          <div className="invitation-list">
+          <div className="space-y-3">
             {pastInvitations.map((inv) => (
-              <div key={inv.id} className="invitation-card invitation-card--past">
-                <div className="invitation-card-main">
-                  <div className="invitation-card-info">
-                    <strong>{inv.email}</strong>
-                    <span className="muted">{inv.organizationName}</span>
+              <div key={inv.id} className="flex items-center justify-between rounded-md border px-4 py-3 opacity-60">
+                <div className="flex flex-col gap-1">
+                  <div className="flex flex-col">
+                    <strong className="text-sm">{inv.email}</strong>
+                    <span className="text-sm text-muted-foreground">{inv.organizationName}</span>
                   </div>
-                  <div className="invitation-card-meta">
-                    <span className="invitation-role">{inv.role}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{inv.role}</Badge>
                     <StatusBadge status={inv.status} />
-                    <span className="muted">{formatDate(inv.createdAt)}</span>
+                    <span className="text-sm text-muted-foreground">{formatDate(inv.createdAt)}</span>
                   </div>
                 </div>
               </div>

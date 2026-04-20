@@ -19,7 +19,7 @@ export const buildCursorCondition = (
   const cmp = sortOrder === 'asc' ? gt : lt
   return or(
     cmp(sortColumn, sortValue),
-    and(eq(sortColumn, sortValue), gt(idColumn, cursor.id))
+    and(eq(sortColumn, sortValue), cmp(idColumn, cursor.id))
   )
 }
 
@@ -79,6 +79,8 @@ export const buildCursorPage = <T>(options: BuildCursorPageOptions<T>): Effect.E
       data,
       total,
       nextCursor,
+      // prevCursor echoes the incoming cursor position — clients use this to detect
+      // "not on first page" rather than for backward traversal.
       prevCursor: options.cursor ?? null
     }
   })

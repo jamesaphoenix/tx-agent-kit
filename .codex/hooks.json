@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/block-integration-timeout-bump.sh",
+            "statusMessage": "Checking command for INTEGRATION_TIMEOUT_SECONDS bypass"
+          }
+        ]
+      }
+    ]
+  }
+}

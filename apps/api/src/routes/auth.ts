@@ -14,6 +14,7 @@ import { TooManyRequests, TxAgentApi, Unauthorized, mapCoreError } from '../api.
 import { getAuthRefreshCookieConfig } from '../config/env.js'
 import { consumeAuthIdentifierRateLimit, toClientIpAddress } from '../middleware/auth-rate-limit.js'
 import { toApiAuthPrincipal, toApiAuthSession } from '../mappers/auth-mapper.js'
+import { requireAuth } from '../utils.js'
 
 export const AuthRouteKind = 'custom' as const
 
@@ -212,13 +213,17 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
     .handleRaw('refreshSession', () =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
-        const payload = yield* HttpServerRequest.schemaBodyJson(refreshSessionRequestSchema)
+        const payload = yield* HttpServerRequest.schemaBodyJson(refreshSessionRequestSchema).pipe(
+          Effect.mapError(mapCoreError)
+        )
         const authService = yield* AuthService
         const refreshToken = resolveRefreshToken(request, payload)
 
         if (refreshToken === null) {
           return yield* Effect.fail(new Unauthorized({ message: 'Invalid refresh token' }))
         }
+
+        yield* enforceIdentifierRateLimit('/v1/auth/refresh', refreshToken)
 
         const session = yield* authService.refreshSession({ refreshToken })
         const isBrowserRefresh = isCookieManagedBrowserSessionRequest(request)
@@ -228,6 +233,8 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
         })
       }).pipe(Effect.catchAll(catchUnauthorizedWithExpiredCookie))
     )
+    // Cannot use requireAuth here — signOut uses catchUnauthorizedWithExpiredCookie to
+    // expire the refresh cookie on auth failure, which requireAuth's mapCoreError would bypass.
     .handleRaw('signOut', () =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
@@ -237,6 +244,8 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
         return withRefreshCookieExpired(renderJson(response))
       }).pipe(Effect.catchAll(catchUnauthorizedWithExpiredCookie))
     )
+    // Cannot use requireAuth here — signOutAll uses catchUnauthorizedWithExpiredCookie to
+    // expire the refresh cookie on auth failure, which requireAuth's mapCoreError would bypass.
     .handleRaw('signOutAll', () =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
@@ -297,12 +306,13 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
     )
     .handle('me', () =>
       Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        const principal = yield* principalFromAuthorization(request.headers.authorization)
+        const principal = yield* requireAuth
 
         return toApiAuthPrincipal(principal)
       }).pipe(Effect.mapError(mapAuthError))
     )
+    // Cannot use requireAuth here — deleteMe uses catchUnauthorizedWithExpiredCookie to
+    // expire the refresh cookie on auth failure, which requireAuth's mapCoreError would bypass.
     .handleRaw('deleteMe', () =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest

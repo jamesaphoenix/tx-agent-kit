@@ -5,6 +5,22 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$PROJECT_ROOT/scripts/lib/lock.sh"
+
+# Pick up DATABASE_SCHEMA (and DATABASE_URL) from the worktree .env when the
+# caller hasn't already exported it. The primary checkout leaves these unset;
+# worktrees write them during setup.sh so pgTAP runs in the worktree schema.
+if [[ -z "${DATABASE_SCHEMA:-}" && -f "$PROJECT_ROOT/.env" ]]; then
+  while IFS='=' read -r key value; do
+    case "$key" in
+      DATABASE_SCHEMA|DATABASE_URL)
+        # Strip optional surrounding quotes
+        value="${value%\"}"
+        value="${value#\"}"
+        export "$key=$value"
+        ;;
+    esac
+  done < <(grep -E '^(DATABASE_SCHEMA|DATABASE_URL)=' "$PROJECT_ROOT/.env" || true)
+fi
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-tx-agent-kit}"
 DB_NAME="${TX_AGENT_DB_NAME:-tx_agent_kit}"
 EXPECTED_DB_NAME="tx_agent_kit"
@@ -69,14 +85,26 @@ if [[ "${#PGTAP_FILES[@]}" -eq 0 ]]; then
   exit 0
 fi
 
-echo "Running pgTAP suites (${#PGTAP_FILES[@]} files)..."
+# Resolve target schema for the pgTAP session. The primary checkout uses
+# `public`; worktrees set DATABASE_SCHEMA=wt_<name> via setup.sh, and the
+# reconcile-schemas step only installs triggers into that schema, so running
+# pgTAP against the default `public` search_path would see stale/missing
+# triggers. Prefix each script with a `SET search_path` statement to match
+# the schema where migrations and reconciled triggers actually live.
+PGTAP_SCHEMA="${DATABASE_SCHEMA:-public}"
+
+echo "Running pgTAP suites (${#PGTAP_FILES[@]} files) against schema '$PGTAP_SCHEMA'..."
 for sql_file in "${PGTAP_FILES[@]}"; do
   relative_sql_file="${sql_file#$PROJECT_ROOT/}"
   echo
   echo "==> $relative_sql_file"
   tap_output="$(
+    {
+      printf 'SET search_path TO "%s", public;\n' "$PGTAP_SCHEMA"
+      cat "$sql_file"
+    } |
     docker exec -i "$POSTGRES_CONTAINER_ID" \
-      psql -X -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" -f - < "$sql_file"
+      psql -X -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" -f -
   )"
 
   printf '%s\n' "$tap_output"

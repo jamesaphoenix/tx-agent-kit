@@ -2,7 +2,7 @@
 
 ## Core Development
 - `pnpm env:configure`: idempotently configure `.env` for local development.
-- `pnpm infra:ensure`: idempotently start shared Docker infra (including Langfuse) and wait for health.
+- `pnpm infra:ensure`: idempotently start shared Docker infra and wait for health.
 - `INFRA_READY_TIMEOUT_SECONDS=300 pnpm infra:ensure`: override infra readiness timeout window (default `120` seconds).
 - `pnpm temporal:dev:up`: start local Temporal CLI server (no-op when `TEMPORAL_RUNTIME_MODE != cli`).
 - `pnpm temporal:dev:down`: stop local Temporal CLI server managed by repo scripts.
@@ -12,7 +12,8 @@
 - `pnpm dev:tunnel:status`: inspect local dev tunnel lock ownership (`active|stale|unlocked`) and owner metadata.
 - Optional tunnel overrides: `DEV_CLOUDFLARE_TUNNEL_URL`, `DEV_CLOUDFLARE_TUNNEL_TOKEN`, `DEV_CLOUDFLARE_TUNNEL_LOG_FILE`, `DEV_CLOUDFLARE_TUNNEL_LOCK_DIR`, `DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS`, `DEV_CLOUDFLARE_TUNNEL_MISSING_PID_GRACE_SECONDS`.
 - `pnpm dev:mobile:web`: run Expo web preview intentionally on the mobile dev port.
-- `pnpm dev:open`: open local app/dev dashboards in Brave Browser (fallback: Google Chrome).
+- `pnpm dev:open`: open local app/dev dashboards, including Langfuse, in Brave Browser (fallback: Google Chrome).
+- `pnpm langfuse:ensure-local`: verify and repair the local Langfuse org/project/user bootstrap.
 - `pnpm openapi:generate`: regenerate `apps/api/openapi.json` from API definitions.
 - `pnpm api:client:generate`: regenerate `apps/api/openapi.json` and web Orval hooks in `apps/web/lib/api/generated`.
 - `pnpm tx <command> [args]`: invoke the repo command dispatcher (tx-style entrypoint for tooling commands).
@@ -50,7 +51,7 @@
 - `pnpm test:integration:quiet`
 - `INTEGRATION_SKIP_OBSERVABILITY=1 pnpm test:integration:quiet`: skip observability health preflight in quiet mode.
 - `pnpm test:boilerplate:quiet`
-- Integration workspace runners use a shared lock (`/tmp/<domain>-integration.lock`) with PID-aware stale-lock reaping.
+- Parallel integration runs across git worktrees use `WORKTREE_PORT_OFFSET` (set by `scripts/worktree/setup.sh`) to isolate shared API ports and Postgres schemas — no file lock required.
 - `TEST_MAX_WORKERS=8 pnpm test`: cap workspace unit-test workers (defaults to host CPU parallelism).
 - `INTEGRATION_PROJECTS=web pnpm test:integration`: run selected integration project(s) (`api,mobile,observability,testkit,web,worker`).
 - `INTEGRATION_MAX_WORKERS=4 pnpm test:integration`: cap non-web integration workers (defaults to host CPU parallelism).
@@ -98,13 +99,11 @@
 - `pnpm mcp:jaeger`: start Jaeger MCP.
 - `pnpm mcp:context7`: start Context7 MCP.
 - `pnpm mcp:supabase`: start Supabase MCP (requires `SUPABASE_ACCESS_TOKEN`).
-- `pnpm mcp:langfuse -- help`: show Langfuse Public API helper commands (`health`, `traces`, `trace`, `observations`, `scores`).
 - `pnpm playwright:auth:bootstrap`: create/sign-in bootstrap user via real auth API and write Playwright storage state.
 - `op run --env-file=.env -- pnpm playwright:auth:bootstrap`: recommended 1Password-backed auth bootstrap flow.
 - `pnpm mcp:codex-config`: print Codex MCP TOML blocks wired to local wrappers.
 - `PROMETHEUS_URL=http://host.docker.internal:9090 pnpm mcp:prometheus`: point containerized Prometheus MCP at host Prometheus (default).
 - `JAEGER_URL=http://localhost JAEGER_PORT=16686 pnpm mcp:jaeger`: host-mode Jaeger MCP defaults (use either host+port or URL with embedded port).
-- `LANGFUSE_BASE_URL=http://localhost:3200 pnpm mcp:langfuse -- health`: local Langfuse health check with default local API keys.
 - `pnpm mcp:spotlight`: start Spotlight MCP (connects to local Spotlight sidecar for AI-assisted debugging).
 - `SPOTLIGHT_PORT=8969 pnpm mcp:spotlight`: override Spotlight sidecar port.
 
@@ -117,13 +116,16 @@
 - `SPOTLIGHT_PORT=8969`: override Spotlight port (default 8969).
 - `pnpm dev:open` opens the Spotlight UI alongside other dev dashboards.
 
-## AI Tracing (Langfuse)
-- `pnpm infra:ensure`: starts Langfuse as part of shared local infra.
-- Langfuse UI: `http://localhost:3200` (admin@localhost.dev / admin).
+## Langfuse (Local LLM Observability)
+- Langfuse UI: `http://localhost:3003` (LLM/GenAI traces only).
+- `LANGFUSE_PORT=3003`: override the local Langfuse web port.
+- Local login: `dev@tx-agent-kit.local` / `tx-agent-kit-local-langfuse`.
+- `pnpm langfuse:ensure-local`: repair the local Langfuse bootstrap without restarting the full stack.
+- `pnpm dev:open` opens Langfuse alongside the other local dev dashboards.
+
+## AI Tracing
 - `pnpm test:ai:integration`: runs AI integration tests.
 - `VCR_MODE=record pnpm test:ai:integration`: records fresh cassettes for AI integration tests.
-- Enable trace export: set `LANGFUSE_ENABLED=true` in `.env`.
-- Production: set `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` to Langfuse Cloud values.
 
 ## Diagnostics
 - `pnpm test:run-silent`: verify `scripts/run-silent.sh` behavior.

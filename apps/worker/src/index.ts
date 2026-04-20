@@ -5,17 +5,23 @@ import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { activities } from './activities.js'
+import { combinedActivities } from './activities.js'
+import { campaignActivities } from './campaign-activities.js'
 import {
   getWorkerEnv,
   resolveWorkerTemporalConnectionOptions,
   type WorkerEnv
 } from './config/env.js'
 import {
+  ensureAutoRechargeRetrySchedule,
+  ensureStorageReconcileSchedule,
   ensureOutboxPollerSchedule,
   ensurePrunePublishedSchedule,
+  ensureReleaseStaleReservationsSchedule,
+  ensureRetentionCleanerSchedule,
   ensureStuckEventsResetSchedule
 } from './schedules.js'
+import { ensureEmailSendsPruneSchedule } from './campaign-schedules.js'
 import {
   captureWorkerException,
   flushWorkerSentry,
@@ -24,6 +30,32 @@ import {
 
 const logger = createLogger('tx-agent-kit-worker')
 
+const toErrorLogContext = (error: unknown) =>
+  error instanceof Error
+    ? { name: error.name, message: error.message, stack: error.stack }
+    : { message: String(error) }
+
+const shutdownWorkerIfRunning = (worker: Worker, taskQueue: string): void => {
+  const state = worker.getState()
+  if (state !== 'RUNNING') {
+    logger.info('Temporal worker shutdown skipped because it is not running.', {
+      taskQueue,
+      state
+    })
+    return
+  }
+
+  try {
+    worker.shutdown()
+  } catch (error) {
+    logger.warn('Temporal worker shutdown failed.', {
+      taskQueue,
+      state,
+      error: toErrorLogContext(error)
+    })
+  }
+}
+
 async function run(env: WorkerEnv): Promise<void> {
   const sourceDir = path.dirname(fileURLToPath(import.meta.url))
   const workflowJsPath = path.join(sourceDir, 'workflows.js')
@@ -31,11 +63,22 @@ async function run(env: WorkerEnv): Promise<void> {
     ? workflowJsPath
     : path.join(sourceDir, 'workflows.ts')
 
+  const campaignWorkflowJsPath = path.join(sourceDir, 'campaign-workflows.js')
+  const campaignWorkflowSourcePath = existsSync(campaignWorkflowJsPath)
+    ? campaignWorkflowJsPath
+    : path.join(sourceDir, 'campaign-workflows.ts')
+
   startTelemetry('tx-agent-kit-worker')
 
   const connOpts = resolveWorkerTemporalConnectionOptions(env)
 
   const connection = await NativeConnection.connect(connOpts)
+  const testPollerOptions = env.NODE_ENV === 'test'
+    ? {
+        maxConcurrentWorkflowTaskPolls: 1,
+        maxConcurrentActivityTaskPolls: 1
+      }
+    : {}
 
   try {
     const worker = await Worker.create({
@@ -43,15 +86,19 @@ async function run(env: WorkerEnv): Promise<void> {
       namespace: env.TEMPORAL_NAMESPACE,
       taskQueue: env.TEMPORAL_TASK_QUEUE,
       workflowsPath: workflowSourcePath,
-      activities,
-      shutdownGraceTime: '30s'
+      activities: combinedActivities,
+      shutdownGraceTime: '30s',
+      ...testPollerOptions
     })
 
-    logger.info('Temporal worker started.', {
-      runtimeMode: env.TEMPORAL_RUNTIME_MODE,
-      address: env.TEMPORAL_ADDRESS,
+    const emailCampaignWorker = await Worker.create({
+      connection,
       namespace: env.TEMPORAL_NAMESPACE,
-      taskQueue: env.TEMPORAL_TASK_QUEUE
+      taskQueue: env.EMAIL_CAMPAIGNS_TASK_QUEUE,
+      workflowsPath: campaignWorkflowSourcePath,
+      activities: campaignActivities,
+      shutdownGraceTime: '30s',
+      ...testPollerOptions
     })
 
     let clientConnection: Connection | undefined
@@ -67,6 +114,53 @@ async function run(env: WorkerEnv): Promise<void> {
     } else if (connOpts.tls === true) {
       tlsConfig = { tls: true }
     }
+    const workerRun = worker.run()
+    const emailCampaignWorkerRun = emailCampaignWorker.run()
+    const workerRuns = Promise.all([
+      workerRun,
+      emailCampaignWorkerRun
+    ])
+    void (async () => {
+      try {
+        await workerRuns
+      } catch {
+        // The rejection is awaited below; attach a handler now to avoid a
+        // transient unhandled-rejection while schedule reconciliation runs.
+      }
+    })()
+
+    let shuttingDown = false
+    let shutdownSignal = 'worker.run completed'
+    const requestShutdown = (signal: string) => {
+      if (shuttingDown) {
+        return
+      }
+
+      shuttingDown = true
+      shutdownSignal = signal
+      logger.info('Stopping Temporal workers.', { signal })
+      shutdownWorkerIfRunning(worker, env.TEMPORAL_TASK_QUEUE)
+      shutdownWorkerIfRunning(emailCampaignWorker, env.EMAIL_CAMPAIGNS_TASK_QUEUE)
+    }
+
+    const onSigint = () => {
+      requestShutdown('SIGINT')
+    }
+    const onSigterm = () => {
+      requestShutdown('SIGTERM')
+    }
+
+    process.once('SIGINT', onSigint)
+    process.once('SIGTERM', onSigterm)
+
+    logger.info('Temporal worker started.', {
+      runtimeMode: env.TEMPORAL_RUNTIME_MODE,
+      address: env.TEMPORAL_ADDRESS,
+      namespace: env.TEMPORAL_NAMESPACE,
+      taskQueue: env.TEMPORAL_TASK_QUEUE,
+      emailCampaignsTaskQueue: env.EMAIL_CAMPAIGNS_TASK_QUEUE
+    })
+
     try {
       clientConnection = await Connection.connect({
         address: connOpts.address,
@@ -84,56 +178,95 @@ async function run(env: WorkerEnv): Promise<void> {
         namespace: env.TEMPORAL_NAMESPACE
       })
 
-      let shuttingDown = false
-      let shutdownSignal = 'worker.run completed'
-      const requestShutdown = (signal: string) => {
-        if (shuttingDown) {
-          return
-        }
+      if (env.WORKER_ENABLE_SCHEDULES) {
+        await ensureOutboxPollerSchedule(
+          temporalClient,
+          env.TEMPORAL_TASK_QUEUE,
+          5,
+          env.OUTBOX_POLL_BATCH_SIZE
+        )
 
-        shuttingDown = true
-        shutdownSignal = signal
-        logger.info('Stopping Temporal worker.', { signal })
-        worker.shutdown()
+        await ensureStuckEventsResetSchedule(
+          temporalClient,
+          env.TEMPORAL_TASK_QUEUE,
+          120,
+          env.OUTBOX_STUCK_THRESHOLD_MINUTES
+        )
+
+        await ensurePrunePublishedSchedule(
+          temporalClient,
+          env.TEMPORAL_TASK_QUEUE,
+          24,
+          env.OUTBOX_PRUNE_RETENTION_DAYS
+        )
+
+        await ensureRetentionCleanerSchedule(
+          temporalClient,
+          env.TEMPORAL_TASK_QUEUE,
+          6,
+          72
+        )
+
+        // @spec INV-BILLING-003 — reclaim orphaned credit reservations every
+        // 10 minutes. Default max age is 7200s (2 hours), overridable via
+        // `RESERVATION_RECLAIM_MAX_AGE_SECONDS`.
+        await ensureReleaseStaleReservationsSchedule(
+          temporalClient,
+          env.TEMPORAL_TASK_QUEUE,
+          10,
+          env.RESERVATION_RECLAIM_MAX_AGE_SECONDS
+        )
+
+        // @spec billing-and-pricing-design §"Auto-recharge retry policy" —
+        // every hour, scan for failed auto-recharge attempts whose
+        // `next_retry_at` has elapsed and re-fire the trigger.
+        await ensureAutoRechargeRetrySchedule(
+          temporalClient,
+          env.TEMPORAL_TASK_QUEUE,
+          60
+        )
+
+        // @spec billing-and-pricing-design §"Monthly Storage Reconciliation" —
+        // nightly at 03:00 UTC, walk every org whose storage_usage rollup
+        // has rolled over and charge ongoing overage via
+        // `StorageBillingService.reconcileMonthlyOverage`. Idempotent via the
+        // `reconcile:<orgId>:<monthTag>` ledger reference.
+        await ensureStorageReconcileSchedule(
+          temporalClient,
+          env.TEMPORAL_TASK_QUEUE
+        )
+
+        await ensureEmailSendsPruneSchedule(
+          temporalClient,
+          env.EMAIL_CAMPAIGNS_TASK_QUEUE,
+          24,
+          30
+        )
+      } else {
+        logger.info('Temporal schedule reconciliation skipped.', {
+          nodeEnv: env.NODE_ENV
+        })
       }
 
-      process.once('SIGINT', () => {
-        requestShutdown('SIGINT')
-      })
-
-      process.once('SIGTERM', () => {
-        requestShutdown('SIGTERM')
-      })
-
-      await ensureOutboxPollerSchedule(
-        temporalClient,
-        env.TEMPORAL_TASK_QUEUE,
-        5,
-        env.OUTBOX_POLL_BATCH_SIZE
-      )
-
-      await ensureStuckEventsResetSchedule(
-        temporalClient,
-        env.TEMPORAL_TASK_QUEUE,
-        120,
-        env.OUTBOX_STUCK_THRESHOLD_MINUTES
-      )
-
-      await ensurePrunePublishedSchedule(
-        temporalClient,
-        env.TEMPORAL_TASK_QUEUE,
-        24,
-        env.OUTBOX_PRUNE_RETENTION_DAYS
-      )
-
-      await worker.run()
-      logger.info('Temporal worker stopped.', { signal: shutdownSignal })
+      await workerRuns
+      logger.info('Temporal workers stopped.', { signal: shutdownSignal })
     } finally {
+      process.off('SIGINT', onSigint)
+      process.off('SIGTERM', onSigterm)
+      shutdownWorkerIfRunning(worker, env.TEMPORAL_TASK_QUEUE)
+      shutdownWorkerIfRunning(emailCampaignWorker, env.EMAIL_CAMPAIGNS_TASK_QUEUE)
+      await Promise.allSettled([
+        workerRun,
+        emailCampaignWorkerRun
+      ])
       await clientConnection?.close()
     }
   } finally {
-    await connection.close()
-    await stopTelemetry()
+    try {
+      await connection.close()
+    } finally {
+      await stopTelemetry()
+    }
   }
 }
 

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorkerEnv } from './env.js'
-import { getWorkerEnv, resetWorkerEnvCache, resolveWorkerTemporalConnectionOptions } from './env.js'
+import {
+  getWorkerEnv,
+  getWorkerStripeSecretKey,
+  resetWorkerEnvCache,
+  resolveWorkerTemporalConnectionOptions
+} from './env.js'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -11,6 +16,7 @@ describe('getWorkerEnv', () => {
   it('returns default Temporal worker settings', () => {
     vi.stubEnv('NODE_ENV', undefined)
     vi.stubEnv('DATABASE_URL', 'postgresql://localhost:5432/test')
+    vi.stubEnv('WORKER_ENABLE_SCHEDULES', undefined)
     vi.stubEnv('OUTBOX_POLL_BATCH_SIZE', undefined)
     vi.stubEnv('OUTBOX_STUCK_THRESHOLD_MINUTES', undefined)
     vi.stubEnv('OUTBOX_PRUNE_RETENTION_DAYS', undefined)
@@ -32,9 +38,11 @@ describe('getWorkerEnv', () => {
     expect(getWorkerEnv()).toEqual({
       NODE_ENV: 'development',
       DATABASE_URL: 'postgresql://localhost:5432/test',
+      WORKER_ENABLE_SCHEDULES: true,
       OUTBOX_POLL_BATCH_SIZE: 50,
       OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
       OUTBOX_PRUNE_RETENTION_DAYS: 30,
+      RESERVATION_RECLAIM_MAX_AGE_SECONDS: 7200,
       TEMPORAL_RUNTIME_MODE: 'cli',
       TEMPORAL_ADDRESS: 'localhost:7233',
       TEMPORAL_NAMESPACE: 'default',
@@ -49,13 +57,16 @@ describe('getWorkerEnv', () => {
       SENTRY_SPOTLIGHT: false,
       RESEND_API_KEY: undefined,
       RESEND_FROM_EMAIL: undefined,
-      WEB_BASE_URL: undefined
+      WEB_BASE_URL: undefined,
+      EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+      STRIPE_SECRET_KEY: undefined
     })
   })
 
   it('returns explicit Temporal worker env overrides for cloud mode', () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('DATABASE_URL', 'postgresql://localhost:5432/prod')
+    vi.stubEnv('WORKER_ENABLE_SCHEDULES', undefined)
     vi.stubEnv('OUTBOX_POLL_BATCH_SIZE', '100')
     vi.stubEnv('OUTBOX_STUCK_THRESHOLD_MINUTES', undefined)
     vi.stubEnv('OUTBOX_PRUNE_RETENTION_DAYS', undefined)
@@ -77,9 +88,11 @@ describe('getWorkerEnv', () => {
     expect(getWorkerEnv()).toEqual({
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://localhost:5432/prod',
+      WORKER_ENABLE_SCHEDULES: true,
       OUTBOX_POLL_BATCH_SIZE: 100,
       OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
       OUTBOX_PRUNE_RETENTION_DAYS: 30,
+      RESERVATION_RECLAIM_MAX_AGE_SECONDS: 7200,
       TEMPORAL_RUNTIME_MODE: 'cloud',
       TEMPORAL_ADDRESS: 'temporal.internal:7233',
       TEMPORAL_NAMESPACE: 'production',
@@ -94,8 +107,48 @@ describe('getWorkerEnv', () => {
       SENTRY_SPOTLIGHT: false,
       RESEND_API_KEY: undefined,
       RESEND_FROM_EMAIL: undefined,
-      WEB_BASE_URL: undefined
+      WEB_BASE_URL: undefined,
+      EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+      STRIPE_SECRET_KEY: undefined
     })
+  })
+
+  it('disables schedule reconciliation by default in test workers', () => {
+    vi.stubEnv('NODE_ENV', 'test')
+    vi.stubEnv('DATABASE_URL', 'postgresql://localhost:5432/test')
+    vi.stubEnv('WORKER_ENABLE_SCHEDULES', undefined)
+
+    expect(getWorkerEnv()).toEqual(
+      expect.objectContaining({
+        NODE_ENV: 'test',
+        WORKER_ENABLE_SCHEDULES: false
+      })
+    )
+  })
+
+  it('allows test workers to opt into schedule reconciliation explicitly', () => {
+    vi.stubEnv('NODE_ENV', 'test')
+    vi.stubEnv('DATABASE_URL', 'postgresql://localhost:5432/test')
+    vi.stubEnv('WORKER_ENABLE_SCHEDULES', 'true')
+
+    expect(getWorkerEnv()).toEqual(
+      expect.objectContaining({
+        NODE_ENV: 'test',
+        WORKER_ENABLE_SCHEDULES: true
+      })
+    )
+  })
+
+  it.each([
+    ['OUTBOX_POLL_BATCH_SIZE'],
+    ['OUTBOX_STUCK_THRESHOLD_MINUTES'],
+    ['OUTBOX_PRUNE_RETENTION_DAYS'],
+    ['RESERVATION_RECLAIM_MAX_AGE_SECONDS']
+  ])('throws when %s is not a strict positive integer', (envName) => {
+    vi.stubEnv('DATABASE_URL', 'postgresql://localhost:5432/test')
+    vi.stubEnv(envName, '1.5')
+
+    expect(() => getWorkerEnv()).toThrow(`${envName} must be a positive integer`)
   })
 
   it('throws for invalid runtime mode', () => {
@@ -170,6 +223,12 @@ describe('getWorkerEnv', () => {
     )
   })
 
+  it('treats a sanitized blank Stripe secret as stub mode', () => {
+    vi.stubEnv('STRIPE_SECRET_KEY', '')
+
+    expect(getWorkerStripeSecretKey()).toBeUndefined()
+  })
+
   it('normalizes escaped newlines in TLS PEM values', () => {
     vi.stubEnv('DATABASE_URL', 'postgresql://localhost:5432/test')
     vi.stubEnv('TEMPORAL_RUNTIME_MODE', 'cloud')
@@ -194,9 +253,11 @@ describe('resolveWorkerTemporalConnectionOptions', () => {
     const env: WorkerEnv = {
       NODE_ENV: 'development',
       DATABASE_URL: 'postgresql://localhost:5432/test',
+      WORKER_ENABLE_SCHEDULES: true,
       OUTBOX_POLL_BATCH_SIZE: 50,
       OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
       OUTBOX_PRUNE_RETENTION_DAYS: 30,
+      RESERVATION_RECLAIM_MAX_AGE_SECONDS: 7200,
       TEMPORAL_RUNTIME_MODE: 'cli' as const,
       TEMPORAL_ADDRESS: 'localhost:7233',
       TEMPORAL_NAMESPACE: 'default',
@@ -211,7 +272,9 @@ describe('resolveWorkerTemporalConnectionOptions', () => {
       SENTRY_SPOTLIGHT: false,
       RESEND_API_KEY: undefined,
       RESEND_FROM_EMAIL: undefined,
-      WEB_BASE_URL: undefined
+      WEB_BASE_URL: undefined,
+      EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+      STRIPE_SECRET_KEY: undefined
     }
 
     expect(resolveWorkerTemporalConnectionOptions(env)).toEqual({
@@ -223,9 +286,11 @@ describe('resolveWorkerTemporalConnectionOptions', () => {
     const env: WorkerEnv = {
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://localhost:5432/prod',
+      WORKER_ENABLE_SCHEDULES: true,
       OUTBOX_POLL_BATCH_SIZE: 50,
       OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
       OUTBOX_PRUNE_RETENTION_DAYS: 30,
+      RESERVATION_RECLAIM_MAX_AGE_SECONDS: 7200,
       TEMPORAL_RUNTIME_MODE: 'cloud' as const,
       TEMPORAL_ADDRESS: 'cloud.temporal.io:7233',
       TEMPORAL_NAMESPACE: 'cloud.ns',
@@ -240,7 +305,9 @@ describe('resolveWorkerTemporalConnectionOptions', () => {
       SENTRY_SPOTLIGHT: false,
       RESEND_API_KEY: undefined,
       RESEND_FROM_EMAIL: undefined,
-      WEB_BASE_URL: undefined
+      WEB_BASE_URL: undefined,
+      EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+      STRIPE_SECRET_KEY: undefined
     }
 
     expect(resolveWorkerTemporalConnectionOptions(env)).toEqual({
@@ -256,9 +323,11 @@ describe('resolveWorkerTemporalConnectionOptions', () => {
     const env: WorkerEnv = {
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://localhost:5432/prod',
+      WORKER_ENABLE_SCHEDULES: true,
       OUTBOX_POLL_BATCH_SIZE: 50,
       OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
       OUTBOX_PRUNE_RETENTION_DAYS: 30,
+      RESERVATION_RECLAIM_MAX_AGE_SECONDS: 7200,
       TEMPORAL_RUNTIME_MODE: 'cloud' as const,
       TEMPORAL_ADDRESS: 'cloud.temporal.io:7233',
       TEMPORAL_NAMESPACE: 'cloud.ns',
@@ -273,7 +342,9 @@ describe('resolveWorkerTemporalConnectionOptions', () => {
       SENTRY_SPOTLIGHT: false,
       RESEND_API_KEY: undefined,
       RESEND_FROM_EMAIL: undefined,
-      WEB_BASE_URL: undefined
+      WEB_BASE_URL: undefined,
+      EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+      STRIPE_SECRET_KEY: undefined
     }
 
     expect(resolveWorkerTemporalConnectionOptions(env)).toEqual({

@@ -9,7 +9,9 @@ import {
   AuthUsersPortLive,
   AuthOrganizationMembershipPortLive,
   AuthOrganizationOwnershipPortLive,
+  AutoRechargeAttemptStorePortLive,
   BillingGuardPort,
+  BillingUiPreferenceStorePortLive,
   BillingServiceLive,
   BillingStorePortLive,
   ClockPortLive,
@@ -17,14 +19,48 @@ import {
   PasswordHasherPortLive,
   SessionTokenPortLive,
   OrganizationInvitationStorePortLive,
+  OrganizationMemberServiceLive,
+  OrganizationMemberStorePortLive,
   OrganizationServiceLive,
   OrganizationStorePortLive,
   OrganizationUsersPortLive,
+  RoleServiceLive,
+  RoleStorePortLive,
   SubscriptionEventStorePortLive,
+  ContentReviewTokenStorePortLive,
+  TeamAuthMiddlewareLive,
+  OrgAuthMiddlewareLive,
   TeamServiceLive,
   TeamStorePortLive,
   TeamOrganizationMembershipPortLive,
-  UsageStorePortLive
+  UsageStorePortLive,
+  EmailCampaignServiceLive,
+  CampaignStorePortLive,
+  CampaignStepStorePortLive,
+  EnrollmentStorePortLive,
+  EmailSendStorePortLive,
+  UnsubscribeStorePortLive,
+  UploadServiceLive,
+  MediaAssetServiceLive,
+  CollectionServiceLive,
+  StorageMeteringServiceLive,
+  MediaAssetStorePortLive,
+  PendingUploadStorePortLive,
+  StorageMeteringPortLive,
+  CollectionStorePortLive,
+  StorageAdapterPortLive,
+  TeamLookupPortLive,
+  SubscriptionLookupPortLive,
+  CreditLedgerStorePortLive,
+  ProcessedStripeEventStorePortLive,
+  CreditServicePort,
+  makeCreditService,
+  makeStorageBillingService,
+  StorageBillingServicePort,
+  StorageUsageReaderPortLive,
+  UsageCapServicePort,
+  UsageCapStorePortLive,
+  makeUsageCapService
 } from '@tx-agent-kit/core'
 import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
@@ -46,9 +82,15 @@ import { BillingLive } from './routes/billing.js'
 import { HealthLive } from './routes/health.js'
 import { OrganizationsLive } from './routes/organizations.js'
 import { PermissionsLive } from './routes/permissions.js'
+import { RolesLive } from './routes/roles.js'
 import { TeamsLive } from './routes/teams.js'
 import { StorageLive as StorageRouteLive } from './routes/storage.js'
+import { EmailCampaignsLive } from './routes/email-campaigns.js'
+import { EmailWebhooksLive } from './routes/email-webhooks.js'
+import { EmailUnsubscribeLive } from './routes/email-unsubscribe.js'
 import { StorageLive as StorageServiceLive } from '@tx-agent-kit/storage'
+import { AssetsLive } from './routes/assets.js'
+import { StorageMeteringLive } from './routes/storage-metering.js'
 
 const logger = createLogger('tx-agent-kit-api').child('server')
 
@@ -59,7 +101,13 @@ const ApiLive = HttpApiBuilder.api(TxAgentApi).pipe(
   Layer.provide(TeamsLive),
   Layer.provide(BillingLive),
   Layer.provide(PermissionsLive),
-  Layer.provide(StorageRouteLive)
+  Layer.provide(StorageRouteLive),
+  Layer.provide(RolesLive),
+  Layer.provide(AssetsLive),
+  Layer.provide(StorageMeteringLive),
+  Layer.provide(EmailCampaignsLive),
+  Layer.provide(EmailWebhooksLive),
+  Layer.provide(EmailUnsubscribeLive)
 )
 
 const MiddlewareLive = Layer.mergeAll(
@@ -95,21 +143,64 @@ const PortDependenciesLive = Layer.mergeAll(
   OrganizationInvitationStorePortLive,
   OrganizationUsersPortLive,
   BillingStorePortLive,
+  BillingUiPreferenceStorePortLive,
   UsageStorePortLive,
   SubscriptionEventStorePortLive,
   StripePortLive,
   BillingGuardPortLive,
   ClockPortLive,
+  RoleStorePortLive,
   TeamStorePortLive,
   TeamOrganizationMembershipPortLive,
-  StorageServiceLive
+  ContentReviewTokenStorePortLive,
+  OrganizationMemberStorePortLive,
+  StorageServiceLive,
+  MediaAssetStorePortLive,
+  PendingUploadStorePortLive,
+  StorageMeteringPortLive,
+  CollectionStorePortLive,
+  StorageAdapterPortLive.pipe(Layer.provide(StorageServiceLive)),
+  TeamLookupPortLive,
+  SubscriptionLookupPortLive,
+  CreditLedgerStorePortLive,
+  ProcessedStripeEventStorePortLive,
+  StorageUsageReaderPortLive,
+  UsageCapStorePortLive,
+  AutoRechargeAttemptStorePortLive,
+  CampaignStorePortLive,
+  CampaignStepStorePortLive,
+  EnrollmentStorePortLive,
+  EmailSendStorePortLive,
+  UnsubscribeStorePortLive
 )
 
+const CreditServicePortLive = Layer.effect(CreditServicePort, makeCreditService)
+const StorageBillingServicePortLive = Layer.effect(
+  StorageBillingServicePort,
+  makeStorageBillingService
+)
+const UsageCapServicePortLive = Layer.effect(UsageCapServicePort, makeUsageCapService)
+
+// Note: ContentReviewTokenService is not wired here — the token lifecycle
+// (create, validate, revoke) is managed through TeamService, which owns
+// the content review token store internally.
 const ServiceDependenciesLive = Layer.mergeAll(
   AuthServiceLive,
   BillingServiceLive,
+  OrganizationMemberServiceLive,
   OrganizationServiceLive,
-  TeamServiceLive
+  RoleServiceLive,
+  TeamAuthMiddlewareLive,
+  OrgAuthMiddlewareLive,
+  TeamServiceLive,
+  UploadServiceLive,
+  MediaAssetServiceLive,
+  CollectionServiceLive,
+  StorageMeteringServiceLive,
+  CreditServicePortLive,
+  StorageBillingServicePortLive,
+  UsageCapServicePortLive,
+  EmailCampaignServiceLive
 )
 
 const ApiWithDependenciesLive = ApiLive.pipe(

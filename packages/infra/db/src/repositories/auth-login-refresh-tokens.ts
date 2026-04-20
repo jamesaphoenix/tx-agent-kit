@@ -1,32 +1,16 @@
-import { and, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm'
-import { Effect, Schema } from 'effect'
-import { DB, provideDB } from '../client.js'
-import {
-  authLoginRefreshTokenRowSchema,
-  type AuthLoginRefreshTokenRowShape
-} from '../effect-schemas/auth-login-refresh-tokens.js'
-import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
+import { and, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
+import { Effect } from 'effect'
+import { authLoginRefreshTokenRowSchema } from '../effect-schemas/auth-login-refresh-tokens.js'
 import { authLoginRefreshTokens } from '../schema.js'
+import { withDb, decodeFirst } from './repo-helpers.js'
+import { createOptionalDecoder } from './sql-helpers.js'
 
-const decodeAuthLoginRefreshTokenRow = Schema.decodeUnknown(authLoginRefreshTokenRowSchema)
-
-const decodeNullableAuthLoginRefreshToken = (
-  value: unknown
-): Effect.Effect<AuthLoginRefreshTokenRowShape | null, DbError> => {
-  if (value === null || value === undefined) {
-    return Effect.succeed(null)
-  }
-
-  return decodeAuthLoginRefreshTokenRow(value).pipe(
-    Effect.mapError((error) => dbDecodeFailed('auth login refresh token row decode failed', error))
-  )
-}
+const decode = createOptionalDecoder(authLoginRefreshTokenRowSchema, 'auth login refresh token row')
 
 export const authLoginRefreshTokensRepository = {
   create: (input: { sessionId: string; tokenHash: string; expiresAt: Date }) =>
-    provideDB(
+    withDb('Failed to create auth login refresh token', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .insert(authLoginRefreshTokens)
           .values({
@@ -39,14 +23,13 @@ export const authLoginRefreshTokensRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullableAuthLoginRefreshToken(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to create auth login refresh token', error))),
+    ),
 
   consumeActiveByTokenHash: (tokenHash: string) =>
-    provideDB(
+    withDb('Failed to consume auth login refresh token', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const nowExpression = sql`now()`
         const rows = yield* db
           .update(authLoginRefreshTokens)
@@ -64,14 +47,13 @@ export const authLoginRefreshTokensRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullableAuthLoginRefreshToken(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to consume auth login refresh token', error))),
+    ),
 
   findByTokenHash: (tokenHash: string) =>
-    provideDB(
+    withDb('Failed to find auth login refresh token', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .select()
           .from(authLoginRefreshTokens)
@@ -79,14 +61,13 @@ export const authLoginRefreshTokensRepository = {
           .limit(1)
           .execute()
 
-        return yield* decodeNullableAuthLoginRefreshToken(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to find auth login refresh token', error))),
+    ),
 
   revokeActiveForSession: (sessionId: string) =>
-    provideDB(
+    withDb('Failed to revoke auth login refresh tokens', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const nowExpression = sql`now()`
         const rows = yield* db
           .update(authLoginRefreshTokens)
@@ -106,12 +87,11 @@ export const authLoginRefreshTokensRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke auth login refresh tokens', error))),
+    ),
 
   revokeAllActiveForUser: (userId: string) =>
-    provideDB(
+    withDb('Failed to revoke all auth login refresh tokens for user', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const nowExpression = sql`now()`
         const rows = yield* db
           .update(authLoginRefreshTokens)
@@ -134,19 +114,18 @@ export const authLoginRefreshTokensRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke all auth login refresh tokens for user', error))),
+    ),
 
   pruneExpired: (olderThan: Date) =>
-    provideDB(
+    withDb('Failed to prune expired auth login refresh tokens', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .delete(authLoginRefreshTokens)
           .where(
             or(
               lt(authLoginRefreshTokens.expiresAt, olderThan),
-              lt(authLoginRefreshTokens.revokedAt, olderThan),
-              lt(authLoginRefreshTokens.usedAt, olderThan)
+              and(isNotNull(authLoginRefreshTokens.revokedAt), lt(authLoginRefreshTokens.revokedAt, olderThan)),
+              and(isNotNull(authLoginRefreshTokens.usedAt), lt(authLoginRefreshTokens.usedAt, olderThan))
             )
           )
           .returning({ id: authLoginRefreshTokens.id })
@@ -154,5 +133,5 @@ export const authLoginRefreshTokensRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to prune expired auth login refresh tokens', error)))
+    )
 }

@@ -1,8 +1,26 @@
 import { vi } from 'vitest'
 
 ;(globalThis as Record<string, unknown>).__DEV__ = true
+;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 const secureStoreValues: Record<string, string> = {}
+
+vi.mock('react-test-renderer', async () => {
+  const actual = await vi.importActual<typeof import('react-test-renderer')>(
+    'react-test-renderer'
+  )
+
+  return {
+    ...actual,
+    create: (...args: Parameters<typeof actual.create>) => {
+      let renderer!: ReturnType<typeof actual.create>
+      void actual.act(() => {
+        renderer = actual.create(...args)
+      })
+      return renderer
+    }
+  }
+})
 
 vi.mock('react-native-toast-message', () => {
   const MockToast = () => 'Toast'

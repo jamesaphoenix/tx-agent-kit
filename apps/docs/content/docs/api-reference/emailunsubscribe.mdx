@@ -1,0 +1,47 @@
+---
+title: "emailUnsubscribe Endpoints"
+description: "API endpoints for the emailUnsubscribe resource group"
+---
+
+# emailUnsubscribe Endpoints
+
+## `GET /v1/email/unsubscribe`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `token` | query | `string` | No | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/email/unsubscribe`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |

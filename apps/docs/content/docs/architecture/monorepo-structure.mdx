@@ -81,6 +81,16 @@ The mobile app is a cross-platform Expo React Native client that mirrors the web
 
 The mobile app has full integration test coverage including component test suites for `AuthForm`, `CreateOrganizationForm`, `CreateInvitationForm`, `AcceptInvitationForm`, `SignOutButton`, and `AuthBootstrapProvider`, plus unit test suites for `env`, `auth-token`, `axios`, `client-api`, `client-auth`, `url-state`, and `session-store`.
 
+### `apps/docs`: Fumadocs Documentation Site
+
+The documentation site (what you are reading) is a Fumadocs-powered Next.js app. Content lives as MDX under `content/docs/` and is grouped by section via `meta.json` files. Treat the docs as runtime code that can drift from the boilerplate — the audit workflow in `.claude/skills/` checks docs against the actual code on every large change.
+
+| Directory | Role |
+|-----------|------|
+| `content/docs/` | MDX source files, organized into sections |
+| `content/docs/**/meta.json` | Navigation ordering per section |
+| `source.config.ts` | Fumadocs source configuration |
+
 ## Packages
 
 ### `packages/core`: DDD Domain Slices
@@ -113,7 +123,27 @@ A structured JSON logger that replaces `console.*` across the codebase. All sour
 
 ### `packages/infra/observability`: OpenTelemetry Bootstrap
 
-Configures OpenTelemetry tracing and metrics. Provides bootstrap functions for instrumenting the API server and worker at startup.
+Configures OpenTelemetry tracing and metrics. Provides bootstrap functions for instrumenting the API server and worker at startup. Optional Langfuse span processor composes for LLM observability.
+
+### `packages/infra/storage`: R2 / S3 Client
+
+S3-compatible storage layer (Cloudflare R2 in production). Wraps the AWS SDK with presigned-URL generation, proxy-upload fallback for localhost, and Effect-native error types.
+
+### `packages/infra/ai`: OpenRouter AI Routing
+
+Thin wrapper around the OpenRouter SDK. All text generation, structured outputs, image generation, and embeddings flow through this package. Cost is read directly from OpenRouter responses (no custom per-model pricing table).
+
+### `packages/infra/stripe`: Stripe Integration
+
+Stripe client + webhook handlers for subscription management, checkout sessions, usage-based metering, and refund/dispute processing. The billing domain consumes this via a port.
+
+### `packages/infra/email`: Transactional Email
+
+React Email templates compiled via Resend. Shared layout primitives + per-event templates under `src/templates/{billing,onboarding,shared}/`. Used by billing notifications and the `email_campaigns` domain.
+
+### `packages/temporal-client`: Temporal Client Types
+
+Shared Temporal workflow types + `SerializedDomainEvent` contract used by both the API (for event schemas) and the worker (for dispatching). Ensures both sides agree on the outbox payload shape.
 
 ### `packages/testkit`: Test Utilities
 

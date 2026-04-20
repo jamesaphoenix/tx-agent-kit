@@ -9,6 +9,7 @@ import { StructuredData } from '../../../components/StructuredData'
 import { buildBlogListStructuredData } from '../../../lib/blog-seo'
 import { buildBreadcrumbStructuredData } from '../../../lib/seo'
 import { Breadcrumbs } from '../../../components/Breadcrumbs'
+import { Button } from '@/components/ui/button'
 
 export default function BlogListingPage() {
   const [articles, setArticles] = useState<BlogArticle[]>([])
@@ -62,20 +63,22 @@ export default function BlogListingPage() {
 
       {categories.length > 0 && (
         <div className="blog-categories">
-          <button
-            className={`blog-category-pill${activeCategory === null ? ' blog-category-pill--active' : ''}`}
+          <Button
+            variant={activeCategory === null ? 'default' : 'outline'}
+            size="sm"
             onClick={() => setActiveCategory(null)}
           >
             All
-          </button>
+          </Button>
           {categories.map((cat) => (
-            <button
+            <Button
               key={cat.id}
-              className={`blog-category-pill${activeCategory === cat.id ? ' blog-category-pill--active' : ''}`}
+              variant={activeCategory === cat.id ? 'default' : 'outline'}
+              size="sm"
               onClick={() => setActiveCategory(cat.id)}
             >
               {cat.name}
-            </button>
+            </Button>
           ))}
         </div>
       )}

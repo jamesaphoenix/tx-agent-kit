@@ -1,7 +1,7 @@
-import { cleanupPersistentWebIntegrationHarnesses } from './integration/support/web-integration-harness'
-
+// Web integration tests now use the shared API server started by
+// scripts/test/vitest-global-setup.ts. No per-project global setup needed.
 export default (): (() => Promise<void>) => {
   return async () => {
-    await cleanupPersistentWebIntegrationHarnesses()
+    // No-op: shared server teardown is handled by the root globalSetup
   }
 }

@@ -8,6 +8,7 @@
   "references": [
     { "path": "../infra/auth" },
     { "path": "../contracts" },
-    { "path": "../infra/db" }
+    { "path": "../infra/db" },
+    { "path": "../infra/storage" }
   ]
 }

@@ -1,0 +1,448 @@
+---
+title: "assets Endpoints"
+description: "API endpoints for the assets resource group"
+---
+
+# assets Endpoints
+
+## `POST /v1/teams/{teamId}/uploads/request`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `201` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `PUT /v1/teams/{teamId}/uploads/{uploadId}/content`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `uploadId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/teams/{teamId}/uploads/{uploadId}/confirm`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `uploadId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/teams/{teamId}/assets`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `cursor` | query | `string` | No | --- |
+| `limit` | query | `string` | No | --- |
+| `sortBy` | query | `string` | No | --- |
+| `sortOrder` | query | `string` | No | --- |
+| `filter[assetType]` | query | `string` | No | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/teams/{teamId}/assets/{assetId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `assetId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `PATCH /v1/teams/{teamId}/assets/{assetId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `assetId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `DELETE /v1/teams/{teamId}/assets/{assetId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `assetId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/teams/{teamId}/assets/{assetId}/url`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `assetId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/teams/{teamId}/assets/{assetId}/thumbnail-url`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `assetId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/teams/{teamId}/assets/search`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `query` | query | `string` | Yes | a string at least 1 character(s) long |
+| `semantic` | query | `string` | No | --- |
+| `cursor` | query | `string` | No | --- |
+| `limit` | query | `string` | No | --- |
+| `sortBy` | query | `string` | No | --- |
+| `sortOrder` | query | `string` | No | --- |
+| `filter[assetType]` | query | `string` | No | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/teams/{teamId}/collections`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `cursor` | query | `string` | No | --- |
+| `limit` | query | `string` | No | --- |
+| `sortBy` | query | `string` | No | --- |
+| `sortOrder` | query | `string` | No | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/teams/{teamId}/collections`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `201` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `PATCH /v1/teams/{teamId}/collections/{collectionId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `collectionId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `DELETE /v1/teams/{teamId}/collections/{collectionId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `collectionId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `GET /v1/teams/{teamId}/collections/{collectionId}/assets`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `collectionId` | path | `string` | Yes | --- |
+| `cursor` | query | `string` | No | --- |
+| `limit` | query | `string` | No | --- |
+| `sortBy` | query | `string` | No | --- |
+| `sortOrder` | query | `string` | No | --- |
+| `filter[assetType]` | query | `string` | No | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/teams/{teamId}/collections/{collectionId}/assets`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `collectionId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `201` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `DELETE /v1/teams/{teamId}/collections/{collectionId}/assets/{assetId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `teamId` | path | `string` | Yes | --- |
+| `collectionId` | path | `string` | Yes | --- |
+| `assetId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |

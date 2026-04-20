@@ -1,68 +1,50 @@
 import { eq, sql } from 'drizzle-orm'
-import { Effect, Schema } from 'effect'
-import { DB, provideDB } from '../client.js'
-import { userRowSchema, type UserRowShape } from '../effect-schemas/users.js'
-import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
+import { Effect } from 'effect'
+import { userRowSchema } from '../effect-schemas/users.js'
 import { users } from '../schema.js'
+import { withDb, decodeFirst } from './repo-helpers.js'
+import { createOptionalDecoder } from './sql-helpers.js'
 
-const decodeUserRow = Schema.decodeUnknown(userRowSchema)
-
-const decodeNullableUser = (
-  value: unknown
-): Effect.Effect<UserRowShape | null, DbError> => {
-  if (value === null || value === undefined) {
-    return Effect.succeed(null)
-  }
-
-  return decodeUserRow(value).pipe(
-    Effect.mapError((error) => dbDecodeFailed('users row decode failed', error))
-  )
-}
+const decode = createOptionalDecoder(userRowSchema, 'users row')
 
 export const usersRepository = {
   create: (input: { email: string; passwordHash: string; name: string }) =>
-    provideDB(
+    withDb('Failed to create user', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db.insert(users).values(input).returning().execute()
-        return yield* decodeNullableUser(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to create user', error))),
+    ),
 
   findByEmail: (email: string) =>
-    provideDB(
+    withDb('Failed to find user by email', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .select()
           .from(users)
           .where(sql`lower(trim(${users.email})) = lower(trim(${email}))`)
           .limit(1)
           .execute()
-        const row = rows[0]
-        return yield* decodeNullableUser(row)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to find user by email', error))),
+    ),
 
   findById: (id: string) =>
-    provideDB(
+    withDb('Failed to find user by id', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .select()
           .from(users)
           .where(eq(users.id, id))
           .limit(1)
           .execute()
-        const row = rows[0]
-        return yield* decodeNullableUser(row)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to find user by id', error))),
+    ),
 
   updatePasswordHash: (id: string, passwordHash: string) =>
-    provideDB(
+    withDb('Failed to update user password hash', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .update(users)
           .set({
@@ -73,16 +55,15 @@ export const usersRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullableUser(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to update user password hash', error))),
+    ),
 
   deleteById: (id: string) =>
-    provideDB(
+    withDb('Failed to delete user', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db.delete(users).where(eq(users.id, id)).returning().execute()
-        return yield* decodeNullableUser(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to delete user', error)))
+    )
 }

@@ -1,6 +1,8 @@
 import React from 'react'
+import { randomUUID } from 'node:crypto'
 import { writeAuthToken } from '@/lib/auth-token'
 import { clientApi } from '@/lib/client-api'
+import { notify } from '@/lib/notify'
 import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import { describe, expect, it, vi } from 'vitest'
 import { CreateInvitationForm } from './CreateInvitationForm'
@@ -12,14 +14,10 @@ describe('CreateInvitationForm integration', () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'invite-owner@example.com',
-      password: 'invite-owner-pass-12345',
       name: 'Invite Owner'
     })
 
     const invitee = await createUser(factoryContext, {
-      email: 'invitee@example.com',
-      password: 'invitee-pass-12345',
       name: 'Invitee User'
     })
 
@@ -55,6 +53,7 @@ describe('CreateInvitationForm integration', () => {
 
   it('shows a local validation error when there are no organizations', async () => {
     const onCreated = vi.fn<() => void | Promise<void>>()
+    const notifyErrorSpy = vi.spyOn(notify, 'error')
     const user = userEvent.setup()
 
     renderWithProviders(<CreateInvitationForm organizations={[]} onCreated={onCreated} />)
@@ -63,30 +62,25 @@ describe('CreateInvitationForm integration', () => {
     await user.click(screen.getByRole('button', { name: 'Send invitation' }))
 
     await waitFor(() => {
-      expect(screen.getByText('Create an organization first')).toBeInTheDocument()
+      expect(notifyErrorSpy).toHaveBeenCalledWith('Create an organization first')
     })
 
     expect(onCreated).not.toHaveBeenCalled()
+    notifyErrorSpy.mockRestore()
   })
 
   it('surfaces an error and does not create invitations for non-organization members', async () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'invite-owner-forbidden@example.com',
-      password: 'invite-owner-pass-12345',
       name: 'Invite Owner Forbidden'
     })
 
     const outsider = await createUser(factoryContext, {
-      email: 'invite-outsider-forbidden@example.com',
-      password: 'invite-outsider-pass-12345',
       name: 'Invite Outsider Forbidden'
     })
 
     const invitee = await createUser(factoryContext, {
-      email: 'invitee-forbidden@example.com',
-      password: 'invitee-pass-12345',
       name: 'Invitee Forbidden'
     })
 
@@ -125,12 +119,10 @@ describe('CreateInvitationForm integration', () => {
     ).toBe(false)
   })
 
-  it('surfaces an error when inviting an email without an existing account', async () => {
+  it('creates pending invitations for emails without an existing account', async () => {
     const factoryContext = createWebFactoryContext()
 
     const owner = await createUser(factoryContext, {
-      email: 'invite-owner-unknown-email@example.com',
-      password: 'invite-owner-pass-12345',
       name: 'Invite Owner Unknown Email'
     })
 
@@ -151,23 +143,34 @@ describe('CreateInvitationForm integration', () => {
       />
     )
 
-    const unknownEmail = 'invitee-without-account@example.com'
+    const unknownEmail = `invitee-without-account-${randomUUID()}@example.com`
     await user.type(screen.getByLabelText('Email'), unknownEmail)
     await user.click(screen.getByRole('button', { name: 'Send invitation' }))
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          /failed to send invitation|must already have an account|invalid|network error/i
-        )
-      ).toBeInTheDocument()
+      expect(onCreated).toHaveBeenCalledTimes(1)
     })
 
-    expect(onCreated).not.toHaveBeenCalled()
+    const persistedInvitation = await factoryContext.testContext.withSchemaClient(
+      async (client) => {
+        const result = await client.query<{ email: string; status: string }>(
+          `
+            SELECT email, status
+              FROM invitations
+             WHERE organization_id = $1
+               AND email = $2
+             LIMIT 1
+          `,
+          [organization.id, unknownEmail]
+        )
 
-    const invitations = await clientApi.listInvitations()
-    expect(
-      invitations.data.some((invitation) => invitation.email === unknownEmail)
-    ).toBe(false)
+        return result.rows[0] ?? null
+      }
+    )
+
+    expect(persistedInvitation).toEqual({
+      email: unknownEmail,
+      status: 'pending'
+    })
   })
 })

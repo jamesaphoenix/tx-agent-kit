@@ -60,3 +60,31 @@ export const resolveBrowserUrl = (href: string): URL => {
   const location = readBrowserLocationState()
   return new URL(href, location.origin)
 }
+
+type ExternalNavigationHandler = (url: string) => void
+
+let externalNavigationHandler: ExternalNavigationHandler | null = null
+
+export const configureExternalNavigationHandler = (
+  handler: ExternalNavigationHandler | null
+): void => {
+  externalNavigationHandler = handler
+}
+
+/**
+ * Navigate the current tab to an absolute external URL (e.g. a
+ * Stripe-hosted checkout page). Thin wrapper over `globalThis.location.assign`
+ * so components never reach for the browser location API directly —
+ * the `enforce-web-client-contracts.mjs` invariant forbids that pattern
+ * everywhere except this url-state wrapper.
+ */
+export const navigateToExternalUrl = (url: string): void => {
+  if (typeof globalThis === 'undefined') {
+    return
+  }
+  if (externalNavigationHandler !== null) {
+    externalNavigationHandler(url)
+    return
+  }
+  globalThis.location.assign(url)
+}

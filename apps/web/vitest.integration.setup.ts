@@ -4,24 +4,14 @@ import { cleanup, configure } from '@testing-library/react'
 configure({ asyncUtilTimeout: 5000 })
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 import { clearAuthToken } from './lib/auth-token'
-import { resolveWebIntegrationPort } from './integration/support/web-integration-harness'
 import { resetIntegrationRouterLocation } from './integration/support/next-router-context'
-import {
-  releaseVitestWorkerSlot,
-  resolveVitestWorkerOffset,
-  resolveVitestWorkerSlot
-} from './integration/support/vitest-worker'
 import {
   resetWebIntegrationCase,
   setupWebIntegrationSuite,
-  teardownWebIntegrationSuite
+  teardownWebIntegrationSuite,
+  integrationBaseUrl
 } from './integration/support/web-integration-context'
 import { sessionStore, sessionStoreInitialState } from './stores/session-store'
-
-const workerSlot = resolveVitestWorkerSlot()
-const workerOffset = resolveVitestWorkerOffset()
-const integrationApiPort = resolveWebIntegrationPort(workerSlot)
-const integrationApiBaseUrl = `http://localhost:${integrationApiPort}`
 
 if (process.env.WEB_INTEGRATION_DEBUG === '1') {
   process.stderr.write(
@@ -30,15 +20,20 @@ if (process.env.WEB_INTEGRATION_DEBUG === '1') {
       `pid=${process.pid}`,
       `worker_id=${process.env.VITEST_WORKER_ID ?? 'unset'}`,
       `pool_id=${process.env.VITEST_POOL_ID ?? 'unset'}`,
-      `slot=${workerSlot}`,
-      `offset=${workerOffset}`,
-      `api_base=${integrationApiBaseUrl}`
+      `api_base=${integrationBaseUrl}`
     ].join(' ') + '\n'
   )
 }
 
-process.env.NEXT_PUBLIC_API_BASE_URL = integrationApiBaseUrl
-process.env.API_BASE_URL = integrationApiBaseUrl
+import { resetWebEnvCache } from './lib/env'
+import { api } from './lib/axios'
+import { configureExternalNavigationHandler } from './lib/url-state'
+
+process.env.NEXT_PUBLIC_API_BASE_URL = integrationBaseUrl
+process.env.API_BASE_URL = integrationBaseUrl
+// Reset cached env and update the axios instance to use the test server URL
+resetWebEnvCache()
+api.defaults.baseURL = integrationBaseUrl
 
 if (typeof window.matchMedia !== 'function') {
   Object.defineProperty(window, 'matchMedia', {
@@ -70,6 +65,7 @@ vi.mock('sonner', () => ({
 const shouldResetBackendState = process.env.WEB_INTEGRATION_RESET_EACH_TEST !== '0'
 
 beforeAll(async () => {
+  configureExternalNavigationHandler(() => undefined)
   await setupWebIntegrationSuite()
 })
 
@@ -92,9 +88,6 @@ afterEach(() => {
 })
 
 afterAll(() => {
-  try {
-    teardownWebIntegrationSuite()
-  } finally {
-    releaseVitestWorkerSlot()
-  }
+  configureExternalNavigationHandler(null)
+  teardownWebIntegrationSuite()
 })

@@ -14,79 +14,49 @@ interface DashboardShellProps {
   title: string
   subtitle: string
   children: ReactNode
+  actions?: ReactNode
   principalEmail?: string | null
   orgId?: string
   teamId?: string
+  /** @deprecated Metrics are no longer rendered. Kept for backwards compatibility. */
   metrics?: DashboardMetric[]
-}
-
-const metricToneClass = (tone: DashboardMetric['tone']): string => {
-  if (tone === 'success') {
-    return 'is-success'
-  }
-
-  if (tone === 'warning') {
-    return 'is-warning'
-  }
-
-  return 'is-default'
 }
 
 export function DashboardShell({
   title,
   subtitle,
   children,
+  actions,
   principalEmail,
   orgId,
-  teamId,
-  metrics = []
+  teamId
 }: DashboardShellProps) {
   return (
     <SidebarProvider
       defaultOpen
       style={
         {
-          '--sidebar-width': '18rem',
-          '--sidebar-width-mobile': '18rem'
+          '--sidebar-width': '14rem',
+          '--sidebar-width-mobile': '14rem'
         } as CSSProperties
       }
     >
-      <div className="dashboard-shell-root">
+      <div className="flex min-h-dvh w-full">
         <AppSidebar orgId={orgId} teamId={teamId} principalEmail={principalEmail} />
         <SidebarInset>
-          <div className="dashboard-shell-main">
-            <header className="dashboard-shell-topbar">
-              <div className="dashboard-shell-topbar-left">
+          <div className="flex flex-1 flex-col">
+            <header className="flex items-center gap-3 border-b border-border px-4 py-3">
+              <div className="flex items-center gap-3">
                 <SidebarTrigger />
-                <div className="dashboard-shell-context">
-                  <span className="dashboard-shell-context-kicker">OctoSpark Command</span>
-                  <strong className="dashboard-shell-context-title">{title}</strong>
+                <div>
+                  <h1 className="text-lg font-semibold tracking-tight leading-tight">{title}</h1>
+                  <p className="text-sm text-muted-foreground">{subtitle}</p>
                 </div>
               </div>
+              {actions ? <div className="ml-auto flex items-center gap-2">{actions}</div> : null}
             </header>
 
-            <section className="dashboard-shell-hero">
-              <div className="dashboard-shell-hero-copy">
-                <h1>{title}</h1>
-                <p>{subtitle}</p>
-              </div>
-
-              {metrics.length > 0 && (
-                <div className="dashboard-shell-metrics">
-                  {metrics.map((metric) => (
-                    <article
-                      key={metric.label}
-                      className={`dashboard-shell-metric ${metricToneClass(metric.tone)}`}
-                    >
-                      <span>{metric.label}</span>
-                      <strong>{metric.value}</strong>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="dashboard-shell-content">
+            <section className="flex-1 p-6">
               {children}
             </section>
           </div>

@@ -1,106 +1,77 @@
 'use client'
 
-import type { Organization, Team } from '@tx-agent-kit/contracts'
-import { useCallback, useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { DashboardShell } from '../../../../../components/DashboardShell'
 import { useCurrentPrincipal } from '../../../../../hooks/use-session-store'
-import { clientApi } from '../../../../../lib/client-api'
-import { handleUnauthorizedApiError } from '../../../../../lib/client-auth'
-
-interface DashboardState {
-  organization: Organization | null
-  team: Team | null
-}
-
-const emptyState: DashboardState = {
-  organization: null,
-  team: null
-}
+import { useOrganizationsGetOrganization } from '../../../../../lib/api/generated/organizations/organizations'
+import { useTeamsGetTeam } from '../../../../../lib/api/generated/teams/teams'
 
 export default function TeamDashboardPage() {
-  const router = useRouter()
   const params = useParams<{ orgId: string; teamId: string }>()
   const { orgId, teamId } = params
   const principal = useCurrentPrincipal()
-  const [state, setState] = useState<DashboardState>(emptyState)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async (): Promise<void> => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [organization, team] = await Promise.all([clientApi.getOrganization(orgId), clientApi.getTeam(teamId)])
-      setState({ organization, team })
-    } catch (error_) {
-      if (handleUnauthorizedApiError(error_, router, `/org/${orgId}/${teamId}`)) {
-        return
-      }
-      setError(error_ instanceof Error ? error_.message : 'Failed to load dashboard')
-    } finally {
-      setLoading(false)
-    }
-  }, [orgId, teamId, router])
+  const orgQuery = useOrganizationsGetOrganization(orgId, {
+    query: {}
+  })
+  const teamQuery = useTeamsGetTeam(teamId, {
+    query: {}
+  })
 
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  const metrics = [
-    {
-      label: 'Workspace',
-      value: state.team?.name ?? (loading ? 'Loading' : 'Unknown')
-    },
-    {
-      label: 'Organization',
-      value: state.organization?.name ?? (loading ? 'Loading' : 'Unknown')
-    },
-    {
-      label: 'State',
-      value: loading ? 'Refreshing' : 'Current',
-      tone: loading ? 'warning' as const : 'success' as const
-    }
-  ]
+  const organization = orgQuery.data ?? null
+  const team = teamQuery.data ?? null
+  const loading = orgQuery.isLoading || teamQuery.isLoading
+  const error = orgQuery.error || teamQuery.error ? 'Failed to load dashboard' : null
 
   return (
     <DashboardShell
-      title={state.team?.name ?? 'Workspace dashboard'}
+      title={team?.name ?? 'Dashboard'}
       subtitle={principal ? `Signed in as ${principal.email}` : 'Loading profile...'}
       principalEmail={principal?.email}
       orgId={orgId}
       teamId={teamId}
-      metrics={metrics}
     >
-      {error && <p className="error">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="dashboard-shell-grid">
-        <section className="card stack">
-          <h2>Organization</h2>
-          {state.organization && (
-            <>
-              <p><strong>{state.organization.name}</strong></p>
-              <p className="muted">Status: {state.organization.subscriptionStatus}</p>
-            </>
-          )}
-          {!state.organization && loading && (
-            <p className="muted">Loading organization...</p>
-          )}
-        </section>
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      )}
 
-        <section className="card stack">
-          <h2>Team</h2>
-          {state.team && (
-            <>
-              <p><strong>{state.team.name}</strong></p>
-              {state.team.website && <p className="muted">{state.team.website}</p>}
-            </>
-          )}
-          {!state.team && loading && (
-            <p className="muted">Loading team...</p>
-          )}
-        </section>
-      </div>
+      {!loading && !error && !organization && !team && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">No dashboard data available.</p>
+        </div>
+      )}
+
+      {!loading && (error || organization || team) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-lg border bg-card p-6 shadow-sm">
+            <h2 className="text-sm font-medium text-muted-foreground mb-3">Organization</h2>
+            {organization ? (
+              <>
+                <p className="text-base font-semibold">{organization.name}</p>
+                <p className="text-sm text-muted-foreground mt-1">Status: {organization.subscriptionStatus}</p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No organization data.</p>
+            )}
+          </div>
+
+          <div className="rounded-lg border bg-card p-6 shadow-sm">
+            <h2 className="text-sm font-medium text-muted-foreground mb-3">Workspace</h2>
+            {team ? (
+              <>
+                <p className="text-base font-semibold">{team.name}</p>
+                {team.website && <p className="text-sm text-muted-foreground mt-1">{team.website}</p>}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No workspace data.</p>
+            )}
+          </div>
+        </div>
+      )}
     </DashboardShell>
   )
 }

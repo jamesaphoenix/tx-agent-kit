@@ -38,7 +38,9 @@ test('domain-invariants enables all critical domain-structure rules', () => {
     'no-raw-schema-literal-enums',
     'no-inline-pgenum-array',
     'json-columns-require-explicit-drizzle-type',
-    'core-adapters-use-db-row-mappers'
+    'core-adapters-use-db-row-mappers',
+    'enforce-domain-extends-row-shape',
+    'enforce-shadcn-button'
   ]
 
   for (const ruleName of expectedRules) {

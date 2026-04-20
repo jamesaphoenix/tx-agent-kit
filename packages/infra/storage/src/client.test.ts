@@ -85,6 +85,21 @@ describe('StorageService', () => {
     })
   })
 
+  describe('getObject', () => {
+    it('returns object bytes', async () => {
+      const bytes = new Uint8Array([1, 2, 3])
+      mockSend.mockResolvedValueOnce({
+        Body: {
+          transformToByteArray: () => Promise.resolve(bytes)
+        }
+      })
+
+      const service = await getService()
+      const result = await Effect.runPromise(service.getObject('test/file.png'))
+      expect(result).toEqual(bytes)
+    })
+  })
+
   describe('listObjects', () => {
     it('returns object keys', async () => {
       mockSend.mockResolvedValueOnce({

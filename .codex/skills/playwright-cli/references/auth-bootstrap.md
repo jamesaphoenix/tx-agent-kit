@@ -1,5 +1,15 @@
 # Authenticated Browser Sessions
 
+## Preferred Local Shortcut
+
+When the tx-agent-kit local web app exposes the dev-only **Custom dev utils** button, prefer that flow over the storage-state bootstrap below. It creates a unique user, organization, workspace, signs the browser in, and can optionally grant Pro + local credits.
+
+```bash
+playwright-cli open http://localhost:3000
+playwright-cli snapshot
+# Click "Open developer utilities", then choose "Fresh free org" or "Fresh Pro + $20 local credit".
+```
+
 Bootstrap authenticated `playwright-cli` sessions using real auth APIs and 1Password-backed credentials. Use this for quick UI checks or polish runs without manual sign-in.
 
 ## Prerequisites

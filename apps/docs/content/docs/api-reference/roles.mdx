@@ -1,0 +1,98 @@
+---
+title: "roles Endpoints"
+description: "API endpoints for the roles resource group"
+---
+
+# roles Endpoints
+
+## `GET /v1/roles`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `cursor` | query | `string` | No | --- |
+| `limit` | query | `string` | No | --- |
+| `sortBy` | query | `string` | No | --- |
+| `sortOrder` | query | `string` | No | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `POST /v1/roles`
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `201` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `PATCH /v1/roles/{roleId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `roleId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |
+
+## `DELETE /v1/roles/{roleId}`
+
+
+### Parameters
+
+| Name | In | Type | Required | Description |
+|------|-----|------|----------|-------------|
+| `roleId` | path | `string` | Yes | --- |
+
+
+### Responses
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `400` | The request did not match the expected schema |
+| `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
+| `500` | InternalError |

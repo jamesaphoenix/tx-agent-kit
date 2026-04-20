@@ -1,283 +1,59 @@
-import { StripePort, type StripeWebhookEvent } from '@tx-agent-kit/core'
-import { createLogger } from '@tx-agent-kit/logging'
-import { Effect, Layer } from 'effect'
-import { randomUUID } from 'node:crypto'
-import Stripe from 'stripe'
+import type { StripePort } from '@tx-agent-kit/core'
+import { makeStripePortLive, type StripePortConfig } from '@tx-agent-kit/stripe'
+import { Layer } from 'effect'
 import { getApiEnv } from '../config/env.js'
 
-const stripeLogger = createLogger('stripe')
+/**
+ * API-side Stripe adapter.
+ *
+ * The actual implementation lives in `@tx-agent-kit/stripe` so the worker
+ * and the API server share one source of truth for the Stripe Port
+ * wiring. This module is a thin shim: it resolves the api env and hands
+ * the config to {@link makeStripePortLive}.
+ *
+ * The layer is evaluated lazily via `Layer.suspend` so `getApiEnv()`
+ * (which can throw on missing required vars) only runs when the layer is
+ * actually provided — never at module import time.
+ *
+ * @spec billing-and-pricing-design
+ */
 
-type JsonPrimitive = string | number | boolean | null
-type JsonValue = JsonPrimitive | JsonObject | JsonValue[]
-interface JsonObject {
-  [key: string]: JsonValue
-}
+let cachedStripePortLive: Layer.Layer<StripePort> | null = null
 
-const toJsonValue = (value: unknown): JsonValue => {
-  if (value === null) {
-    return null
-  }
-
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return value
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((entry) => toJsonValue(entry))
-  }
-
-  if (typeof value === 'object') {
-    const entries = Object.entries(value)
-    const mapped: JsonObject = {}
-    for (const [key, child] of entries) {
-      mapped[key] = toJsonValue(child)
-    }
-    return mapped
-  }
-
-  return null
-}
-
-const toJsonObject = (value: unknown): JsonObject => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return {}
-  }
-
-  const result: JsonObject = {}
-  for (const [key, child] of Object.entries(value)) {
-    result[key] = toJsonValue(child)
-  }
-  return result
-}
-
-const resolveStripeClient = (): Stripe | null => {
+const resolveStripePortConfig = (): StripePortConfig => {
   const env = getApiEnv()
-  if (!env.STRIPE_SECRET_KEY) {
-    return null
-  }
-
-  return new Stripe(env.STRIPE_SECRET_KEY, {
-    apiVersion: '2025-10-29.clover'
-  })
-}
-
-const requireProPriceIds = (): Effect.Effect<{ proPriceId: string; meteredPriceId: string }, Error> =>
-  Effect.sync(() => {
-    const env = getApiEnv()
-    const proPriceId = env.STRIPE_PRO_PRICE_ID
-    const meteredPriceId = env.STRIPE_PRO_METERED_PRICE_ID
-
-    if (!proPriceId || !meteredPriceId) {
-      throw new Error('Stripe Pro price IDs are not configured.')
-    }
-
-    return { proPriceId, meteredPriceId }
-  })
-
-const parseWebhookEventWithoutVerification = (rawBody: string): StripeWebhookEvent => {
-  const parsed = JSON.parse(rawBody) as unknown
-  const payload = toJsonObject(parsed)
-  const eventId = typeof payload.id === 'string' ? payload.id : 'local-webhook-event'
-  const eventType = typeof payload.type === 'string' ? payload.type : 'unknown'
-  const data = toJsonObject(payload.data)
-
   return {
-    id: eventId,
-    type: eventType,
-    payload,
-    data: {
-      object: toJsonObject(data.object)
-    }
+    secretKey: env.STRIPE_SECRET_KEY,
+    webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+    checkoutPriceIds: {
+      try_me: {
+        recurring: env.STRIPE_TRY_ME_PRICE_ID
+      },
+      pro: {
+        recurring: env.STRIPE_PRO_PRICE_ID
+      },
+      agency: {
+        recurring: env.STRIPE_AGENCY_PRICE_ID
+      }
+    },
+    nodeEnv: env.NODE_ENV
   }
 }
 
-const readStringMember = (value: unknown, key: string): string | null => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return null
-  }
-
-  const maybe = (value as Record<string, unknown>)[key]
-  return typeof maybe === 'string' ? maybe : null
+const getStripePortLive = (): Layer.Layer<StripePort> => {
+  cachedStripePortLive ??= makeStripePortLive(resolveStripePortConfig())
+  return cachedStripePortLive
 }
 
-export const StripePortLive = Layer.succeed(StripePort, {
-  createCheckoutSession: (input) =>
-    Effect.gen(function* () {
-      const stripe = resolveStripeClient()
-      if (!stripe) {
-        return {
-          id: `cs_local_${randomUUID()}`,
-          url: `${input.successUrl}?session_id=cs_local`
-        }
-      }
+/**
+ * Test hook: resets the cached adapter so a subsequent call picks up a
+ * freshly stubbed env. Used by integration tests that flip env vars
+ * between runs.
+ */
+export const _resetStripePortLiveForTest = (): void => {
+  cachedStripePortLive = null
+}
 
-      const prices = yield* requireProPriceIds()
-
-      return yield* Effect.tryPromise({
-        try: async () => {
-          const session = await stripe.checkout.sessions.create({
-            mode: 'subscription',
-            customer: input.customerId,
-            success_url: input.successUrl,
-            cancel_url: input.cancelUrl,
-            client_reference_id: input.organizationId,
-            metadata: {
-              organizationId: input.organizationId
-            },
-            subscription_data: {
-              metadata: {
-                organizationId: input.organizationId
-              }
-            },
-            line_items: [
-              {
-                price: prices.proPriceId,
-                quantity: 1
-              },
-              {
-                price: prices.meteredPriceId
-              }
-            ]
-          })
-
-          if (!session.url) {
-            throw new Error('Stripe checkout session did not include a redirect URL.')
-          }
-
-          return {
-            id: session.id,
-            url: session.url
-          }
-        },
-        catch: (error) => (error instanceof Error ? error : new Error(String(error)))
-      })
-    }),
-
-  createPortalSession: (input) =>
-    Effect.gen(function* () {
-      const stripe = resolveStripeClient()
-      if (!stripe) {
-        return {
-          id: `bps_local_${randomUUID()}`,
-          url: input.returnUrl
-        }
-      }
-
-      return yield* Effect.tryPromise({
-        try: async () => {
-          const session = await stripe.billingPortal.sessions.create({
-            customer: input.customerId,
-            return_url: input.returnUrl
-          })
-
-          return {
-            id: session.id,
-            url: session.url
-          }
-        },
-        catch: (error) => (error instanceof Error ? error : new Error(String(error)))
-      })
-    }),
-
-  constructWebhookEvent: (rawBody: string, signature: string) =>
-    Effect.gen(function* () {
-      const env = getApiEnv()
-      const stripe = resolveStripeClient()
-      const webhookSecret = env.STRIPE_WEBHOOK_SECRET
-
-      if (!stripe || !webhookSecret) {
-        if (env.NODE_ENV === 'development' || env.NODE_ENV === 'test') {
-          stripeLogger.warn('Processing webhook without signature verification (Stripe not fully configured)')
-          return yield* Effect.sync(() => parseWebhookEventWithoutVerification(rawBody))
-        }
-        return yield* Effect.fail(new Error('Stripe webhook secret is not configured — signature verification required outside development'))
-      }
-
-      return yield* Effect.try({
-        try: () => {
-          const event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
-          const payload = toJsonObject(event as unknown)
-          const eventData = (event.data as { object: unknown }).object
-          return {
-            id: event.id,
-            type: event.type,
-            payload,
-            data: {
-              object: toJsonObject(eventData)
-            }
-          } satisfies StripeWebhookEvent
-        },
-        catch: (error) => (error instanceof Error ? error : new Error(String(error)))
-      })
-    }),
-
-  createCustomer: (input) =>
-    Effect.gen(function* () {
-      const stripe = resolveStripeClient()
-      if (!stripe) {
-        return { id: `cus_local_${input.organizationId}` }
-      }
-
-      return yield* Effect.tryPromise({
-        try: async () => {
-          const customer = await stripe.customers.create({
-            email: input.email,
-            metadata: {
-              organizationId: input.organizationId
-            }
-          })
-
-          return { id: customer.id }
-        },
-        catch: (error) => (error instanceof Error ? error : new Error(String(error)))
-      })
-    }),
-
-  reportUsage: (input) =>
-    Effect.gen(function* () {
-      const env = getApiEnv()
-      if (!env.STRIPE_SECRET_KEY) {
-        return { id: `usage_${randomUUID()}` }
-      }
-
-      const stripeKey = env.STRIPE_SECRET_KEY
-
-      return yield* Effect.tryPromise({
-        try: async () => {
-          const body = new URLSearchParams()
-          body.set('quantity', String(input.quantity))
-          body.set('action', 'increment')
-          body.set('timestamp', String(Math.floor(input.timestamp.getTime() / 1000)))
-
-          const response = await fetch(
-            `https://api.stripe.com/v1/subscription_items/${encodeURIComponent(input.subscriptionItemId)}/usage_records`,
-            {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${stripeKey}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
-                ...(input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : {})
-              },
-              body
-            }
-          )
-
-          if (!response.ok) {
-            const message = await response.text()
-            throw new Error(
-              `Stripe usage report failed with status ${response.status}${message ? `: ${message}` : ''}`
-            )
-          }
-
-          const payload: unknown = await response.json()
-          const usageRecordId = readStringMember(payload, 'id')
-          if (!usageRecordId) {
-            throw new Error('Stripe usage report response did not include an id.')
-          }
-
-          return { id: usageRecordId }
-        },
-        catch: (error) => (error instanceof Error ? error : new Error(String(error)))
-      })
-    })
-})
+export const StripePortLive: Layer.Layer<StripePort> = Layer.suspend(() =>
+  getStripePortLive()
+)

@@ -11,7 +11,9 @@ export const integrationConfig = mergeConfig(
       testTimeout: 60000,
       hookTimeout: 60000,
       maxWorkers: integrationMaxWorkers,
-      fileParallelism: integrationMaxWorkers > 1
+      fileParallelism: integrationMaxWorkers > 1,
+      pool: 'threads',
+      isolate: false
     }
   })
 )

@@ -260,6 +260,7 @@ api.interceptors.response.use(
             await clearAuthToken()
             await clearRefreshToken()
           }
+          throw catchError
         }
       } else {
         finishRequestTelemetry(config, statusCode, error)

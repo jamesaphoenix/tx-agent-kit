@@ -1,27 +1,12 @@
 import { and, eq, gt, isNull, lt, or, sql } from 'drizzle-orm'
 import type { AuthLoginProvider } from '@tx-agent-kit/contracts'
-import { Effect, Schema } from 'effect'
-import { DB, provideDB } from '../client.js'
-import {
-  authLoginOidcStateRowSchema,
-  type AuthLoginOidcStateRowShape
-} from '../effect-schemas/auth-login-oidc-states.js'
-import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
+import { Effect } from 'effect'
+import { authLoginOidcStateRowSchema } from '../effect-schemas/auth-login-oidc-states.js'
 import { authLoginOidcStates } from '../schema.js'
+import { withDb, decodeFirst } from './repo-helpers.js'
+import { createOptionalDecoder } from './sql-helpers.js'
 
-const decodeAuthLoginOidcStateRow = Schema.decodeUnknown(authLoginOidcStateRowSchema)
-
-const decodeNullableAuthLoginOidcState = (
-  value: unknown
-): Effect.Effect<AuthLoginOidcStateRowShape | null, DbError> => {
-  if (value === null || value === undefined) {
-    return Effect.succeed(null)
-  }
-
-  return decodeAuthLoginOidcStateRow(value).pipe(
-    Effect.mapError((error) => dbDecodeFailed('auth login oidc state row decode failed', error))
-  )
-}
+const decode = createOptionalDecoder(authLoginOidcStateRowSchema, 'auth login oidc state row')
 
 export const authLoginOidcStatesRepository = {
   create: (input: {
@@ -33,9 +18,8 @@ export const authLoginOidcStatesRepository = {
     requesterIp: string | null
     expiresAt: Date
   }) =>
-    provideDB(
+    withDb('Failed to create auth login oidc state', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .insert(authLoginOidcStates)
           .values({
@@ -51,14 +35,13 @@ export const authLoginOidcStatesRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullableAuthLoginOidcState(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to create auth login oidc state', error))),
+    ),
 
   consumeActiveByProviderAndState: (provider: AuthLoginProvider, state: string) =>
-    provideDB(
+    withDb('Failed to consume auth login oidc state', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const nowExpression = sql`now()`
         const rows = yield* db
           .update(authLoginOidcStates)
@@ -76,14 +59,13 @@ export const authLoginOidcStatesRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullableAuthLoginOidcState(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to consume auth login oidc state', error))),
+    ),
 
   pruneExpired: (olderThan: Date) =>
-    provideDB(
+    withDb('Failed to prune expired auth login oidc states', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .delete(authLoginOidcStates)
           .where(
@@ -97,5 +79,5 @@ export const authLoginOidcStatesRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to prune expired auth login oidc states', error)))
+    )
 }

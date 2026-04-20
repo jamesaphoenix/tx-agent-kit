@@ -1,6 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { domainEventsRepository } from '@tx-agent-kit/db'
+import { Effect } from 'effect'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { defaultTestBrandSettings } from './api-factories.js'
 import { createDbAuthContext } from './db-auth-context.js'
 import {
   backdateFailedAt,
@@ -21,14 +25,29 @@ const apiCwd = resolve(dirname(fileURLToPath(import.meta.url)), '../../../apps/a
 
 const dbAuthContext = createDbAuthContext({
   apiCwd,
-  host: '127.0.0.1',
-  port: Number.parseInt(process.env.TESTKIT_INTEGRATION_API_PORT ?? '4103', 10),
-  authSecret: 'domain-events-integration-secret-32c',
+  authSecret: process.env.INTEGRATION_AUTH_SECRET ?? 'domain-events-integration-secret-32c',
   corsOrigin: '*',
   sql: {
     schemaPrefix: 'domain_events_outbox'
   }
 })
+
+const runWithRepositoryDatabaseUrl = async <A>(
+  createEffect: () => Effect.Effect<A, unknown>
+): Promise<A> => {
+  const originalDatabaseUrl = process.env.DATABASE_URL
+  process.env.DATABASE_URL = dbAuthContext.testContext.schemaDatabaseUrl
+
+  try {
+    return await Effect.runPromise(createEffect())
+  } finally {
+    if (originalDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL
+    } else {
+      process.env.DATABASE_URL = originalDatabaseUrl
+    }
+  }
+}
 
 beforeAll(async () => {
   await dbAuthContext.setup()
@@ -45,8 +64,6 @@ afterAll(async () => {
 describe('domain events outbox integration', () => {
   it('creates a domain event when an organization is created via the API', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'domain-events-org@example.com',
-      password: 'strong-pass-12345',
       name: 'Domain Events Test User'
     })
 
@@ -82,8 +99,6 @@ describe('domain events outbox integration', () => {
 
   it('ensures atomicity — exactly one event per org creation', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'domain-events-atomicity@example.com',
-      password: 'strong-pass-12345',
       name: 'Atomicity Test User'
     })
 
@@ -101,8 +116,6 @@ describe('domain events outbox integration', () => {
 
   it('supports full event lifecycle: pending → processing → published', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'domain-events-lifecycle@example.com',
-      password: 'strong-pass-12345',
       name: 'Lifecycle Test User'
     })
 
@@ -120,7 +133,7 @@ describe('domain events outbox integration', () => {
     expect(events[0]!.status).toBe('pending')
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 1)
+      claimPendingEventsForProcessing(client, 1, org.id)
     )
 
     const afterClaim = await dbAuthContext.testContext.withSchemaClient(async (client) =>
@@ -144,8 +157,6 @@ describe('domain events outbox integration', () => {
 
   it('supports failure lifecycle: pending → processing → failed', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'domain-events-fail-lifecycle@example.com',
-      password: 'strong-pass-12345',
       name: 'Fail Lifecycle Test User'
     })
 
@@ -162,7 +173,7 @@ describe('domain events outbox integration', () => {
     const eventId = events[0]!.id
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 1)
+      claimPendingEventsForProcessing(client, 1, org.id)
     )
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
@@ -180,8 +191,6 @@ describe('domain events outbox integration', () => {
 
   it('fetches only pending events in occurred_at order', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'domain-events-fetch@example.com',
-      password: 'strong-pass-12345',
       name: 'Fetch Test User'
     })
 
@@ -206,20 +215,23 @@ describe('domain events outbox integration', () => {
       }
     })
 
-    const pendingEvents = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      queryPendingDomainEvents(client)
+    const pendingOrg2 = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      queryPendingDomainEvents(client, 50, org2.id)
     )
 
-    expect(pendingEvents.length).toBeGreaterThanOrEqual(1)
-    expect(pendingEvents.every((e) => e.status === 'pending')).toBe(true)
-    expect(pendingEvents.some((e) => e.aggregate_id === org2.id)).toBe(true)
-    expect(pendingEvents.every((e) => e.aggregate_id !== org1.id)).toBe(true)
+    expect(pendingOrg2).toHaveLength(1)
+    expect(pendingOrg2.every((e) => e.status === 'pending')).toBe(true)
+    expect(pendingOrg2[0]!.aggregate_id).toBe(org2.id)
+
+    const pendingOrg1 = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      queryPendingDomainEvents(client, 50, org1.id)
+    )
+
+    expect(pendingOrg1).toHaveLength(0)
   })
 
   it('produces exactly one event per org across a batch of creations', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'domain-events-batch@example.com',
-      password: 'strong-pass-12345',
       name: 'Batch Test User'
     })
 
@@ -230,45 +242,39 @@ describe('domain events outbox integration', () => {
       orgs.push(org)
     }
 
+    const eventIds = new Set<string>()
     for (const org of orgs) {
       const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
         queryDomainEventsByAggregate(client, 'organization', org.id)
       )
 
       expect(events).toHaveLength(1)
+      eventIds.add(events[0]!.id)
       expect(events[0]!.event_type).toBe('organization.created')
       expect(events[0]!.payload).toEqual(
         expect.objectContaining({ organizationName: org.name })
       )
     }
 
-    const allPending = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      queryPendingDomainEvents(client)
-    )
-
-    const batchOrgIds = new Set(orgs.map((o) => o.id))
-    const batchEvents = allPending.filter((e) => batchOrgIds.has(e.aggregate_id))
-    expect(batchEvents).toHaveLength(3)
+    expect(eventIds.size).toBe(3)
   })
 
   it('orders pending events by occurred_at ascending', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'domain-events-order@example.com',
-      password: 'strong-pass-12345',
       name: 'Order Test User'
     })
 
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Order Org First' })
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Order Org Second' })
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Order Org Third' })
+    const org1 = await dbAuthContext.createOrganization({ token: user.token, name: 'Order Org First' })
+    const org2 = await dbAuthContext.createOrganization({ token: user.token, name: 'Order Org Second' })
+    const org3 = await dbAuthContext.createOrganization({ token: user.token, name: 'Order Org Third' })
 
-    const pendingEvents = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      queryPendingDomainEvents(client)
-    )
-
-    const orderEvents = pendingEvents.filter((e) => {
-      const name = e.payload['organizationName']
-      return typeof name === 'string' && name.startsWith('Order Org')
+    const orderEvents = await dbAuthContext.testContext.withSchemaClient(async (client) => {
+      const e1 = await queryDomainEventsByAggregate(client, 'organization', org1.id)
+      const e2 = await queryDomainEventsByAggregate(client, 'organization', org2.id)
+      const e3 = await queryDomainEventsByAggregate(client, 'organization', org3.id)
+      return [...e1, ...e2, ...e3].sort(
+        (a, b) => a.occurred_at.getTime() - b.occurred_at.getTime()
+      )
     })
 
     expect(orderEvents.length).toBe(3)
@@ -281,8 +287,6 @@ describe('domain events outbox integration', () => {
 
   it('enforces unique aggregate_id + sequence_number constraint', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'domain-events-unique@example.com',
-      password: 'strong-pass-12345',
       name: 'Unique Constraint Test User'
     })
 
@@ -311,39 +315,74 @@ describe('domain events outbox integration', () => {
 })
 
 describe('domain events outbox — claim and dispatch', () => {
+  it('repository fetchUnprocessed decodes timestamps from raw SQL claim results', async () => {
+    const aggregateId = randomUUID()
+
+    await dbAuthContext.testContext.withSchemaClient(async (client) => {
+      await client.query(
+        `UPDATE domain_events
+            SET status = 'published',
+                published_at = COALESCE(published_at, now())
+          WHERE status = 'pending'`
+      )
+      await insertDomainEventDirect(client, {
+        eventType: 'organization.created',
+        aggregateType: 'organization',
+        aggregateId,
+        payload: {
+          organizationName: 'Repository Claim Decode Org',
+          ownerUserId: randomUUID()
+        }
+      })
+    })
+
+    const claimed = await runWithRepositoryDatabaseUrl(
+      () => domainEventsRepository.fetchUnprocessed(10)
+    )
+
+    expect(claimed).toHaveLength(1)
+    expect(claimed[0]!.aggregateId).toBe(aggregateId)
+    expect(claimed[0]!.status).toBe('processing')
+    expect(claimed[0]!.occurredAt).toBeInstanceOf(Date)
+    expect(claimed[0]!.processingAt).toBeInstanceOf(Date)
+    expect(claimed[0]!.createdAt).toBeInstanceOf(Date)
+  })
+
   it('claimPendingEventsForProcessing atomically transitions events to processing', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'claim-atomic@example.com',
-      password: 'strong-pass-12345',
       name: 'Claim Atomic User'
     })
 
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Claim Org A' })
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Claim Org B' })
+    const orgA = await dbAuthContext.createOrganization({ token: user.token, name: 'Claim Org A' })
+    const orgB = await dbAuthContext.createOrganization({ token: user.token, name: 'Claim Org B' })
 
-    const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 10)
+    const claimedA = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      claimPendingEventsForProcessing(client, 10, orgA.id)
+    )
+    const claimedB = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      claimPendingEventsForProcessing(client, 10, orgB.id)
     )
 
-    expect(claimed.length).toBeGreaterThanOrEqual(2)
+    const claimed = [...claimedA, ...claimedB]
+    expect(claimed).toHaveLength(2)
     for (const event of claimed) {
       expect(event.status).toBe('processing')
       expect(event.processing_at).not.toBeNull()
     }
 
-    const pendingAfterClaim = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      queryPendingDomainEvents(client)
+    const pendingA = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      queryPendingDomainEvents(client, 50, orgA.id)
+    )
+    const pendingB = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      queryPendingDomainEvents(client, 50, orgB.id)
     )
 
-    const claimedIds = new Set(claimed.map((e) => e.id))
-    const stillPending = pendingAfterClaim.filter((e) => claimedIds.has(e.id))
-    expect(stillPending).toHaveLength(0)
+    expect(pendingA).toHaveLength(0)
+    expect(pendingB).toHaveLength(0)
   })
 
   it('markPublished only affects processing events (state guard)', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'mark-pub-guard@example.com',
-      password: 'strong-pass-12345',
       name: 'Mark Published Guard User'
     })
 
@@ -368,7 +407,7 @@ describe('domain events outbox — claim and dispatch', () => {
     expect(afterAttempt!.status).toBe('pending')
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 1)
+      claimPendingEventsForProcessing(client, 1, org.id)
     )
 
     const rowsPublished = await dbAuthContext.testContext.withSchemaClient(async (client) =>
@@ -386,8 +425,6 @@ describe('domain events outbox — claim and dispatch', () => {
 
   it('markPublished is idempotent — second call is a no-op', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'mark-pub-idempotent@example.com',
-      password: 'strong-pass-12345',
       name: 'Idempotent Publish User'
     })
 
@@ -400,7 +437,7 @@ describe('domain events outbox — claim and dispatch', () => {
     const eventId = events[0]!.id
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 1)
+      claimPendingEventsForProcessing(client, 1, org.id)
     )
 
     const firstCall = await dbAuthContext.testContext.withSchemaClient(async (client) =>
@@ -424,8 +461,6 @@ describe('domain events outbox — claim and dispatch', () => {
 
   it('markFailed only affects processing events — no-op on pending', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'mark-fail-guard@example.com',
-      password: 'strong-pass-12345',
       name: 'Mark Failed Guard User'
     })
 
@@ -437,42 +472,40 @@ describe('domain events outbox — claim and dispatch', () => {
 
     const eventId = events[0]!.id
 
-    const rowsAffected = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      markProcessingEventFailed(client, eventId, 'should be no-op')
-    )
+    await dbAuthContext.testContext.withSchemaClient(async (client) => {
+      await client.query('BEGIN')
+      try {
+        // Keep the live outbox publisher from claiming this row while the guard
+        // verifies the exact pending and processing status transitions.
+        await client.query('SELECT id FROM domain_events WHERE id = $1 FOR UPDATE', [eventId])
 
-    expect(rowsAffected).toBe(0)
+        const rowsAffected = await markProcessingEventFailed(client, eventId, 'should be no-op')
+        expect(rowsAffected).toBe(0)
 
-    const afterAttempt = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      queryDomainEventById(client, eventId)
-    )
+        const afterAttempt = await queryDomainEventById(client, eventId)
+        expect(afterAttempt!.status).toBe('pending')
+        expect(afterAttempt!.failure_reason).toBeNull()
 
-    expect(afterAttempt!.status).toBe('pending')
-    expect(afterAttempt!.failure_reason).toBeNull()
+        await claimPendingEventsForProcessing(client, 1, org.id)
 
-    await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 1)
-    )
+        const rowsFailed = await markProcessingEventFailed(client, eventId, 'genuine failure')
+        expect(rowsFailed).toBe(1)
 
-    const rowsFailed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      markProcessingEventFailed(client, eventId, 'genuine failure')
-    )
+        const afterFail = await queryDomainEventById(client, eventId)
+        expect(afterFail!.status).toBe('failed')
+        expect(afterFail!.failure_reason).toBe('genuine failure')
+        expect(afterFail!.failed_at).not.toBeNull()
 
-    expect(rowsFailed).toBe(1)
-
-    const afterFail = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      queryDomainEventById(client, eventId)
-    )
-
-    expect(afterFail!.status).toBe('failed')
-    expect(afterFail!.failure_reason).toBe('genuine failure')
-    expect(afterFail!.failed_at).not.toBeNull()
+        await client.query('COMMIT')
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      }
+    })
   })
 
   it('dead-letter exclusion — fetchUnprocessed skips failed events', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'dead-letter@example.com',
-      password: 'strong-pass-12345',
       name: 'Dead Letter User'
     })
 
@@ -498,44 +531,63 @@ describe('domain events outbox — claim and dispatch', () => {
     })
 
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 50)
+      claimPendingEventsForProcessing(client, 50, org3.id)
     )
 
-    const orgIds = new Set([org1.id, org2.id, org3.id])
-    const relevantClaimed = claimed.filter((e) => orgIds.has(e.aggregate_id))
+    expect(claimed).toHaveLength(1)
+    expect(claimed[0]!.aggregate_id).toBe(org3.id)
 
-    expect(relevantClaimed).toHaveLength(1)
-    expect(relevantClaimed[0]!.aggregate_id).toBe(org3.id)
+    const claimedOrg1 = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      claimPendingEventsForProcessing(client, 50, org1.id)
+    )
+    const claimedOrg2 = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      claimPendingEventsForProcessing(client, 50, org2.id)
+    )
+
+    expect(claimedOrg1).toHaveLength(0)
+    expect(claimedOrg2).toHaveLength(0)
   })
 
   it('batch limit is binding — claims exactly N when more are available', async () => {
-    const user = await dbAuthContext.createUser({
-      email: 'batch-limit@example.com',
-      password: 'strong-pass-12345',
-      name: 'Batch Limit User'
+    const { randomUUID } = await import('node:crypto')
+    const sharedAggregateId = randomUUID()
+
+    await dbAuthContext.testContext.withSchemaClient(async (client) => {
+      await insertDomainEventDirect(client, {
+        eventType: 'test.batch_limit',
+        aggregateType: 'test',
+        aggregateId: sharedAggregateId,
+        payload: { label: 'A' }
+      })
+      await insertDomainEventDirect(client, {
+        eventType: 'test.batch_limit',
+        aggregateType: 'test',
+        aggregateId: sharedAggregateId,
+        payload: { label: 'B' }
+      })
+      await insertDomainEventDirect(client, {
+        eventType: 'test.batch_limit',
+        aggregateType: 'test',
+        aggregateId: sharedAggregateId,
+        payload: { label: 'C' }
+      })
     })
 
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Batch Limit Org A' })
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Batch Limit Org B' })
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Batch Limit Org C' })
-
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 2)
+      claimPendingEventsForProcessing(client, 2, sharedAggregateId)
     )
 
     expect(claimed).toHaveLength(2)
 
     const remaining = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      queryPendingDomainEvents(client)
+      queryPendingDomainEvents(client, 50, sharedAggregateId)
     )
 
-    expect(remaining.length).toBeGreaterThanOrEqual(1)
+    expect(remaining).toHaveLength(1)
   })
 
   it('markFailed is idempotent — second call on already-failed event is a no-op', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'mark-fail-idempotent@example.com',
-      password: 'strong-pass-12345',
       name: 'Fail Idempotent User'
     })
 
@@ -548,7 +600,7 @@ describe('domain events outbox — claim and dispatch', () => {
     const eventId = events[0]!.id
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 1)
+      claimPendingEventsForProcessing(client, 1, org.id)
     )
 
     const firstFail = await dbAuthContext.testContext.withSchemaClient(async (client) =>
@@ -573,8 +625,6 @@ describe('domain events outbox — claim and dispatch', () => {
 
   it('markFailed on already-published event is a no-op', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'mark-fail-published@example.com',
-      password: 'strong-pass-12345',
       name: 'Fail Published User'
     })
 
@@ -587,7 +637,7 @@ describe('domain events outbox — claim and dispatch', () => {
     const eventId = events[0]!.id
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 1)
+      claimPendingEventsForProcessing(client, 1, org.id)
     )
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
@@ -610,19 +660,17 @@ describe('domain events outbox — claim and dispatch', () => {
 
   it('two concurrent pollers cannot claim the same event (FOR UPDATE SKIP LOCKED)', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'concurrent-poller@example.com',
-      password: 'strong-pass-12345',
       name: 'Concurrent Poller User'
     })
 
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Concurrent Poller Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Concurrent Poller Org' })
 
     const [claimed1, claimed2] = await Promise.all([
       dbAuthContext.testContext.withSchemaClient((client) =>
-        claimPendingEventsForProcessing(client, 1)
+        claimPendingEventsForProcessing(client, 1, org.id)
       ),
       dbAuthContext.testContext.withSchemaClient((client) =>
-        claimPendingEventsForProcessing(client, 1)
+        claimPendingEventsForProcessing(client, 1, org.id)
       )
     ])
 
@@ -637,15 +685,13 @@ describe('domain events outbox — claim and dispatch', () => {
 describe('domain events outbox — resetStuckProcessing', () => {
   it('resets stuck processing events back to pending', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'reset-stuck@example.com',
-      password: 'strong-pass-12345',
       name: 'Reset Stuck User'
     })
 
     const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Reset Stuck Org' })
 
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 1)
+      claimPendingEventsForProcessing(client, 1, org.id)
     )
 
     const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
@@ -662,7 +708,7 @@ describe('domain events outbox — resetStuckProcessing', () => {
 
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60_000)
     const resetIds = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      resetStuckProcessingEvents(client, fiveMinutesAgo)
+      resetStuckProcessingEvents(client, fiveMinutesAgo, org.id)
     )
 
     expect(resetIds).toContain(eventId)
@@ -677,15 +723,13 @@ describe('domain events outbox — resetStuckProcessing', () => {
 
   it('does NOT reset recently-claimed processing events', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'reset-fresh@example.com',
-      password: 'strong-pass-12345',
       name: 'Reset Fresh User'
     })
 
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Reset Fresh Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Reset Fresh Org' })
 
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 1)
+      claimPendingEventsForProcessing(client, 1, org.id)
     )
 
     expect(claimed).toHaveLength(1)
@@ -693,7 +737,7 @@ describe('domain events outbox — resetStuckProcessing', () => {
 
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60_000)
     const resetIds = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      resetStuckProcessingEvents(client, fiveMinutesAgo)
+      resetStuckProcessingEvents(client, fiveMinutesAgo, org.id)
     )
 
     expect(resetIds).not.toContain(eventId)
@@ -708,15 +752,13 @@ describe('domain events outbox — resetStuckProcessing', () => {
 
   it('reset events can be re-claimed by the poller', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'reset-reclaim@example.com',
-      password: 'strong-pass-12345',
       name: 'Reset Reclaim User'
     })
 
     const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Reset Reclaim Org' })
 
     await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 10)
+      claimPendingEventsForProcessing(client, 10, org.id)
     )
 
     const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
@@ -733,12 +775,12 @@ describe('domain events outbox — resetStuckProcessing', () => {
 
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60_000)
     const resetIds = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      resetStuckProcessingEvents(client, fiveMinutesAgo)
+      resetStuckProcessingEvents(client, fiveMinutesAgo, org.id)
     )
     expect(resetIds).toContain(eventId)
 
     const reClaimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 10)
+      claimPendingEventsForProcessing(client, 10, org.id)
     )
 
     const reClaimedEvent = reClaimed.find((e) => e.id === eventId)
@@ -751,8 +793,6 @@ describe('domain events outbox — resetStuckProcessing', () => {
 describe('domain events outbox — sequence number auto-increment', () => {
   it('auto-increments sequence_number for same aggregate_id', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'seq-auto@example.com',
-      password: 'strong-pass-12345',
       name: 'Sequence Auto User'
     })
 
@@ -797,8 +837,6 @@ describe('domain events outbox — sequence number auto-increment', () => {
 
   it('maintains independent sequence numbers per aggregate', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'seq-independent@example.com',
-      password: 'strong-pass-12345',
       name: 'Independent Seq User'
     })
 
@@ -829,8 +867,6 @@ describe('domain events outbox — sequence number auto-increment', () => {
 describe('domain events outbox — pruning', () => {
   it('prunes published and failed events older than threshold', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'prune-old@example.com',
-      password: 'strong-pass-12345',
       name: 'Prune Old User'
     })
 
@@ -838,26 +874,31 @@ describe('domain events outbox — pruning', () => {
     const org2 = await dbAuthContext.createOrganization({ token: user.token, name: 'Prune Org Failed' })
     const org3 = await dbAuthContext.createOrganization({ token: user.token, name: 'Prune Org Pending' })
 
+    let eventId1: string
+    let eventId2: string
+
     await dbAuthContext.testContext.withSchemaClient(async (client) => {
       const events1 = await queryDomainEventsByAggregate(client, 'organization', org1.id)
       const events2 = await queryDomainEventsByAggregate(client, 'organization', org2.id)
+      eventId1 = events1[0]!.id
+      eventId2 = events2[0]!.id
 
       await client.query(
         `UPDATE domain_events SET status = 'processing', processing_at = now() WHERE id = ANY($1) AND status = 'pending'`,
-        [[events1[0]!.id, events2[0]!.id]]
+        [[eventId1, eventId2]]
       )
 
-      await markProcessingEventsPublished(client, [events1[0]!.id])
-      await markProcessingEventFailed(client, events2[0]!.id, 'test failure')
+      await markProcessingEventsPublished(client, [eventId1])
+      await markProcessingEventFailed(client, eventId2, 'test failure')
 
       const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60_000)
-      await backdatePublishedAt(client, events1[0]!.id, fortyEightHoursAgo)
-      await backdateFailedAt(client, events2[0]!.id, fortyEightHoursAgo)
+      await backdatePublishedAt(client, eventId1, fortyEightHoursAgo)
+      await backdateFailedAt(client, eventId2, fortyEightHoursAgo)
     })
 
     const olderThan = new Date(Date.now() - 24 * 60 * 60_000)
     const deleted = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      prunePublishedAndFailedEvents(client, olderThan)
+      prunePublishedAndFailedEvents(client, olderThan, [eventId1!, eventId2!])
     )
 
     expect(deleted).toBe(2)
@@ -874,35 +915,35 @@ describe('domain events outbox — pruning', () => {
 
     expect(prunedFailed).toHaveLength(0)
 
-    const pendingStillExists = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+    const unrelatedEventStillExists = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       queryDomainEventsByAggregate(client, 'organization', org3.id)
     )
 
-    expect(pendingStillExists).toHaveLength(1)
-    expect(pendingStillExists[0]!.status).toBe('pending')
+    expect(unrelatedEventStillExists).toHaveLength(1)
   })
 
   it('prune does not delete recent published events', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'prune-recent@example.com',
-      password: 'strong-pass-12345',
       name: 'Prune Recent User'
     })
 
     const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Prune Recent Org' })
 
+    let eventId: string
+
     await dbAuthContext.testContext.withSchemaClient(async (client) => {
       const events = await queryDomainEventsByAggregate(client, 'organization', org.id)
+      eventId = events[0]!.id
       await client.query(
         `UPDATE domain_events SET status = 'processing', processing_at = now() WHERE id = $1 AND status = 'pending'`,
-        [events[0]!.id]
+        [eventId]
       )
-      await markProcessingEventsPublished(client, [events[0]!.id])
+      await markProcessingEventsPublished(client, [eventId])
     })
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60_000)
     const deleted = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      prunePublishedAndFailedEvents(client, thirtyDaysAgo)
+      prunePublishedAndFailedEvents(client, thirtyDaysAgo, [eventId!])
     )
 
     expect(deleted).toBe(0)
@@ -919,24 +960,25 @@ describe('domain events outbox — pruning', () => {
 describe('domain events outbox — pruning edge cases', () => {
   it('pruning does not touch processing events', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'prune-processing@example.com',
-      password: 'strong-pass-12345',
       name: 'Prune Processing User'
     })
 
     const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Prune Processing Org' })
 
+    let eventId: string
+
     await dbAuthContext.testContext.withSchemaClient(async (client) => {
       const events = await queryDomainEventsByAggregate(client, 'organization', org.id)
-      await claimPendingEventsForProcessing(client, 1)
+      eventId = events[0]!.id
+      await claimPendingEventsForProcessing(client, 1, org.id)
 
       const tenMinutesAgo = new Date(Date.now() - 10 * 60_000)
-      await backdateProcessingAt(client, events[0]!.id, tenMinutesAgo)
+      await backdateProcessingAt(client, eventId, tenMinutesAgo)
     })
 
     const oneMinuteAgo = new Date(Date.now() - 60_000)
     const deleted = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      prunePublishedAndFailedEvents(client, oneMinuteAgo)
+      prunePublishedAndFailedEvents(client, oneMinuteAgo, [eventId!])
     )
 
     expect(deleted).toBe(0)
@@ -951,8 +993,6 @@ describe('domain events outbox — pruning edge cases', () => {
 
   it('pruning boundary — event exactly at threshold is pruned', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'prune-boundary@example.com',
-      password: 'strong-pass-12345',
       name: 'Prune Boundary User'
     })
 
@@ -960,18 +1000,21 @@ describe('domain events outbox — pruning edge cases', () => {
 
     const threshold = new Date(Date.now() - 24 * 60 * 60_000)
 
+    let eventId: string
+
     await dbAuthContext.testContext.withSchemaClient(async (client) => {
       const events = await queryDomainEventsByAggregate(client, 'organization', org.id)
+      eventId = events[0]!.id
       await client.query(
         `UPDATE domain_events SET status = 'processing', processing_at = now() WHERE id = $1 AND status = 'pending'`,
-        [events[0]!.id]
+        [eventId]
       )
-      await markProcessingEventsPublished(client, [events[0]!.id])
-      await backdatePublishedAt(client, events[0]!.id, threshold)
+      await markProcessingEventsPublished(client, [eventId])
+      await backdatePublishedAt(client, eventId, threshold)
     })
 
     const deleted = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      prunePublishedAndFailedEvents(client, threshold)
+      prunePublishedAndFailedEvents(client, threshold, [eventId!])
     )
 
     expect(deleted).toBe(1)
@@ -979,8 +1022,6 @@ describe('domain events outbox — pruning edge cases', () => {
 
   it('resetStuckProcessing ignores published and failed events', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'reset-terminal@example.com',
-      password: 'strong-pass-12345',
       name: 'Reset Terminal User'
     })
 
@@ -1001,11 +1042,15 @@ describe('domain events outbox — pruning edge cases', () => {
     })
 
     const oneMinuteAgo = new Date(Date.now() - 60_000)
-    const resetIds = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      resetStuckProcessingEvents(client, oneMinuteAgo)
+    const resetIds1 = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      resetStuckProcessingEvents(client, oneMinuteAgo, org1.id)
+    )
+    const resetIds2 = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      resetStuckProcessingEvents(client, oneMinuteAgo, org2.id)
     )
 
-    expect(resetIds).toHaveLength(0)
+    expect(resetIds1).toHaveLength(0)
+    expect(resetIds2).toHaveLength(0)
 
     const pub = await dbAuthContext.testContext.withSchemaClient(async (client) =>
       queryDomainEventsByAggregate(client, 'organization', org1.id)
@@ -1021,24 +1066,22 @@ describe('domain events outbox — pruning edge cases', () => {
 
   it('batch limit 0 claims no events', async () => {
     const user = await dbAuthContext.createUser({
-      email: 'batch-zero@example.com',
-      password: 'strong-pass-12345',
       name: 'Batch Zero User'
     })
 
-    await dbAuthContext.createOrganization({ token: user.token, name: 'Batch Zero Org' })
+    const org = await dbAuthContext.createOrganization({ token: user.token, name: 'Batch Zero Org' })
 
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 0)
+      claimPendingEventsForProcessing(client, 0, org.id)
     )
 
     expect(claimed).toHaveLength(0)
 
     const stillPending = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      queryPendingDomainEvents(client)
+      queryPendingDomainEvents(client, 50, org.id)
     )
 
-    expect(stillPending.length).toBeGreaterThanOrEqual(1)
+    expect(stillPending).toHaveLength(1)
   })
 })
 
@@ -1052,19 +1095,246 @@ describe('domain events outbox — edge cases', () => {
   })
 
   it('claimPendingEventsForProcessing returns empty when no pending events', async () => {
+    const { randomUUID } = await import('node:crypto')
+    const nonexistentAggregateId = randomUUID()
+
     const claimed = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      claimPendingEventsForProcessing(client, 10)
+      claimPendingEventsForProcessing(client, 10, nonexistentAggregateId)
     )
 
     expect(claimed).toHaveLength(0)
   })
 
   it('resetStuckProcessingEvents returns empty when no stuck events', async () => {
+    const { randomUUID } = await import('node:crypto')
+    const nonexistentAggregateId = randomUUID()
+
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60_000)
     const resetIds = await dbAuthContext.testContext.withSchemaClient(async (client) =>
-      resetStuckProcessingEvents(client, fiveMinutesAgo)
+      resetStuckProcessingEvents(client, fiveMinutesAgo, nonexistentAggregateId)
     )
 
     expect(resetIds).toHaveLength(0)
+  })
+})
+
+describe('domain events outbox — deletion events', () => {
+  it('emits a team.deleted domain event with correct payload when a team is deleted', async () => {
+    const user = await dbAuthContext.createUser({
+      name: 'Team Deleted Event User'
+    })
+
+    const org = await dbAuthContext.createOrganization({
+      token: user.token,
+      name: 'Team Deleted Event Org'
+    })
+
+    // Create team via API
+    const createTeamRes = await fetch(`${dbAuthContext.baseUrl}/v1/teams`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${user.token}`,
+        ...dbAuthContext.testContext.headersForCase('create-team-for-delete')
+      },
+      body: JSON.stringify({
+        organizationId: org.id,
+        name: 'Team To Delete',
+        brandSettings: defaultTestBrandSettings
+      })
+    })
+
+    expect(createTeamRes.ok).toBe(true)
+    const team = (await createTeamRes.json()) as { id: string; name: string; organizationId: string }
+
+    // Delete team via API
+    const deleteTeamRes = await fetch(`${dbAuthContext.baseUrl}/v1/teams/${team.id}`, {
+      method: 'DELETE',
+      headers: {
+        authorization: `Bearer ${user.token}`,
+        ...dbAuthContext.testContext.headersForCase('delete-team-event')
+      }
+    })
+
+    expect(deleteTeamRes.ok).toBe(true)
+
+    // Query domain events for the team aggregate
+    const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      queryDomainEventsByAggregate(client, 'team', team.id)
+    )
+
+    expect(events).toHaveLength(1)
+
+    const domainEvent = events[0]!
+    expect(domainEvent.event_type).toBe('team.deleted')
+    expect(domainEvent.aggregate_type).toBe('team')
+    expect(domainEvent.aggregate_id).toBe(team.id)
+    expect(domainEvent.status).toBe('pending')
+    expect(domainEvent.sequence_number).toBe(1)
+    expect(domainEvent.payload).toEqual(
+      expect.objectContaining({
+        teamId: team.id,
+        teamName: 'Team To Delete',
+        organizationId: org.id,
+        deletedByUserId: user.user.id
+      })
+    )
+  })
+
+  it('emits an organization.deleted domain event with correct payload when an org is deleted', async () => {
+    const user = await dbAuthContext.createUser({
+      name: 'Org Deleted Event User'
+    })
+
+    const org = await dbAuthContext.createOrganization({
+      token: user.token,
+      name: 'Org To Delete'
+    })
+
+    // Verify the organization.created event exists first
+    const createdEvents = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      queryDomainEventsByAggregate(client, 'organization', org.id)
+    )
+
+    expect(createdEvents).toHaveLength(1)
+    expect(createdEvents[0]!.event_type).toBe('organization.created')
+
+    // Delete organization via API
+    const deleteOrgRes = await fetch(`${dbAuthContext.baseUrl}/v1/organizations/${org.id}`, {
+      method: 'DELETE',
+      headers: {
+        authorization: `Bearer ${user.token}`,
+        ...dbAuthContext.testContext.headersForCase('delete-org-event')
+      }
+    })
+
+    expect(deleteOrgRes.ok).toBe(true)
+
+    // Query domain events for the organization aggregate
+    const allEvents = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      queryDomainEventsByAggregate(client, 'organization', org.id)
+    )
+
+    // Should have both organization.created and organization.deleted
+    expect(allEvents).toHaveLength(2)
+
+    const deletedEvent = allEvents.find((e) => e.event_type === 'organization.deleted')!
+    expect(deletedEvent).toBeDefined()
+    expect(deletedEvent.aggregate_type).toBe('organization')
+    expect(deletedEvent.aggregate_id).toBe(org.id)
+    expect(deletedEvent.status).toBe('pending')
+    expect(deletedEvent.sequence_number).toBe(2)
+    expect(deletedEvent.payload).toEqual(
+      expect.objectContaining({
+        organizationId: org.id,
+        organizationName: 'Org To Delete',
+        deletedByUserId: user.user.id
+      })
+    )
+  })
+
+  it('team deletion event is written transactionally — event persists even though team row is gone', async () => {
+    const user = await dbAuthContext.createUser({
+      name: 'Team Tx Event User'
+    })
+
+    const org = await dbAuthContext.createOrganization({
+      token: user.token,
+      name: 'Team Tx Org'
+    })
+
+    // Create team
+    const createRes = await fetch(`${dbAuthContext.baseUrl}/v1/teams`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${user.token}`,
+        ...dbAuthContext.testContext.headersForCase('create-team-tx')
+      },
+      body: JSON.stringify({
+        organizationId: org.id,
+        name: 'Tx Team',
+        brandSettings: defaultTestBrandSettings
+      })
+    })
+
+    expect(createRes.ok).toBe(true)
+    const team = (await createRes.json()) as { id: string }
+
+    // Delete team
+    const deleteRes = await fetch(`${dbAuthContext.baseUrl}/v1/teams/${team.id}`, {
+      method: 'DELETE',
+      headers: {
+        authorization: `Bearer ${user.token}`,
+        ...dbAuthContext.testContext.headersForCase('delete-team-tx')
+      }
+    })
+
+    expect(deleteRes.ok).toBe(true)
+
+    // Team should be gone (GET returns 404, 403, or 401 depending on auth middleware behavior)
+    const getRes = await fetch(`${dbAuthContext.baseUrl}/v1/teams/${team.id}`, {
+      headers: {
+        authorization: `Bearer ${user.token}`,
+        ...dbAuthContext.testContext.headersForCase('get-deleted-team-tx')
+      }
+    })
+
+    expect([401, 403, 404]).toContain(getRes.status)
+
+    // But the domain event should persist
+    const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      queryDomainEventsByAggregate(client, 'team', team.id)
+    )
+
+    expect(events).toHaveLength(1)
+    expect(events[0]!.event_type).toBe('team.deleted')
+  })
+
+  it('organization deletion event is written transactionally — event persists even though org row is gone', async () => {
+    const user = await dbAuthContext.createUser({
+      name: 'Org Tx Event User'
+    })
+
+    const org = await dbAuthContext.createOrganization({
+      token: user.token,
+      name: 'Tx Org'
+    })
+
+    // Delete organization
+    const deleteRes = await fetch(`${dbAuthContext.baseUrl}/v1/organizations/${org.id}`, {
+      method: 'DELETE',
+      headers: {
+        authorization: `Bearer ${user.token}`,
+        ...dbAuthContext.testContext.headersForCase('delete-org-tx')
+      }
+    })
+
+    expect(deleteRes.ok).toBe(true)
+
+    // Org should be gone
+    const getRes = await fetch(`${dbAuthContext.baseUrl}/v1/organizations/${org.id}`, {
+      headers: {
+        authorization: `Bearer ${user.token}`,
+        ...dbAuthContext.testContext.headersForCase('get-deleted-org-tx')
+      }
+    })
+
+    // After org deletion, the user loses membership, so either 404 or 401
+    expect([401, 404]).toContain(getRes.status)
+
+    // But both domain events (created + deleted) should persist
+    const events = await dbAuthContext.testContext.withSchemaClient(async (client) =>
+      queryDomainEventsByAggregate(client, 'organization', org.id)
+    )
+
+    expect(events).toHaveLength(2)
+
+    const createdEvent = events.find((e) => e.event_type === 'organization.created')!
+    const deletedEvent = events.find((e) => e.event_type === 'organization.deleted')!
+
+    expect(createdEvent).toBeDefined()
+    expect(deletedEvent).toBeDefined()
+    expect(deletedEvent.sequence_number).toBeGreaterThan(createdEvent.sequence_number)
   })
 })

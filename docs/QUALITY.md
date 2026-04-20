@@ -11,8 +11,8 @@
 - Web integration can be independently capped with `WEB_INTEGRATION_MAX_WORKERS` and continues to use pool-slot isolated API ports/schemas.
 - Web integration harnesses keep one API process per pool slot warm across test files; resets happen per test case.
 - Integration DB resets cache each schema's mutable table list after setup and preserve baseline seed tables (`__tx_agent_migrations`, `roles`, `permissions`, `role_permissions`, `system_settings`).
-- Integration DB reset is lock-guarded (`/tmp/<domain>-db-reset.lock`) to avoid concurrent local test clobbering.
-- Full integration runners are lock-guarded (`/tmp/<domain>-integration.lock`) to prevent concurrent suite interference.
+- Integration DB reset is lock-guarded (`/tmp/<domain>-db-reset.lock`) to avoid concurrent local test clobbering within the same checkout.
+- Parallel integration runs across git worktrees are isolated by `WORKTREE_PORT_OFFSET`: each worktree's shared API server binds to `4100 + offset` and each worktree uses its own Postgres schema.
 - Run database contract suites via `pnpm test:db:pgtap`.
 - API integration harness is standardized via `createDbAuthContext(...)` (no manual process spawning in API integration suites).
 - API harness callers must resolve `apiCwd` via `fileURLToPath(import.meta.url)` (never `process.cwd()`), so root-workspace integration runs stay deterministic.
@@ -28,6 +28,7 @@
 - Client component contract: all `apps/web/app/**/*.tsx` and `apps/web/components/**/*.tsx` start with `'use client'`.
 - Web auth-token contract: only `apps/web/lib/auth-token.ts` can manage browser-visible access token state; any `localStorage` usage is restricted there, while refresh persistence lives in an HttpOnly cookie set by the API.
 - Web transport contract: `apps/web/lib` must not use `/api/*` proxy paths; use `API_BASE_URL`.
+- Web API client contract: `apps/web` runtime pages/components/hooks must use generated Orval clients/hooks from `apps/web/lib/api/generated/*`; `apps/web/lib/client-api.ts` is reserved for auth/session bootstrap, sign-in/sign-out side effects, and imperative test/setup helpers.
 - Web URL-state contract: `nuqs` usage is centralized in `apps/web/lib/url-state.tsx`.
 - Web notifications contract: `sonner` usage is centralized in `apps/web/lib/notify.tsx`.
 - Web browser API contract: direct `window.location` access is forbidden; use URL-state wrappers.
@@ -82,7 +83,7 @@
 - No payload `as` casts: `.payload as <Type>` is forbidden in worker source; use Schema decode.
 - Event type naming convention: strings must match `^[a-z][a-z_]*\.[a-z][a-z_]*$`.
 - Retention settings completeness: every table in `retentionTableNames` must appear in the generated `retention_settings` reconcile schema.
-- Financial audit trail governance: `usage_records` and `credit_ledger` must never have retention policies; they are financial audit trails. Metered usage continues reporting to Stripe during `past_due` status (Stripe needs accurate usage to calculate recovery invoices).
+- Financial audit trail governance: `usage_records` and `credit_ledger` must never have retention policies; they are financial audit trails. Stripe is the payment rail for subscriptions, top-ups, auto-recharge, refunds, disputes, and payment-method management; usage deduction is accounted for in the local credit ledger rather than Stripe metered subscription items.
 - Domain event insert helper: inline `.insert(domainEvents).values(...)` outside `repositories/domain-events.ts` is banned; use `insertDomainEventInTransaction`.
 - Naming derivation: the enforcement script derives names via dot-split PascalCase (e.g., `organization.created` → `OrganizationCreatedEventPayload` / `OrganizationCreatedEventPayloadSchema`).
 

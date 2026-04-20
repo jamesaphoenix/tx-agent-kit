@@ -1,5 +1,5 @@
 import * as Schema from 'effect/Schema'
-import { orgMemberRoles, permissionActions, type OrgMemberRole, type PermissionAction } from './literals.js'
+import { memberRoles, orgMemberRoles, permissionActions, type MemberRole, type PermissionAction } from './literals.js'
 
 export const permissionActionSchema = Schema.Literal(...permissionActions)
 export const orgMemberRoleSchema = Schema.Literal(...orgMemberRoles)
@@ -12,10 +12,6 @@ export type RolePermissionPolicyEntry =
   | { readonly mode: 'explicit'; readonly include: ReadonlyArray<PermissionAction> }
 
 export const rolePermissionPolicy = {
-  owner: {
-    mode: 'all'
-  },
-  // admin intentionally mirrors owner — includes assign_roles so admins can manage team membership
   admin: {
     mode: 'all'
   },
@@ -31,10 +27,21 @@ export const rolePermissionPolicy = {
       'delete_workflows',
       'export_analytics',
       'manage_integrations',
-      'manage_api_keys'
+      'manage_api_keys',
+      'manage_assets',
+      'delete_assets'
+    ]
+  },
+  viewer: {
+    mode: 'explicit',
+    include: [
+      'view_organization',
+      'view_workflows',
+      'view_analytics',
+      'view_assets'
     ]
   }
-} as const satisfies Record<OrgMemberRole, RolePermissionPolicyEntry>
+} as const satisfies Record<MemberRole, RolePermissionPolicyEntry>
 
 const resolveRolePermissions = (
   entry: RolePermissionPolicyEntry
@@ -60,21 +67,62 @@ const renderSqlTupleValues = (rows: ReadonlyArray<ReadonlyArray<string>>): strin
   rows.map((row) => `  (${row.map((value) => quoteSqlLiteral(value)).join(', ')})`).join(',\n')
 
 const buildRolePermissionMap = (
-  policy: Record<OrgMemberRole, RolePermissionPolicyEntry>
-): Record<OrgMemberRole, ReadonlyArray<PermissionAction>> => ({
-  owner: resolveRolePermissions(policy.owner),
+  policy: Record<MemberRole, RolePermissionPolicyEntry>
+): Record<MemberRole, ReadonlyArray<PermissionAction>> => ({
   admin: resolveRolePermissions(policy.admin),
-  member: resolveRolePermissions(policy.member)
+  member: resolveRolePermissions(policy.member),
+  viewer: resolveRolePermissions(policy.viewer)
 })
 
-export const rolePermissionMap: Record<OrgMemberRole, ReadonlyArray<PermissionAction>> = {
+export const rolePermissionMap: Record<MemberRole, ReadonlyArray<PermissionAction>> = {
   ...buildRolePermissionMap(rolePermissionPolicy)
 }
 
-export const getPermissionsForRole = (role: OrgMemberRole): ReadonlyArray<PermissionAction> =>
+export const getPermissionsForRole = (role: MemberRole): ReadonlyArray<PermissionAction> =>
   rolePermissionMap[role]
 
-const desiredRolePermissionRows = orgMemberRoles.flatMap((role) =>
+// ---------------------------------------------------------------------------
+// Team-level permission policy (uses unified MemberRole)
+// ---------------------------------------------------------------------------
+
+export const teamRolePermissionPolicy = {
+  admin: { mode: 'all' },
+  member: {
+    mode: 'all_except',
+    exclude: [
+      'manage_organization',
+      'manage_organization_members',
+      'manage_billing',
+      'manage_team_members',
+      'assign_roles',
+      'delete_teams',
+      'manage_integrations',
+      'manage_api_keys'
+    ]
+  },
+  viewer: {
+    mode: 'explicit',
+    include: [
+      'view_organization',
+      'view_workflows',
+      'view_analytics',
+      'view_assets'
+    ]
+  }
+} as const satisfies Record<MemberRole, RolePermissionPolicyEntry>
+
+export const teamRolePermissionMap: Record<MemberRole, ReadonlyArray<PermissionAction>> = {
+  admin: resolveRolePermissions(teamRolePermissionPolicy.admin),
+  member: resolveRolePermissions(teamRolePermissionPolicy.member),
+  viewer: resolveRolePermissions(teamRolePermissionPolicy.viewer),
+}
+
+export const getPermissionsForTeamRole = (role: MemberRole): ReadonlyArray<PermissionAction> =>
+  teamRolePermissionMap[role]
+
+export const memberRoleSchema = Schema.Literal(...memberRoles)
+
+const desiredRolePermissionRows = memberRoles.flatMap((role) =>
   rolePermissionMap[role].map((permission) => [role, permission] as const)
 )
 
@@ -85,7 +133,7 @@ export const renderPermissionReconcileSql = (): string =>
     '',
     'INSERT INTO roles (name)',
     'VALUES',
-    renderSqlValues(orgMemberRoles),
+    renderSqlValues(memberRoles),
     'ON CONFLICT (name) DO NOTHING;',
     '',
     'INSERT INTO permissions (key)',
@@ -114,7 +162,7 @@ export const renderPermissionReconcileSql = (): string =>
     'USING roles r, permissions p',
     'WHERE rp.role_id = r.id',
     '  AND rp.permission_id = p.id',
-    `  AND r.name IN (${orgMemberRoles.map((role) => quoteSqlLiteral(role)).join(', ')})`,
+    `  AND r.name IN (${memberRoles.map((role) => quoteSqlLiteral(role)).join(', ')})`,
     '  AND NOT EXISTS (',
     '    SELECT 1',
     '    FROM desired_role_permissions desired',
@@ -131,7 +179,16 @@ export const renderPermissionReconcileSql = (): string =>
     '  );'
   ].join('\n')
 
+export const myPermissionsResponseSchema = Schema.Struct({
+  organizationId: Schema.optional(Schema.String),
+  role: Schema.optional(memberRoleSchema),
+  isOwner: Schema.Boolean,
+  permissions: Schema.Array(permissionActionSchema)
+})
+
 export const rolePermissionMapSchema = Schema.Record({
-  key: orgMemberRoleSchema,
+  key: memberRoleSchema,
   value: Schema.Array(permissionActionSchema)
 })
+
+export type MyPermissionsResponse = Schema.Schema.Type<typeof myPermissionsResponseSchema>

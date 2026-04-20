@@ -1,9 +1,13 @@
+import { createLogger } from '@tx-agent-kit/logging'
 import * as Schema from 'effect/Schema'
+
+const dbLogger = createLogger('db')
 
 export class DbError extends Schema.TaggedError<DbError>()('DbError', {
   code: Schema.String,
   constraint: Schema.optional(Schema.String),
-  message: Schema.String
+  message: Schema.String,
+  cause: Schema.optional(Schema.Unknown)
 }) {}
 
 interface PostgresErrorLike {
@@ -24,6 +28,14 @@ const authLoginIdentityUniqueConstraints = new Set([
   'auth_login_identities_user_provider_unique'
 ])
 
+const invitationOrgwidePendingUniqueConstraints = new Set([
+  'invitations_org_email_orgwide_pending_unique'
+])
+
+const invitationTeamPendingUniqueConstraints = new Set([
+  'invitations_org_email_team_pending_unique'
+])
+
 const getConstraintName = (error: PostgresErrorLike | null): string | undefined =>
   typeof error?.constraint === 'string' && error.constraint.length > 0
     ? error.constraint
@@ -36,6 +48,14 @@ const getUniqueViolationCode = (constraint: string | undefined): string => {
 
   if (constraint && authLoginIdentityUniqueConstraints.has(constraint)) {
     return 'DB_AUTH_LOGIN_IDENTITY_UNIQUE_VIOLATION'
+  }
+
+  if (constraint && invitationOrgwidePendingUniqueConstraints.has(constraint)) {
+    return 'DB_INVITATION_ORGWIDE_PENDING_UNIQUE_VIOLATION'
+  }
+
+  if (constraint && invitationTeamPendingUniqueConstraints.has(constraint)) {
+    return 'DB_INVITATION_TEAM_PENDING_UNIQUE_VIOLATION'
   }
 
   return 'DB_UNIQUE_VIOLATION'
@@ -89,18 +109,32 @@ const toErrorMessage = (error: unknown): string => {
 export const dbQueryFailed = (context: string, cause: unknown): DbError =>
   new DbError({
     code: 'DB_QUERY_FAILED',
-    message: `${context}: ${toErrorMessage(cause)}`
+    message: `${context}: ${toErrorMessage(cause)}`,
+    cause
   })
 
 export const dbDecodeFailed = (context: string, cause: unknown): DbError =>
   new DbError({
     code: 'DB_DECODE_FAILED',
-    message: `${context}: ${toErrorMessage(cause)}`
+    message: `${context}: ${toErrorMessage(cause)}`,
+    cause
   })
 
 export const toDbError = (context: string, cause: unknown): DbError => {
   if (cause instanceof DbError) {
     return cause
+  }
+
+  if (typeof cause === 'object' && cause !== null) {
+    const pgError = extractPostgresError(cause)
+    if (pgError) {
+      const code = typeof pgError.code === 'string' ? pgError.code : ''
+      const constraint = typeof pgError.constraint === 'string' ? pgError.constraint : ''
+      dbLogger.error(context, { pgCode: code, constraint, pgMessage: toErrorMessage(pgError) })
+    } else {
+      const tag = (cause as { _tag?: string })._tag
+      dbLogger.error(context, { errorType: tag ?? 'unknown', detail: toErrorMessage(cause) })
+    }
   }
 
   if (isPostgresUniqueViolation(cause)) {

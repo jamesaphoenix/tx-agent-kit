@@ -1,87 +1,53 @@
 'use client'
 
-import type { Organization } from '@tx-agent-kit/contracts'
-import { useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { CreateOrganizationForm } from '../../components/CreateOrganizationForm'
 import { DashboardShell } from '../../components/DashboardShell'
 import { useCurrentPrincipal, useIsSessionReady } from '../../hooks/use-session-store'
-import { ensureSessionOrRedirect, handleUnauthorizedApiError } from '../../lib/client-auth'
-import { clientApi } from '../../lib/client-api'
+import {
+  useOrganizationsListOrganizations,
+  getOrganizationsListOrganizationsQueryKey
+} from '../../lib/api/generated/organizations/organizations'
 
 export default function OrganizationsPage() {
-  const router = useRouter()
   const isSessionReady = useIsSessionReady()
   const principal = useCurrentPrincipal()
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
-  const load = useCallback(async (): Promise<void> => {
-    if (!ensureSessionOrRedirect(router, '/organizations')) {
-      return
-    }
+  const orgsQuery = useOrganizationsListOrganizations(undefined, {
+    query: { enabled: isSessionReady }
+  })
 
-    setLoading(true)
-    setError(null)
+  const organizations = orgsQuery.data?.data ?? []
+  const loading = orgsQuery.isLoading
+  const error = orgsQuery.error ? 'Failed to load organizations' : null
 
-    try {
-      const payload = await clientApi.listOrganizations()
-      setOrganizations(payload.data)
-    } catch (error_) {
-      if (handleUnauthorizedApiError(error_, router, '/organizations')) {
-        return
-      }
-
-      setError(error_ instanceof Error ? error_.message : 'Failed to load organizations')
-    } finally {
-      setLoading(false)
-    }
-  }, [router])
-
-  useEffect(() => {
-    if (!isSessionReady) {
-      return
-    }
-
-    void load()
-  }, [isSessionReady, load])
-
-  const metrics = [
-    {
-      label: 'Organizations',
-      value: String(organizations.length)
-    },
-    {
-      label: 'Load state',
-      value: loading ? 'Refreshing' : 'Current',
-      tone: loading ? 'warning' as const : 'success' as const
-    }
-  ]
+  const handleCreated = () => {
+    void queryClient.invalidateQueries({ queryKey: getOrganizationsListOrganizationsQueryKey() })
+  }
 
   return (
     <DashboardShell
       title="Organizations"
       subtitle="Manage team boundaries and operational ownership."
       principalEmail={principal?.email}
-      metrics={metrics}
     >
-      {error && <p className="error">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="dashboard-shell-grid">
-        <section className="card">
-          <CreateOrganizationForm onCreated={load} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className="rounded-xl border border-border bg-white p-6 shadow-sm">
+          <CreateOrganizationForm onCreated={handleCreated} />
         </section>
 
-        <section className="card stack">
-          <h2>Your organizations</h2>
+        <section className="rounded-xl border border-border bg-white p-6 shadow-sm space-y-3">
+          <h2 className="text-base font-semibold">Your organizations</h2>
           {organizations.length === 0 ? (
-            <p className="muted">{loading ? 'Loading organizations...' : 'No organizations yet.'}</p>
+            <p className="text-sm text-muted-foreground">{loading ? 'Loading organizations...' : 'No organizations yet.'}</p>
           ) : (
             organizations.map((organization) => (
-              <article key={organization.id} className="card" style={{ background: 'var(--surface-2)' }}>
+              <article key={organization.id} className="rounded-xl border border-border bg-secondary p-6 shadow-sm">
                 <strong>{organization.name}</strong>
-                <p className="muted">Status: {organization.subscriptionStatus}</p>
+                <p className="text-sm text-muted-foreground">Status: {organization.subscriptionStatus}</p>
               </article>
             ))
           )}

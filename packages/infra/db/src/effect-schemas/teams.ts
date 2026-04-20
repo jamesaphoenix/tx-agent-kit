@@ -1,9 +1,20 @@
 import * as Schema from 'effect/Schema'
 
+const hexColorSchema = Schema.String.pipe(Schema.pattern(/^#[0-9a-fA-F]{6}$/))
+
+export const brandSettingsColorsSchema = Schema.Struct({
+  primary: hexColorSchema,
+  secondary: hexColorSchema,
+  accent: hexColorSchema,
+  background: hexColorSchema,
+  text: hexColorSchema
+})
+
 export const brandSettingsSchema = Schema.Struct({
-  primaryColor: Schema.optional(Schema.String),
-  logoUrl: Schema.optional(Schema.String),
-  metadata: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String }))
+  colors: brandSettingsColorsSchema,
+  brandGuidelines: Schema.String.pipe(Schema.maxLength(500)),
+  industry: Schema.String.pipe(Schema.maxLength(100)),
+  targetAudience: Schema.String.pipe(Schema.maxLength(500))
 })
 
 export const teamRowSchema = Schema.Struct({

@@ -27,7 +27,16 @@
     "apps/mobile/lib/api/orval-mutator.ts": ["files"],
     "apps/web/lib/api/orval-mutator.ts": ["files"],
     "packages/testkit/src/render-runtime-values.ts": ["files"],
-    "packages/testkit/src/api-client/test-mutator.ts": ["files"]
+    "packages/testkit/src/api-client/test-mutator.ts": ["files"],
+    // Billing test-colocation anchors — required by the
+    // enforce-domain-invariants lint so each `*.integration.test.ts`
+    // has a source module next to it. They export invariant marker
+    // constants that aren't imported at runtime.
+    "apps/api/src/billing-credits.ts": ["files"],
+    "apps/api/src/billing-outbox-emission.ts": ["files"],
+    "apps/api/src/billing-storage.ts": ["files"],
+    "apps/api/src/billing-usage-cap.ts": ["files"],
+    "apps/worker/src/billing-reservation-reclaim.ts": ["files"]
   },
   "workspaces": {
     ".": {

@@ -25,20 +25,29 @@ This harness starts a real API server process, provides authenticated HTTP helpe
 
 **Path resolution rule**: The `apiCwd` parameter must be resolved from `fileURLToPath(import.meta.url)`, never from `process.cwd()`. This ensures correct behavior when running from the root workspace integration runner.
 
-## Lock-Guarded Execution
+## Parallel Execution Across Worktrees
 
-Integration test runners use file locks to prevent concurrent execution from clobbering shared resources:
+Integration tests are safe to run in parallel across git worktrees:
+
+- **Per-worktree Postgres schema.** `scripts/worktree/setup.sh` creates a
+  dedicated schema named after the worktree and writes it into the
+  worktree's `DATABASE_URL`.
+- **Per-worktree shared API port.** `scripts/test/vitest-global-setup.ts`
+  binds the shared integration API server to `4100 + WORKTREE_PORT_OFFSET`.
+- **Pool-slot claim files inside each worktree.** Web integration workers
+  claim slots under `.vitest/web-integration/slot-claims`, which is local
+  to the worktree's filesystem.
 
 | Lock File | Purpose |
 |-----------|---------|
-| `/tmp/tx-agent-kit-db-reset.lock` | Guards database reset operations |
-| `/tmp/tx-agent-kit-integration.lock` | Guards full integration suite execution |
+| `/tmp/tx-agent-kit-db-reset.lock` | Guards database reset within a single checkout |
 
-This prevents two parallel agent sessions or CI jobs from running integration tests against the same database simultaneously.
+No global integration suite lock is used — parallelism across worktrees
+comes from port and schema isolation, not from serialization.
 
 ## Database Reset
 
-The testkit provides idempotent database reset that truncates test data tables while preserving the schema and migrations, all within the lock guard.
+The testkit provides idempotent database reset that truncates test data tables while preserving the schema and migrations, scoped to each worktree's isolated schema.
 
 ## Environment
 

@@ -1,5 +1,6 @@
 import { buildSignInPath } from '@tx-agent-kit/contracts'
 import { clearAuthToken } from './auth-token'
+import { getApiErrorStatus } from './axios'
 import { sessionStore, sessionStoreActions } from '../stores/session-store'
 
 interface RouterLike {
@@ -26,12 +27,8 @@ export const handleUnauthorizedApiError = (
   router: RouterLike,
   nextPath: string
 ): boolean => {
-  if (
-    !error ||
-    typeof error !== 'object' ||
-    !('status' in error) ||
-    (error as { status?: unknown }).status !== 401
-  ) {
+  const status = getApiErrorStatus(error) ?? (error && typeof error === 'object' && 'status' in error ? (error as { status: number }).status : undefined)
+  if (status !== 401) {
     return false
   }
 

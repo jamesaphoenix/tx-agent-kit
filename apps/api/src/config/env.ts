@@ -20,8 +20,10 @@ const requiredApiEnvShape = {
   GOOGLE_OIDC_CALLBACK_URL: Schema.optional(Schema.String),
   STRIPE_SECRET_KEY: Schema.optional(Schema.String),
   STRIPE_WEBHOOK_SECRET: Schema.optional(Schema.String),
+  RESEND_WEBHOOK_SECRET: Schema.optional(Schema.String),
+  STRIPE_TRY_ME_PRICE_ID: Schema.optional(Schema.String),
   STRIPE_PRO_PRICE_ID: Schema.optional(Schema.String),
-  STRIPE_PRO_METERED_PRICE_ID: Schema.optional(Schema.String),
+  STRIPE_AGENCY_PRICE_ID: Schema.optional(Schema.String),
   SUBSCRIPTION_GUARD_ENABLED: Schema.optional(Schema.String),
   TRUST_PROXY: Schema.optional(Schema.String),
   API_SENTRY_DSN: Schema.optional(Schema.String),
@@ -91,20 +93,21 @@ const assertApiEnvInvariants = (env: ApiEnv): ApiEnv => {
 
   const stripeConfigured =
     typeof env.STRIPE_SECRET_KEY === 'string' && env.STRIPE_SECRET_KEY.length > 0
-  const hasProPriceId =
-    typeof env.STRIPE_PRO_PRICE_ID === 'string' && env.STRIPE_PRO_PRICE_ID.length > 0
-  const hasMeteredPriceId =
-    typeof env.STRIPE_PRO_METERED_PRICE_ID === 'string' && env.STRIPE_PRO_METERED_PRICE_ID.length > 0
-
-  if (stripeConfigured && (!hasProPriceId || !hasMeteredPriceId)) {
-    throw new Error('STRIPE_PRO_PRICE_ID and STRIPE_PRO_METERED_PRICE_ID are required when Stripe is configured.')
-  }
-
   const hasWebhookSecret =
     typeof env.STRIPE_WEBHOOK_SECRET === 'string' && env.STRIPE_WEBHOOK_SECRET.length > 0
   const isProductionLike = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging'
   if (stripeConfigured && isProductionLike && !hasWebhookSecret) {
     throw new Error('STRIPE_WEBHOOK_SECRET is required in production and staging when Stripe is configured.')
+  }
+
+  const hasResendWebhookSecret =
+    typeof env.RESEND_WEBHOOK_SECRET === 'string' && env.RESEND_WEBHOOK_SECRET.length > 0
+  if (resendConfigured && isProductionLike && !hasResendWebhookSecret) {
+    throw new Error('RESEND_WEBHOOK_SECRET is required in production and staging when Resend is configured.')
+  }
+
+  if (isProductionLike && !env.TRUST_PROXY) {
+    process.stderr.write('[WARN] TRUST_PROXY is not set. Rate limiting may be ineffective behind a load balancer.\n')
   }
 
   if (isProductionLike && env.API_CORS_ORIGIN === '*') {

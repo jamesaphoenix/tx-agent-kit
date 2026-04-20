@@ -8,6 +8,12 @@
     "teams",
     "billing",
     "permissions",
-    "storage"
+    "storage",
+    "roles",
+    "assets",
+    "storagemetering",
+    "emailcampaigns",
+    "emailwebhooks",
+    "emailunsubscribe"
   ]
 }

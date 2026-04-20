@@ -67,4 +67,4 @@ apps/web/app/
 - `packages/infra/db/schemas/permissions/reconcile_role_permissions.sql` is generated from the policy module and reapplied via `pnpm db:schemas:apply` to reconcile current desired-state role permissions.
 - Permission actions defined in `packages/contracts/src/literals.ts` (`permissionActions` + `PermissionAction` type).
 - Owner and admin roles get all permissions; member role gets a safe subset (excludes `manage_organization`, `manage_organization_members`, `manage_billing`, `manage_team_members`, `assign_roles`, `delete_teams`, `delete_workflows`, `export_analytics`, `manage_integrations`, `manage_api_keys`).
-- Team CRUD in `apps/web/lib/client-api.ts`: `listTeams`, `getTeam`, `createTeam`, `updateTeam`, `removeTeam`.
+- Web product API access uses generated Orval clients/hooks from `apps/web/lib/api/generated/*`. `apps/web/lib/client-api.ts` is reserved for auth/session bootstrap, sign-in/sign-out side effects, and imperative test/setup helpers.

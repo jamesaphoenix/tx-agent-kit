@@ -1,18 +1,24 @@
+import type {
+  OrganizationRowShape,
+  InvitationRowShape,
+  OrgMemberRowShape,
+  UserRowShape
+} from '@tx-agent-kit/db'
 import {
   invitationAssignableRoles,
   invitationStatuses,
   type InvitationAssignableRole,
-  type InvitationRole,
   type InvitationStatus,
+  type MembershipType,
   type OrganizationOnboardingData,
-  type OrgMemberRole,
-  type SubscriptionStatus
+  type OrgMemberRole
 } from '@tx-agent-kit/contracts'
 
 export type {
   InvitationAssignableRole,
   InvitationRole,
   InvitationStatus,
+  MembershipType,
   OrganizationOnboardingData,
   OrgMemberRole,
   SubscriptionStatus
@@ -20,87 +26,20 @@ export type {
 
 export type OnboardingData = OrganizationOnboardingData
 
-export interface OrganizationRecord {
-  id: string
-  name: string
-  billingEmail: string | null
-  onboardingData: OnboardingData | null
-  stripeCustomerId: string | null
-  stripeSubscriptionId: string | null
-  stripePaymentMethodId: string | null
-  stripeMeteredSubscriptionItemId: string | null
-  creditsBalance: number
-  reservedCredits: number
-  autoRechargeEnabled: boolean
-  autoRechargeThreshold: number | null
-  autoRechargeAmount: number | null
-  isSubscribed: boolean
-  subscriptionStatus: SubscriptionStatus
-  subscriptionPlan: string | null
-  subscriptionStartedAt: Date | null
-  subscriptionEndsAt: Date | null
-  subscriptionCurrentPeriodEnd: Date | null
-  createdAt: Date
-  updatedAt: Date
+// Extends row shape — new DB columns appear automatically.
+// Omit `usageCap` which is billing-only and not part of the organization domain record.
+export type OrganizationRecord = Omit<OrganizationRowShape, 'usageCap'>
+
+export type InvitationRecord = InvitationRowShape
+
+// Extends OrgMemberRowShape with optional joined user fields.
+export interface OrgMemberRecord extends OrgMemberRowShape {
+  userName?: string | null
+  userEmail?: string | null
 }
 
-export interface InvitationRecord {
-  id: string
-  organizationId: string
-  inviteeUserId: string | null
-  email: string
-  role: InvitationRole
-  status: InvitationStatus
-  invitedByUserId: string
-  token: string
-  expiresAt: Date
-  createdAt: Date
-}
-
-export interface OrganizationUserRecord {
-  id: string
-  email: string
-  passwordHash: string
-  name: string
-  createdAt: Date
-}
-
-export interface Organization {
-  id: string
-  name: string
-  billingEmail: string | null
-  onboardingData: OnboardingData | null
-  stripeCustomerId: string | null
-  stripeSubscriptionId: string | null
-  stripePaymentMethodId: string | null
-  stripeMeteredSubscriptionItemId: string | null
-  creditsBalance: number
-  reservedCredits: number
-  autoRechargeEnabled: boolean
-  autoRechargeThreshold: number | null
-  autoRechargeAmount: number | null
-  isSubscribed: boolean
-  subscriptionStatus: SubscriptionStatus
-  subscriptionPlan: string | null
-  subscriptionStartedAt: Date | null
-  subscriptionEndsAt: Date | null
-  subscriptionCurrentPeriodEnd: Date | null
-  createdAt: Date
-  updatedAt: Date
-}
-
-export interface Invitation {
-  id: string
-  organizationId: string
-  inviteeUserId: string | null
-  email: string
-  role: InvitationRole
-  status: InvitationStatus
-  invitedByUserId: string
-  token: string
-  expiresAt: Date
-  createdAt: Date
-}
+// Subset of UserRowShape — excludes passwordChangedAt.
+export type OrganizationUserRecord = Pick<UserRowShape, 'id' | 'email' | 'passwordHash' | 'name' | 'createdAt'>
 
 export interface CreateOrganizationCommand {
   name: string
@@ -115,6 +54,8 @@ export interface CreateInvitationCommand {
   organizationId: string
   email: string
   role: InvitationAssignableRole
+  teamId?: string
+  membershipType?: MembershipType
 }
 
 export interface UpdateInvitationCommand {
@@ -138,10 +79,11 @@ export const isValidOrganizationName = (name: string): boolean => {
   return trimmed.length >= minOrganizationNameLength && trimmed.length <= maxOrganizationNameLength
 }
 
-export const canCreateInvitation = (role: OrgMemberRole): boolean => role === 'owner' || role === 'admin'
-export const canManageOrganization = (role: OrgMemberRole): boolean => role === 'owner' || role === 'admin'
-export const canDeleteOrganization = (role: OrgMemberRole): boolean => role === 'owner'
-export const canManageInvitation = (role: OrgMemberRole): boolean => role === 'owner' || role === 'admin'
+export const canCreateInvitation = (role: OrgMemberRole): boolean => role === 'admin'
+export const canManageOrganization = (role: OrgMemberRole): boolean => role === 'admin'
+export const canDeleteOrganization = (role: OrgMemberRole): boolean => role === 'admin'
+export const canManageInvitation = (role: OrgMemberRole): boolean => role === 'admin'
+export const canManageMembers = (role: OrgMemberRole): boolean => role === 'admin'
 
 const isInvitationAssignableRole = (role: string): role is InvitationAssignableRole =>
   invitationAssignableRoles.some((value) => value === role)
@@ -156,40 +98,3 @@ export const isValidInvitationRoleUpdate = (
 export const isValidInvitationStatusUpdate = (
   status: string | undefined
 ): status is InvitationStatus | undefined => status === undefined || isInvitationStatus(status)
-
-export const toOrganization = (row: OrganizationRecord): Organization => ({
-  id: row.id,
-  name: row.name,
-  billingEmail: row.billingEmail,
-  onboardingData: row.onboardingData,
-  stripeCustomerId: row.stripeCustomerId,
-  stripeSubscriptionId: row.stripeSubscriptionId,
-  stripePaymentMethodId: row.stripePaymentMethodId,
-  stripeMeteredSubscriptionItemId: row.stripeMeteredSubscriptionItemId,
-  creditsBalance: row.creditsBalance,
-  reservedCredits: row.reservedCredits,
-  autoRechargeEnabled: row.autoRechargeEnabled,
-  autoRechargeThreshold: row.autoRechargeThreshold,
-  autoRechargeAmount: row.autoRechargeAmount,
-  isSubscribed: row.isSubscribed,
-  subscriptionStatus: row.subscriptionStatus,
-  subscriptionPlan: row.subscriptionPlan,
-  subscriptionStartedAt: row.subscriptionStartedAt,
-  subscriptionEndsAt: row.subscriptionEndsAt,
-  subscriptionCurrentPeriodEnd: row.subscriptionCurrentPeriodEnd,
-  createdAt: row.createdAt,
-  updatedAt: row.updatedAt
-})
-
-export const toInvitation = (row: InvitationRecord): Invitation => ({
-  id: row.id,
-  organizationId: row.organizationId,
-  inviteeUserId: row.inviteeUserId,
-  email: row.email,
-  role: row.role,
-  status: row.status,
-  invitedByUserId: row.invitedByUserId,
-  token: row.token,
-  expiresAt: row.expiresAt,
-  createdAt: row.createdAt
-})

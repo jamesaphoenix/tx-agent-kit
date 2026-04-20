@@ -1,13 +1,54 @@
 import { and, eq, inArray, lte, or, sql } from 'drizzle-orm'
 import type { DomainEventType, DomainEventAggregateType } from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
-import { DB, provideDB, type DbClient } from '../client.js'
-import { domainEventRowSchema } from '../effect-schemas/domain-events.js'
-import { dbDecodeFailed, toDbError } from '../errors.js'
+import { type DbClient } from '../client.js'
+import { domainEventRowSchema, type DomainEventRowShape } from '../effect-schemas/domain-events.js'
+import { dbDecodeFailed } from '../errors.js'
 import { domainEvents, type JsonObject } from '../schema.js'
+import { withDb } from './repo-helpers.js'
 
 const decodeDomainEventRows = Schema.decodeUnknown(Schema.Array(domainEventRowSchema))
 const decodeDomainEventRow = Schema.decodeUnknown(domainEventRowSchema)
+
+interface RawDomainEventRowShape {
+  readonly [key: string]: unknown
+  readonly id: DomainEventRowShape['id']
+  readonly eventType: DomainEventRowShape['eventType']
+  readonly aggregateType: DomainEventRowShape['aggregateType']
+  readonly aggregateId: DomainEventRowShape['aggregateId']
+  readonly payload: DomainEventRowShape['payload']
+  readonly correlationId: DomainEventRowShape['correlationId']
+  readonly sequenceNumber: DomainEventRowShape['sequenceNumber']
+  readonly status: DomainEventRowShape['status']
+  readonly occurredAt: unknown
+  readonly processingAt: unknown
+  readonly publishedAt: unknown
+  readonly failedAt: unknown
+  readonly failureReason: DomainEventRowShape['failureReason']
+  readonly createdAt: unknown
+}
+
+const normalizeTimestamp = (value: unknown): unknown => {
+  if (value === null || value instanceof Date) {
+    return value
+  }
+
+  if (typeof value !== 'string') {
+    return value
+  }
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed
+}
+
+const normalizeRawDomainEventRow = (row: RawDomainEventRowShape) => ({
+  ...row,
+  occurredAt: normalizeTimestamp(row.occurredAt),
+  processingAt: normalizeTimestamp(row.processingAt),
+  publishedAt: normalizeTimestamp(row.publishedAt),
+  failedAt: normalizeTimestamp(row.failedAt),
+  createdAt: normalizeTimestamp(row.createdAt)
+})
 
 export interface DomainEventInput {
   eventType: DomainEventType
@@ -44,9 +85,8 @@ export const insertDomainEventInTransaction = (
 
 export const domainEventsRepository = {
   create: (input: DomainEventInput) =>
-    provideDB(
+    withDb('Failed to create domain event', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .insert(domainEvents)
           .values({
@@ -73,53 +113,54 @@ export const domainEventsRepository = {
           Effect.mapError((error) => dbDecodeFailed('domain event row decode failed', error))
         )
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to create domain event', error))),
+    ),
 
   fetchUnprocessed: (limit: number) =>
-    provideDB(
+    withDb('Failed to fetch unprocessed domain events', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
-        const rows = yield* db
-          .update(domainEvents)
-          .set({ status: 'processing', processingAt: sql`now()` })
-          .where(
-            inArray(
-              domainEvents.id,
-              sql`(SELECT id FROM domain_events WHERE status = 'pending' ORDER BY occurred_at ASC, id ASC LIMIT ${limit} FOR UPDATE SKIP LOCKED)`
-            )
+        const rows = yield* db.execute<RawDomainEventRowShape>(sql`
+          WITH events_to_claim AS MATERIALIZED (
+            SELECT id
+              FROM domain_events
+             WHERE status = 'pending'
+             ORDER BY occurred_at ASC, id ASC
+             LIMIT ${limit}
+             FOR UPDATE SKIP LOCKED
           )
-          .returning({
-            id: domainEvents.id,
-            eventType: domainEvents.eventType,
-            aggregateType: domainEvents.aggregateType,
-            aggregateId: domainEvents.aggregateId,
-            payload: domainEvents.payload,
-            correlationId: domainEvents.correlationId,
-            sequenceNumber: domainEvents.sequenceNumber,
-            status: domainEvents.status,
-            occurredAt: domainEvents.occurredAt,
-            processingAt: domainEvents.processingAt,
-            publishedAt: domainEvents.publishedAt,
-            failedAt: domainEvents.failedAt,
-            failureReason: domainEvents.failureReason,
-            createdAt: domainEvents.createdAt
-          })
-          .execute()
+          UPDATE domain_events
+             SET status = 'processing',
+                 processing_at = now()
+            FROM events_to_claim
+           WHERE domain_events.id = events_to_claim.id
+           RETURNING domain_events.id,
+                     domain_events.event_type AS "eventType",
+                     domain_events.aggregate_type AS "aggregateType",
+                     domain_events.aggregate_id AS "aggregateId",
+                     domain_events.payload,
+                     domain_events.correlation_id AS "correlationId",
+                     domain_events.sequence_number AS "sequenceNumber",
+                     domain_events.status,
+                     domain_events.occurred_at AS "occurredAt",
+                     domain_events.processing_at AS "processingAt",
+                     domain_events.published_at AS "publishedAt",
+                     domain_events.failed_at AS "failedAt",
+                     domain_events.failure_reason AS "failureReason",
+                     domain_events.created_at AS "createdAt"
+        `)
 
-        return yield* decodeDomainEventRows(rows).pipe(
+        return yield* decodeDomainEventRows(rows.map(normalizeRawDomainEventRow)).pipe(
           Effect.mapError((error) => dbDecodeFailed('domain event list decode failed', error))
         )
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to fetch unprocessed domain events', error))),
+    ),
 
   markPublished: (ids: ReadonlyArray<string>) =>
-    provideDB(
+    withDb('Failed to mark domain events as published', (db) =>
       Effect.gen(function* () {
         if (ids.length === 0) {
           return { updated: 0 }
         }
 
-        const db = yield* DB
         const rows = yield* db
           .update(domainEvents)
           .set({ status: 'published', publishedAt: sql`now()` })
@@ -134,12 +175,11 @@ export const domainEventsRepository = {
 
         return { updated: rows.length }
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to mark domain events as published', error))),
+    ),
 
   markFailed: (id: string, reason: string) =>
-    provideDB(
+    withDb('Failed to mark domain event as failed', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .update(domainEvents)
           .set({ status: 'failed', failedAt: sql`now()`, failureReason: reason })
@@ -154,12 +194,11 @@ export const domainEventsRepository = {
 
         return { updated: rows.length }
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to mark domain event as failed', error))),
+    ),
 
   resetStuckProcessing: (stuckThreshold: Date) =>
-    provideDB(
+    withDb('Failed to reset stuck processing events', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .update(domainEvents)
           .set({ status: 'pending', processingAt: null })
@@ -174,12 +213,11 @@ export const domainEventsRepository = {
 
         return rows.map((row) => row.id)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to reset stuck processing events', error))),
+    ),
 
   prunePublished: (olderThan: Date) =>
-    provideDB(
+    withDb('Failed to prune published domain events', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .delete(domainEvents)
           .where(
@@ -199,5 +237,5 @@ export const domainEventsRepository = {
 
         return { deleted: rows.length }
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to prune published domain events', error)))
+    )
 }
