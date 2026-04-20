@@ -21,9 +21,11 @@ vi.mock('@sentry/node', () => ({
 const baseEnv = {
   NODE_ENV: 'development',
   DATABASE_URL: 'postgresql://localhost:5432/test',
+  WORKER_ENABLE_SCHEDULES: true,
   OUTBOX_POLL_BATCH_SIZE: 50,
   OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
   OUTBOX_PRUNE_RETENTION_DAYS: 30,
+  RESERVATION_RECLAIM_MAX_AGE_SECONDS: 7200,
   TEMPORAL_RUNTIME_MODE: 'cli' as const,
   TEMPORAL_ADDRESS: 'localhost:7233',
   TEMPORAL_NAMESPACE: 'default',
@@ -38,7 +40,9 @@ const baseEnv = {
   SENTRY_SPOTLIGHT: false,
   RESEND_API_KEY: undefined,
   RESEND_FROM_EMAIL: undefined,
-  WEB_BASE_URL: undefined
+  WEB_BASE_URL: undefined,
+  EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+    STRIPE_SECRET_KEY: undefined
 }
 
 describe('worker sentry wiring', () => {

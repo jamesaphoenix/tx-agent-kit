@@ -15,6 +15,7 @@
     "./promise": "./promise.js",
     "./testing": "./testing.js",
     "./type-safety": "./type-safety.js",
-    "./unicorn": "./unicorn.js"
+    "./unicorn": "./unicorn.js",
+    "./web-ui": "./web-ui.js"
   }
 }

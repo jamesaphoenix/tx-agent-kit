@@ -1,21 +1,16 @@
+import { parsePositiveInt } from '@tx-agent-kit/contracts'
 import { availableParallelism, cpus } from 'node:os'
 
 const fallbackWorkerCount = 1
-const maxAutoIntegrationWorkers = 6
-const maxAutoWebIntegrationWorkers = 4
-
-const parsePositiveInt = (value: string | undefined, fallback: number): number => {
-  if (!value) {
-    return fallback
-  }
-
-  const parsed = Number.parseInt(value, 10)
-  if (Number.isNaN(parsed) || parsed < 1) {
-    return fallback
-  }
-
-  return parsed
-}
+// Raised 6 → 10 (integration) and 4 → 8 (web integration). With
+// `pool: 'threads', isolate: false` each worker is a cheap OS thread
+// (not a process fork), so the effective cost of adding workers is just
+// per-worker module-import amortisation. The old cap was sized for the
+// per-file spawned API server pattern; the shared-API-server pattern
+// removed that ceiling — the only remaining resource constraint is the
+// Postgres pool (1000 max_connections vs 150 API + 40 worker + pg defaults).
+const maxAutoIntegrationWorkers = 10
+const maxAutoWebIntegrationWorkers = 8
 
 const resolveAutoMaxWorkers = (): number => {
   try {

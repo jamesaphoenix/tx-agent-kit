@@ -8,9 +8,7 @@ const apiCwd = resolve(dirname(fileURLToPath(import.meta.url)), '../../../apps/a
 
 const dbAuthContext = createDbAuthContext({
   apiCwd,
-  host: '127.0.0.1',
-  port: Number.parseInt(process.env.TESTKIT_INTEGRATION_API_PORT ?? '4102', 10),
-  authSecret: 'testkit-integration-auth-secret-32-chars',
+  authSecret: process.env.INTEGRATION_AUTH_SECRET ?? 'testkit-integration-auth-secret-32-chars',
   corsOrigin: '*',
   sql: {
     schemaPrefix: 'testkit'
@@ -32,8 +30,6 @@ afterAll(async () => {
 describe('db auth context integration', () => {
   it('supports create/login/delete user lifecycle', async () => {
     const createdUser = await dbAuthContext.createUser({
-      email: 'testkit-auth-flow@example.com',
-      password: 'strong-pass-12345',
       name: 'Testkit Auth Flow'
     })
 
@@ -62,8 +58,6 @@ describe('db auth context integration', () => {
 
   it('creates organizations via context factory helpers', async () => {
     const owner = await dbAuthContext.createUser({
-      email: 'testkit-org-owner@example.com',
-      password: 'strong-pass-12345',
       name: 'Testkit Organization Owner'
     })
 
@@ -77,8 +71,6 @@ describe('db auth context integration', () => {
 
   it('creates organization/team records via direct DB seeding', async () => {
     const owner = await dbAuthContext.createUser({
-      email: 'org-team-owner@example.com',
-      password: 'strong-pass-12345',
       name: 'Org Team Owner'
     })
 

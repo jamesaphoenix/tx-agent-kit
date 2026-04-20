@@ -34,7 +34,37 @@ export interface <PascalCase>EventPayload {
 
 If the file already exists (e.g. `organization-events.ts`), add the new interface alongside existing ones.
 
-### 3. Add payload schema in temporal-client
+### 3. Re-export from the domain's public `events.ts`
+
+**File:** `packages/core/src/domains/<aggregate>/events.ts`
+
+Re-export the payload type and add the event discriminant + version:
+
+```typescript
+export type { <PascalCase>EventPayload } from './domain/<aggregate>-events.js'
+
+export const <aggregate>Events = {
+  // ... existing events
+  <verb>: '<aggregate>.<verb>',
+} as const
+
+export const <aggregate>EventVersions = {
+  // ... existing versions
+  '<aggregate>.<verb>': 1,
+} as const
+```
+
+If `events.ts` doesn't exist yet, create it. This is the public cross-domain contract — other domains may ONLY import from this file.
+
+### 4. Export from `packages/core/src/index.ts`
+
+Add the events exports:
+```typescript
+export { <aggregate>Events, <aggregate>EventVersions } from './domains/<aggregate>/events.js'
+export type { <PascalCase>EventPayload } from './domains/<aggregate>/events.js'
+```
+
+### 5. Add payload schema in temporal-client
 
 **File:** `packages/temporal-client/src/types/domain-event.ts`
 
@@ -48,7 +78,7 @@ export const <PascalCase>EventPayloadSchema = Schema.Struct({
 
 Re-export from `packages/temporal-client/src/index.ts` if not already.
 
-### 4. Add handler case in the worker workflow dispatcher
+### 6. Add handler case in the worker workflow dispatcher
 
 **File:** `apps/worker/src/workflows.ts`
 
@@ -69,7 +99,7 @@ Requirements enforced by lint:
 - `parentClosePolicy: ParentClosePolicy.ABANDON`
 - No `as` type assertions on `.payload`
 
-### 5. Add the handler workflow function
+### 7. Add the handler workflow function
 
 **File:** `apps/worker/src/workflows.ts`
 
@@ -80,31 +110,31 @@ export async function <eventName>Workflow(event: SerializedDomainEvent): Promise
 }
 ```
 
-### 6. Add activity if needed
+### 8. Add activity if needed
 
 **File:** `apps/worker/src/activities.ts`
 
 Add the activity function and register it in the `activities` object.
 
-### 7. Write the event transactionally
+### 9. Write the event transactionally
 
 **File:** `packages/infra/db/src/repositories/<aggregate>.ts`
 
 Either reuse the existing `createWithEvent` pattern or add a new `*WithEvent` method that writes the domain event inside `db.transaction()`.
 
-### 8. Wire through the port and adapter
+### 10. Wire through the port and adapter
 
 - **Port:** `packages/core/src/domains/<aggregate>/ports/<aggregate>-ports.ts` — add method signature
 - **Adapter:** `packages/core/src/domains/<aggregate>/adapters/<aggregate>-adapters.ts` — wire to repository
 - **Service:** `packages/core/src/domains/<aggregate>/application/<aggregate>-service.ts` — call the port method
 
-### 9. Add integration tests
+### 11. Add integration tests
 
 **File:** `packages/testkit/src/domain-events-outbox.integration.test.ts`
 
 Test that the event is written transactionally, has correct payload, and follows the full lifecycle.
 
-### 10. Verify
+### 12. Verify
 
 ```bash
 pnpm lint        # structural enforcement checks all 10 rules
@@ -135,7 +165,8 @@ Run `pnpm lint` after each step — it tells you exactly what's missing.
 | File | Role |
 |------|------|
 | `packages/contracts/src/literals.ts` | Event type registry |
-| `packages/core/src/domains/*/domain/*-events.ts` | Payload interfaces |
+| `packages/core/src/domains/<domain>/events.ts` | Public cross-domain event contract |
+| `packages/core/src/domains/*/domain/*-events.ts` | Internal payload interfaces |
 | `packages/temporal-client/src/types/domain-event.ts` | Payload schemas |
 | `apps/worker/src/workflows.ts` | Poller dispatcher + handler workflows |
 | `apps/worker/src/activities.ts` | Activity implementations |

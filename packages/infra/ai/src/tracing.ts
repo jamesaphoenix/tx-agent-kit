@@ -63,6 +63,32 @@ export interface TracedCallModelOptions {
   readonly stepName?: string
 }
 
+const stringifyJson = (value: unknown): string | undefined => {
+  if (value === undefined) {
+    return undefined
+  }
+
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return undefined
+  }
+}
+
+const responseOutputText = (
+  response: OpenResponsesNonStreamingResponse
+): string | undefined => {
+  const text =
+    response.output
+      .filter((output) => output.type === 'message')
+      .flatMap((output) => output.content)
+      .filter((content) => content.type === 'output_text')
+      .map((content) => content.text)
+      .join('')
+
+  return text.length > 0 ? text : undefined
+}
+
 /**
  * Set usage attributes on a span from a completed response.
  */
@@ -71,6 +97,7 @@ const setUsageAttributes = (
   response: OpenResponsesNonStreamingResponse
 ): void => {
   span.setAttribute('gen_ai.response.model', response.model)
+  span.setAttribute('langfuse.observation.model.name', response.model)
 
   if (response.usage) {
     span.setAttribute(
@@ -85,9 +112,21 @@ const setUsageAttributes = (
       'gen_ai.usage.total_tokens',
       response.usage.totalTokens
     )
+    span.setAttribute(
+      'langfuse.observation.usage_details',
+      JSON.stringify({
+        input: response.usage.inputTokens,
+        output: response.usage.outputTokens,
+        total: response.usage.totalTokens
+      })
+    )
 
     if (response.usage.cost !== undefined && response.usage.cost !== null) {
       span.setAttribute('gen_ai.usage.cost', response.usage.cost)
+      span.setAttribute(
+        'langfuse.observation.cost_details',
+        JSON.stringify({ total: response.usage.cost })
+      )
     }
   }
 }
@@ -97,8 +136,7 @@ const setUsageAttributes = (
  * the response via `getResponse()`, capturing token usage attributes.
  *
  * Returns the full `OpenResponsesNonStreamingResponse` (not the lazy `ModelResult`).
- * Langfuse picks up these spans via `LangfuseSpanProcessor` and renders them
- * as generations. All calls within the same `withAgentTrace` share one traceId.
+ * All calls within the same `withAgentTrace` share one traceId.
  */
 export const tracedCallModel = <TTools extends readonly Tool[]>(
   request: CallModelInput<TTools>,
@@ -115,9 +153,31 @@ export const tracedCallModel = <TTools extends readonly Tool[]>(
   const requestMaxTokens =
     typeof request.maxOutputTokens === 'number' ? request.maxOutputTokens : undefined
 
+  const modelParameters = Object.fromEntries(
+    Object.entries({
+      temperature: requestTemperature,
+      max_tokens: requestMaxTokens
+    }).filter((entry): entry is [string, number] => entry[1] !== undefined)
+  )
+
   const attributes: Record<string, string | number> = {
     'gen_ai.system': 'openrouter',
-    'gen_ai.request.model': model
+    'gen_ai.request.model': model,
+    'langfuse.observation.type': 'generation',
+    'langfuse.observation.model.name': model,
+    'langfuse.observation.metadata.provider': 'openrouter'
+  }
+  const langfuseInput = stringifyJson(request.input)
+  if (langfuseInput !== undefined) {
+    attributes['langfuse.observation.input'] = langfuseInput
+  }
+  const langfuseModelParameters = stringifyJson(modelParameters)
+  if (
+    langfuseModelParameters !== undefined &&
+    Object.keys(modelParameters).length > 0
+  ) {
+    attributes['langfuse.observation.model.parameters'] =
+      langfuseModelParameters
   }
   if (requestTemperature !== undefined) {
     attributes['gen_ai.request.temperature'] = requestTemperature
@@ -137,6 +197,10 @@ export const tracedCallModel = <TTools extends readonly Tool[]>(
           catch: (error) => new AiError({ message: String(error) })
         })
         setUsageAttributes(span, response)
+        const output = stringifyJson(responseOutputText(response))
+        if (output !== undefined) {
+          span.setAttribute('langfuse.observation.output', output)
+        }
         return response
       })
   )
@@ -145,8 +209,7 @@ export const tracedCallModel = <TTools extends readonly Tool[]>(
 /**
  * Creates a named agent step span around an Effect computation.
  * All traced calls (including `tracedCallModel`) inside the provided
- * effect will appear as children of this span in Langfuse, sharing
- * the same traceId.
+ * effect will appear as children of this span, sharing the same traceId.
  */
 export const withAgentStep = <A, E>(
   name: string,
@@ -172,7 +235,7 @@ export const withAgentStep = <A, E>(
 /**
  * Wraps an entire multi-agent run in a root trace span.
  * All nested `withAgentStep` and `tracedCallModel` calls will be
- * parented under this span, sharing the same traceId in Langfuse.
+ * parented under this span, sharing the same traceId.
  */
 export const withAgentTrace = <A, E>(
   name: string,

@@ -147,20 +147,22 @@ The Axios client in `apps/web/lib/axios.ts` must use `webEnv.API_BASE_URL` as it
 
 ## Integration Testing
 
-Web integration tests are colocated alongside the components and pages they test:
+Web integration tests are colocated alongside the components and pages they test. The suite covers auth flows, onboarding, multi-tenancy (orgs + workspaces), billing UX, media management, and access-gate components:
 
-| Test file |
-|-----------|
-| `apps/web/components/AuthForm.integration.test.tsx` |
-| `apps/web/components/CreateOrganizationForm.integration.test.tsx` |
-| `apps/web/components/CreateInvitationForm.integration.test.tsx` |
-| `apps/web/components/AcceptInvitationForm.integration.test.tsx` |
-| `apps/web/components/SignOutButton.integration.test.tsx` |
-| `apps/web/components/ForgotPasswordForm.integration.test.tsx` |
-| `apps/web/components/ResetPasswordForm.integration.test.tsx` |
-| `apps/web/app/dashboard/page.integration.test.tsx` |
-| `apps/web/app/organizations/page.integration.test.tsx` |
-| `apps/web/app/invitations/page.integration.test.tsx` |
+| Category | Representative test files |
+|----------|---------------------------|
+| Auth | `components/{AuthForm,SignOutButton,ForgotPasswordForm,ResetPasswordForm}.integration.test.tsx` |
+| Multi-tenancy | `components/{CreateOrganizationForm,CreateInvitationForm,AcceptInvitationForm}.integration.test.tsx` |
+| Access gates | `components/{PermissionsGate,SubscriptionGate,SuspensionBanner}.integration.test.tsx` |
+| Org + workspace pages | `app/(application)/org/**/page.integration.test.tsx` |
+| Onboarding | `app/(application)/org/onboarding/page.integration.test.tsx`, `components/onboarding/SpendCapStep.integration.test.tsx` |
+| Billing UX | `components/billing/{AutoRechargeForm,BillingSettingsForm,CreditBalanceWidget,CreditHistoryTable,GracePeriodBanner,NoCapReminderCard,PlanSelector,RechargeRequiresActionBanner,SpendCapReminderCard,ThreeDSChallengeModal,TopUpDialog,UsageBreakdownCard}.integration.test.tsx` |
+| Billing pages | `app/(application)/org/[orgId]/billing/**/page.integration.test.tsx` |
+| Media library | `app/(application)/org/[orgId]/[teamId]/media/page.integration.test.tsx` |
+| Review flow | `app/review/[token]/page.integration.test.tsx` |
+| Marketing | `app/(website)/{page,LandingPageContent}.integration.test.tsx` |
+
+Run `find apps/web -name '*.integration.test.tsx'` for the canonical list.
 
 Suite lifecycle is centralized in `apps/web/vitest.integration.setup.ts`. Individual test files must not call `setupWebIntegrationSuite`, `resetWebIntegrationCase`, or `teardownWebIntegrationSuite` directly.
 

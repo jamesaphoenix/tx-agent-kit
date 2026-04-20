@@ -139,7 +139,7 @@ const collectApiRouteKinds = (rootRelativePath, expectsHandlers, requiredPathTok
       return false
     }
 
-    if (normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx')) {
+    if (normalized.endsWith('.test.ts') || normalized.endsWith('.test.tsx') || /\/test-[^/]+\.tsx?$/.test(normalized)) {
       return false
     }
 

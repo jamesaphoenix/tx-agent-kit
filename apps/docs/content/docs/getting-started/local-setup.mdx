@@ -118,7 +118,7 @@ For integration tests (which require running infrastructure):
 pnpm test:integration
 ```
 
-Integration tests are lock-guarded (`/tmp/tx-agent-kit-integration.lock`) to prevent overlapping runs from clobbering each other.
+Integration tests run in parallel across git worktrees: `scripts/worktree/setup.sh` allocates a deterministic `WORKTREE_PORT_OFFSET` so each worktree's shared API port (`4100 + offset`) and Postgres schema are already isolated. Run `./scripts/worktree/setup.sh <path>` once per worktree to seed its `.env` with secrets from the primary checkout.
 
 ## Quiet runners
 

@@ -7,12 +7,14 @@ export const onboardingDataSchema = organizationOnboardingDataSchema
 export const organizationRowSchema = Schema.Struct({
   id: Schema.UUID,
   name: Schema.String,
+  ownerUserId: Schema.NullOr(Schema.UUID),
   billingEmail: Schema.NullOr(Schema.String),
   onboardingData: Schema.NullOr(onboardingDataSchema),
   stripeCustomerId: Schema.NullOr(Schema.String),
   stripeSubscriptionId: Schema.NullOr(Schema.String),
   stripePaymentMethodId: Schema.NullOr(Schema.String),
   stripeMeteredSubscriptionItemId: Schema.NullOr(Schema.String),
+  usageCap: Schema.NullOr(Schema.Number),
   creditsBalance: Schema.Number,
   reservedCredits: Schema.Number,
   autoRechargeEnabled: Schema.Boolean,
@@ -24,6 +26,9 @@ export const organizationRowSchema = Schema.Struct({
   subscriptionStartedAt: Schema.NullOr(Schema.DateFromSelf),
   subscriptionEndsAt: Schema.NullOr(Schema.DateFromSelf),
   subscriptionCurrentPeriodEnd: Schema.NullOr(Schema.DateFromSelf),
+  paymentGracePeriodEndsAt: Schema.NullOr(Schema.DateFromSelf),
+  suspendedAt: Schema.NullOr(Schema.DateFromSelf),
+  welcomeCreditGrantedAt: Schema.NullOr(Schema.DateFromSelf),
   createdAt: Schema.DateFromSelf,
   updatedAt: Schema.DateFromSelf
 })

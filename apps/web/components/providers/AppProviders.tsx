@@ -9,6 +9,7 @@ import { NotifyToaster } from '../../lib/notify'
 import { initializeWebSentry } from '../../lib/sentry'
 import { UrlStateProvider } from '../../lib/url-state'
 import { sessionStore } from '../../stores/session-store'
+import { CustomDevUtils } from '../devtools/CustomDevUtils'
 import { TanStackStoreDevtools } from '../devtools/TanStackStoreDevtools'
 import { AuthBootstrapProvider } from './AuthBootstrapProvider'
 
@@ -66,13 +67,14 @@ export function AppProviders({ children, devtoolsMode = 'auto' }: AppProvidersPr
         {shouldRenderDevtools ? (
           <>
             <div data-testid="react-query-devtools-container">
-              <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+              <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
             </div>
             <TanStackStoreDevtools
               store={sessionStore}
               name="Session Store Devtools"
               maxHistory={30}
             />
+            <CustomDevUtils />
           </>
         ) : null}
       </QueryClientProvider>

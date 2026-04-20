@@ -40,6 +40,10 @@ vi.mock('../devtools/TanStackStoreDevtools', () => ({
   TanStackStoreDevtools: () => <div data-testid="tanstack-store-devtools" />
 }))
 
+vi.mock('../devtools/CustomDevUtils', () => ({
+  CustomDevUtils: () => <div data-testid="custom-dev-utils" />
+}))
+
 const renderAppProviders = async (nodeEnv: string | null): Promise<void> => {
   if (nodeEnv === null) {
     clearNodeEnv()
@@ -77,15 +81,17 @@ describe('AppProviders', () => {
     expect(screen.queryByTestId('notify-toaster')).not.toBeNull()
     expect(screen.queryByTestId('react-query-devtools')).not.toBeNull()
     expect(screen.queryByTestId('tanstack-store-devtools')).not.toBeNull()
+    expect(screen.queryByTestId('custom-dev-utils')).not.toBeNull()
     expect(initializeWebSentryMock).toHaveBeenCalledTimes(1)
   })
 
-  it('hides TanStack devtools in production', async () => {
+  it('hides developer tools in production', async () => {
     await renderAppProviders('production')
 
     expect(screen.queryByTestId('app-providers-child')).not.toBeNull()
     expect(screen.queryByTestId('react-query-devtools')).toBeNull()
     expect(screen.queryByTestId('tanstack-store-devtools')).toBeNull()
+    expect(screen.queryByTestId('custom-dev-utils')).toBeNull()
   })
 
   it('defaults to showing devtools when NODE_ENV is not set', async () => {
@@ -93,5 +99,6 @@ describe('AppProviders', () => {
 
     expect(screen.queryByTestId('react-query-devtools')).not.toBeNull()
     expect(screen.queryByTestId('tanstack-store-devtools')).not.toBeNull()
+    expect(screen.queryByTestId('custom-dev-utils')).not.toBeNull()
   })
 })

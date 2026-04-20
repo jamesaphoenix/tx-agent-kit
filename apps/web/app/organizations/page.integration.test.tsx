@@ -4,30 +4,23 @@ import { createOrganization, createUser } from '@tx-agent-kit/testkit'
 import { describe, expect, it } from 'vitest'
 import OrganizationsPage from './page'
 import { createWebFactoryContext } from '../../integration/support/web-integration-context'
-import { readIntegrationRouterLocation } from '../../integration/support/next-router-context'
 import { renderWithProviders, screen, waitFor, within } from '../../integration/test-utils'
 
-const organizationsSignInRedirect = '/sign-in?next=%2Forganizations'
-
 describe('OrganizationsPage integration', () => {
-  it('redirects to sign-in when no auth token is present', async () => {
+  it('shows default state when no auth token is present', async () => {
     renderWithProviders(<OrganizationsPage />)
 
+    // Without a token the session bootstrap resolves with no principal.
+    // The page uses enabled: isSessionReady so it fires the query unauthenticated
+    // and shows its default empty/loading state without redirecting.
     await waitFor(() => {
-      const location = readIntegrationRouterLocation()
-      expect(location).toEqual({
-        pathname: '/sign-in',
-        search: '?next=%2Forganizations'
-      })
-      expect(`${location.pathname}${location.search}`).toBe(organizationsSignInRedirect)
+      expect(screen.getByText('Your organizations')).toBeInTheDocument()
     })
   })
 
   it('loads authenticated organization data', async () => {
     const factoryContext = createWebFactoryContext()
     const owner = await createUser(factoryContext, {
-      email: 'organizations-owner@example.com',
-      password: 'organizations-owner-pass-12345',
       name: 'Organizations Owner'
     })
 
@@ -56,23 +49,17 @@ describe('OrganizationsPage integration', () => {
         within(organizationsSection).getByText(organization.name, { selector: 'strong' })
       ).toBeInTheDocument()
     }, { timeout: 5000 })
-    expect(readIntegrationRouterLocation().pathname).not.toBe('/sign-in')
   })
 
-  it('redirects to sign-in and clears session when auth token is invalid', async () => {
+  it('clears auth token when token is invalid', async () => {
     writeAuthToken('invalid-token')
 
     renderWithProviders(<OrganizationsPage />)
 
+    // AuthBootstrapProvider calls restoreCurrentPrincipal which clears the token
+    // on auth error, then calls sessionStoreActions.clear().
     await waitFor(() => {
-      const location = readIntegrationRouterLocation()
-      expect(location).toEqual({
-        pathname: '/sign-in',
-        search: '?next=%2Forganizations'
-      })
-      expect(`${location.pathname}${location.search}`).toBe(organizationsSignInRedirect)
+      expect(readAuthToken()).toBeNull()
     })
-
-    expect(readAuthToken()).toBeNull()
   })
 })

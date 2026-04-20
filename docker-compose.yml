@@ -1,25 +1,36 @@
-x-langfuse-env: &langfuse-env
-  DATABASE_URL: postgresql://postgres:postgres@langfuse-postgres:5432/langfuse
-  DIRECT_URL: postgresql://postgres:postgres@langfuse-postgres:5432/langfuse
-  CLICKHOUSE_URL: http://langfuse-clickhouse:8123
-  CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
-  CLICKHOUSE_USER: clickhouse
-  CLICKHOUSE_PASSWORD: clickhouse
-  REDIS_HOST: redis
-  REDIS_PORT: '6379'
-  REDIS_AUTH: ''
-  LANGFUSE_S3_EVENT_UPLOAD_ENABLED: 'false'
-  LANGFUSE_S3_MEDIA_UPLOAD_ENABLED: 'false'
-  SALT: 'salt-for-local-dev-only'
-  ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
-  TELEMETRY_ENABLED: 'false'
-  LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: 'true'
-
 services:
   postgres:
     build:
       context: .
       dockerfile: monitoring/local/postgres/Dockerfile
+    # Dev-only tuning: sized for parallel integration test workers with unsafe
+    # durability settings. NOT for production — production uses PgBouncer and
+    # default durability.
+    #
+    # Sized for concurrent *stress* integration tests. Multiple billing stress
+    # tests (100-parallel reclaim, 25-parallel suspended-at) can run in the
+    # same vitest slot simultaneously — combined they exceed 125 in-flight DB
+    # calls per slot. With 4 slots that's up to 760 concurrent connections.
+    # max_connections=1000 leaves headroom for psql/admin and bursts. The
+    # earlier 500 ceiling was observed causing transient flakes in createUser
+    # (HTTP sign-up) during stress-test overlap within a slot.
+    #
+    # max_connections=1000      4 slots × (150 API + 40 worker) = 760, plus
+    #                           admin headroom.
+    # shared_buffers=1024MB     larger cache keeps hot pages in memory under
+    #                           concurrent load.
+    # fsync=off                 +
+    # synchronous_commit=off    ~3–5× write throughput in exchange for "last few
+    # full_page_writes=off      seconds lost on crash". Safe locally because test
+    #                           schemas are ephemeral — reset-test-db.sh recreates
+    #                           them, and a mid-test crash just restarts the suite.
+    command: >
+      postgres
+      -c max_connections=1000
+      -c shared_buffers=1024MB
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -66,7 +77,12 @@ services:
       - ./monitoring/local/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki_data:/loki
     ports:
-      - '3100:3100'
+      # Host port overridable via LOKI_HOST_PORT for environments where
+      # port 3100 is taken by another process (e.g. a Next.js dev server
+      # on a neighbouring project — 3100 is a common default). The
+      # container port stays 3100 because Loki's internal config is
+      # hard-coded to it.
+      - '${LOKI_HOST_PORT:-3100}:3100'
     profiles: ['infra']
 
   grafana:
@@ -157,88 +173,162 @@ services:
       retries: 5
     profiles: ['infra']
 
+  # Langfuse local dev stack. Application services send only LLM/GenAI spans to
+  # this endpoint; regular OTel traces continue to flow through otel-collector.
   langfuse-postgres:
-    image: postgres:17
+    image: postgres:17-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
       POSTGRES_DB: langfuse
-    ports:
-      - '127.0.0.1:15432:5432'
+      TZ: UTC
+      PGTZ: UTC
     volumes:
       - langfuse_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d langfuse']
-      interval: 10s
+      test: ['CMD-SHELL', 'pg_isready -U langfuse -d langfuse']
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
     profiles: ['infra']
 
   langfuse-clickhouse:
-    image: clickhouse/clickhouse-server
+    image: clickhouse/clickhouse-server:25.11
+    user: '101:101'
     environment:
       CLICKHOUSE_DB: default
       CLICKHOUSE_USER: clickhouse
       CLICKHOUSE_PASSWORD: clickhouse
-    ports:
-      - '127.0.0.1:18123:8123'
-      - '127.0.0.1:19000:9000'
     volumes:
       - langfuse_clickhouse_data:/var/lib/clickhouse
       - langfuse_clickhouse_logs:/var/log/clickhouse-server
-      - ./monitoring/local/clickhouse/keeper-config.xml:/etc/clickhouse-server/config.d/keeper-config.xml:ro
+    ports:
+      - '127.0.0.1:${LANGFUSE_CLICKHOUSE_HTTP_PORT:-8123}:8123'
+      - '127.0.0.1:${LANGFUSE_CLICKHOUSE_TCP_PORT:-9000}:9000'
     healthcheck:
       test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1']
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    profiles: ['infra']
+
+  langfuse-minio:
+    image: cgr.dev/chainguard/minio:latest
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    volumes:
+      - langfuse_minio_data:/data
+    ports:
+      - '127.0.0.1:${LANGFUSE_MINIO_PORT:-9092}:9000'
+      - '127.0.0.1:${LANGFUSE_MINIO_CONSOLE_PORT:-9093}:9001'
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles: ['infra']
+
+  langfuse-redis:
+    image: redis:8.6.0-alpine3.23
+    command:
+      [
+        'redis-server',
+        '--requirepass',
+        '${LANGFUSE_REDIS_AUTH:-langfuse-redis-secret}',
+        '--maxmemory-policy',
+        'noeviction'
+      ]
+    volumes:
+      - langfuse_redis_data:/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'redis-cli -a "$${LANGFUSE_REDIS_AUTH:-langfuse-redis-secret}" ping'
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     profiles: ['infra']
 
   langfuse-worker:
     image: langfuse/langfuse-worker:3
-    environment:
-      <<: *langfuse-env
-    ports:
-      - '127.0.0.1:3230:3030'
-    depends_on:
+    depends_on: &langfuse-depends-on
       langfuse-postgres:
         condition: service_healthy
       langfuse-clickhouse:
         condition: service_healthy
-      redis:
+      langfuse-minio:
         condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:${LANGFUSE_WORKER_PORT:-3030}:3030'
+    environment: &langfuse-worker-env
+      NEXTAUTH_URL: http://localhost:${LANGFUSE_PORT:-3003}
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-postgres:5432/langfuse
+      SALT: ${LANGFUSE_SALT:-local-langfuse-salt}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      TELEMETRY_ENABLED: 'false'
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: 'false'
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: 'false'
+      LANGFUSE_USE_AZURE_BLOB: 'false'
+      LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE: 'false'
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: 'true'
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:${LANGFUSE_MINIO_PORT:-9092}
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: 'true'
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      LANGFUSE_S3_BATCH_EXPORT_ENABLED: 'false'
+      LANGFUSE_S3_BATCH_EXPORT_BUCKET: langfuse
+      LANGFUSE_S3_BATCH_EXPORT_PREFIX: exports/
+      LANGFUSE_S3_BATCH_EXPORT_REGION: auto
+      LANGFUSE_S3_BATCH_EXPORT_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_BATCH_EXPORT_EXTERNAL_ENDPOINT: http://localhost:${LANGFUSE_MINIO_PORT:-9092}
+      LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE: 'true'
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: 6379
+      REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:-langfuse-redis-secret}
+      REDIS_TLS_ENABLED: 'false'
+      EMAIL_FROM_ADDRESS: ''
+      SMTP_CONNECTION_URL: ''
     profiles: ['infra']
 
   langfuse-web:
     image: langfuse/langfuse:3
-    environment:
-      <<: *langfuse-env
-      NEXTAUTH_URL: http://localhost:3200
-      NEXTAUTH_SECRET: mysecret-for-local-dev-only
-      LANGFUSE_INIT_ORG_ID: local-dev-org
-      LANGFUSE_INIT_ORG_NAME: Local Dev
-      LANGFUSE_INIT_PROJECT_ID: local-dev-project
-      LANGFUSE_INIT_PROJECT_NAME: Local Dev Project
-      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-local-dev
-      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-local-dev
-      LANGFUSE_INIT_USER_EMAIL: admin@localhost.dev
-      LANGFUSE_INIT_USER_NAME: Admin
-      LANGFUSE_INIT_USER_PASSWORD: adminadmin
+    depends_on: *langfuse-depends-on
     ports:
-      - '3200:3000'
-    depends_on:
-      langfuse-postgres:
-        condition: service_healthy
-      langfuse-clickhouse:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:3000/api/public/health || exit 1']
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
+      - '${LANGFUSE_PORT:-3003}:3000'
+    environment:
+      <<: *langfuse-worker-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-local-langfuse-nextauth-secret}
+      LANGFUSE_INIT_ORG_ID: tx-agent-kit-local
+      LANGFUSE_INIT_ORG_NAME: tx-agent-kit Local
+      LANGFUSE_INIT_PROJECT_ID: tx-agent-kit-local
+      LANGFUSE_INIT_PROJECT_NAME: tx-agent-kit Local
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-00000000-0000-4000-8000-000000000000}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-00000000-0000-4000-8000-000000000000}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-dev@tx-agent-kit.local}
+      LANGFUSE_INIT_USER_NAME: tx-agent-kit Dev
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-tx-agent-kit-local-langfuse}
     profiles: ['infra']
 
 volumes:
@@ -250,3 +340,5 @@ volumes:
   langfuse_postgres_data:
   langfuse_clickhouse_data:
   langfuse_clickhouse_logs:
+  langfuse_minio_data:
+  langfuse_redis_data:

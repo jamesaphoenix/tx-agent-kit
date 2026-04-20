@@ -6,15 +6,11 @@ afterEach(() => {
 })
 
 describe('getAuthEnv', () => {
-  it('returns defaults when auth env vars are unset', () => {
+  it('throws when AUTH_SECRET is unset', () => {
     vi.stubEnv('AUTH_SECRET', undefined)
     vi.stubEnv('AUTH_BCRYPT_ROUNDS', undefined)
 
-    expect(getAuthEnv()).toEqual({
-      AUTH_SECRET: '',
-      AUTH_BCRYPT_ROUNDS: 12,
-      AUTH_ACCESS_TOKEN_TTL: '15m'
-    })
+    expect(() => getAuthEnv()).toThrow('AUTH_SECRET environment variable is required')
   })
 
   it('accepts bcrypt rounds in the supported range', () => {

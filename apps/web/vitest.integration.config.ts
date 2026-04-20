@@ -22,11 +22,13 @@ export default mergeConfig(
         }
       },
       hookTimeout: 120_000,
+      maxWorkers: integrationMaxWorkers,
+      fileParallelism: integrationMaxWorkers > 1,
+      pool: 'forks',
+      isolate: true,
       setupFiles: ['./vitest.integration.setup.ts'],
       include: ['**/*.integration.test.ts', '**/*.integration.test.tsx'],
       exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/coverage/**'],
-      pool: 'forks',
-      isolate: true,
       passWithNoTests: true
     },
     resolve: {

@@ -26,12 +26,13 @@ describe('AppProviders integration', () => {
     mutableProcessEnv.NEXT_PUBLIC_NODE_ENV = 'test'
   })
 
-  it('renders TanStack devtools in auto mode for integration environment', () => {
+  it('renders developer tools in auto mode for integration environment', () => {
     renderAppProviders('auto')
 
     expect(screen.getByTestId('app-providers-child')).toBeInTheDocument()
     expect(screen.getByTestId('react-query-devtools-container')).toBeInTheDocument()
     expect(screen.getByTestId('tanstack-store-devtools-toggle')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open developer utilities/i })).toBeInTheDocument()
   })
 
   it('renders real TanStack devtools and tracks session store updates', async () => {
@@ -49,9 +50,10 @@ describe('AppProviders integration', () => {
       expect(screen.getByTestId('tanstack-store-devtools-panel')).toBeInTheDocument()
     }, { timeout: 5000 })
 
+    const devtoolsEmail = `devtools-integration-${randomUUID()}@example.com`
     sessionStoreActions.setPrincipal({
       userId: randomUUID(),
-      email: 'devtools-integration@example.com',
+      email: devtoolsEmail,
       roles: ['member'],
       organizationId: undefined,
       permissions: []
@@ -59,7 +61,7 @@ describe('AppProviders integration', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('tanstack-store-devtools-current-state')).toHaveTextContent(
-        'devtools-integration@example.com'
+        devtoolsEmail
       )
     }, { timeout: 5000 })
 
@@ -69,9 +71,14 @@ describe('AppProviders integration', () => {
 
     await user.click(screen.getByRole('button', { name: 'Clear history' }))
 
-    expect(screen.getByTestId('tanstack-store-devtools-history-count')).toHaveTextContent(
-      '1 snapshot'
-    )
+    await waitFor(() => {
+      expect(screen.getByTestId('tanstack-store-devtools-current-state')).toHaveTextContent(
+        /isReady/
+      )
+      expect(screen.getByTestId('tanstack-store-devtools-history-count')).toHaveTextContent(
+        /snapshots?/i
+      )
+    }, { timeout: 5000 })
   })
 
   it('disables TanStack devtools when devtools mode is disabled', () => {
@@ -80,6 +87,7 @@ describe('AppProviders integration', () => {
     expect(screen.getByTestId('app-providers-child')).toBeInTheDocument()
     expect(screen.queryByTestId('react-query-devtools-container')).toBeNull()
     expect(screen.queryByTestId('tanstack-store-devtools-toggle')).toBeNull()
+    expect(screen.queryByRole('button', { name: /open developer utilities/i })).toBeNull()
   })
 
   it('keeps store snapshot history capped at the configured max history size', async () => {

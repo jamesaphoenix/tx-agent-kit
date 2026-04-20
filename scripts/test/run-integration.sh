@@ -9,6 +9,13 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
+if [[ -f ./.env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source ./.env
+  set +a
+fi
+
 discover_integration_project_map() {
   node "$PROJECT_ROOT/scripts/lib/discover-integration-projects.mjs"
 }

@@ -1,9 +1,11 @@
 'use client'
 
-import Link from 'next/link'
-import { type FormEvent, useState } from 'react'
+import { type SyntheticEvent, useState } from 'react'
 import { clientApi } from '../lib/client-api'
 import { notify } from '../lib/notify'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
 
 const successMessage = 'If an account exists for that email, a reset link has been sent.'
 
@@ -13,7 +15,9 @@ export function ForgotPasswordForm() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (
+    event: SyntheticEvent<HTMLFormElement, SubmitEvent>
+  ) => {
     event.preventDefault()
     setPending(true)
     setError(null)
@@ -23,9 +27,8 @@ export function ForgotPasswordForm() {
       setMessage(successMessage)
       notify.success(successMessage)
     } catch (submitError) {
-      const reason = submitError instanceof Error ? submitError.message : 'Request failed'
+      const reason = notify.apiError(submitError, 'Request failed')
       setError(reason)
-      notify.error(reason)
     } finally {
       setPending(false)
     }
@@ -33,14 +36,15 @@ export function ForgotPasswordForm() {
 
   return (
     <form
-      className="stack"
+      className="space-y-4"
       onSubmit={(event) => {
         void onSubmit(event)
       }}
     >
-      <label className="stack">
-        <span>Email</span>
-        <input
+      <div className="space-y-2">
+        <Label htmlFor="forgot-email">Email</Label>
+        <Input
+          id="forgot-email"
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
@@ -49,26 +53,22 @@ export function ForgotPasswordForm() {
           inputMode="email"
           required
         />
-      </label>
+      </div>
 
       {message && (
-        <p className="muted" role="status" aria-live="polite">
+        <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
           {message}
         </p>
       )}
       {error && (
-        <p className="error" role="alert">
+        <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
       )}
 
-      <button type="submit" disabled={pending}>
+      <Button className="w-full" type="submit" disabled={pending || message !== null}>
         {pending ? 'Sending...' : 'Send reset link'}
-      </button>
-
-      <p className="muted">
-        Back to <Link href="/sign-in">sign in</Link>
-      </p>
+      </Button>
     </form>
   )
 }

@@ -20,6 +20,7 @@ import {
   createApiServerHarness,
   type CreateApiServerHarnessOptions
 } from './api-server-harness.js'
+import { getTestkitEnv } from './env.js'
 import { parseLogOutput, type LogCapture } from './log-capture.js'
 import { createSqlTestContext, type CreateSqlTestContextOptions, type SqlTestContext } from './sql-context.js'
 
@@ -72,9 +73,90 @@ export interface DbAuthContext {
   }>
 }
 
+/**
+ * Uses the shared integration API only after the root workspace global setup
+ * has started or reused it and exported the base URL. Direct package-level
+ * vitest runs fall back to the per-context harness instead of silently
+ * talking to any stale process that happens to be healthy on port 4100.
+ */
+const resolveSharedServer = (): { baseUrl: string; authSecret: string } | undefined => {
+  const env = getTestkitEnv()
+  if (!env.INTEGRATION_API_BASE_URL) {
+    return undefined
+  }
+
+  const authSecret = env.INTEGRATION_AUTH_SECRET ?? 'integration-shared-auth-secret-32ch'
+  return { baseUrl: env.INTEGRATION_API_BASE_URL, authSecret }
+}
+
 export const createDbAuthContext = (options: CreateDbAuthContextOptions): DbAuthContext => {
+  // Only use the shared server when the caller did NOT explicitly provide a port.
+  // Explicit port means the caller needs a dedicated server (e.g. different env vars).
+  const sharedServer = options.port === undefined ? resolveSharedServer() : undefined
+
   const testContext = createSqlTestContext(options.sql)
 
+  // Shared server path: no API harness, just point HTTP traffic at the
+  // already-running server from vitest-global-setup.
+  if (sharedServer) {
+    const { baseUrl } = sharedServer
+    const output: string[] = []
+
+    const getFactoryContext = (): ApiFactoryContext => ({
+      baseUrl,
+      testContext
+    })
+
+    return {
+      baseUrl,
+      testContext,
+      get apiFactoryContext() {
+        return getFactoryContext()
+      },
+      output,
+      get logs() {
+        return parseLogOutput(output)
+      },
+      get resetStrategy() {
+        return testContext.resetStrategy
+      },
+      setup: async () => {
+        // Verify the shared server is healthy
+        const healthUrl = `${baseUrl}/health`
+        const response = await fetch(healthUrl).catch(() => undefined)
+        if (!response?.ok) {
+          throw new Error(
+            `Shared integration API server is not healthy at ${healthUrl}. ` +
+            'Ensure vitest-global-setup.ts started the shared server before tests run.'
+          )
+        }
+      },
+      reset: async () => {
+        // No-op: data isolation is per-user
+      },
+      flushReset: async () => {
+        // No-op in shared server mode
+      },
+      teardown: async () => {
+        // No-op: global teardown handles cleanup
+      },
+      createUser: async (createUserOptions?: CreateUserOptions) =>
+        createUserFactory(getFactoryContext(), createUserOptions),
+      loginUser: async (loginUserOptions: LoginUserOptions) =>
+        loginUserFactory(getFactoryContext(), loginUserOptions),
+      deleteUser: async (token: string) => deleteUserFactory(getFactoryContext(), token),
+      createOrganization: async (createOrganizationOptions: CreateOrganizationOptions) =>
+        createOrganizationFactory(getFactoryContext(), createOrganizationOptions),
+      createInvitation: async (invitationOptions: CreateInvitationOptions) =>
+        createInvitationFactory(getFactoryContext(), invitationOptions),
+      createUserWithOrg: async (userWithOrgOptions) =>
+        createUserWithOrgFactory(getFactoryContext(), userWithOrgOptions),
+      createUserWithOrgAndInvitation: async (userWithOrgAndInvitationOptions) =>
+        createUserWithOrgAndInvitationFactory(getFactoryContext(), userWithOrgAndInvitationOptions)
+    }
+  }
+
+  // Fallback: no shared server — spawn a per-context API server via the harness.
   const apiHarness = createApiServerHarness({
     cwd: options.apiCwd,
     host: options.host,

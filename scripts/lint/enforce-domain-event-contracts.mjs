@@ -165,6 +165,188 @@ for (const eventType of domainEventTypes) {
   }
 }
 
+// ─── Rule 4: Event Payload Field Parity ─────────────────────────────
+//
+// For every domain event type the script now compares the field SETS of
+// the TypeScript interface (in core/.../domain/*-events.ts) and the
+// effect-Schema struct (in temporal-client/.../*.ts) and refuses to ship
+// when they disagree. Catches the entire class of "added a field on one
+// side but forgot the other" drift bugs that the existence checks above
+// can't see.
+//
+// This is intentionally a field-NAME comparison only — type compatibility
+// (string vs number, optional vs required) is delegated to TypeScript and
+// to runtime Schema decode at the API boundary. The structural lint just
+// has to guarantee that every name on one side is present on the other.
+
+/**
+ * Brace-balanced extraction: given a source string and an opening-brace
+ * index, return the substring between that brace and its matching close.
+ */
+const extractBalancedBlock = (source, openBraceIndex) => {
+  if (source[openBraceIndex] !== '{') {
+    return null
+  }
+  let depth = 1
+  let i = openBraceIndex + 1
+  while (i < source.length && depth > 0) {
+    if (source[i] === '{') depth++
+    else if (source[i] === '}') depth--
+    i++
+  }
+  if (depth !== 0) {
+    return null
+  }
+  return source.slice(openBraceIndex + 1, i - 1)
+}
+
+/**
+ * Strip line + block comments from a source slice so the field-key regex
+ * never matches a documentation example.
+ */
+const stripComments = (source) =>
+  source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+
+/**
+ * Extract the field-name set from a `export interface FooEventPayload {
+ * readonly foo: ...; bar: ...; }` block. Returns null if the interface
+ * isn't found in the supplied source.
+ */
+const extractInterfaceFields = (source, interfaceName) => {
+  const headerRegex = new RegExp(
+    `export\\s+interface\\s+${interfaceName}\\b[^{]*\\{`
+  )
+  const match = headerRegex.exec(source)
+  if (!match) {
+    return null
+  }
+  const openBraceIndex = match.index + match[0].length - 1
+  const body = extractBalancedBlock(source, openBraceIndex)
+  if (body === null) {
+    return null
+  }
+  const cleaned = stripComments(body)
+  // Keys are `readonly? identifier:` or `identifier?:`. Reject lines
+  // that look like nested types or parenthesized signatures.
+  const fields = new Set()
+  const fieldRegex = /(?:^|[\n;])\s*(?:readonly\s+)?([A-Za-z_$][A-Za-z0-9_$]*)\??\s*:/g
+  let fieldMatch
+  while ((fieldMatch = fieldRegex.exec(cleaned)) !== null) {
+    fields.add(fieldMatch[1])
+  }
+  return fields
+}
+
+/**
+ * Extract the field-name set from a `export const FooSchema = Schema.Struct({...})`
+ * block. Returns null if the schema isn't found.
+ */
+const extractSchemaFields = (source, schemaName) => {
+  const headerRegex = new RegExp(
+    `export\\s+const\\s+${schemaName}\\s*=\\s*Schema\\.Struct\\s*\\(\\s*\\{`
+  )
+  const match = headerRegex.exec(source)
+  if (!match) {
+    return null
+  }
+  const openBraceIndex = match.index + match[0].length - 1
+  const body = extractBalancedBlock(source, openBraceIndex)
+  if (body === null) {
+    return null
+  }
+  const cleaned = stripComments(body)
+  const fields = new Set()
+  // Top-level keys only — skip nested struct keys by tracking brace depth.
+  let depth = 0
+  let lineStart = 0
+  const lines = cleaned.split('\n')
+  for (const line of lines) {
+    if (depth === 0) {
+      // Opening of a new key; match `keyName:` at the start of the
+      // trimmed line. The key may be quoted (`'foo':`) or bare (`foo:`).
+      const keyMatch = line.match(/^\s*(?:'([A-Za-z_$][A-Za-z0-9_$]*)'|([A-Za-z_$][A-Za-z0-9_$]*))\s*:/)
+      if (keyMatch) {
+        fields.add(keyMatch[1] ?? keyMatch[2])
+      }
+    }
+    for (const ch of line) {
+      if (ch === '{' || ch === '(' || ch === '[') depth++
+      else if (ch === '}' || ch === ')' || ch === ']') depth--
+    }
+    lineStart += line.length + 1
+  }
+  void lineStart
+  return fields
+}
+
+const setDiff = (a, b) => {
+  const out = []
+  for (const value of a) {
+    if (!b.has(value)) {
+      out.push(value)
+    }
+  }
+  return out.sort()
+}
+
+for (const eventType of domainEventTypes) {
+  const [aggregateName] = eventType.split('.')
+  const interfaceName = toPascalCase(eventType) + 'EventPayload'
+  const schemaName = interfaceName + 'Schema'
+
+  // Find the TS interface
+  const domainDir = resolve(repoRoot, `packages/core/src/domains/${aggregateName}/domain`)
+  let interfaceFields = null
+  if (existsSync(domainDir)) {
+    const eventFiles = listFilesRecursively(domainDir).filter((f) => f.endsWith('-events.ts'))
+    for (const filePath of eventFiles) {
+      const fields = extractInterfaceFields(readUtf8(filePath), interfaceName)
+      if (fields !== null) {
+        interfaceFields = fields
+        break
+      }
+    }
+  }
+
+  // Find the effect-Schema struct
+  let schemaFields = null
+  for (const filePath of temporalTypeFiles) {
+    const fields = extractSchemaFields(readUtf8(filePath), schemaName)
+    if (fields !== null) {
+      schemaFields = fields
+      break
+    }
+  }
+
+  // If either side is missing the upstream existence checks will already
+  // have failed — skip the parity check to avoid noise.
+  if (interfaceFields === null || schemaFields === null) {
+    continue
+  }
+
+  const onlyInInterface = setDiff(interfaceFields, schemaFields)
+  const onlyInSchema = setDiff(schemaFields, interfaceFields)
+
+  if (onlyInInterface.length > 0 || onlyInSchema.length > 0) {
+    const lines = [
+      `Event payload field drift for '${eventType}':`,
+      `  TypeScript interface \`${interfaceName}\` and effect-Schema \`${schemaName}\` have different fields.`
+    ]
+    if (onlyInInterface.length > 0) {
+      lines.push(`    Only in TS interface: ${onlyInInterface.map((f) => `\`${f}\``).join(', ')}`)
+    }
+    if (onlyInSchema.length > 0) {
+      lines.push(`    Only in effect-Schema: ${onlyInSchema.map((f) => `\`${f}\``).join(', ')}`)
+    }
+    lines.push(
+      `  Update both \`packages/core/src/domains/${aggregateName}/domain/*-events.ts\` and \`packages/temporal-client/src/types/*\` so the field sets match.`
+    )
+    fail(lines.join('\n'))
+  }
+}
+
 // ─── Rule 5: Transactional Event Write Enforcement ──────────────────
 const repoDir = resolve(repoRoot, 'packages/infra/db/src/repositories')
 const repoFiles = existsSync(repoDir)

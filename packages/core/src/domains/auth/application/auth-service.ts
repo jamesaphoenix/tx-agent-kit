@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { Context, Effect, Layer } from 'effect'
+import { Context, Effect, Layer, Option } from 'effect'
 import { badRequest, conflict, notFound, unauthorized, type CoreError } from '../../../errors.js'
 import {
   type CompleteGoogleAuthCommand,
@@ -78,7 +78,7 @@ const recordAuditEvent = (
       ipAddress: input.ipAddress,
       metadata: input.metadata ?? {}
     }).pipe(
-      Effect.catchAll(() => Effect.void)
+      Effect.catchAll((_cause) => Effect.void)
     )
   })
 
@@ -103,22 +103,24 @@ const buildSession = (
         createdIp: context.ipAddress ?? null,
         createdUserAgent: context.userAgent ?? null
       })
-      .pipe(Effect.mapError(() => unauthorized('Failed to create login session')))
-
-    if (!createdSession) {
-      return yield* Effect.fail(unauthorized('Failed to create login session'))
-    }
+      .pipe(
+        Effect.mapError((cause) => unauthorized('Failed to create login session', cause)),
+        Effect.flatMap(Option.match({
+          onNone: () => Effect.fail(unauthorized('Failed to create login session')),
+          onSome: Effect.succeed
+        }))
+      )
 
     const token = yield* sessionTokenPort.sign({
       sub: user.id,
       email: user.email,
       pwd: user.passwordChangedAt.getTime(),
       sid: createdSession.sessionId
-    }).pipe(Effect.mapError(() => unauthorized('Failed to create access token')))
+    }).pipe(Effect.mapError((cause) => unauthorized('Failed to create access token', cause)))
 
     const refresh = yield* refreshTokenPort
       .issueForSession(createdSession.sessionId)
-      .pipe(Effect.mapError(() => unauthorized('Failed to issue refresh token')))
+      .pipe(Effect.mapError((cause) => unauthorized('Failed to issue refresh token', cause)))
 
     return {
       token,
@@ -225,13 +227,13 @@ export const AuthServiceLive = Layer.effect(
         const email = normalizeEmail(input.email)
         const name = input.name.trim()
 
-        const existing = yield* usersPort.findByEmail(email).pipe(
-          Effect.mapError(() => badRequest('Sign-up failed'))
+        const existingOpt = yield* usersPort.findByEmail(email).pipe(
+          Effect.mapError((cause) => badRequest('Sign-up failed', cause))
         )
 
-        if (existing) {
+        if (Option.isSome(existingOpt)) {
           yield* recordAuditEvent({
-            userId: existing.id,
+            userId: existingOpt.value.id,
             eventType: 'login_failure',
             status: 'failure',
             identifier: email,
@@ -242,7 +244,7 @@ export const AuthServiceLive = Layer.effect(
         }
 
         const passwordHash = yield* passwordHasher.hash(input.password).pipe(
-          Effect.mapError(() => badRequest('Could not hash password'))
+          Effect.mapError((cause) => badRequest('Could not hash password', cause))
         )
 
         const created = yield* usersPort.create({
@@ -254,12 +256,12 @@ export const AuthServiceLive = Layer.effect(
             isEmailUniqueViolation(error)
               ? Effect.fail(conflict('Email is already in use'))
               : Effect.fail(badRequest('Sign-up failed'))
-          )
+          ),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(badRequest('User creation failed')),
+            onSome: Effect.succeed
+          }))
         )
-
-        if (!created) {
-          return yield* Effect.fail(badRequest('User creation failed'))
-        }
 
         const session = yield* buildSession(created, 'password', context)
 
@@ -295,23 +297,24 @@ export const AuthServiceLive = Layer.effect(
         const email = normalizeEmail(input.email)
 
         const user = yield* usersPort.findByEmail(email).pipe(
-          Effect.mapError(() => unauthorized('Invalid credentials'))
+          Effect.mapError((cause) => unauthorized('Invalid credentials', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => {
+              return recordAuditEvent({
+                userId: null,
+                eventType: 'login_failure',
+                status: 'failure',
+                identifier: email,
+                ipAddress: context.ipAddress ?? null,
+                metadata: { reason: 'missing_user' }
+              }).pipe(Effect.flatMap(() => Effect.fail(unauthorized('Invalid credentials'))))
+            },
+            onSome: Effect.succeed
+          }))
         )
 
-        if (!user) {
-          yield* recordAuditEvent({
-            userId: null,
-            eventType: 'login_failure',
-            status: 'failure',
-            identifier: email,
-            ipAddress: context.ipAddress ?? null,
-            metadata: { reason: 'missing_user' }
-          })
-          return yield* Effect.fail(unauthorized('Invalid credentials'))
-        }
-
         const ok = yield* passwordHasher.verify(input.password, user.passwordHash).pipe(
-          Effect.mapError(() => unauthorized('Invalid credentials'))
+          Effect.mapError((cause) => unauthorized('Invalid credentials', cause))
         )
 
         if (!ok) {
@@ -352,53 +355,56 @@ export const AuthServiceLive = Layer.effect(
         }
 
         const rotated = yield* refreshTokenPort.rotate(input.refreshToken).pipe(
-          Effect.mapError(() => unauthorized('Invalid refresh token'))
+          Effect.mapError((cause) => unauthorized('Invalid refresh token', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => {
+              return recordAuditEvent({
+                userId: null,
+                eventType: 'session_refreshed',
+                status: 'failure',
+                identifier: null,
+                ipAddress: null,
+                metadata: { reason: 'refresh_token_rejected' }
+              }).pipe(Effect.flatMap(() => Effect.fail(unauthorized('Invalid refresh token'))))
+            },
+            onSome: Effect.succeed
+          }))
         )
-
-        if (!rotated) {
-          yield* recordAuditEvent({
-            userId: null,
-            eventType: 'session_refreshed',
-            status: 'failure',
-            identifier: null,
-            ipAddress: null,
-            metadata: { reason: 'refresh_token_rejected' }
-          })
-          return yield* Effect.fail(unauthorized('Invalid refresh token'))
-        }
 
         const activeSession = yield* loginSessionPort.findActiveById(rotated.sessionId).pipe(
-          Effect.tapError(() =>
-            refreshTokenPort.revokeForSession(rotated.sessionId).pipe(Effect.catchAll(() => Effect.void))
+          Effect.tapError((_cause) =>
+            refreshTokenPort.revokeForSession(rotated.sessionId).pipe(Effect.catchAll((_cause2) => Effect.void))
           ),
-          Effect.mapError(() => unauthorized('Invalid refresh session'))
+          Effect.mapError((cause) => unauthorized('Invalid refresh session', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => {
+              return refreshTokenPort.revokeForSession(rotated.sessionId).pipe(
+                Effect.catchAll((_cause) => Effect.void),
+                Effect.flatMap(() => recordAuditEvent({
+                  userId: null,
+                  eventType: 'session_refreshed',
+                  status: 'failure',
+                  identifier: null,
+                  ipAddress: null,
+                  metadata: { reason: 'session_inactive', sessionId: rotated.sessionId }
+                })),
+                Effect.flatMap(() => Effect.fail(unauthorized('Invalid refresh session')))
+              )
+            },
+            onSome: Effect.succeed
+          }))
         )
-
-        if (!activeSession) {
-          yield* refreshTokenPort.revokeForSession(rotated.sessionId).pipe(
-            Effect.catchAll(() => Effect.void)
-          )
-          yield* recordAuditEvent({
-            userId: null,
-            eventType: 'session_refreshed',
-            status: 'failure',
-            identifier: null,
-            ipAddress: null,
-            metadata: { reason: 'session_inactive', sessionId: rotated.sessionId }
-          })
-          return yield* Effect.fail(unauthorized('Invalid refresh session'))
-        }
 
         const user = yield* usersPort.findById(activeSession.userId).pipe(
-          Effect.mapError(() => unauthorized('Invalid refresh session'))
+          Effect.mapError((cause) => unauthorized('Invalid refresh session', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(unauthorized('Invalid refresh session')),
+            onSome: Effect.succeed
+          }))
         )
 
-        if (!user) {
-          return yield* Effect.fail(unauthorized('Invalid refresh session'))
-        }
-
         yield* loginSessionPort.touchById(activeSession.sessionId).pipe(
-          Effect.catchAll(() => Effect.void)
+          Effect.catchAll((_cause) => Effect.void)
         )
 
         const token = yield* sessionTokenPort.sign({
@@ -406,7 +412,7 @@ export const AuthServiceLive = Layer.effect(
           email: user.email,
           pwd: user.passwordChangedAt.getTime(),
           sid: activeSession.sessionId
-        }).pipe(Effect.mapError(() => unauthorized('Failed to issue access token')))
+        }).pipe(Effect.mapError((cause) => unauthorized('Failed to issue access token', cause)))
 
         yield* recordAuditEvent({
           userId: user.id,
@@ -434,11 +440,11 @@ export const AuthServiceLive = Layer.effect(
         }
 
         yield* refreshTokenPort.revokeForSession(principal.sessionId).pipe(
-          Effect.catchAll(() => Effect.void)
+          Effect.catchAll((_cause) => Effect.void)
         )
 
         yield* loginSessionPort.revokeById(principal.sessionId).pipe(
-          Effect.mapError(() => badRequest('Failed to revoke session'))
+          Effect.mapError((cause) => badRequest('Failed to revoke session', cause))
         )
 
         yield* recordAuditEvent({
@@ -459,11 +465,13 @@ export const AuthServiceLive = Layer.effect(
         const refreshTokenPort = yield* AuthLoginRefreshTokenPort
 
         yield* refreshTokenPort.revokeAllForUser(principal.userId).pipe(
-          Effect.catchAll(() => Effect.void)
+          Effect.catchAll((_cause) => Effect.void)
         )
 
+        // Use catchAll (non-fatal) — consistent with resetPassword and deleteUser.
+        // A transient DB hiccup should not prevent a user from signing out.
         const revokedSessions = yield* loginSessionPort.revokeAllForUser(principal.userId).pipe(
-          Effect.mapError(() => badRequest('Failed to revoke user sessions'))
+          Effect.catchAll((_cause) => Effect.succeed(0))
         )
 
         yield* recordAuditEvent({
@@ -487,7 +495,7 @@ export const AuthServiceLive = Layer.effect(
             ipAddress: input.ipAddress ?? null,
             statePrefix: input.statePrefix
           })
-          .pipe(Effect.mapError(() => badRequest('Failed to start Google authorization')))
+          .pipe(Effect.mapError((cause) => badRequest('Failed to start Google authorization', cause)))
       }),
 
     completeGoogleAuth: (input) =>
@@ -500,7 +508,7 @@ export const AuthServiceLive = Layer.effect(
         const identity = yield* googleOidcPort.completeAuthorization({
           code: input.code,
           state: input.state
-        }).pipe(Effect.mapError(() => unauthorized('Invalid Google authorization response')))
+        }).pipe(Effect.mapError((cause) => unauthorized('Invalid Google authorization response', cause)))
 
         const normalizedEmail = normalizeEmail(identity.email)
 
@@ -516,33 +524,33 @@ export const AuthServiceLive = Layer.effect(
           return yield* Effect.fail(unauthorized('Google account email must be verified'))
         }
 
-        const linkedIdentity = yield* identityPort.findByProviderSubject({
+        const linkedIdentityOpt = yield* identityPort.findByProviderSubject({
           provider: 'google',
           providerSubject: identity.providerSubject
-        }).pipe(Effect.mapError(() => badRequest('Failed to read Google identity link')))
+        }).pipe(Effect.mapError((cause) => badRequest('Failed to read Google identity link', cause)))
 
-        let user = linkedIdentity
-          ? yield* usersPort.findById(linkedIdentity.userId).pipe(
-              Effect.mapError(() => badRequest('Failed to read linked user'))
+        let userOpt: Option.Option<AuthUserRecord> = Option.isSome(linkedIdentityOpt)
+          ? yield* usersPort.findById(linkedIdentityOpt.value.userId).pipe(
+              Effect.mapError((cause) => badRequest('Failed to read linked user', cause))
             )
-          : null
+          : Option.none()
 
         let didLinkIdentity = false
 
-        if (!user) {
-          const existingUser = yield* usersPort.findByEmail(normalizedEmail).pipe(
-            Effect.mapError(() => badRequest('Failed to read existing user'))
+        if (Option.isNone(userOpt)) {
+          const existingUserOpt = yield* usersPort.findByEmail(normalizedEmail).pipe(
+            Effect.mapError((cause) => badRequest('Failed to read existing user', cause))
           )
 
-          if (existingUser) {
-            user = existingUser
+          if (Option.isSome(existingUserOpt)) {
+            userOpt = existingUserOpt
           } else {
             const syntheticPassword = randomBytes(64).toString('base64url')
             const syntheticPasswordHash = yield* passwordHasher.hash(syntheticPassword).pipe(
-              Effect.mapError(() => badRequest('Failed to generate Google account credentials'))
+              Effect.mapError((cause) => badRequest('Failed to generate Google account credentials', cause))
             )
 
-            user = yield* usersPort.create({
+            userOpt = yield* usersPort.create({
               email: normalizedEmail,
               passwordHash: syntheticPasswordHash,
               name: identity.name.trim().length > 0 ? identity.name : normalizedEmail
@@ -555,17 +563,19 @@ export const AuthServiceLive = Layer.effect(
             )
           }
 
-          if (!user) {
+          if (Option.isNone(userOpt)) {
             return yield* Effect.fail(badRequest('Google login failed'))
           }
 
-          const existingProviderLink = yield* identityPort.findByUserProvider({
+          const user = userOpt.value
+
+          const existingProviderLinkOpt = yield* identityPort.findByUserProvider({
             userId: user.id,
             provider: 'google'
-          }).pipe(Effect.mapError(() => badRequest('Failed to read existing Google link')))
+          }).pipe(Effect.mapError((cause) => badRequest('Failed to read existing Google link', cause)))
 
-          if (!existingProviderLink) {
-            const linkResult = yield* identityPort.linkIdentity({
+          if (Option.isNone(existingProviderLinkOpt)) {
+            const linkResultOpt = yield* identityPort.linkIdentity({
               userId: user.id,
               provider: 'google',
               providerSubject: identity.providerSubject,
@@ -574,14 +584,19 @@ export const AuthServiceLive = Layer.effect(
             }).pipe(
               Effect.catchAll((error) =>
                 isAuthLoginIdentityUniqueViolation(error)
-                  ? Effect.succeed(null)
+                  ? Effect.succeed(Option.none())
                   : Effect.fail(error)
               ),
-              Effect.mapError(() => badRequest('Failed to link Google identity'))
+              Effect.mapError((cause) => badRequest('Failed to link Google identity', cause))
             )
-            didLinkIdentity = linkResult !== null
+            didLinkIdentity = Option.isSome(linkResultOpt)
           }
         }
+
+        if (Option.isNone(userOpt)) {
+          return yield* Effect.fail(badRequest('Google login failed — user record not found'))
+        }
+        const user = userOpt.value
 
         const session = yield* buildSession(user, 'google', {
           ipAddress: input.ipAddress,
@@ -630,11 +645,11 @@ export const AuthServiceLive = Layer.effect(
         }
 
         const email = normalizeEmail(input.email)
-        const user = yield* usersPort.findByEmail(email).pipe(
-          Effect.mapError(() => badRequest('Failed to process forgot-password request'))
+        const userOpt = yield* usersPort.findByEmail(email).pipe(
+          Effect.mapError((cause) => badRequest('Failed to process forgot-password request', cause))
         )
 
-        if (!user) {
+        if (Option.isNone(userOpt)) {
           yield* recordAuditEvent({
             userId: null,
             eventType: 'password_reset_requested',
@@ -646,19 +661,21 @@ export const AuthServiceLive = Layer.effect(
           return { accepted: true as const }
         }
 
+        const user = userOpt.value
+
         yield* passwordResetTokenPort.revokeTokensForUser(user.id).pipe(
-          Effect.mapError(() => badRequest('Failed to process forgot-password request'))
+          Effect.mapError((cause) => badRequest('Failed to process forgot-password request', cause))
         )
 
         const token = yield* passwordResetTokenPort.createToken(user.id).pipe(
-          Effect.mapError(() => badRequest('Failed to process forgot-password request'))
+          Effect.mapError((cause) => badRequest('Failed to process forgot-password request', cause))
         )
 
         yield* passwordResetEmailPort.sendPasswordResetEmail({
           email: user.email,
           name: user.name,
           token
-        }).pipe(Effect.mapError(() => badRequest('Failed to process forgot-password request')))
+        }).pipe(Effect.mapError((cause) => badRequest('Failed to process forgot-password request', cause)))
 
         yield* recordAuditEvent({
           userId: user.id,
@@ -683,38 +700,40 @@ export const AuthServiceLive = Layer.effect(
         }
 
         const tokenPrincipal = yield* passwordResetTokenPort.consumeToken(input.token).pipe(
-          Effect.mapError(() => badRequest('Invalid or expired password reset token'))
+          Effect.mapError((cause) => badRequest('Invalid or expired password reset token', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(badRequest('Invalid or expired password reset token')),
+            onSome: Effect.succeed
+          }))
         )
 
-        if (!tokenPrincipal) {
-          return yield* Effect.fail(badRequest('Invalid or expired password reset token'))
-        }
-
         const passwordHash = yield* passwordHasher.hash(input.password).pipe(
-          Effect.mapError(() => badRequest('Could not hash password'))
+          Effect.mapError((cause) => badRequest('Could not hash password', cause))
         )
 
         const updatedUser = yield* usersPort
           .updatePasswordHash(tokenPrincipal.userId, passwordHash)
-          .pipe(Effect.mapError(() => badRequest('Failed to reset password')))
-
-        if (!updatedUser) {
-          return yield* Effect.fail(notFound('User not found'))
-        }
+          .pipe(
+            Effect.mapError((cause) => badRequest('Failed to reset password', cause)),
+            Effect.flatMap(Option.match({
+              onNone: () => Effect.fail(notFound('User not found')),
+              onSome: Effect.succeed
+            }))
+          )
 
         yield* passwordResetTokenPort.revokeTokensForUser(tokenPrincipal.userId).pipe(
-          Effect.mapError(() => badRequest('Failed to finalize password reset'))
+          Effect.catchAll(() => Effect.void)
         )
 
         const loginSessionPort = yield* AuthLoginSessionPort
         const refreshTokenPort = yield* AuthLoginRefreshTokenPort
 
         yield* refreshTokenPort.revokeAllForUser(tokenPrincipal.userId).pipe(
-          Effect.catchAll(() => Effect.void)
+          Effect.catchAll((_cause) => Effect.void)
         )
 
         yield* loginSessionPort.revokeAllForUser(tokenPrincipal.userId).pipe(
-          Effect.catchAll(() => Effect.void)
+          Effect.catchAll((_cause) => Effect.void)
         )
 
         yield* recordAuditEvent({
@@ -737,7 +756,7 @@ export const AuthServiceLive = Layer.effect(
         const loginSessionPort = yield* AuthLoginSessionPort
 
         const payload = yield* sessionTokenPort.verify(token).pipe(
-          Effect.mapError(() => unauthorized('Invalid token'))
+          Effect.mapError((cause) => unauthorized('Invalid token', cause))
         )
 
         if (typeof payload.pwd !== 'number' || typeof payload.sid !== 'string') {
@@ -745,32 +764,38 @@ export const AuthServiceLive = Layer.effect(
         }
 
         const activeSession = yield* loginSessionPort.findActiveById(payload.sid).pipe(
-          Effect.mapError(() => unauthorized('Invalid token'))
+          Effect.mapError((cause) => unauthorized('Invalid token', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(unauthorized('Invalid token')),
+            onSome: Effect.succeed
+          }))
         )
 
-        if (activeSession?.userId !== payload.sub) {
+        if (activeSession.userId !== payload.sub) {
           return yield* Effect.fail(unauthorized('Invalid token'))
         }
 
         const user = yield* usersPort.findById(payload.sub).pipe(
-          Effect.mapError(() => unauthorized('Invalid token'))
+          Effect.mapError((cause) => unauthorized('Invalid token', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(unauthorized('Invalid token')),
+            onSome: Effect.succeed
+          }))
         )
-
-        if (!user) {
-          return yield* Effect.fail(unauthorized('Invalid token'))
-        }
 
         if (payload.pwd < user.passwordChangedAt.getTime()) {
           return yield* Effect.fail(unauthorized('Invalid token'))
         }
 
         yield* loginSessionPort.touchById(payload.sid).pipe(
-          Effect.catchAll(() => Effect.void)
+          Effect.catchAll((_cause) => Effect.void)
         )
 
-        const primaryMembership = yield* membershipPort.getPrimaryMembershipForUser(user.id).pipe(
-          Effect.mapError(() => unauthorized('Invalid token'))
+        const primaryMembershipOpt = yield* membershipPort.getPrimaryMembershipForUser(user.id).pipe(
+          Effect.mapError((cause) => unauthorized('Invalid token', cause))
         )
+
+        const primaryMembership = Option.getOrUndefined(primaryMembershipOpt)
 
         return toAuthPrincipal({
           sub: user.id,
@@ -790,15 +815,15 @@ export const AuthServiceLive = Layer.effect(
         const refreshTokenPort = yield* AuthLoginRefreshTokenPort
 
         const existing = yield* usersPort.findById(principal.userId).pipe(
-          Effect.mapError(() => badRequest('Failed to read user'))
+          Effect.mapError((cause) => badRequest('Failed to read user', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('User not found')),
+            onSome: Effect.succeed
+          }))
         )
 
-        if (!existing) {
-          return yield* Effect.fail(notFound('User not found'))
-        }
-
         const ownedOrganizationCount = yield* organizationOwnershipPort.countOwnedByUser(principal.userId).pipe(
-          Effect.mapError(() => badRequest('Failed to validate organization ownership'))
+          Effect.mapError((cause) => badRequest('Failed to validate organization ownership', cause))
         )
 
         if (ownedOrganizationCount > 0) {
@@ -806,20 +831,20 @@ export const AuthServiceLive = Layer.effect(
         }
 
         yield* refreshTokenPort.revokeAllForUser(principal.userId).pipe(
-          Effect.catchAll(() => Effect.void)
+          Effect.catchAll((_cause) => Effect.void)
         )
 
         yield* loginSessionPort.revokeAllForUser(principal.userId).pipe(
-          Effect.catchAll(() => Effect.void)
+          Effect.catchAll((_cause) => Effect.void)
         )
 
-        const deleted = yield* usersPort.deleteById(principal.userId).pipe(
-          Effect.mapError(() => badRequest('Failed to delete user'))
+        yield* usersPort.deleteById(principal.userId).pipe(
+          Effect.mapError((cause) => badRequest('Failed to delete user', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('User not found')),
+            onSome: Effect.succeed
+          }))
         )
-
-        if (!deleted) {
-          return yield* Effect.fail(notFound('User not found'))
-        }
 
         yield* recordAuditEvent({
           userId: principal.userId,

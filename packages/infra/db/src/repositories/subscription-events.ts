@@ -1,32 +1,16 @@
 import { and, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm'
-import { Effect, Schema } from 'effect'
-import { DB, provideDB } from '../client.js'
-import {
-  subscriptionEventRowSchema,
-  type SubscriptionEventRowShape
-} from '../effect-schemas/subscription-events.js'
-import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
+import { Effect } from 'effect'
+import { subscriptionEventRowSchema } from '../effect-schemas/subscription-events.js'
 import { subscriptionEvents, type JsonObject } from '../schema.js'
+import { withDb, decodeFirst } from './repo-helpers.js'
+import { createOptionalDecoder } from './sql-helpers.js'
 
-const decodeSubscriptionEventRow = Schema.decodeUnknown(subscriptionEventRowSchema)
-
-const decodeNullableSubscriptionEvent = (
-  value: unknown
-): Effect.Effect<SubscriptionEventRowShape | null, DbError> => {
-  if (value === null || value === undefined) {
-    return Effect.succeed(null)
-  }
-
-  return decodeSubscriptionEventRow(value).pipe(
-    Effect.mapError((error) => dbDecodeFailed('subscription event row decode failed', error))
-  )
-}
+const decode = createOptionalDecoder(subscriptionEventRowSchema, 'subscription event row')
 
 export const subscriptionEventsRepository = {
   findByStripeEventId: (stripeEventId: string) =>
-    provideDB(
+    withDb('Failed to find subscription event by stripe event id', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .select({
             id: subscriptionEvents.id,
@@ -42,9 +26,9 @@ export const subscriptionEventsRepository = {
           .limit(1)
           .execute()
 
-        return yield* decodeNullableSubscriptionEvent(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to find subscription event by stripe event id', error))),
+    ),
 
   create: (input: {
     stripeEventId: string
@@ -52,9 +36,8 @@ export const subscriptionEventsRepository = {
     organizationId?: string | null
     payload: JsonObject
   }) =>
-    provideDB(
+    withDb('Failed to create subscription event', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .insert(subscriptionEvents)
           .values({
@@ -70,7 +53,7 @@ export const subscriptionEventsRepository = {
           .execute()
 
         if (rows.length > 0) {
-          return yield* decodeNullableSubscriptionEvent(rows[0] ?? null)
+          return yield* decodeFirst(rows, decode)
         }
 
         const existingRows = yield* db
@@ -88,14 +71,13 @@ export const subscriptionEventsRepository = {
           .limit(1)
           .execute()
 
-        return yield* decodeNullableSubscriptionEvent(existingRows[0] ?? null)
+        return yield* decodeFirst(existingRows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to create subscription event', error))),
+    ),
 
   markProcessed: (id: string) =>
-    provideDB(
+    withDb('Failed to mark subscription event as processed', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .update(subscriptionEvents)
           .set({ processedAt: sql`now()` })
@@ -103,14 +85,13 @@ export const subscriptionEventsRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullableSubscriptionEvent(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to mark subscription event as processed', error))),
+    ),
 
   pruneProcessed: (olderThan: Date) =>
-    provideDB(
+    withDb('Failed to prune processed subscription events', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .delete(subscriptionEvents)
           .where(
@@ -124,5 +105,5 @@ export const subscriptionEventsRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to prune processed subscription events', error)))
+    )
 }

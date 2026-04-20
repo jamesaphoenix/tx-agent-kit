@@ -1,26 +1,11 @@
 import type { AuthLoginAuditEventType, AuthLoginAuditStatus } from '@tx-agent-kit/contracts'
-import { Effect, Schema } from 'effect'
-import { DB, provideDB } from '../client.js'
-import {
-  authLoginAuditEventRowSchema,
-  type AuthLoginAuditEventRowShape
-} from '../effect-schemas/auth-login-audit-events.js'
-import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
+import { Effect } from 'effect'
+import { authLoginAuditEventRowSchema } from '../effect-schemas/auth-login-audit-events.js'
 import { authLoginAuditEvents, type JsonObject } from '../schema.js'
+import { withDb, decodeFirst } from './repo-helpers.js'
+import { createOptionalDecoder } from './sql-helpers.js'
 
-const decodeAuthLoginAuditEventRow = Schema.decodeUnknown(authLoginAuditEventRowSchema)
-
-const decodeNullableAuthLoginAuditEvent = (
-  value: unknown
-): Effect.Effect<AuthLoginAuditEventRowShape | null, DbError> => {
-  if (value === null || value === undefined) {
-    return Effect.succeed(null)
-  }
-
-  return decodeAuthLoginAuditEventRow(value).pipe(
-    Effect.mapError((error) => dbDecodeFailed('auth login audit event row decode failed', error))
-  )
-}
+const decode = createOptionalDecoder(authLoginAuditEventRowSchema, 'auth login audit event row')
 
 export const authLoginAuditEventsRepository = {
   create: (input: {
@@ -31,9 +16,8 @@ export const authLoginAuditEventsRepository = {
     ipAddress: string | null
     metadata: JsonObject
   }) =>
-    provideDB(
+    withDb('Failed to create auth login audit event', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .insert(authLoginAuditEvents)
           .values({
@@ -47,7 +31,7 @@ export const authLoginAuditEventsRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullableAuthLoginAuditEvent(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to create auth login audit event', error)))
+    )
 }

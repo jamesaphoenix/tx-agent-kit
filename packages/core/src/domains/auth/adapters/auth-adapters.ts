@@ -11,8 +11,8 @@ import {
   usersRepository,
   type JsonObject
 } from '@tx-agent-kit/db'
-import { Effect, Layer } from 'effect'
-import { mapNullable, toAuthUserRecord } from '../../../adapters/db-row-mappers.js'
+import { Effect, Layer, Option } from 'effect'
+import { mapOptional, toAuthUserRecord } from '../../../adapters/db-row-mappers.js'
 import {
   AuthLoginAuditPort,
   AuthLoginIdentityPort,
@@ -60,16 +60,16 @@ const toJsonObject = (metadata: Record<string, unknown>): JsonObject => {
 
 export const AuthUsersPortLive = Layer.succeed(AuthUsersPort, {
   create: (input: { email: string; passwordHash: string; name: string }) =>
-    usersRepository.create(input).pipe(Effect.map((row) => mapNullable(row, toAuthUserRecord))),
+    usersRepository.create(input).pipe(Effect.map((opt) => mapOptional(opt, toAuthUserRecord))),
   findByEmail: (email: string) =>
-    usersRepository.findByEmail(email).pipe(Effect.map((row) => mapNullable(row, toAuthUserRecord))),
-  findById: (id: string) => usersRepository.findById(id).pipe(Effect.map((row) => mapNullable(row, toAuthUserRecord))),
+    usersRepository.findByEmail(email).pipe(Effect.map((opt) => mapOptional(opt, toAuthUserRecord))),
+  findById: (id: string) => usersRepository.findById(id).pipe(Effect.map((opt) => mapOptional(opt, toAuthUserRecord))),
   updatePasswordHash: (id: string, passwordHash: string) =>
     usersRepository
       .updatePasswordHash(id, passwordHash)
-      .pipe(Effect.map((row) => mapNullable(row, toAuthUserRecord))),
+      .pipe(Effect.map((opt) => mapOptional(opt, toAuthUserRecord))),
   deleteById: (id: string) =>
-    usersRepository.deleteById(id).pipe(Effect.map((row) => mapNullable(row, toAuthUserRecord)))
+    usersRepository.deleteById(id).pipe(Effect.map((opt) => mapOptional(opt, toAuthUserRecord)))
 })
 
 export const AuthOrganizationOwnershipPortLive = Layer.succeed(AuthOrganizationOwnershipPort, {
@@ -79,15 +79,13 @@ export const AuthOrganizationOwnershipPortLive = Layer.succeed(AuthOrganizationO
 export const AuthOrganizationMembershipPortLive = Layer.succeed(AuthOrganizationMembershipPort, {
   getPrimaryMembershipForUser: (userId: string) =>
     organizationsRepository.getPrimaryMembershipForUser(userId).pipe(
-      Effect.map((membership) => (
-        membership
-          ? {
-              organizationId: membership.organizationId,
-              role: membership.role,
-              permissions: getPermissionsForRole(membership.role)
-            }
-          : null
-      ))
+      Effect.map((membershipOpt) =>
+        Option.map(membershipOpt, (m) => ({
+          organizationId: m.organizationId,
+          role: m.role,
+          permissions: getPermissionsForRole(m.role)
+        }))
+      )
     )
 })
 
@@ -115,26 +113,18 @@ export const AuthLoginSessionPortLive = Layer.succeed(AuthLoginSessionPort, {
       createdUserAgent: input.createdUserAgent,
       expiresAt: toExpiryDate(defaultSessionTtlMs)
     }).pipe(
-      Effect.map((session) => (
-        session
-          ? {
-              sessionId: session.id,
-              expiresAt: session.expiresAt
-            }
-          : null
-      ))
+      Effect.map(Option.map((session) => ({
+        sessionId: session.id,
+        expiresAt: session.expiresAt
+      })))
     ),
   findActiveById: (sessionId: string) =>
     authLoginSessionsRepository.findActiveById(sessionId).pipe(
-      Effect.map((session) => (
-        session
-          ? {
-              sessionId: session.id,
-              userId: session.userId,
-              expiresAt: session.expiresAt
-            }
-          : null
-      ))
+      Effect.map(Option.map((session) => ({
+        sessionId: session.id,
+        userId: session.userId,
+        expiresAt: session.expiresAt
+      })))
     ),
   touchById: (sessionId: string) => authLoginSessionsRepository.touchById(sessionId).pipe(Effect.asVoid),
   revokeById: (sessionId: string) => authLoginSessionsRepository.revokeById(sessionId),
@@ -152,7 +142,7 @@ export const AuthLoginRefreshTokenPortLive = Layer.succeed(AuthLoginRefreshToken
         expiresAt
       })
 
-      if (!created) {
+      if (Option.isNone(created)) {
         return yield* Effect.fail(new Error('Failed to create auth login refresh token'))
       }
 
@@ -166,33 +156,33 @@ export const AuthLoginRefreshTokenPortLive = Layer.succeed(AuthLoginRefreshToken
       const tokenHash = hashRefreshToken(refreshToken)
       const consumed = yield* authLoginRefreshTokensRepository.consumeActiveByTokenHash(tokenHash)
 
-      if (consumed) {
+      if (Option.isSome(consumed)) {
         const nextToken = createOpaqueToken()
         const nextExpiresAt = toExpiryDate(defaultRefreshTokenTtlMs)
         const created = yield* authLoginRefreshTokensRepository.create({
-          sessionId: consumed.sessionId,
+          sessionId: consumed.value.sessionId,
           tokenHash: hashRefreshToken(nextToken),
           expiresAt: nextExpiresAt
         })
 
-        if (!created) {
+        if (Option.isNone(created)) {
           return yield* Effect.fail(new Error('Failed to rotate auth login refresh token'))
         }
 
-        return {
-          sessionId: consumed.sessionId,
+        return Option.some({
+          sessionId: consumed.value.sessionId,
           refreshToken: nextToken,
           expiresAt: nextExpiresAt
-        }
+        })
       }
 
       const existing = yield* authLoginRefreshTokensRepository.findByTokenHash(tokenHash)
-      if (existing?.usedAt) {
-        yield* authLoginRefreshTokensRepository.revokeActiveForSession(existing.sessionId).pipe(Effect.asVoid)
-        yield* authLoginSessionsRepository.revokeById(existing.sessionId).pipe(Effect.asVoid)
+      if (Option.isSome(existing) && existing.value.usedAt) {
+        yield* authLoginRefreshTokensRepository.revokeActiveForSession(existing.value.sessionId).pipe(Effect.asVoid)
+        yield* authLoginSessionsRepository.revokeById(existing.value.sessionId).pipe(Effect.asVoid)
       }
 
-      return null
+      return Option.none()
     }),
   revokeForSession: (sessionId: string) =>
     authLoginRefreshTokensRepository.revokeActiveForSession(sessionId).pipe(Effect.asVoid),
@@ -211,7 +201,7 @@ export const PasswordResetTokenPortLive = Layer.succeed(PasswordResetTokenPort, 
         tokenHash
       })
 
-      if (!created) {
+      if (Option.isNone(created)) {
         return yield* Effect.fail(new Error('Failed to create password reset token'))
       }
 
@@ -230,32 +220,24 @@ export const AuthLoginIdentityPortLive = Layer.succeed(AuthLoginIdentityPort, {
     authLoginIdentitiesRepository
       .findByProviderSubject(input.provider, input.providerSubject)
       .pipe(
-        Effect.map((identity) => (
-          identity
-            ? {
-                userId: identity.userId,
-                provider: identity.provider,
-                providerSubject: identity.providerSubject,
-                email: identity.email
-              }
-            : null
-        ))
+        Effect.map(Option.map((identity) => ({
+          userId: identity.userId,
+          provider: identity.provider,
+          providerSubject: identity.providerSubject,
+          email: identity.email
+        })))
       ),
 
   findByUserProvider: (input: { userId: string; provider: 'password' | 'google' }) =>
     authLoginIdentitiesRepository
       .findByUserProvider(input.userId, input.provider)
       .pipe(
-        Effect.map((identity) => (
-          identity
-            ? {
-                userId: identity.userId,
-                provider: identity.provider,
-                providerSubject: identity.providerSubject,
-                email: identity.email
-              }
-            : null
-        ))
+        Effect.map(Option.map((identity) => ({
+          userId: identity.userId,
+          provider: identity.provider,
+          providerSubject: identity.providerSubject,
+          email: identity.email
+        })))
       ),
 
   linkIdentity: (input: {
@@ -274,16 +256,12 @@ export const AuthLoginIdentityPortLive = Layer.succeed(AuthLoginIdentityPort, {
         emailVerified: input.emailVerified
       })
       .pipe(
-        Effect.map((identity) => (
-          identity
-            ? {
-                userId: identity.userId,
-                provider: identity.provider,
-                providerSubject: identity.providerSubject,
-                email: identity.email
-              }
-            : null
-        ))
+        Effect.map(Option.map((identity) => ({
+          userId: identity.userId,
+          provider: identity.provider,
+          providerSubject: identity.providerSubject,
+          email: identity.email
+        })))
       ),
 
   unlinkIdentity: (input: {
@@ -293,16 +271,12 @@ export const AuthLoginIdentityPortLive = Layer.succeed(AuthLoginIdentityPort, {
     authLoginIdentitiesRepository
       .deleteByUserProvider(input.userId, input.provider)
       .pipe(
-        Effect.map((identity) => (
-          identity
-            ? {
-                userId: identity.userId,
-                provider: identity.provider,
-                providerSubject: identity.providerSubject,
-                email: identity.email
-              }
-            : null
-        ))
+        Effect.map(Option.map((identity) => ({
+          userId: identity.userId,
+          provider: identity.provider,
+          providerSubject: identity.providerSubject,
+          email: identity.email
+        })))
       )
 })
 

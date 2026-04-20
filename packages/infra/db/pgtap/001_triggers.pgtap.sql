@@ -7,11 +7,13 @@ BEGIN;
 -- update_team_members_updated_at
 -- normalize_user_email
 -- normalize_invitation_identity
+-- set_updated_at (team_media_assets)
+-- set_updated_at (media_collections)
 -- Dropped triggers (coverage markers for migration-created triggers dropped in 0007):
 -- trg_workspace_owner_membership (dropped: workspaces table removed)
 -- trg_normalize_invitation_identity (dropped: replaced by normalize_invitation_identity)
 
-SELECT plan(9);
+SELECT plan(11);
 
 SELECT ok(
   EXISTS (
@@ -106,7 +108,7 @@ VALUES ('PGTAP Organization')
 RETURNING id AS organization_id \gset
 
 INSERT INTO org_members (organization_id, user_id, role)
-VALUES (:'organization_id', :'owner_id', 'owner')
+VALUES (:'organization_id', :'owner_id', 'admin')
 ON CONFLICT (organization_id, user_id) DO NOTHING;
 
 SELECT ok(
@@ -115,9 +117,9 @@ SELECT ok(
     FROM org_members
     WHERE organization_id = :'organization_id'
       AND user_id = :'owner_id'
-      AND role = 'owner'::membership_role
+      AND role = 'admin'::member_role
   ),
-  'org_members owner membership created successfully'
+  'org_members admin membership created successfully'
 );
 
 INSERT INTO users (email, password_hash, name)
@@ -144,7 +146,7 @@ INSERT INTO invitations (
 VALUES (
   :'invite_organization_id',
   '  PGTAP-INVITEE@EXAMPLE.COM  ',
-  'member'::membership_role,
+  'member'::member_role,
   'pending'::invitation_status,
   :'inviter_id',
   'pgtap-token-001',
@@ -169,6 +171,34 @@ SELECT ok(
     WHERE id = :'invitation_id'
   ),
   'invitation trigger binds invitee_user_id from canonical user email'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_trigger AS t
+    JOIN pg_class AS r ON r.oid = t.tgrelid
+    JOIN pg_namespace AS n ON n.oid = r.relnamespace
+    WHERE t.tgname = 'set_updated_at'
+      AND r.relname = 'team_media_assets'
+      AND n.nspname = current_schema()
+      AND t.tgisinternal = false
+  ),
+  'team_media_assets set_updated_at trigger exists'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_trigger AS t
+    JOIN pg_class AS r ON r.oid = t.tgrelid
+    JOIN pg_namespace AS n ON n.oid = r.relnamespace
+    WHERE t.tgname = 'set_updated_at'
+      AND r.relname = 'media_collections'
+      AND n.nspname = current_schema()
+      AND t.tgisinternal = false
+  ),
+  'media_collections set_updated_at trigger exists'
 );
 
 SELECT * FROM finish();

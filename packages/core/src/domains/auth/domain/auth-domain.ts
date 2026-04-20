@@ -1,20 +1,11 @@
+import type { UserRowShape } from '@tx-agent-kit/db'
 import type { OrgMemberRole, PermissionAction } from '@tx-agent-kit/contracts'
 
-export interface AuthUserRecord {
-  id: string
-  email: string
-  passwordHash: string
-  passwordChangedAt: Date
-  name: string
-  createdAt: Date
-}
+// Extends row shape — new DB columns appear automatically.
+export type AuthUserRecord = UserRowShape
 
-export interface AuthUser {
-  id: string
-  email: string
-  name: string
-  createdAt: Date
-}
+// Projection of UserRowShape — excludes passwordHash, passwordChangedAt.
+export type AuthUser = Pick<UserRowShape, 'id' | 'email' | 'name' | 'createdAt'>
 
 export interface SignUpCommand {
   email: string

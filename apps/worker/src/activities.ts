@@ -1,13 +1,27 @@
 import { createLogger } from '@tx-agent-kit/logging'
+import {
+  AssetThumbnailService,
+  AssetThumbnailServiceLive,
+  RetentionCleanerService,
+  RetentionCleanerServiceLive,
+  MediaAssetStorePortLive,
+  PendingUploadStorePortLive,
+  StorageAdapterPort,
+  StorageAdapterPortLive
+} from '@tx-agent-kit/core'
 import { domainEventsRepository } from '@tx-agent-kit/db'
 import { Storage, StorageLive } from '@tx-agent-kit/storage'
-import { Effect } from 'effect'
+import { Effect, Layer } from 'effect'
+import { SharpThumbnailGeneratorPortLive } from './asset-thumbnail-generator.js'
 import { getWorkerEnv } from './config/env.js'
+import { billingActivities } from './billing-activities.js'
+
+export { billingActivities } from './billing-activities.js'
 
 const logger = createLogger('tx-agent-kit-worker-activities')
 const resendEndpoint = 'https://api.resend.com/emails'
 
-const runEffect = <A>(effect: Effect.Effect<A, unknown>): Promise<A> =>
+const runEffect = <A, E>(effect: Effect.Effect<A, E>): Promise<A> =>
   Effect.runPromise(
     effect.pipe(
       Effect.mapError((e) => {
@@ -122,6 +136,139 @@ export const activities = {
     return result.deleted
   },
 
+  cleanExpiredUploadsActivity: async (): Promise<number> => {
+    const layer = Layer.mergeAll(
+      RetentionCleanerServiceLive,
+      PendingUploadStorePortLive,
+      StorageAdapterPortLive.pipe(Layer.provide(StorageLive))
+    )
+
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const service = yield* RetentionCleanerService
+        return yield* service.cleanExpiredUploads()
+      }).pipe(
+        Effect.provide(layer),
+        Effect.mapError((e) => {
+          const message = e instanceof Error ? e.message : String(e)
+          return new Error(message, { cause: e instanceof Error ? e : undefined })
+        })
+      )
+    )
+
+    if (result > 0) {
+      logger.info('Cleaned expired uploads.', { count: result })
+    }
+
+    return result
+  },
+
+  cleanRetainedAssetsActivity: async (retentionHours: number): Promise<number> => {
+    const layer = Layer.mergeAll(
+      RetentionCleanerServiceLive,
+      MediaAssetStorePortLive,
+      StorageAdapterPortLive.pipe(Layer.provide(StorageLive))
+    )
+
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const service = yield* RetentionCleanerService
+        return yield* service.cleanRetainedAssets(retentionHours)
+      }).pipe(
+        Effect.provide(layer),
+        Effect.mapError((e) => {
+          const message = e instanceof Error ? e.message : String(e)
+          return new Error(message, { cause: e instanceof Error ? e : undefined })
+        })
+      )
+    )
+
+    if (result > 0) {
+      logger.info('Cleaned retained soft-deleted assets.', { count: result, retentionHours })
+    }
+
+    return result
+  },
+
+  purgeOrganizationAssets: async (storagePaths: ReadonlyArray<string>): Promise<number> => {
+    if (storagePaths.length === 0) {
+      logger.info('No R2 objects to purge for deleted organization.')
+      return 0
+    }
+
+    const layer = StorageAdapterPortLive.pipe(Layer.provide(StorageLive))
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const storageAdapter = yield* StorageAdapterPort
+        yield* storageAdapter.deleteObjects([...storagePaths]).pipe(
+          Effect.mapError((e) => new Error(e instanceof Error ? e.message : String(e)))
+        )
+      }).pipe(Effect.provide(layer))
+    )
+
+    logger.info('Purged R2 objects for deleted organization.', { count: storagePaths.length })
+    return storagePaths.length
+  },
+
+  purgeTeamAssets: async (storagePaths: ReadonlyArray<string>): Promise<number> => {
+    if (storagePaths.length === 0) {
+      logger.info('No R2 objects to purge for deleted team.')
+      return 0
+    }
+
+    const layer = StorageAdapterPortLive.pipe(Layer.provide(StorageLive))
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const storageAdapter = yield* StorageAdapterPort
+        yield* storageAdapter.deleteObjects([...storagePaths]).pipe(
+          Effect.mapError((e) => new Error(e instanceof Error ? e.message : String(e)))
+        )
+      }).pipe(Effect.provide(layer))
+    )
+
+    logger.info('Purged R2 objects for deleted team.', { count: storagePaths.length })
+    return storagePaths.length
+  },
+
+  generateAssetThumbnail: async (payload: {
+    teamId: string
+    assetId: string
+  }): Promise<{ status: 'generated' | 'skipped'; thumbnailPath: string | null }> => {
+    const layer = Layer.mergeAll(
+      AssetThumbnailServiceLive,
+      MediaAssetStorePortLive,
+      StorageAdapterPortLive.pipe(Layer.provide(StorageLive)),
+      SharpThumbnailGeneratorPortLive
+    )
+
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const service = yield* AssetThumbnailService
+        return yield* service.generateForAsset(payload)
+      }).pipe(
+        Effect.provide(layer),
+        Effect.mapError((e) => {
+          const message = e instanceof Error ? e.message : String(e)
+          return new Error(message, { cause: e instanceof Error ? e : undefined })
+        })
+      )
+    )
+
+    logger.info('Asset thumbnail generation finished.', {
+      teamId: payload.teamId,
+      assetId: payload.assetId,
+      status: result.status,
+      thumbnailPath: result.thumbnailPath
+    })
+
+    return {
+      status: result.status,
+      thumbnailPath: result.thumbnailPath
+    }
+  },
+
   sendOrganizationWelcomeEmail: async (payload: {
     organizationName: string
     ownerUserId: string
@@ -207,7 +354,7 @@ export interface StorageDeleteResult {
   failed: number
 }
 
-const runStorageEffect = <A>(effect: Effect.Effect<A, unknown, Storage>): Promise<A> =>
+const runStorageEffect = <A, E>(effect: Effect.Effect<A, E, Storage>): Promise<A> =>
   Effect.runPromise(
     effect.pipe(
       Effect.provide(StorageLive),
@@ -217,6 +364,11 @@ const runStorageEffect = <A>(effect: Effect.Effect<A, unknown, Storage>): Promis
       })
     )
   )
+
+export const combinedActivities = {
+  ...activities,
+  ...billingActivities
+}
 
 export const storageActivities = {
   deleteStorageObjects: async (keys: ReadonlyArray<string>): Promise<StorageDeleteResult> => {

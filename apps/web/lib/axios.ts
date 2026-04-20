@@ -11,6 +11,7 @@ import {
   withSerializedAuthRefresh,
   writeAuthToken
 } from './auth-token'
+import { sessionStoreActions } from '../stores/session-store'
 import { browserAuthSessionHeaders } from './auth-session-mode'
 import { getWebEnv } from './env'
 
@@ -247,8 +248,10 @@ api.interceptors.response.use(
           await refreshAccessToken()
           config._retryAuthRefresh = true
           return await api(config)
-        } catch {
+        } catch (retryError) {
           clearAuthToken()
+          sessionStoreActions.clear()
+          throw retryError instanceof Error ? retryError : new Error('Token refresh failed')
         }
       } else {
         finishRequestTelemetry(config, statusCode, error)
@@ -268,16 +271,21 @@ export const getApiErrorStatus = (error: unknown): number | undefined => {
 }
 
 export const getApiErrorMessage = (error: unknown, fallback: string): string => {
-  if (!axios.isAxiosError(error)) {
-    return fallback
+  if (axios.isAxiosError(error)) {
+    const payload: unknown = error.response?.data
+    if (isApiErrorPayload(payload)) {
+      const extracted = payload.error?.message ?? payload.message
+      if (extracted) {
+        return extracted
+      }
+    }
   }
 
-  const payload: unknown = error.response?.data
-  if (!isApiErrorPayload(payload)) {
-    return error.message || fallback
+  if (error instanceof Error && error.message) {
+    return error.message
   }
 
-  return payload.error?.message ?? payload.message ?? error.message
+  return fallback
 }
 
 export type ApiAxiosRequestConfig = AxiosRequestConfig

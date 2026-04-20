@@ -1,8 +1,9 @@
 import * as Schema from 'effect/Schema'
-import { invitationStatuses, orgMemberRoles } from '@tx-agent-kit/contracts'
+import { invitationStatuses, memberRoles, membershipTypes } from '@tx-agent-kit/contracts'
 
 export const invitationStatusSchema = Schema.Literal(...invitationStatuses)
-export const invitationRoleSchema = Schema.Literal(...orgMemberRoles)
+export const invitationRoleSchema = Schema.Literal(...memberRoles)
+export const invitationMembershipTypeSchema = Schema.Literal(...membershipTypes)
 
 export const invitationRowSchema = Schema.Struct({
   id: Schema.UUID,
@@ -14,6 +15,10 @@ export const invitationRowSchema = Schema.Struct({
   invitedByUserId: Schema.UUID,
   token: Schema.String,
   expiresAt: Schema.DateFromSelf,
+  revokedAt: Schema.NullOr(Schema.DateFromSelf),
+  revokedByUserId: Schema.NullOr(Schema.UUID),
+  teamId: Schema.NullOr(Schema.UUID),
+  membershipType: invitationMembershipTypeSchema,
   createdAt: Schema.DateFromSelf
 })
 

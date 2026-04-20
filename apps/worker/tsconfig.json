@@ -6,10 +6,14 @@
   },
   "include": ["src/**/*"],
   "references": [
+    { "path": "../../packages/core" },
     { "path": "../../packages/infra/db" },
+    { "path": "../../packages/infra/email" },
     { "path": "../../packages/infra/logging" },
     { "path": "../../packages/infra/observability" },
     { "path": "../../packages/temporal-client" },
-    { "path": "../../packages/infra/storage" }
+    { "path": "../../packages/infra/storage" },
+    { "path": "../../packages/infra/stripe" },
+    { "path": "../../packages/testkit" }
   ]
 }

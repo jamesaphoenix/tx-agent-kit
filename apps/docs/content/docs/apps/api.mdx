@@ -19,14 +19,26 @@ Each route handler extracts the authenticated principal from the `Authorization`
 
 ## Route Groups
 
-OpenAPI tags map directly to generated API reference pages:
+OpenAPI tags map directly to generated API reference pages. The full route surface lives in `apps/api/src/routes/`:
 
-- **auth** (`/v1/auth/*`): password auth, refresh token rotation, Google OIDC start/callback, and password reset flows.
-- **organizations** (`/v1/organizations/*` plus `/v1/invitations/*`): org CRUD and invitation lifecycle.
-- **teams** (`/v1/teams/*`): team-level management.
-- **billing** (`/v1/organizations/{organizationId}/billing`, `/v1/billing/*`, `/v1/webhooks/stripe`): subscription state, checkout/portal session creation, usage summaries, and Stripe webhook synchronization.
-- **permissions** (`/v1/permissions`, `/v1/permissions/me`): role-permission map and current-user permission resolution.
-- **health** (`/health`): service health probe.
+| Route module | Path prefix | Purpose |
+|--------------|-------------|---------|
+| `auth.ts` | `/v1/auth/*` | Password auth, refresh rotation, Google OIDC, password reset |
+| `organizations.ts` | `/v1/organizations/*`, `/v1/invitations/*` | Org CRUD, members, invitations, onboarding state |
+| `teams.ts` | `/v1/teams/*` | Team (workspace) CRUD and team-member management |
+| `teams-brand.ts` | `/v1/teams/{teamId}/brand-settings` | Team brand settings (logo, colors) |
+| `roles.ts` | `/v1/roles/*` | Role + permission management (org-scoped) |
+| `permissions.ts` | `/v1/permissions`, `/v1/permissions/me` | Role-permission map + current-user permission resolution |
+| `billing.ts` | `/v1/organizations/{id}/billing`, `/v1/billing/*`, `/v1/webhooks/stripe` | Subscription state, top-up, credits, Stripe webhooks, auto-recharge |
+| `assets.ts` | `/v1/teams/{id}/assets`, `/v1/teams/{id}/collections`, presign/confirm/thumbnail endpoints | Media uploads, deduplication, thumbnails, collections |
+| `storage.ts` | `/v1/storage/*` | Presigned upload/download URLs, object metadata, list/delete |
+| `storage-metering.ts` | `/v1/organizations/{id}/storage-metering/*` | Storage usage reporting to Stripe metered billing |
+| `notifications.ts` | `/v1/notifications/*` | In-app notification listing and mark-as-read |
+| `email-campaigns.ts` | `/v1/teams/{id}/email-campaigns/*` | Reference implementation: CRUD, enrollments, analytics |
+| `email-webhooks.ts` | `/v1/webhooks/email/resend` | Resend delivery-event webhook handler |
+| `email-unsubscribe.ts` | `/v1/email/unsubscribe/*` | Token-verified unsubscribe landing + POST |
+| `list-query.ts` | (internal helper) | Shared list query builder used by other route files |
+| `health.ts` | `/health` | Liveness probe |
 
 For full request/response shapes, use the generated pages in `docs/api-reference/*` or runtime `/openapi.json`.
 
@@ -154,13 +166,14 @@ Runtime environment variables are read exclusively through `apps/api/src/config/
 | `GOOGLE_OIDC_CALLBACK_URL` | Google OIDC redirect callback URL |
 | `STRIPE_SECRET_KEY` | Stripe secret key |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
-| `STRIPE_PRO_PRICE_ID` | Stripe pro plan price ID |
-| `STRIPE_PRO_METERED_PRICE_ID` | Stripe metered price ID |
+| `STRIPE_TRY_ME_PRICE_ID` | Stripe Try Me recurring plan price ID |
+| `STRIPE_PRO_PRICE_ID` | Stripe Pro recurring plan price ID |
+| `STRIPE_AGENCY_PRICE_ID` | Stripe Agency recurring plan price ID |
 
 **Group invariants enforced at startup:**
 - `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `WEB_BASE_URL` must all be set together. In production, all three are required.
 - All four `GOOGLE_OIDC_*` variables must be configured together. In production they are required.
-- `STRIPE_PRO_PRICE_ID` and `STRIPE_PRO_METERED_PRICE_ID` are required whenever `STRIPE_SECRET_KEY` is set.
+- Stripe plan checkout requires the selected plan's recurring Stripe Price ID.
 - `STRIPE_WEBHOOK_SECRET` is required in production/staging when Stripe is configured.
 
 ## Integration Testing

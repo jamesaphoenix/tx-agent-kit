@@ -1,8 +1,8 @@
 const { availableParallelism, cpus } = require('node:os')
 
 const fallbackWorkerCount = 1
-const maxAutoIntegrationWorkers = 6
-const maxAutoWebIntegrationWorkers = 4
+const maxAutoIntegrationWorkers = 10
+const maxAutoWebIntegrationWorkers = 8
 
 const parsePositiveInt = (value, fallback) => {
   if (!value) {

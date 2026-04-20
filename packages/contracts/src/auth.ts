@@ -86,6 +86,10 @@ export const googleAuthCallbackRequestSchema = Schema.Struct({
   state: Schema.String.pipe(Schema.minLength(1))
 })
 
+export const deleteMeResponseSchema = Schema.Struct({
+  deleted: Schema.Boolean
+})
+
 export type User = Schema.Schema.Type<typeof userSchema>
 export type AuthPrincipal = Schema.Schema.Type<typeof authPrincipalSchema>
 export type SignUpRequest = Schema.Schema.Type<typeof signUpRequestSchema>
@@ -102,3 +106,4 @@ export type SignOutResponse = Schema.Schema.Type<typeof signOutResponseSchema>
 export type SignOutAllResponse = Schema.Schema.Type<typeof signOutAllResponseSchema>
 export type GoogleAuthStartResponse = Schema.Schema.Type<typeof googleAuthStartResponseSchema>
 export type GoogleAuthCallbackRequest = Schema.Schema.Type<typeof googleAuthCallbackRequestSchema>
+export type DeleteMeResponse = Schema.Schema.Type<typeof deleteMeResponseSchema>

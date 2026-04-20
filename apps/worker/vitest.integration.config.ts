@@ -7,7 +7,12 @@ export default mergeConfig(
     test: {
       name: 'worker-integration',
       include: ['src/**/*.integration.test.ts'],
-      exclude: ['src/activities.integration.test.ts']
+      exclude: [
+        'src/activities.integration.test.ts',
+        'src/billing-end-to-end.e2e.integration.test.ts',
+        'src/temporal-connectivity.integration.test.ts',
+        'src/temporal-cloud-mtls.integration.test.ts'
+      ]
     }
   })
 )

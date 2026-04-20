@@ -1,4 +1,3 @@
-import { LangfuseSpanProcessor } from '@langfuse/otel'
 import { diag, DiagConsoleLogger, DiagLogLevel, metrics, trace } from '@opentelemetry/api'
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http'
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http'
@@ -12,10 +11,9 @@ import {
   ATTR_SERVICE_NAME
 } from '@opentelemetry/semantic-conventions'
 
-import { getLangfuseEnv, getObservabilityEnv } from './env.js'
+import { getObservabilityEnv } from './env.js'
+import { createLangfuseSpanProcessor } from './langfuse.js'
 import { getOrCreateNodeServiceMetrics } from './metrics-registry.js'
-
-export { getLangfuseEnv, type LangfuseEnv } from './env.js'
 
 /**
  * Stable semantic convention for deployment environment.
@@ -62,17 +60,9 @@ export const startTelemetry = (serviceName: string): void => {
       })
     )
   ]
-
-  const langfuseEnv = getLangfuseEnv()
-  if (langfuseEnv.LANGFUSE_ENABLED) {
-    spanProcessors.push(
-      new LangfuseSpanProcessor({
-        publicKey: langfuseEnv.LANGFUSE_PUBLIC_KEY,
-        secretKey: langfuseEnv.LANGFUSE_SECRET_KEY,
-        baseUrl: langfuseEnv.LANGFUSE_BASE_URL,
-        environment: env.NODE_ENV
-      })
-    )
+  const langfuseSpanProcessor = createLangfuseSpanProcessor(env.LANGFUSE)
+  if (langfuseSpanProcessor) {
+    spanProcessors.push(langfuseSpanProcessor)
   }
 
   telemetrySdk = new NodeSDK({

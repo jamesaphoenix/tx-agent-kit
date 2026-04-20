@@ -23,6 +23,20 @@ playwright-cli screenshot
 playwright-cli close
 ```
 
+## tx-agent-kit Local Login Shortcut
+
+If testing this repository locally and the app exposes the dev-only **Custom dev utils** button, use it to seed a logged-in browser session instead of manually signing up.
+
+```bash
+playwright-cli open http://localhost:3000
+playwright-cli snapshot
+# Click "Open developer utilities".
+# Choose "Fresh free org" for a clean account, or
+# choose "Fresh Pro + $20 local credit" for billing-gated UI.
+```
+
+The selected preset creates a unique user email, organization, workspace, writes the browser auth session, and navigates into the app. Use this before screenshots, UI smoke checks, and authenticated navigation when the helper is available.
+
 ## Commands
 
 ### Core

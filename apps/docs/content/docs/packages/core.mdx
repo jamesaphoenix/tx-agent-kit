@@ -9,10 +9,11 @@ The core package contains the domain logic for the entire system. It is organize
 
 ## Domain Structure
 
-Each domain slice must contain these folders:
+Each domain slice must contain these folders and files:
 
 ```
 packages/core/src/domains/<domain>/
+  events.ts     # PUBLIC cross-domain event contract (the ONLY importable file)
   domain/       # Entities, value objects, pure business rules
   ports/        # Capability contracts (Effect Context.Tag services)
   application/  # Use-case orchestration (Effect services)
@@ -27,9 +28,50 @@ The `repositories/` and `services/` folders are forbidden. Concrete persistence 
 
 | Domain | Purpose |
 |--------|---------|
-| `auth` | User authentication, principal extraction, session management |
-| `organization` | Organization CRUD, membership, billing, subscriptions |
-| `invitation` | Invitation management and acceptance |
+| `auth` | User authentication, principal extraction, session management, OAuth providers |
+| `organization` | Organization CRUD, members, onboarding state, invitations |
+| `team` | Teams (workspaces) within organizations, team members, brand settings, review tokens |
+| `role` | Role + permission management, role-permission policy matrix |
+| `billing` | Stripe subscriptions, credit ledger, usage caps, welcome credit, auto-recharge |
+| `assets` | Media uploads (R2), deduplication, thumbnails, collections, storage metering |
+| `notifications` | In-app notification delivery, fan-out from domain events |
+| `email_campaigns` | Transactional + campaign email reference implementation (kept as a non-trivial CRUD example) |
+
+## Cross-Domain Boundaries
+
+**Events are public nouns. Ports are public verbs. Errors are private semantics.**
+
+| What | Cross-domain? | How |
+|------|--------------|-----|
+| Domain events (`events.ts` at domain root) | Yes | The ONLY file other domains may import from this domain |
+| Ports (`ports/`) | No — wired via DI | Adapters bridge repos to ports; services depend on their own ports |
+| Domain errors | No — translated at seams | Rich typed ADT errors inside a domain; translated at port/app boundary |
+| Shared infra errors | Yes | `CoreError` (`unauthorized`, `notFound`, etc.) at core package level |
+
+The `events.ts` contract exposes event type discriminants, typed payload shapes, and version constants:
+
+```typescript
+// packages/core/src/domains/billing/events.ts
+export type {
+  BillingCreditsPurchasedEventPayload,
+  BillingUsageCapExceededEventPayload,
+  BillingWelcomeCreditGrantedEventPayload
+} from './domain/billing-events.js'
+
+export const billingEvents = {
+  creditsPurchased: 'billing.credits_purchased',
+  usageCapExceeded: 'billing.usage_cap_exceeded',
+  welcomeCreditGranted: 'billing.welcome_credit_granted'
+} as const
+
+export const billingEventVersions = {
+  'billing.credits_purchased': 1,
+  'billing.usage_cap_exceeded': 1,
+  'billing.welcome_credit_granted': 1
+} as const
+```
+
+Consumers import only with `import type` — events are data contracts, not runtime code. ESLint + structural lint enforce that `events.ts` is the only cross-domain importable file at a domain root.
 
 ## Layer Dependency Direction
 
@@ -44,7 +86,7 @@ runtime    -> all layers
 ui         -> all layers
 ```
 
-Cross-domain imports are forbidden. Each domain is a self-contained unit.
+Cross-domain imports are forbidden except through `events.ts`. Each domain is otherwise a self-contained unit.
 
 ## Domain Layer
 

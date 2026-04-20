@@ -1,8 +1,8 @@
-import { HttpApiBuilder, HttpServerRequest } from '@effect/platform'
-import { principalFromAuthorization } from '@tx-agent-kit/core'
+import { HttpApiBuilder } from '@effect/platform'
 import { Storage } from '@tx-agent-kit/storage'
 import { Effect } from 'effect'
-import { TxAgentApi, mapCoreError, BadRequest } from '../api.js'
+import { TxAgentApi, mapCoreError } from '../api.js'
+import { requireAuth } from '../utils.js'
 
 export const StorageRouteKind = 'custom' as const
 
@@ -10,10 +10,7 @@ export const StorageLive = HttpApiBuilder.group(TxAgentApi, 'storage', (handlers
   handlers
     .handle('generateUploadUrl', ({ payload }) =>
       Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        yield* principalFromAuthorization(request.headers.authorization).pipe(
-          Effect.mapError(mapCoreError)
-        )
+        const _principal = yield* requireAuth
 
         const storage = yield* Storage
         const url = yield* storage.generateUploadUrl(
@@ -21,7 +18,7 @@ export const StorageLive = HttpApiBuilder.group(TxAgentApi, 'storage', (handlers
           payload.contentType,
           payload.expiresIn
         ).pipe(
-          Effect.mapError((e) => new BadRequest({ message: e.message }))
+          Effect.mapError(mapCoreError)
         )
 
         return { url }
@@ -29,17 +26,14 @@ export const StorageLive = HttpApiBuilder.group(TxAgentApi, 'storage', (handlers
     )
     .handle('generateDownloadUrl', ({ payload }) =>
       Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        yield* principalFromAuthorization(request.headers.authorization).pipe(
-          Effect.mapError(mapCoreError)
-        )
+        const _principal = yield* requireAuth
 
         const storage = yield* Storage
         const url = yield* storage.generateDownloadUrl(
           payload.key,
           payload.expiresIn
         ).pipe(
-          Effect.mapError((e) => new BadRequest({ message: e.message }))
+          Effect.mapError(mapCoreError)
         )
 
         return { url }
@@ -47,14 +41,11 @@ export const StorageLive = HttpApiBuilder.group(TxAgentApi, 'storage', (handlers
     )
     .handle('deleteObject', ({ payload }) =>
       Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        yield* principalFromAuthorization(request.headers.authorization).pipe(
-          Effect.mapError(mapCoreError)
-        )
+        const _principal = yield* requireAuth
 
         const storage = yield* Storage
         yield* storage.deleteObject(payload.key).pipe(
-          Effect.mapError((e) => new BadRequest({ message: e.message }))
+          Effect.mapError(mapCoreError)
         )
 
         return { deleted: true }
@@ -62,14 +53,11 @@ export const StorageLive = HttpApiBuilder.group(TxAgentApi, 'storage', (handlers
     )
     .handle('listObjects', ({ urlParams }) =>
       Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        yield* principalFromAuthorization(request.headers.authorization).pipe(
-          Effect.mapError(mapCoreError)
-        )
+        const _principal = yield* requireAuth
 
         const storage = yield* Storage
         const keys = yield* storage.listObjects(urlParams.prefix).pipe(
-          Effect.mapError((e) => new BadRequest({ message: e.message }))
+          Effect.mapError(mapCoreError)
         )
 
         return { keys: [...keys] }
@@ -77,14 +65,11 @@ export const StorageLive = HttpApiBuilder.group(TxAgentApi, 'storage', (handlers
     )
     .handle('getObjectMetadata', ({ path }) =>
       Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        yield* principalFromAuthorization(request.headers.authorization).pipe(
-          Effect.mapError(mapCoreError)
-        )
+        const _principal = yield* requireAuth
 
         const storage = yield* Storage
         const metadata = yield* storage.getObjectMetadata(path.key).pipe(
-          Effect.mapError((e) => new BadRequest({ message: e.message }))
+          Effect.mapError(mapCoreError)
         )
 
         return {

@@ -1,7 +1,7 @@
 ---
 name: verify-invariants
-description: Implement and verify design doc invariants by annotating tests and source code with [INV-*] / @spec tags, then driving tx spec coverage from BUILD toward HARDEN (100% FCI). Works with any design doc that has an invariants block.
-argument-hint: [design-doc-name] (optional — omit to verify ALL docs)
+description: "Implement and verify design doc invariants by annotating tests and source code with [INV-*] / @spec tags, then driving tx spec coverage from BUILD toward HARDEN (100% FCI). Works with any design doc that has an invariants block."
+argument-hint: "[design-doc-name] (optional — omit to verify ALL docs)"
 ---
 
 # Verify Invariants

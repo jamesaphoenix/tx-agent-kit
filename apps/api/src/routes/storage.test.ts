@@ -4,6 +4,8 @@ import { Context, Effect, Layer } from 'effect'
 class MockStorage extends Context.Tag('@tx-agent-kit/storage/Storage')<MockStorage, {
   generateUploadUrl(key: string, contentType: string, expiresIn?: number): Effect.Effect<string>
   generateDownloadUrl(key: string, expiresIn?: number): Effect.Effect<string>
+  putObject(key: string, body: Uint8Array, contentType: string): Effect.Effect<void>
+  getObject(key: string): Effect.Effect<Uint8Array>
   deleteObject(key: string): Effect.Effect<void>
   listObjects(prefix?: string): Effect.Effect<readonly string[]>
   getObjectMetadata(key: string): Effect.Effect<{
@@ -20,6 +22,8 @@ const mockService = {
     Effect.succeed(`https://r2.example.com/upload?key=${key}&type=${contentType}`),
   generateDownloadUrl: (key: string) =>
     Effect.succeed(`https://r2.example.com/download?key=${key}`),
+  putObject: () => Effect.void,
+  getObject: () => Effect.succeed(new Uint8Array([1, 2, 3])),
   deleteObject: () => Effect.void,
   listObjects: () => Effect.succeed(['org/file1.png', 'org/file2.jpg']),
   getObjectMetadata: (key: string) =>

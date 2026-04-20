@@ -1,4 +1,4 @@
-import { Context } from 'effect'
+import { Context, type Option } from 'effect'
 import type * as Effect from 'effect/Effect'
 import type { OrgMemberRole, PermissionAction } from '@tx-agent-kit/contracts'
 import type {
@@ -14,11 +14,11 @@ export type { AuthSessionTokenPayload, AuthUserRecord }
 export class AuthUsersPort extends Context.Tag('AuthUsersPort')<
   AuthUsersPort,
   {
-    create: (input: { email: string; passwordHash: string; name: string }) => Effect.Effect<AuthUserRecord | null, unknown>
-    findByEmail: (email: string) => Effect.Effect<AuthUserRecord | null, unknown>
-    findById: (id: string) => Effect.Effect<AuthUserRecord | null, unknown>
-    updatePasswordHash: (id: string, passwordHash: string) => Effect.Effect<AuthUserRecord | null, unknown>
-    deleteById: (id: string) => Effect.Effect<AuthUserRecord | null, unknown>
+    create: (input: { email: string; passwordHash: string; name: string }) => Effect.Effect<Option.Option<AuthUserRecord>, unknown>
+    findByEmail: (email: string) => Effect.Effect<Option.Option<AuthUserRecord>, unknown>
+    findById: (id: string) => Effect.Effect<Option.Option<AuthUserRecord>, unknown>
+    updatePasswordHash: (id: string, passwordHash: string) => Effect.Effect<Option.Option<AuthUserRecord>, unknown>
+    deleteById: (id: string) => Effect.Effect<Option.Option<AuthUserRecord>, unknown>
   }
 >() {}
 
@@ -34,7 +34,7 @@ export class AuthOrganizationMembershipPort extends Context.Tag('AuthOrganizatio
   {
     getPrimaryMembershipForUser: (
       userId: string
-    ) => Effect.Effect<{ organizationId: string; role: OrgMemberRole; permissions: ReadonlyArray<PermissionAction> } | null, unknown>
+    ) => Effect.Effect<Option.Option<{ organizationId: string; role: OrgMemberRole; permissions: ReadonlyArray<PermissionAction> }>, unknown>
   }
 >() {}
 
@@ -62,8 +62,8 @@ export class AuthLoginSessionPort extends Context.Tag('AuthLoginSessionPort')<
       provider: 'password' | 'google'
       createdIp: string | null
       createdUserAgent: string | null
-    }) => Effect.Effect<{ sessionId: string; expiresAt: Date } | null, unknown>
-    findActiveById: (sessionId: string) => Effect.Effect<{ sessionId: string; userId: string; expiresAt: Date } | null, unknown>
+    }) => Effect.Effect<Option.Option<{ sessionId: string; expiresAt: Date }>, unknown>
+    findActiveById: (sessionId: string) => Effect.Effect<Option.Option<{ sessionId: string; userId: string; expiresAt: Date }>, unknown>
     touchById: (sessionId: string) => Effect.Effect<void, unknown>
     revokeById: (sessionId: string) => Effect.Effect<number, unknown>
     revokeAllForUser: (userId: string) => Effect.Effect<number, unknown>
@@ -74,7 +74,7 @@ export class AuthLoginRefreshTokenPort extends Context.Tag('AuthLoginRefreshToke
   AuthLoginRefreshTokenPort,
   {
     issueForSession: (sessionId: string) => Effect.Effect<{ refreshToken: string; expiresAt: Date }, unknown>
-    rotate: (refreshToken: string) => Effect.Effect<{ sessionId: string; refreshToken: string; expiresAt: Date } | null, unknown>
+    rotate: (refreshToken: string) => Effect.Effect<Option.Option<{ sessionId: string; refreshToken: string; expiresAt: Date }>, unknown>
     revokeForSession: (sessionId: string) => Effect.Effect<void, unknown>
     revokeAllForUser: (userId: string) => Effect.Effect<void, unknown>
   }
@@ -84,7 +84,7 @@ export class PasswordResetTokenPort extends Context.Tag('PasswordResetTokenPort'
   PasswordResetTokenPort,
   {
     createToken: (userId: string) => Effect.Effect<string, unknown>
-    consumeToken: (token: string) => Effect.Effect<{ userId: string } | null, unknown>
+    consumeToken: (token: string) => Effect.Effect<Option.Option<{ userId: string }>, unknown>
     revokeTokensForUser: (userId: string) => Effect.Effect<void, unknown>
   }
 >() {}
@@ -115,22 +115,22 @@ export class AuthLoginIdentityPort extends Context.Tag('AuthLoginIdentityPort')<
     findByProviderSubject: (input: {
       provider: 'password' | 'google'
       providerSubject: string
-    }) => Effect.Effect<{ userId: string; provider: 'password' | 'google'; providerSubject: string; email: string } | null, unknown>
+    }) => Effect.Effect<Option.Option<{ userId: string; provider: 'password' | 'google'; providerSubject: string; email: string }>, unknown>
     findByUserProvider: (input: {
       userId: string
       provider: 'password' | 'google'
-    }) => Effect.Effect<{ userId: string; provider: 'password' | 'google'; providerSubject: string; email: string } | null, unknown>
+    }) => Effect.Effect<Option.Option<{ userId: string; provider: 'password' | 'google'; providerSubject: string; email: string }>, unknown>
     linkIdentity: (input: {
       userId: string
       provider: 'password' | 'google'
       providerSubject: string
       email: string
       emailVerified: boolean
-    }) => Effect.Effect<{ userId: string; provider: 'password' | 'google'; providerSubject: string; email: string } | null, unknown>
+    }) => Effect.Effect<Option.Option<{ userId: string; provider: 'password' | 'google'; providerSubject: string; email: string }>, unknown>
     unlinkIdentity: (input: {
       userId: string
       provider: 'password' | 'google'
-    }) => Effect.Effect<{ userId: string; provider: 'password' | 'google'; providerSubject: string; email: string } | null, unknown>
+    }) => Effect.Effect<Option.Option<{ userId: string; provider: 'password' | 'google'; providerSubject: string; email: string }>, unknown>
   }
 >() {}
 

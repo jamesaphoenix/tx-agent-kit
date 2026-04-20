@@ -1,34 +1,126 @@
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from '@effect/platform'
 import { createLogger } from '@tx-agent-kit/logging'
 import {
+  addAssetToCollectionBodySchema,
+  assetSearchParamsSchema,
+  assetSignedUrlResponseSchema,
+  assetThumbnailSignedUrlResponseSchema,
+  assetsListParamsSchema,
+  collectionsListParamsSchema,
+  confirmUploadResponseSchema,
+  createCollectionBodySchema,
+  listAssetsResponseSchema,
+  listCollectionAssetsResponseSchema,
+  listCollectionsResponseSchema,
+  mediaAssetSchema,
+  uploadContentResponseSchema,
+  requestUploadBodySchema,
+  requestUploadResponseSchema,
+  storageQuotaResponseSchema,
+  storageUsageResponseSchema,
+  updateAssetMetadataBodySchema,
+  updateCollectionBodySchema,
+  acceptInvitationResponseSchema,
+  addOrgMemberRequestSchema,
+  autoRechargeRequiresActionChallengeSchema,
   authPrincipalSchema,
   authResponseSchema,
   billingSettingsSchema,
+  completeLocalBillingSetupSchema,
   createCheckoutSessionSchema,
+  createTopUpSessionSchema,
+  createInvitationRequestSchema,
+  createOrganizationRequestSchema,
   createPortalSessionSchema,
+  createReviewTokenRequestSchema,
+  createRoleRequestSchema,
+  addTeamMemberRequestSchema,
+  createTeamRequestSchema,
+  deletedResponseSchema,
+  deleteMeResponseSchema,
+  deleteObjectBodySchema,
+  campaignAnalyticsResponseSchema,
+  campaignListParamsSchema,
+  campaignListResponseSchema,
+  campaignResponseSchema,
+  campaignStepResponseSchema,
+  createCampaignBodySchema,
+  createStepBodySchema,
+  enrollmentListResponseSchema,
+  enrollmentResponseSchema,
+  enrollUsersBodySchema,
+  enrollUsersResponseSchema,
+  resendWebhookResponseSchema,
+  stepAnalyticsResponseSchema,
+  stepListResponseSchema,
+  unsubscribeBodySchema,
+  unsubscribeResponseSchema,
+  unsubscribeTokenParamsSchema,
+  unsubscribeVerifyResponseSchema,
+  updateCampaignBodySchema,
+  updateStepBodySchema,
   forgotPasswordRequestSchema,
   forgotPasswordResponseSchema,
+  generateDownloadUrlBodySchema,
+  generateUploadUrlBodySchema,
   googleAuthCallbackRequestSchema,
   googleAuthStartResponseSchema,
-  invitationAssignableRoles,
-  invitationStatuses,
-  orgMemberRoles,
-  organizationOnboardingDataSchema,
-  permissionActions,
+  healthResponseSchema,
+  idsBodySchema,
+  invitationSchema,
+  invitationsListParamsSchema,
+  invitationSummarySchema,
+  listObjectsParamsSchema,
+  listObjectsResponseSchema,
+  listParamsSchema,
+  listReviewTokensResponseSchema,
+  listRolesResponseSchema,
+  manyResponseSchema,
+  myPermissionsResponseSchema,
+  noCapReminderPreferenceSchema,
+  objectMetadataResponseSchema,
+  orgMemberSchema,
+  orgMembersResponseSchema,
+  organizationSchema,
+  presignedUrlResponseSchema,
   refreshSessionRequestSchema,
   refreshSessionResponseSchema,
+  reviewTokenSchema,
+  reviewTokensListParamsSchema,
+  reviewTokenValidationSchema,
+  roleApiResponseSchema,
   rolePermissionMapSchema,
+  rolesListParamsSchema,
   resetPasswordRequestSchema,
   resetPasswordResponseSchema,
+  sessionUrlResponseSchema,
   signInRequestSchema,
   signOutAllResponseSchema,
   signOutResponseSchema,
   signUpRequestSchema,
-  sortOrders,
-  subscriptionStatuses,
+  stripeWebhookResponseSchema,
+  teamApiResponseSchema,
+  teamMemberSchema,
+  teamMembersListParamsSchema,
+  teamMembersResponseSchema,
+  transferOwnershipRequestSchema,
+  transferOwnershipResponseSchema,
   updateBillingSettingsSchema,
-  usageCategories,
-  usageSummarySchema
+  updateInvitationRequestSchema,
+  updateMemberRoleRequestSchema,
+  updateOrganizationRequestSchema,
+  updateRoleRequestSchema,
+  updateTeamMemberRoleRequestSchema,
+  updateTeamRequestSchema,
+  usageQueryParamsSchema,
+  usageSummarySchema,
+  listOrganizationsResponseSchema,
+  listInvitationsResponseSchema,
+  listInvitationSummariesResponseSchema,
+  listTeamsResponseSchema,
+  teamsListParamsSchema,
+  creditBalanceResponseSchema,
+  creditEntryTypeSchema
 } from '@tx-agent-kit/contracts'
 import * as Schema from 'effect/Schema'
 
@@ -48,6 +140,14 @@ export class Conflict extends Schema.TaggedError<Conflict>()('Conflict', {
   message: Schema.String
 }) {}
 
+export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
+  message: Schema.String
+}) {}
+
+export class PaymentRequired extends Schema.TaggedError<PaymentRequired>()('PaymentRequired', {
+  message: Schema.String
+}) {}
+
 export class TooManyRequests extends Schema.TaggedError<TooManyRequests>()('TooManyRequests', {
   message: Schema.String
 }) {}
@@ -58,20 +158,56 @@ export class InternalError extends Schema.TaggedError<InternalError>()('Internal
 
 const apiLogger = createLogger('api')
 
-export const mapCoreError = (error: unknown): BadRequest | Unauthorized | NotFound | Conflict | InternalError => {
+export const mapCoreError = (error: unknown): BadRequest | Unauthorized | Forbidden | PaymentRequired | NotFound | Conflict | InternalError => {
   if (error && typeof error === 'object' && '_tag' in error) {
     const e = error as { _tag: string; code?: string; message?: string }
+
+    // Pass through already-mapped API error types (idempotent when double-mapped)
+    switch (e._tag) {
+      case 'BadRequest':
+        return error as BadRequest
+      case 'Unauthorized':
+        return error as Unauthorized
+      case 'Forbidden':
+        return error as Forbidden
+      case 'PaymentRequired':
+        return error as PaymentRequired
+      case 'NotFound':
+        return error as NotFound
+      case 'Conflict':
+        return error as Conflict
+      case 'InternalError':
+        return error as InternalError
+    }
+
     const message = e.message ?? 'Internal server error'
+    const cause = 'cause' in e ? e.cause : undefined
+
+    if (e.code === 'BAD_REQUEST' || e.code === 'INTERNAL_ERROR' || e.code === 'UNAUTHORIZED' || e.code === 'FORBIDDEN' || e.code === 'PAYMENT_REQUIRED') {
+      let causeDetail: unknown
+      if (cause instanceof Error) {
+        causeDetail = { message: cause.message, stack: cause.stack }
+      } else if (cause != null) {
+        causeDetail = typeof cause === 'object' ? JSON.stringify(cause) : String(cause as string | number | boolean)
+      }
+      apiLogger.error('CoreError mapped to HTTP error', { code: e.code, message: e.message, cause: causeDetail })
+    }
 
     switch (e.code) {
       case 'BAD_REQUEST':
         return new BadRequest({ message })
       case 'UNAUTHORIZED':
         return new Unauthorized({ message })
+      case 'FORBIDDEN':
+        return new Forbidden({ message })
+      case 'PAYMENT_REQUIRED':
+        return new PaymentRequired({ message })
       case 'NOT_FOUND':
         return new NotFound({ message })
       case 'CONFLICT':
         return new Conflict({ message })
+      case 'INTERNAL_ERROR':
+        return new InternalError({ message: 'Internal server error' })
       case undefined:
       default:
         apiLogger.error('Unmapped core error code fell through to 500', { tag: e._tag, code: e.code, message: e.message })
@@ -83,264 +219,160 @@ export const mapCoreError = (error: unknown): BadRequest | Unauthorized | NotFou
   return new InternalError({ message: 'Internal server error' })
 }
 
-const paginatedResponseSchema = <A, I, R>(itemSchema: Schema.Schema<A, I, R>) =>
-  Schema.Struct({
-    data: Schema.Array(itemSchema),
-    total: Schema.Number,
-    nextCursor: Schema.NullOr(Schema.String),
-    prevCursor: Schema.NullOr(Schema.String)
-  })
+// --- Aliases referencing contract schemas ---
 
 const AuthResponse = authResponseSchema
-
 const PrincipalResponse = authPrincipalSchema
-
-const DeleteMeResponse = Schema.Struct({
-  deleted: Schema.Boolean
-})
+const DeleteMeResponse = deleteMeResponseSchema
 
 const SignUpBody = signUpRequestSchema
-
 const SignInBody = signInRequestSchema
-
 const ForgotPasswordBody = forgotPasswordRequestSchema
-
 const ForgotPasswordResponse = forgotPasswordResponseSchema
-
 const ResetPasswordBody = resetPasswordRequestSchema
-
 const ResetPasswordResponse = resetPasswordResponseSchema
-
 const RefreshSessionBody = refreshSessionRequestSchema
-
 const RefreshSessionResponse = refreshSessionResponseSchema
-
 const SignOutResponse = signOutResponseSchema
-
 const SignOutAllResponse = signOutAllResponseSchema
-
 const GoogleAuthStartResponse = googleAuthStartResponseSchema
-
 const GoogleAuthCallbackParams = googleAuthCallbackRequestSchema
+const GoogleAuthCallbackResponse = authResponseSchema
 
-const Organization = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  billingEmail: Schema.NullOr(Schema.String),
-  onboardingData: Schema.NullOr(organizationOnboardingDataSchema),
-  stripeCustomerId: Schema.NullOr(Schema.String),
-  stripeSubscriptionId: Schema.NullOr(Schema.String),
-  stripePaymentMethodId: Schema.NullOr(Schema.String),
-  stripeMeteredSubscriptionItemId: Schema.NullOr(Schema.String),
-  creditsBalance: Schema.Number,
-  reservedCredits: Schema.Number,
-  autoRechargeEnabled: Schema.Boolean,
-  autoRechargeThreshold: Schema.NullOr(Schema.Number),
-  autoRechargeAmount: Schema.NullOr(Schema.Number),
-  isSubscribed: Schema.Boolean,
-  subscriptionStatus: Schema.Literal(...subscriptionStatuses),
-  subscriptionPlan: Schema.NullOr(Schema.String),
-  subscriptionStartedAt: Schema.NullOr(Schema.String),
-  subscriptionEndsAt: Schema.NullOr(Schema.String),
-  subscriptionCurrentPeriodEnd: Schema.NullOr(Schema.String),
-  createdAt: Schema.String,
-  updatedAt: Schema.String
-})
+const Organization = organizationSchema
+const OrganizationsResponse = listOrganizationsResponseSchema
+const OrganizationsListParams = listParamsSchema
+const CreateOrganizationBody = createOrganizationRequestSchema
+const UpdateOrganizationBody = updateOrganizationRequestSchema
 
-const OrganizationsResponse = paginatedResponseSchema(Organization)
+const OrgMember = orgMemberSchema
+const OrgMembersResponse = orgMembersResponseSchema
+const OrgMembersListParams = listParamsSchema
+const AddOrgMemberBody = addOrgMemberRequestSchema
+const UpdateMemberRoleBody = updateMemberRoleRequestSchema
+const TransferOwnershipBody = transferOwnershipRequestSchema
+const TransferOwnershipResponse = transferOwnershipResponseSchema
 
-const OrganizationsListParams = Schema.Struct({
-  cursor: Schema.optional(Schema.String),
-  limit: Schema.optional(Schema.String),
-  sortBy: Schema.optional(Schema.String),
-  sortOrder: Schema.optional(Schema.Literal(...sortOrders))
-})
+const MemberIdParam = HttpApiSchema.param('memberId', Schema.String)
 
-const CreateOrganizationBody = Schema.Struct({
-  name: Schema.String
-})
-
-const UpdateOrganizationBody = Schema.Struct({
-  name: Schema.optional(Schema.String),
-  onboardingData: Schema.optional(Schema.NullOr(organizationOnboardingDataSchema))
-})
-
-const InvitationSummary = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  email: Schema.String,
-  role: Schema.Literal(...invitationAssignableRoles),
-  status: Schema.Literal(...invitationStatuses),
-  invitedByUserId: Schema.String,
-  expiresAt: Schema.String,
-  createdAt: Schema.String
-})
-
-const Invitation = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  email: Schema.String,
-  role: Schema.Literal(...invitationAssignableRoles),
-  status: Schema.Literal(...invitationStatuses),
-  invitedByUserId: Schema.String,
-  token: Schema.String,
-  expiresAt: Schema.String,
-  createdAt: Schema.String
-})
-
-const InvitationsResponse = paginatedResponseSchema(Invitation)
-
-const InvitationsListParams = Schema.Struct({
-  cursor: Schema.optional(Schema.String),
-  limit: Schema.optional(Schema.String),
-  sortBy: Schema.optional(Schema.String),
-  sortOrder: Schema.optional(Schema.Literal(...sortOrders)),
-  'filter[status]': Schema.optional(Schema.String),
-  'filter[role]': Schema.optional(Schema.String)
-})
-
-const CreateInvitationBody = Schema.Struct({
-  organizationId: Schema.String,
-  email: Schema.String,
-  role: Schema.Literal(...invitationAssignableRoles)
-})
-
-const UpdateInvitationBody = Schema.Struct({
-  role: Schema.optional(Schema.Literal(...invitationAssignableRoles)),
-  status: Schema.optional(Schema.Literal(...invitationStatuses))
-})
-
-const AcceptInvitationResponse = Schema.Struct({
-  accepted: Schema.Boolean
-})
+const InvitationSummary = invitationSummarySchema
+const Invitation = invitationSchema
+const InvitationsResponse = listInvitationsResponseSchema
+const InvitationSummariesResponse = listInvitationSummariesResponseSchema
+const InvitationsListParams = invitationsListParamsSchema
+const CreateInvitationBody = createInvitationRequestSchema
+const UpdateInvitationBody = updateInvitationRequestSchema
+const AcceptInvitationResponse = acceptInvitationResponseSchema
 
 const InvitationTokenParam = HttpApiSchema.param('token', Schema.String)
 const InvitationIdParam = HttpApiSchema.param('invitationId', Schema.String)
 const OrganizationIdParam = HttpApiSchema.param('organizationId', Schema.String)
 const TeamIdParam = HttpApiSchema.param('teamId', Schema.String)
 
-const Team = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  name: Schema.String,
-  website: Schema.NullOr(Schema.String),
-  createdAt: Schema.String,
-  updatedAt: Schema.String
-})
+const Team = teamApiResponseSchema
+const TeamsResponse = listTeamsResponseSchema
+const TeamsListParams = teamsListParamsSchema
+const CreateTeamBody = createTeamRequestSchema
+const UpdateTeamBody = updateTeamRequestSchema
 
-const TeamsResponse = paginatedResponseSchema(Team)
+const TeamMember = teamMemberSchema
+const TeamMembersResponse = teamMembersResponseSchema
+const TeamMembersListParams = teamMembersListParamsSchema
+const AddTeamMemberBody = addTeamMemberRequestSchema
+const UpdateTeamMemberRoleBody = updateTeamMemberRoleRequestSchema
+const TeamMemberIdParam = HttpApiSchema.param('memberId', Schema.String)
 
-const TeamsListParams = Schema.Struct({
-  organizationId: Schema.String,
-  cursor: Schema.optional(Schema.String),
-  limit: Schema.optional(Schema.String),
-  sortBy: Schema.optional(Schema.String),
-  sortOrder: Schema.optional(Schema.Literal(...sortOrders))
-})
+const IdsBody = idsBodySchema
+const OrganizationsManyResponse = manyResponseSchema(organizationSchema)
+const InvitationsManyResponse = manyResponseSchema(invitationSummarySchema)
 
-const CreateTeamBody = Schema.Struct({
-  organizationId: Schema.String,
-  name: Schema.String
-})
-
-const UpdateTeamBody = Schema.Struct({
-  name: Schema.optional(Schema.String)
-})
-
-const IdsBody = Schema.Struct({
-  ids: Schema.Array(Schema.UUID)
-})
-
-const OrganizationsManyResponse = Schema.Struct({
-  data: Schema.Array(Organization)
-})
-
-const InvitationsManyResponse = Schema.Struct({
-  data: Schema.Array(Invitation)
-})
-
-const HealthResponse = Schema.Struct({
-  status: Schema.Literal('healthy'),
-  timestamp: Schema.String,
-  service: Schema.String
-})
+const HealthResponse = healthResponseSchema
 
 const BillingSettings = billingSettingsSchema
-
 const UpdateBillingSettingsBody = updateBillingSettingsSchema
-
 const CheckoutSessionBody = createCheckoutSessionSchema
-
+const TopUpSessionBody = createTopUpSessionSchema
 const PortalSessionBody = createPortalSessionSchema
-
-const SessionUrlResponse = Schema.Struct({
-  id: Schema.String,
-  url: Schema.String
-})
-
-const UsageQueryParams = Schema.Struct({
-  category: Schema.Literal(...usageCategories),
-  periodStart: Schema.optional(Schema.String),
-  periodEnd: Schema.optional(Schema.String)
-})
-
+const CompleteLocalBillingSetupBody = completeLocalBillingSetupSchema
+const SessionUrlResponse = sessionUrlResponseSchema
+const UsageQueryParams = usageQueryParamsSchema
 const UsageSummaryResponse = usageSummarySchema
+const NoCapReminderPreferenceResponse = noCapReminderPreferenceSchema
+const AutoRechargeRequiresActionResponse = autoRechargeRequiresActionChallengeSchema
+const StripeWebhookResponse = stripeWebhookResponseSchema
 
-const StripeWebhookResponse = Schema.Struct({
-  processed: Schema.Boolean,
-  idempotent: Schema.Boolean,
-  eventId: Schema.String
+const CreditBalanceResponse = creditBalanceResponseSchema
+const CreditHistoryItem = Schema.Struct({
+  id: Schema.UUID,
+  entryType: creditEntryTypeSchema,
+  amountDecimillicents: Schema.Number,
+  reason: Schema.String,
+  referenceId: Schema.NullOr(Schema.String),
+  balanceAfter: Schema.Number,
+  createdAt: Schema.String
+})
+const CreditHistoryResponse = Schema.Struct({
+  items: Schema.Array(CreditHistoryItem),
+  cursor: Schema.NullOr(Schema.String),
+  hasMore: Schema.Boolean
+})
+const CreditHistoryParams = Schema.Struct({
+  limit: Schema.optional(Schema.String),
+  cursor: Schema.optional(Schema.String)
 })
 
 const PermissionMapResponse = rolePermissionMapSchema
-const GoogleAuthCallbackResponse = authResponseSchema
+const MyPermissionsResponse = myPermissionsResponseSchema
 
-const GenerateUploadUrlBody = Schema.Struct({
-  key: Schema.String,
-  contentType: Schema.String,
-  expiresIn: Schema.optional(Schema.Number)
-})
-
-const GenerateDownloadUrlBody = Schema.Struct({
-  key: Schema.String,
-  expiresIn: Schema.optional(Schema.Number)
-})
-
-const DeleteObjectBody = Schema.Struct({
-  key: Schema.String
-})
-
-const ListObjectsParams = Schema.Struct({
-  prefix: Schema.optional(Schema.String)
-})
-
-const PresignedUrlResponse = Schema.Struct({
-  url: Schema.String
-})
-
-const ListObjectsResponse = Schema.Struct({
-  keys: Schema.Array(Schema.String)
-})
-
-const ObjectMetadataResponse = Schema.Struct({
-  key: Schema.String,
-  contentType: Schema.NullOr(Schema.String),
-  contentLength: Schema.NullOr(Schema.Number),
-  lastModified: Schema.NullOr(Schema.String),
-  etag: Schema.NullOr(Schema.String)
-})
-
+const GenerateUploadUrlBody = generateUploadUrlBodySchema
+const GenerateDownloadUrlBody = generateDownloadUrlBodySchema
+const DeleteObjectBody = deleteObjectBodySchema
+const ListObjectsParams = listObjectsParamsSchema
+const PresignedUrlResponse = presignedUrlResponseSchema
+const ListObjectsResponse = listObjectsResponseSchema
+const ObjectMetadataResponse = objectMetadataResponseSchema
 const ObjectKeyParam = HttpApiSchema.param('key', Schema.String)
 
-const MyPermissionsResponse = Schema.Struct({
-  organizationId: Schema.optional(Schema.String),
-  role: Schema.optional(Schema.Literal(...orgMemberRoles)),
-  permissions: Schema.Array(Schema.Literal(...permissionActions))
-})
+// --- Assets domain aliases ---
+const RequestUploadBody = requestUploadBodySchema
+const RequestUploadResponse = requestUploadResponseSchema
+const UploadContentResponse = uploadContentResponseSchema
+const ConfirmUploadResponse = confirmUploadResponseSchema
+const MediaAsset = mediaAssetSchema
+const AssetsResponse = listAssetsResponseSchema
+const AssetsListParams = assetsListParamsSchema
+const AssetSearchParams = assetSearchParamsSchema
+const AssetSignedUrlResponse = assetSignedUrlResponseSchema
+const AssetThumbnailSignedUrlResponse = assetThumbnailSignedUrlResponseSchema
+const UpdateAssetMetadataBody = updateAssetMetadataBodySchema
+const CollectionsResponse = listCollectionsResponseSchema
+const CollectionAssetsResponse = listCollectionAssetsResponseSchema
+const CollectionsListParams = collectionsListParamsSchema
+const CreateCollectionBody = createCollectionBodySchema
+const UpdateCollectionBody = updateCollectionBodySchema
+const AddAssetToCollectionBody = addAssetToCollectionBodySchema
+const StorageUsageResponse = storageUsageResponseSchema
+const StorageQuotaResponse = storageQuotaResponseSchema
+const AssetIdParam = HttpApiSchema.param('assetId', Schema.String)
+const UploadIdParam = HttpApiSchema.param('uploadId', Schema.String)
+const CollectionIdParam = HttpApiSchema.param('collectionId', Schema.String)
 
-const DeletedResponse = Schema.Struct({
-  deleted: Schema.Boolean
-})
+const ReviewToken = reviewTokenSchema
+const ReviewTokensResponse = listReviewTokensResponseSchema
+const ReviewTokensListParams = reviewTokensListParamsSchema
+const CreateReviewTokenBody = createReviewTokenRequestSchema
+const ReviewTokenIdParam = HttpApiSchema.param('tokenId', Schema.String)
+const ReviewTokenParam = HttpApiSchema.param('token', Schema.String)
+const ReviewTokenValidationResponse = reviewTokenValidationSchema
+
+const DeletedResponse = deletedResponseSchema
+
+const RoleResponse = roleApiResponseSchema
+const RolesResponse = listRolesResponseSchema
+const RolesListParams = rolesListParamsSchema
+const CreateRoleBody = createRoleRequestSchema
+const UpdateRoleBody = updateRoleRequestSchema
+const RoleIdParam = HttpApiSchema.param('roleId', Schema.String)
 
 export const HealthGroup = HttpApiGroup.make('health')
   .add(HttpApiEndpoint.get('health', '/health').addSuccess(HealthResponse))
@@ -420,6 +452,43 @@ export const OrganizationsGroup = HttpApiGroup.make('organizations')
       .addSuccess(DeletedResponse)
   )
   .add(HttpApiEndpoint.post('acceptInvitation')`/v1/invitations/${InvitationTokenParam}/accept`.addSuccess(AcceptInvitationResponse))
+  .add(
+    HttpApiEndpoint.post('addOrgMember')`/v1/organizations/${OrganizationIdParam}/members`
+      .setPayload(AddOrgMemberBody)
+      .addSuccess(OrgMember, { status: 201 })
+  )
+  .add(
+    HttpApiEndpoint.get('listOrgMembers')`/v1/organizations/${OrganizationIdParam}/members`
+      .setUrlParams(OrgMembersListParams)
+      .addSuccess(OrgMembersResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('listOrgInvitations')`/v1/organizations/${OrganizationIdParam}/invitations`
+      .setUrlParams(InvitationsListParams)
+      .addSuccess(InvitationSummariesResponse)
+  )
+  .add(
+    HttpApiEndpoint.patch('updateMemberRole')`/v1/organizations/${OrganizationIdParam}/members/${MemberIdParam}/role`
+      .setPayload(UpdateMemberRoleBody)
+      .addSuccess(OrgMember)
+  )
+  .add(
+    HttpApiEndpoint.post('disableMember')`/v1/organizations/${OrganizationIdParam}/members/${MemberIdParam}/disable`
+      .addSuccess(OrgMember)
+  )
+  .add(
+    HttpApiEndpoint.post('enableMember')`/v1/organizations/${OrganizationIdParam}/members/${MemberIdParam}/enable`
+      .addSuccess(OrgMember)
+  )
+  .add(
+    HttpApiEndpoint.del('removeMember')`/v1/organizations/${OrganizationIdParam}/members/${MemberIdParam}`
+      .addSuccess(DeletedResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('transferOwnership')`/v1/organizations/${OrganizationIdParam}/transfer-ownership`
+      .setPayload(TransferOwnershipBody)
+      .addSuccess(TransferOwnershipResponse)
+  )
 
 export const TeamsGroup = HttpApiGroup.make('teams')
   .add(
@@ -440,6 +509,51 @@ export const TeamsGroup = HttpApiGroup.make('teams')
   .add(
     HttpApiEndpoint.del('removeTeam')`/v1/teams/${TeamIdParam}`
       .addSuccess(DeletedResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('createReviewToken')`/v1/teams/${TeamIdParam}/review-tokens`
+      .setPayload(CreateReviewTokenBody)
+      .addSuccess(ReviewToken, { status: 201 })
+  )
+  .add(
+    HttpApiEndpoint.get('listReviewTokens')`/v1/teams/${TeamIdParam}/review-tokens`
+      .setUrlParams(ReviewTokensListParams)
+      .addSuccess(ReviewTokensResponse)
+  )
+  .add(
+    HttpApiEndpoint.del('revokeReviewToken')`/v1/teams/${TeamIdParam}/review-tokens/${ReviewTokenIdParam}`
+      .addSuccess(DeletedResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('validateReviewToken')`/v1/review/${ReviewTokenParam}`
+      .addSuccess(ReviewTokenValidationResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('listTeamMembers')`/v1/teams/${TeamIdParam}/members`
+      .setUrlParams(TeamMembersListParams)
+      .addSuccess(TeamMembersResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('addTeamMember')`/v1/teams/${TeamIdParam}/members`
+      .setPayload(AddTeamMemberBody)
+      .addSuccess(TeamMember, { status: 201 })
+  )
+  .add(
+    HttpApiEndpoint.patch('updateTeamMemberRole')`/v1/teams/${TeamIdParam}/members/${TeamMemberIdParam}/role`
+      .setPayload(UpdateTeamMemberRoleBody)
+      .addSuccess(TeamMember)
+  )
+  .add(
+    HttpApiEndpoint.del('removeTeamMember')`/v1/teams/${TeamIdParam}/members/${TeamMemberIdParam}`
+      .addSuccess(DeletedResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('disableTeamMember')`/v1/teams/${TeamIdParam}/members/${TeamMemberIdParam}/disable`
+      .addSuccess(TeamMember)
+  )
+  .add(
+    HttpApiEndpoint.post('enableTeamMember')`/v1/teams/${TeamIdParam}/members/${TeamMemberIdParam}/enable`
+      .addSuccess(TeamMember)
   )
 
 export const BillingGroup = HttpApiGroup.make('billing')
@@ -463,9 +577,40 @@ export const BillingGroup = HttpApiGroup.make('billing')
       .addSuccess(SessionUrlResponse)
   )
   .add(
+    HttpApiEndpoint.post('createTopUpSession')`/v1/billing/${OrganizationIdParam}/top-up`
+      .setPayload(TopUpSessionBody)
+      .addSuccess(SessionUrlResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('completeLocalBillingSetup')`/v1/billing/${OrganizationIdParam}/dev/complete-local`
+      .setPayload(CompleteLocalBillingSetupBody)
+      .addSuccess(BillingSettings)
+  )
+  .add(
     HttpApiEndpoint.get('getUsageSummary')`/v1/organizations/${OrganizationIdParam}/usage`
       .setUrlParams(UsageQueryParams)
       .addSuccess(UsageSummaryResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getCreditBalance')`/v1/billing/${OrganizationIdParam}/credits`
+      .addSuccess(CreditBalanceResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getCreditHistory')`/v1/billing/${OrganizationIdParam}/credits/history`
+      .setUrlParams(CreditHistoryParams)
+      .addSuccess(CreditHistoryResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getNoCapReminder')`/v1/billing/${OrganizationIdParam}/no-cap-reminder`
+      .addSuccess(NoCapReminderPreferenceResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('dismissNoCapReminder')`/v1/billing/${OrganizationIdParam}/no-cap-reminder/dismiss`
+      .addSuccess(NoCapReminderPreferenceResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getAutoRechargeRequiresAction')`/v1/billing/${OrganizationIdParam}/auto-recharge/requires-action`
+      .addSuccess(AutoRechargeRequiresActionResponse)
   )
   .add(
     HttpApiEndpoint.post('stripeWebhook', '/v1/webhooks/stripe')
@@ -508,9 +653,249 @@ export const StorageGroup = HttpApiGroup.make('storage')
       .addSuccess(ObjectMetadataResponse)
   )
 
+export const RolesGroup = HttpApiGroup.make('roles')
+  .add(
+    HttpApiEndpoint.get('listRoles', '/v1/roles')
+      .setUrlParams(RolesListParams)
+      .addSuccess(RolesResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('createRole', '/v1/roles')
+      .setPayload(CreateRoleBody)
+      .addSuccess(RoleResponse, { status: 201 })
+  )
+  .add(
+    HttpApiEndpoint.patch('updateRole')`/v1/roles/${RoleIdParam}`
+      .setPayload(UpdateRoleBody)
+      .addSuccess(RoleResponse)
+  )
+  .add(
+    HttpApiEndpoint.del('removeRole')`/v1/roles/${RoleIdParam}`
+      .addSuccess(DeletedResponse)
+  )
+
+export const AssetsGroup = HttpApiGroup.make('assets')
+  .add(
+    HttpApiEndpoint.post('requestUpload')`/v1/teams/${TeamIdParam}/uploads/request`
+      .setPayload(RequestUploadBody)
+      .addSuccess(RequestUploadResponse, { status: 201 })
+  )
+  .add(
+    HttpApiEndpoint.put('uploadContent')`/v1/teams/${TeamIdParam}/uploads/${UploadIdParam}/content`
+      .addSuccess(UploadContentResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('confirmUpload')`/v1/teams/${TeamIdParam}/uploads/${UploadIdParam}/confirm`
+      .addSuccess(ConfirmUploadResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('listAssets')`/v1/teams/${TeamIdParam}/assets`
+      .setUrlParams(AssetsListParams)
+      .addSuccess(AssetsResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getAsset')`/v1/teams/${TeamIdParam}/assets/${AssetIdParam}`
+      .addSuccess(MediaAsset)
+  )
+  .add(
+    HttpApiEndpoint.patch('updateAssetMetadata')`/v1/teams/${TeamIdParam}/assets/${AssetIdParam}`
+      .setPayload(UpdateAssetMetadataBody)
+      .addSuccess(MediaAsset)
+  )
+  .add(
+    HttpApiEndpoint.del('softDeleteAsset')`/v1/teams/${TeamIdParam}/assets/${AssetIdParam}`
+      .addSuccess(MediaAsset)
+  )
+  .add(
+    HttpApiEndpoint.get('getAssetSignedUrl')`/v1/teams/${TeamIdParam}/assets/${AssetIdParam}/url`
+      .addSuccess(AssetSignedUrlResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getAssetThumbnailSignedUrl')`/v1/teams/${TeamIdParam}/assets/${AssetIdParam}/thumbnail-url`
+      .addSuccess(AssetThumbnailSignedUrlResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('searchAssets')`/v1/teams/${TeamIdParam}/assets/search`
+      .setUrlParams(AssetSearchParams)
+      .addSuccess(AssetsResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('listCollections')`/v1/teams/${TeamIdParam}/collections`
+      .setUrlParams(CollectionsListParams)
+      .addSuccess(CollectionsResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('createCollection')`/v1/teams/${TeamIdParam}/collections`
+      .setPayload(CreateCollectionBody)
+      .addSuccess(Schema.Struct({ id: Schema.UUID, teamId: Schema.UUID, name: Schema.String, description: Schema.NullOr(Schema.String), createdAt: Schema.String, updatedAt: Schema.String }), { status: 201 })
+  )
+  .add(
+    HttpApiEndpoint.patch('updateCollection')`/v1/teams/${TeamIdParam}/collections/${CollectionIdParam}`
+      .setPayload(UpdateCollectionBody)
+      .addSuccess(Schema.Struct({ id: Schema.UUID, teamId: Schema.UUID, name: Schema.String, description: Schema.NullOr(Schema.String), createdAt: Schema.String, updatedAt: Schema.String }))
+  )
+  .add(
+    HttpApiEndpoint.del('removeCollection')`/v1/teams/${TeamIdParam}/collections/${CollectionIdParam}`
+      .addSuccess(DeletedResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('listCollectionAssets')`/v1/teams/${TeamIdParam}/collections/${CollectionIdParam}/assets`
+      .setUrlParams(AssetsListParams)
+      .addSuccess(CollectionAssetsResponse)
+  )
+  .add(
+    HttpApiEndpoint.post('addAssetToCollection')`/v1/teams/${TeamIdParam}/collections/${CollectionIdParam}/assets`
+      .setPayload(AddAssetToCollectionBody)
+      .addSuccess(DeletedResponse, { status: 201 })
+  )
+  .add(
+    HttpApiEndpoint.del('removeAssetFromCollection')`/v1/teams/${TeamIdParam}/collections/${CollectionIdParam}/assets/${AssetIdParam}`
+      .addSuccess(DeletedResponse)
+  )
+
+export const StorageMeteringGroup = HttpApiGroup.make('storagemetering')
+  .add(
+    HttpApiEndpoint.get('getStorageUsage')`/v1/organizations/${OrganizationIdParam}/storage/usage`
+      .addSuccess(StorageUsageResponse)
+  )
+  .add(
+    HttpApiEndpoint.get('getStorageQuota')`/v1/organizations/${OrganizationIdParam}/storage/quota`
+      .addSuccess(StorageQuotaResponse)
+  )
+
+// --- Email Campaign API params (API-layer concerns) ---
+
+const CampaignIdParam = HttpApiSchema.param('campaignId', Schema.String)
+const StepIdParam = HttpApiSchema.param('stepId', Schema.String)
+const EnrollmentIdParam = HttpApiSchema.param('enrollmentId', Schema.String)
+
+// --- Email Campaign schema aliases (from contracts) ---
+
+const CampaignResponseSchema = campaignResponseSchema
+const CampaignListResponseSchema = campaignListResponseSchema
+const CampaignStepResponseSchema = campaignStepResponseSchema
+const StepListResponseSchema = stepListResponseSchema
+const EnrollmentResponseSchema = enrollmentResponseSchema
+const EnrollmentListResponseSchema = enrollmentListResponseSchema
+const EnrollUsersResponseSchema = enrollUsersResponseSchema
+const CampaignAnalyticsResponseSchema = campaignAnalyticsResponseSchema
+const StepAnalyticsResponseSchema = stepAnalyticsResponseSchema
+const CreateCampaignBody = createCampaignBodySchema
+const UpdateCampaignBody = updateCampaignBodySchema
+const CreateStepBody = createStepBodySchema
+const UpdateStepBody = updateStepBodySchema
+const EnrollUsersBody = enrollUsersBodySchema
+const CampaignListParams = campaignListParamsSchema
+const ResendWebhookResponseSchema = resendWebhookResponseSchema
+const UnsubscribeTokenParams = unsubscribeTokenParamsSchema
+const UnsubscribeVerifyResponseSchema = unsubscribeVerifyResponseSchema
+const UnsubscribeBody = unsubscribeBodySchema
+const UnsubscribeResponseSchema = unsubscribeResponseSchema
+
+export const EmailCampaignsGroup = HttpApiGroup.make('emailCampaigns')
+  // Campaign CRUD
+  .add(
+    HttpApiEndpoint.get('listCampaigns', '/v1/admin/email-campaigns')
+      .setUrlParams(CampaignListParams)
+      .addSuccess(CampaignListResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.post('createCampaign', '/v1/admin/email-campaigns')
+      .setPayload(CreateCampaignBody)
+      .addSuccess(CampaignResponseSchema, { status: 201 })
+  )
+  .add(
+    HttpApiEndpoint.get('getCampaign')`/v1/admin/email-campaigns/${CampaignIdParam}`
+      .addSuccess(CampaignResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.patch('updateCampaign')`/v1/admin/email-campaigns/${CampaignIdParam}`
+      .setPayload(UpdateCampaignBody)
+      .addSuccess(CampaignResponseSchema)
+  )
+  // Lifecycle
+  .add(
+    HttpApiEndpoint.post('activateCampaign')`/v1/admin/email-campaigns/${CampaignIdParam}/activate`
+      .addSuccess(CampaignResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.post('pauseCampaign')`/v1/admin/email-campaigns/${CampaignIdParam}/pause`
+      .addSuccess(CampaignResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.post('resumeCampaign')`/v1/admin/email-campaigns/${CampaignIdParam}/resume`
+      .addSuccess(CampaignResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.post('archiveCampaign')`/v1/admin/email-campaigns/${CampaignIdParam}/archive`
+      .addSuccess(CampaignResponseSchema)
+  )
+  // Steps
+  .add(
+    HttpApiEndpoint.get('listSteps')`/v1/admin/email-campaigns/${CampaignIdParam}/steps`
+      .addSuccess(StepListResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.post('addStep')`/v1/admin/email-campaigns/${CampaignIdParam}/steps`
+      .setPayload(CreateStepBody)
+      .addSuccess(CampaignStepResponseSchema, { status: 201 })
+  )
+  .add(
+    HttpApiEndpoint.patch('updateStep')`/v1/admin/email-campaigns/${CampaignIdParam}/steps/${StepIdParam}`
+      .setPayload(UpdateStepBody)
+      .addSuccess(CampaignStepResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.del('removeStep')`/v1/admin/email-campaigns/${CampaignIdParam}/steps/${StepIdParam}`
+      .addSuccess(DeletedResponse)
+  )
+  // Enrollments
+  .add(
+    HttpApiEndpoint.get('listEnrollments')`/v1/admin/email-campaigns/${CampaignIdParam}/enrollments`
+      .addSuccess(EnrollmentListResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.post('enrollUsers')`/v1/admin/email-campaigns/${CampaignIdParam}/enroll`
+      .setPayload(EnrollUsersBody)
+      .addSuccess(EnrollUsersResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.post('cancelEnrollment')`/v1/admin/email-campaigns/${CampaignIdParam}/enrollments/${EnrollmentIdParam}/cancel`
+      .addSuccess(EnrollmentResponseSchema)
+  )
+  // Analytics
+  .add(
+    HttpApiEndpoint.get('getCampaignAnalytics')`/v1/admin/email-campaigns/${CampaignIdParam}/analytics`
+      .addSuccess(CampaignAnalyticsResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.get('getStepAnalytics')`/v1/admin/email-campaigns/${CampaignIdParam}/steps/${StepIdParam}/analytics`
+      .addSuccess(StepAnalyticsResponseSchema)
+  )
+
+export const EmailWebhooksGroup = HttpApiGroup.make('emailWebhooks')
+  .add(
+    HttpApiEndpoint.post('resendWebhook', '/v1/webhooks/resend')
+      .addSuccess(ResendWebhookResponseSchema)
+  )
+
+export const EmailUnsubscribeGroup = HttpApiGroup.make('emailUnsubscribe')
+  .add(
+    HttpApiEndpoint.get('getUnsubscribe', '/v1/email/unsubscribe')
+      .setUrlParams(UnsubscribeTokenParams)
+      .addSuccess(UnsubscribeVerifyResponseSchema)
+  )
+  .add(
+    HttpApiEndpoint.post('postUnsubscribe', '/v1/email/unsubscribe')
+      .setPayload(UnsubscribeBody)
+      .addSuccess(UnsubscribeResponseSchema)
+  )
+
 export class TxAgentApi extends HttpApi.make('tx-agent-kit')
   .addError(BadRequest, { status: 400 })
   .addError(Unauthorized, { status: 401 })
+  .addError(PaymentRequired, { status: 402 })
+  .addError(Forbidden, { status: 403 })
   .addError(NotFound, { status: 404 })
   .addError(Conflict, { status: 409 })
   .addError(TooManyRequests, { status: 429 })
@@ -521,4 +906,10 @@ export class TxAgentApi extends HttpApi.make('tx-agent-kit')
   .add(TeamsGroup)
   .add(BillingGroup)
   .add(PermissionsGroup)
-  .add(StorageGroup) {}
+  .add(StorageGroup)
+  .add(RolesGroup)
+  .add(AssetsGroup)
+  .add(StorageMeteringGroup)
+  .add(EmailCampaignsGroup)
+  .add(EmailWebhooksGroup)
+  .add(EmailUnsubscribeGroup) {}

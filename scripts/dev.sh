@@ -217,4 +217,17 @@ start_cloudflare_tunnel_if_enabled() {
 pnpm infra:ensure
 pnpm temporal:dev:up
 start_cloudflare_tunnel_if_enabled
-turbo run dev --parallel
+
+# Seed dev account (idempotent — creates user + org + workspace if missing).
+# Runs in background after a brief delay to let the API server start.
+(sleep 8 && "$SCRIPT_DIR/seed-dev-account.sh") &
+
+# Run dev servers. Mobile (Expo/Metro) requires Node <=22 due to
+# ERR_PACKAGE_PATH_NOT_EXPORTED in Metro bundler on Node 24+.
+# Exclude mobile by default to prevent it from crashing turbo.
+# Set DEV_INCLUDE_MOBILE=1 to include it (requires Node <=22).
+if is_truthy "${DEV_INCLUDE_MOBILE:-0}"; then
+  turbo run dev --parallel
+else
+  turbo run dev --parallel --filter='!@tx-agent-kit/mobile'
+fi

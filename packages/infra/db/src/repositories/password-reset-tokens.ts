@@ -1,49 +1,23 @@
 import { and, eq, gt, isNull, isNotNull, lt, or, sql } from 'drizzle-orm'
 import { Effect, Schema } from 'effect'
-import { DB, provideDB } from '../client.js'
 import {
   passwordResetTokenRowSchema,
-  type PasswordResetTokenRowShape
 } from '../effect-schemas/password-reset-tokens.js'
-import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
 import { passwordResetTokens } from '../schema.js'
+import { withDb, decodeFirst } from './repo-helpers.js'
+import { createOptionalDecoder } from './sql-helpers.js'
 
-const decodePasswordResetTokenRow = Schema.decodeUnknown(passwordResetTokenRowSchema)
-const decodeConsumedResetTokenRow = Schema.decodeUnknown(
-  Schema.Struct({
-    userId: Schema.UUID
-  })
+const decode = createOptionalDecoder(passwordResetTokenRowSchema, 'password reset token row')
+
+const decodeConsumed = createOptionalDecoder(
+  Schema.Struct({ userId: Schema.UUID }),
+  'consumed password reset token'
 )
-
-const decodeNullablePasswordResetToken = (
-  value: unknown
-): Effect.Effect<PasswordResetTokenRowShape | null, DbError> => {
-  if (value === null || value === undefined) {
-    return Effect.succeed(null)
-  }
-
-  return decodePasswordResetTokenRow(value).pipe(
-    Effect.mapError((error) => dbDecodeFailed('password reset token row decode failed', error))
-  )
-}
-
-const decodeNullableConsumedResetToken = (
-  value: unknown
-): Effect.Effect<{ userId: string } | null, DbError> => {
-  if (value === null || value === undefined) {
-    return Effect.succeed(null)
-  }
-
-  return decodeConsumedResetTokenRow(value).pipe(
-    Effect.mapError((error) => dbDecodeFailed('consumed password reset token decode failed', error))
-  )
-}
 
 export const passwordResetTokensRepository = {
   create: (input: { userId: string; tokenHash: string }) =>
-    provideDB(
+    withDb('Failed to create password reset token', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .insert(passwordResetTokens)
           .values({
@@ -54,14 +28,13 @@ export const passwordResetTokensRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullablePasswordResetToken(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to create password reset token', error))),
+    ),
 
   consumeByTokenHash: (tokenHash: string) =>
-    provideDB(
+    withDb('Failed to consume password reset token', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const nowExpression = sql`now()`
 
         const rows = yield* db
@@ -81,14 +54,13 @@ export const passwordResetTokensRepository = {
           })
           .execute()
 
-        return yield* decodeNullableConsumedResetToken(rows[0] ?? null)
+        return yield* decodeFirst(rows, decodeConsumed)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to consume password reset token', error))),
+    ),
 
   revokeActiveForUser: (userId: string) =>
-    provideDB(
+    withDb('Failed to revoke active password reset tokens', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const nowExpression = sql`now()`
 
         const rows = yield* db
@@ -110,12 +82,11 @@ export const passwordResetTokensRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to revoke active password reset tokens', error))),
+    ),
 
   pruneExpired: (olderThan: Date) =>
-    provideDB(
+    withDb('Failed to prune expired password reset tokens', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .delete(passwordResetTokens)
           .where(
@@ -132,5 +103,5 @@ export const passwordResetTokensRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to prune expired password reset tokens', error)))
+    )
 }

@@ -1,4 +1,5 @@
 import { domainStructurePlugin } from './domain-structure-plugin.js'
+import { stripeIdempotencyPlugin } from './stripe-idempotency-plugin.js'
 
 const effectSchemaOnlyRestrictions = {
   paths: [
@@ -281,6 +282,40 @@ export const domainInvariantConfig = [
       'domain-structure/no-throw-try-outside-adapters': 'error'
     }
   },
+  // ── Stripe idempotency guard ───────────────────────────────────────
+  // Every money-moving Stripe SDK `.create(...)` call under the stripe
+  // infra package must pass `{ idempotencyKey }` in its options argument
+  // so a lost-response network retry can't produce a duplicate Stripe
+  // resource. Tests are exempt (they mock the SDK). See iter-2 of the
+  // billing audit for the bug this rule prevents.
+  {
+    files: [
+      'packages/infra/stripe/src/**/*.{ts,tsx}'
+    ],
+    ignores: ['**/*.test.ts', '**/*.test.tsx'],
+    plugins: {
+      'stripe-idempotency': stripeIdempotencyPlugin
+    },
+    rules: {
+      'stripe-idempotency/require-idempotency-key': 'error'
+    }
+  },
+  // ── No swallowed errors: catch handlers must preserve the original error ──
+  // Applies to all Effect-using code in core, infra, and API layers.
+  {
+    files: [
+      'packages/core/src/**/*.{ts,tsx}',
+      'packages/infra/*/src/**/*.{ts,tsx}',
+      'apps/api/src/**/*.{ts,tsx}'
+    ],
+    ignores: ['**/*.test.ts', '**/*.test.tsx'],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/no-swallowed-errors': 'error'
+    }
+  },
   {
     files: [
       'packages/core/src/domains/*/repositories/**/*.{ts,tsx}',
@@ -353,6 +388,59 @@ export const domainInvariantConfig = [
     },
     rules: {
       'domain-structure/core-adapters-use-db-row-mappers': 'error'
+    }
+  },
+  // ── Core: domain records must extend row shapes from @tx-agent-kit/db ──
+  {
+    files: ['packages/core/src/domains/*/domain/**/*.{ts,tsx}'],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/enforce-domain-extends-row-shape': 'error'
+    }
+  },
+  // ── Core: enforce error factory functions ───────────────────────────
+  {
+    files: [
+      'packages/core/src/domains/*/application/**/*.{ts,tsx}',
+      'packages/core/src/domains/*/adapters/**/*.{ts,tsx}'
+    ],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/enforce-core-error-factories': 'error'
+    }
+  },
+  // ── Effect.gen: prefer Effect.forEach over for...of ────────────────
+  {
+    files: [
+      'packages/core/src/domains/*/application/**/*.{ts,tsx}',
+      'apps/api/src/routes/**/*.{ts,tsx}',
+      'apps/worker/src/**/*.{ts,tsx}'
+    ],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/prefer-effect-foreach-in-gen': 'warn'
+    }
+  },
+  // ── API: no port adapters in apps/api (except legacy external-service adapters) ──
+  {
+    files: ['apps/api/src/adapters/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/api/src/adapters/google-oidc.ts',
+      'apps/api/src/adapters/stripe.ts',
+      'apps/api/src/adapters/invitation-email.ts',
+      'apps/api/src/adapters/password-reset-email.ts'
+    ],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/no-api-layer-adapters': 'error'
     }
   },
   // ── Web: core import restrictions + use server ban ──────────────────
@@ -573,6 +661,40 @@ export const domainInvariantConfig = [
       ]
     }
   },
+  // ── Web: enforce getApiErrorMessage in catch handlers ────────────────
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/web/lib/axios.ts',
+      'apps/web/**/*.test.ts',
+      'apps/web/**/*.test.tsx',
+      'apps/web/**/*.integration.test.ts',
+      'apps/web/**/*.integration.test.tsx'
+    ],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/enforce-api-error-message': 'error'
+    }
+  },
+  // ── Web: enforce shadcn Button over raw <button> ─────────────────────
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/web/components/ui/**',
+      'apps/web/components/AppSidebar.tsx',
+      'apps/web/components/devtools/**',
+      '**/*.test.*',
+      '**/*.integration.test.*'
+    ],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/enforce-shadcn-button': 'error'
+    }
+  },
   {
     files: ['apps/web/app/api/**/*.{ts,tsx}'],
     rules: {
@@ -617,6 +739,59 @@ export const domainInvariantConfig = [
       ]
     }
   },
+  // ── Rule: extract-test-fixture-setup ─────────────────────────────────
+  // Flags direct createDbAuthContext calls in API integration test files.
+  {
+    files: ['apps/api/src/**/*.integration.test.ts'],
+    ignores: [
+      'apps/api/src/routes/email-campaigns.integration.test.ts',
+      'apps/api/src/routes/email-campaigns-service.e2e.integration.test.ts',
+      'apps/api/src/routes/email-unsubscribe.integration.test.ts',
+      'apps/api/src/routes/email-webhooks.integration.test.ts'
+    ],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/extract-test-fixture-setup': 'warn'
+    }
+  },
+  // ── Rule: require-auth-middleware-in-routes ───────────────────────────
+  // Route files importing domain services must also import auth middleware.
+  {
+    files: ['apps/api/src/routes/*.ts'],
+    ignores: ['**/*.test.ts', '**/*.integration.test.ts', '**/test-*.ts'],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/require-auth-middleware-in-routes': 'error'
+    }
+  },
+  // ── Rule: enforce-auth-helper-usage ─────────────────────────────────
+  // Route handlers must use requireTeamAuth/requireOrgAuth helpers
+  // instead of accessing TeamAuthMiddleware/OrgAuthMiddleware directly.
+  {
+    files: ['apps/api/src/routes/**/*.ts'],
+    ignores: ['**/*.test.*', '**/test-helpers.*'],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/enforce-auth-helper-usage': 'error'
+    }
+  },
+  // ── Rule: no-hardcoded-test-ports ────────────────────────────────────
+  // Flags hardcoded port numbers 4100-4199 in integration test files.
+  {
+    files: ['apps/api/src/**/*.integration.test.ts'],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/no-hardcoded-test-ports': 'warn'
+    }
+  },
   {
     files: ['apps/web/**/*.integration.test.ts', 'apps/web/**/*.integration.test.tsx'],
     rules: {
@@ -641,6 +816,7 @@ export const domainInvariantConfig = [
       'apps/**/src/domains/*/{domain,ports,application,adapters,runtime,ui}/**/*.{ts,tsx}',
       'apps/api/src/routes/**/*.{ts,tsx}'
     ],
+    ignores: ['**/*.test.ts', '**/*.test.tsx', '**/*.integration.test.ts', '**/*.integration.test.tsx', '**/test-*.ts', '**/test-*.tsx'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -771,7 +947,12 @@ export const domainInvariantConfig = [
   },
   {
     files: ['packages/infra/db/src/repositories/**/*.{ts,tsx}'],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
     rules: {
+      'domain-structure/enforce-financial-audit-immutability': 'error',
+      'domain-structure/enforce-tenant-scope': 'error',
       'no-restricted-syntax': [
         'error',
         {
@@ -798,11 +979,10 @@ export const domainInvariantConfig = [
               name: '@tx-agent-kit/db',
               message: 'Application layer must depend on domain ports, never DB packages directly.'
             },
-            {
-              name: '@tx-agent-kit/contracts',
-              message:
-                'Domain application layer must stay transport-agnostic. Accept typed command objects from routes instead of importing API contract schemas/types.'
-            },
+            // NOTE: @tx-agent-kit/contracts is intentionally NOT restricted here.
+            // It is our shared vocabulary package (constants, types, literals) — not
+            // a transport layer. Application services may import constants and types
+            // from contracts. Schema imports are blocked separately via effect/Schema.
             {
               name: '@tx-agent-kit/auth',
               message:
@@ -824,9 +1004,9 @@ export const domainInvariantConfig = [
               message: 'Application layer must depend on domain ports, never DB packages directly.'
             },
             {
-              group: ['@tx-agent-kit/contracts/*', '@tx-agent-kit/auth/*'],
+              group: ['@tx-agent-kit/auth/*'],
               message:
-                'Application layer must not couple to transport/infra packages. Use domain models and capability ports, then map in outer layers.'
+                'Application layer must not couple to infra packages. Use domain models and capability ports, then map in outer layers.'
             }
           ]
         })
@@ -872,6 +1052,7 @@ export const domainInvariantConfig = [
   },
   {
     files: ['apps/api/src/routes/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx', '**/*.integration.test.ts', '**/*.integration.test.tsx', '**/test-*.ts', '**/test-*.tsx'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -1014,6 +1195,7 @@ export const domainInvariantConfig = [
   },
   {
     files: ['packages/core/src/domains/**/*.{ts,tsx}', 'apps/api/src/routes/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx', '**/*.integration.test.ts', '**/*.integration.test.tsx', '**/test-*.ts', '**/test-*.tsx'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -1254,6 +1436,20 @@ export const domainInvariantConfig = [
     files: ['apps/mobile/lib/log.ts'],
     rules: {
       'no-console': 'off'
+    }
+  },
+  // ── enforce-service-naming: Context.Tag classes must follow naming conventions ──
+  {
+    files: [
+      'packages/core/src/domains/*/application/**/*.{ts,tsx}',
+      'packages/core/src/domains/*/ports/**/*.{ts,tsx}'
+    ],
+    ignores: ['**/*.test.ts', '**/*.integration.test.ts'],
+    plugins: {
+      'domain-structure': domainStructurePlugin
+    },
+    rules: {
+      'domain-structure/enforce-service-naming': 'error'
     }
   },
   // ── Rule: Enforce explicit return types on exported port functions ───

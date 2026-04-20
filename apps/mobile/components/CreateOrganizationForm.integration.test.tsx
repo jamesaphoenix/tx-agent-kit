@@ -49,7 +49,7 @@ describe('CreateOrganizationForm integration', () => {
           INNER JOIN org_members m
             ON m.organization_id = o.id
           WHERE m.user_id = $1
-            AND m.role = 'owner'::membership_role
+            AND m.role = 'admin'::member_role
             AND o.name = $2
         `,
         [createdUser.user.id, organizationName]

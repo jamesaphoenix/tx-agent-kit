@@ -17,14 +17,14 @@
   "dependencies": {
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/db": "workspace:*",
-    "@opentelemetry/api": "^1.9.0",
-    "effect": "^3.19.19",
-    "pg": "^8.19.0",
-    "uuid": "^11.1.0"
+    "@opentelemetry/api": "^1.9.1",
+    "effect": "^3.21.0",
+    "pg": "^8.20.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*",
-    "@types/pg": "^8.18.0",
-    "orval": "^8.1.0"
+    "@types/pg": "^8.20.0",
+    "orval": "^8.8.0"
   }
 }

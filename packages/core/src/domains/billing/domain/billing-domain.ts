@@ -1,5 +1,10 @@
 import type {
-  CreditEntryType,
+  OrganizationRowShape,
+  UsageRecordRowShape,
+  SubscriptionEventRowShape,
+  CreditLedgerRowShape
+} from '@tx-agent-kit/db'
+import type {
   SubscriptionPlanSlug,
   SubscriptionStatus,
   UsageCategory
@@ -24,64 +29,50 @@ export interface StripeWebhookEvent {
   payload: JsonObject
   data: {
     object: JsonObject
+    /**
+     * Stripe's `event.data.previous_attributes` — the subset of
+     * `object` fields that changed in this event. Required for the
+     * `charge.refunded` delta computation (amount_refunded is
+     * cumulative, so we need the previous value to compute the
+     * delta for THIS specific refund event). Present only on
+     * update-style events; null when Stripe didn't send it.
+     */
+    previousAttributes: JsonObject | null
   }
 }
 
-export interface BillingSettingsRecord {
-  id: string
-  billingEmail: string | null
-  stripeCustomerId: string | null
-  stripeSubscriptionId: string | null
-  stripePaymentMethodId: string | null
-  stripeMeteredSubscriptionItemId: string | null
-  creditsBalance: number
-  reservedCredits: number
-  autoRechargeEnabled: boolean
-  autoRechargeThreshold: number | null
-  autoRechargeAmount: number | null
-  isSubscribed: boolean
-  subscriptionStatus: SubscriptionStatus
-  subscriptionPlan: string | null
-  subscriptionStartedAt: Date | null
-  subscriptionEndsAt: Date | null
-  subscriptionCurrentPeriodEnd: Date | null
-}
+// Extends row shape — billing settings are a subset of OrganizationRowShape fields.
+export type BillingSettingsRecord = Pick<
+  OrganizationRowShape,
+  | 'id'
+  | 'ownerUserId'
+  | 'billingEmail'
+  | 'stripeCustomerId'
+  | 'stripeSubscriptionId'
+  | 'stripePaymentMethodId'
+  | 'stripeMeteredSubscriptionItemId'
+  | 'usageCap'
+  | 'creditsBalance'
+  | 'reservedCredits'
+  | 'autoRechargeEnabled'
+  | 'autoRechargeThreshold'
+  | 'autoRechargeAmount'
+  | 'isSubscribed'
+  | 'subscriptionStatus'
+  | 'subscriptionPlan'
+  | 'subscriptionStartedAt'
+  | 'subscriptionEndsAt'
+  | 'subscriptionCurrentPeriodEnd'
+  | 'paymentGracePeriodEndsAt'
+  | 'suspendedAt'
+  | 'welcomeCreditGrantedAt'
+>
 
-export interface UsageRecordRecord {
-  id: string
-  organizationId: string
-  category: UsageCategory
-  quantity: number
-  unitCostDecimillicents: number
-  totalCostDecimillicents: number
-  referenceId: string | null
-  stripeUsageRecordId: string | null
-  metadata: unknown
-  recordedAt: Date
-  createdAt: Date
-}
+export type UsageRecordRecord = UsageRecordRowShape
 
-export interface SubscriptionEventRecord {
-  id: string
-  stripeEventId: string
-  eventType: string
-  organizationId: string | null
-  payload: unknown
-  processedAt: Date | null
-  createdAt: Date
-}
+export type SubscriptionEventRecord = SubscriptionEventRowShape
 
-export interface CreditLedgerEntryRecord {
-  id: string
-  organizationId: string
-  amount: number
-  entryType: CreditEntryType
-  reason: string
-  referenceId: string | null
-  balanceAfter: number
-  metadata: unknown
-  createdAt: Date
-}
+export type CreditLedgerEntryRecord = CreditLedgerRowShape
 
 export interface BillingSettings {
   organizationId: string
@@ -95,27 +86,19 @@ export interface BillingSettings {
   autoRechargeEnabled: boolean
   autoRechargeThresholdDecimillicents: number | null
   autoRechargeAmountDecimillicents: number | null
+  usageCapDecimillicents: number | null
   isSubscribed: boolean
   subscriptionStatus: SubscriptionStatus
   subscriptionPlan: SubscriptionPlanSlug | null
   subscriptionStartedAt: Date | null
   subscriptionEndsAt: Date | null
   subscriptionCurrentPeriodEnd: Date | null
+  paymentGracePeriodEndsAt: Date | null
+  suspendedAt: Date | null
 }
 
-export interface UsageRecord {
-  id: string
-  organizationId: string
-  category: UsageCategory
-  quantity: number
-  unitCostDecimillicents: number
-  totalCostDecimillicents: number
-  referenceId: string | null
-  stripeUsageRecordId: string | null
-  metadata: unknown
-  recordedAt: Date
-  createdAt: Date
-}
+// Extends row shape — usage records are returned as-is from the DB.
+export type UsageRecord = UsageRecordRowShape
 
 export interface UsageSummary {
   organizationId: string
@@ -126,8 +109,22 @@ export interface UsageSummary {
   totalCostDecimillicents: number
 }
 
+export interface NoCapReminderPreferenceResult {
+  dismissed: boolean
+}
+export type NoCapReminderPreference = NoCapReminderPreferenceResult
+
+export interface AutoRechargeRequiresActionChallengeResult {
+  attemptId: string
+  amountDecimillicents: number
+  stripePaymentIntentId: string
+  clientSecret: string
+}
+export type AutoRechargeRequiresActionChallenge = AutoRechargeRequiresActionChallengeResult
+
 export interface CreateCheckoutSessionCommand {
   organizationId: string
+  subscriptionPlan: SubscriptionPlanSlug
   successUrl: string
   cancelUrl: string
 }
@@ -137,11 +134,25 @@ export interface UpdateBillingSettingsCommand {
   autoRechargeEnabled?: boolean
   autoRechargeThresholdDecimillicents?: number | null
   autoRechargeAmountDecimillicents?: number | null
+  usageCapDecimillicents?: number | null
 }
 
 export interface CreatePortalSessionCommand {
   organizationId: string
   returnUrl: string
+}
+
+export interface CompleteLocalBillingSetupCommand {
+  subscriptionPlan: SubscriptionPlanSlug
+}
+
+/** Command for POST /v1/billing/:orgId/top-up — one-time credit purchase
+ *  via a Stripe Checkout session in payment mode. */
+export interface CreateTopUpSessionCommand {
+  organizationId: string
+  amountDecimillicents: number
+  successUrl: string
+  cancelUrl: string
 }
 
 export interface RecordUsageCommand {
@@ -162,11 +173,13 @@ export interface UsageSummaryCommand {
 
 const subscriptionPlanOrder: Record<'free' | SubscriptionPlanSlug, number> = {
   free: 0,
-  pro: 1
+  try_me: 1,
+  pro: 2,
+  agency: 3
 }
 
 const isSubscriptionPlanSlug = (value: string): value is SubscriptionPlanSlug =>
-  value === 'pro'
+  value === 'try_me' || value === 'pro' || value === 'agency'
 
 export const isSubscriptionActive = (status: SubscriptionStatus): boolean =>
   status === 'active' || status === 'trialing' || status === 'past_due'
@@ -214,6 +227,7 @@ export const toBillingSettings = (row: BillingSettingsRecord): BillingSettings =
   autoRechargeEnabled: row.autoRechargeEnabled,
   autoRechargeThresholdDecimillicents: row.autoRechargeThreshold,
   autoRechargeAmountDecimillicents: row.autoRechargeAmount,
+  usageCapDecimillicents: row.usageCap,
   isSubscribed: row.isSubscribed,
   subscriptionStatus: row.subscriptionStatus,
   subscriptionPlan: row.subscriptionPlan && isSubscriptionPlanSlug(row.subscriptionPlan)
@@ -221,19 +235,7 @@ export const toBillingSettings = (row: BillingSettingsRecord): BillingSettings =
     : null,
   subscriptionStartedAt: row.subscriptionStartedAt,
   subscriptionEndsAt: row.subscriptionEndsAt,
-  subscriptionCurrentPeriodEnd: row.subscriptionCurrentPeriodEnd
-})
-
-export const toUsageRecord = (row: UsageRecordRecord): UsageRecord => ({
-  id: row.id,
-  organizationId: row.organizationId,
-  category: row.category,
-  quantity: row.quantity,
-  unitCostDecimillicents: row.unitCostDecimillicents,
-  totalCostDecimillicents: row.totalCostDecimillicents,
-  referenceId: row.referenceId,
-  stripeUsageRecordId: row.stripeUsageRecordId,
-  metadata: row.metadata,
-  recordedAt: row.recordedAt,
-  createdAt: row.createdAt
+  subscriptionCurrentPeriodEnd: row.subscriptionCurrentPeriodEnd,
+  paymentGracePeriodEndsAt: row.paymentGracePeriodEndsAt,
+  suspendedAt: row.suspendedAt
 })

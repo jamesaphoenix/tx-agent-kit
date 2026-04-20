@@ -7,14 +7,6 @@ export const emailSchema = Schema.String.pipe(
 
 export const sortOrderSchema = Schema.Literal(...sortOrders)
 
-export const listQueryParamsSchema = Schema.Struct({
-  cursor: Schema.optional(Schema.String),
-  limit: Schema.optional(Schema.Number),
-  sortBy: Schema.optional(Schema.String),
-  sortOrder: Schema.optional(sortOrderSchema),
-  filter: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String }))
-})
-
 export const paginatedResponseSchema = <A, I, R>(itemSchema: Schema.Schema<A, I, R>) =>
   Schema.Struct({
     data: Schema.Array(itemSchema),
@@ -92,6 +84,26 @@ export const decodeCursor = (cursor: string): CursorPayload | null => {
   }
 }
 
+export const listParamsSchema = Schema.Struct({
+  cursor: Schema.optional(Schema.String),
+  limit: Schema.optional(Schema.String),
+  sortBy: Schema.optional(Schema.String),
+  sortOrder: Schema.optional(Schema.Literal(...sortOrders))
+})
+
+export const deletedResponseSchema = Schema.Struct({
+  deleted: Schema.Boolean
+})
+
+export const idsBodySchema = Schema.Struct({
+  ids: Schema.Array(Schema.UUID)
+})
+
+export const manyResponseSchema = <A, I, R>(itemSchema: Schema.Schema<A, I, R>) =>
+  Schema.Struct({
+    data: Schema.Array(itemSchema)
+  })
+
 export const apiErrorSchema = Schema.Struct({
   code: Schema.String,
   message: Schema.String,
@@ -100,3 +112,16 @@ export const apiErrorSchema = Schema.Struct({
 })
 
 export type ApiError = Schema.Schema.Type<typeof apiErrorSchema>
+export type DeletedResponse = Schema.Schema.Type<typeof deletedResponseSchema>
+
+export const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+  if (!value) {
+    return fallback
+  }
+  const parsed = Number.parseInt(value, 10)
+  if (Number.isNaN(parsed) || parsed < 1) {
+    return fallback
+  }
+  return parsed
+}
+

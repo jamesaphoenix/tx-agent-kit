@@ -1,43 +1,48 @@
-export interface TeamRecord {
-  id: string
-  organizationId: string
-  name: string
-  website: string | null
-  brandSettings: { primaryColor?: string; logoUrl?: string; metadata?: Record<string, string> } | null
-  createdAt: Date
-  updatedAt: Date
+import type {
+  TeamRowShape,
+  TeamMemberRowShape,
+  ContentReviewTokenRowShape
+} from '@tx-agent-kit/db'
+
+export interface BrandSettingsShape {
+  colors: {
+    primary: string
+    secondary: string
+    accent: string
+    background: string
+    text: string
+  }
+  brandGuidelines: string
+  industry: string
+  targetAudience: string
 }
 
-export interface TeamMemberRecord {
-  id: string
-  teamId: string
-  userId: string
-  roleId: string | null
-  createdAt: Date
-  updatedAt: Date
-}
+// Extends row shape — new DB columns appear automatically.
+export type TeamRecord = TeamRowShape
 
-export interface Team {
-  id: string
-  organizationId: string
-  name: string
-  website: string | null
-  brandSettings: { primaryColor?: string; logoUrl?: string; metadata?: Record<string, string> } | null
-  createdAt: Date
-  updatedAt: Date
+export type TeamMemberRecord = TeamMemberRowShape
+
+// ContentReviewTokenRowShape uses `string[]`; domain wants `readonly string[]`.
+export interface ContentReviewTokenRecord extends Omit<ContentReviewTokenRowShape, 'permissions'> {
+  readonly permissions: readonly string[]
 }
 
 export interface CreateTeamCommand {
   organizationId: string
   name: string
+  website?: string | null
+  brandSettings: BrandSettingsShape
 }
 
 export interface UpdateTeamCommand {
   name?: string
+  website?: string | null
+  brandSettings?: BrandSettingsShape | null
 }
 
 const minTeamNameLength = 2
 const maxTeamNameLength = 64
+const hexColorPattern = /^#[0-9a-fA-F]{6}$/
 
 export const normalizeTeamName = (name: string): string => name.trim()
 
@@ -46,12 +51,18 @@ export const isValidTeamName = (name: string): boolean => {
   return trimmed.length >= minTeamNameLength && trimmed.length <= maxTeamNameLength
 }
 
-export const toTeam = (row: TeamRecord): Team => ({
-  id: row.id,
-  organizationId: row.organizationId,
-  name: row.name,
-  website: row.website,
-  brandSettings: row.brandSettings,
-  createdAt: row.createdAt,
-  updatedAt: row.updatedAt
-})
+export const isValidHexColor = (value: string): boolean =>
+  hexColorPattern.test(value)
+
+export const isValidBrandSettings = (settings: BrandSettingsShape): boolean => {
+  const { colors, brandGuidelines, industry, targetAudience } = settings
+  if (!isValidHexColor(colors.primary)) {return false}
+  if (!isValidHexColor(colors.secondary)) {return false}
+  if (!isValidHexColor(colors.accent)) {return false}
+  if (!isValidHexColor(colors.background)) {return false}
+  if (!isValidHexColor(colors.text)) {return false}
+  if (brandGuidelines.length > 500) {return false}
+  if (industry.length > 100) {return false}
+  if (targetAudience.length > 500) {return false}
+  return true
+}

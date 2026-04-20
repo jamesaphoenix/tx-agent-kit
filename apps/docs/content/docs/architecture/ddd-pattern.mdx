@@ -11,7 +11,8 @@ Each domain in `packages/core/src/domains/` follows this structure:
 
 ```
 packages/core/src/domains/<domain>/
-  domain/         # Entities, value objects, pure domain rules
+  events.ts       # PUBLIC cross-domain event contract — the ONLY importable file from sibling domains
+  domain/         # Entities, value objects, pure domain rules, event payload shapes
   ports/          # Interfaces and capability contracts
   application/    # Use-case orchestration
   adapters/       # External system adapters (optional)
@@ -20,6 +21,58 @@ packages/core/src/domains/<domain>/
 ```
 
 Persistence implementations live separately in `packages/infra/db/src/repositories/`, not inside the domain slice.
+
+## Cross-domain boundaries
+
+The cardinal rule:
+
+> **Events are public nouns. Ports are public verbs. Errors are private semantics.**
+
+| What | Cross-domain? | How |
+|------|--------------|-----|
+| Domain events | Yes — via `events.ts` at domain root | The ONLY cross-domain import between sibling domains |
+| Ports | No — wired through DI | Adapters bridge repos to ports; services depend on their own ports |
+| Domain errors | No — translate at seams | Rich typed ADT errors inside a domain; translate at port/app boundary |
+| Shared infra errors | Yes — via `errors.ts` | `CoreError` (`unauthorized`, `notFound`, etc.) at core package level |
+
+### The `events.ts` contract
+
+`events.ts` lives at the domain root (not inside `domain/`) and is mechanically enforced as the single import surface other domains may touch. It contains:
+
+- Event type discriminants (string literal constants like `'billing.credits_purchased'`)
+- Typed payload shapes (re-exported from `domain/*-events.ts`)
+- Version constants (monotonically increasing per event type)
+
+```typescript
+// packages/core/src/domains/billing/events.ts
+export type {
+  BillingCreditsPurchasedEventPayload,
+  BillingUsageCapExceededEventPayload,
+  BillingWelcomeCreditGrantedEventPayload
+} from './domain/billing-events.js'
+
+export const billingEvents = {
+  creditsPurchased: 'billing.credits_purchased',
+  usageCapExceeded: 'billing.usage_cap_exceeded',
+  welcomeCreditGranted: 'billing.welcome_credit_granted'
+} as const
+
+export const billingEventVersions = {
+  'billing.credits_purchased': 1,
+  'billing.usage_cap_exceeded': 1,
+  'billing.welcome_credit_granted': 1
+} as const
+```
+
+Consumers import with `import type` only — events are data contracts, not runtime code. Other domains MUST NOT import internal services, repositories, or domain logic from a sibling; only `events.ts`. ESLint + `scripts/lint/enforce-domain-event-contracts.mjs` enforce this.
+
+### Error architecture
+
+- **Inside a domain** — rich typed ADT errors (`Either<Result, DomainError>`)
+- **At port boundaries** — translate to seam-specific error types that don't leak internals
+- **At application layer** — compose and remap into `CoreError`
+- **At API layer** — final translation to HTTP via `mapCoreError`
+- **Never** import another domain's internal error types
 
 ## Layer responsibilities
 

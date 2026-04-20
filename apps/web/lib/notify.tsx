@@ -2,6 +2,7 @@
 
 import type { ReactElement } from 'react'
 import { Toaster as SonnerToaster, toast } from 'sonner'
+import { getApiErrorMessage } from './axios'
 
 export interface NotifyPromiseMessages {
   loading: string
@@ -20,6 +21,12 @@ export const notify = {
 
   error: (message: string, options?: NotifyOptions): void => {
     toast.error(message, options)
+  },
+
+  apiError: (error: unknown, fallback: string, options?: NotifyOptions): string => {
+    const message = getApiErrorMessage(error, fallback)
+    toast.error(message, options)
+    return message
   },
 
   info: (message: string, options?: NotifyOptions): void => {

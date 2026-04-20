@@ -1,3 +1,4 @@
+import type { MemberRole } from '@tx-agent-kit/contracts'
 import type { teamMembers } from '../schema.js'
 import { generateId, generateTimestamp } from './factory-helpers.js'
 
@@ -8,6 +9,7 @@ export interface CreateTeamMemberFactoryOptions {
   userId: string
   id?: string
   roleId?: string | null
+  role?: MemberRole
   createdAt?: Date
   updatedAt?: Date
 }
@@ -20,6 +22,7 @@ export const createTeamMemberFactory = (
     teamId: options.teamId,
     userId: options.userId,
     roleId: options.roleId ?? null,
+    role: options.role ?? 'member',
     createdAt: options.createdAt ?? generateTimestamp(),
     updatedAt: options.updatedAt ?? generateTimestamp()
   }

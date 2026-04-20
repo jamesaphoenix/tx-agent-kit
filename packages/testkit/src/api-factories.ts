@@ -4,7 +4,12 @@ import {
   createUserFactory,
   generateUniqueValue
 } from '@tx-agent-kit/db'
-import { authResponseSchema, invitationSchema, organizationSchema } from '@tx-agent-kit/contracts'
+import {
+  authResponseSchema,
+  invitationSchema,
+  organizationSchema,
+  type MembershipType
+} from '@tx-agent-kit/contracts'
 import * as Schema from 'effect/Schema'
 import { createTestCaseId } from './test-run.js'
 import type { SqlTestContext } from './sql-context.js'
@@ -287,6 +292,7 @@ export interface CreateInvitationOptions {
   organizationId: string
   email: string
   role?: 'admin' | 'member'
+  membershipType?: MembershipType
 }
 
 export interface CreatedInvitation {
@@ -298,6 +304,8 @@ export interface CreatedInvitation {
   invitedByUserId: string
   token: string
   expiresAt: string
+  teamId: string | null
+  membershipType: MembershipType
   createdAt: string
 }
 
@@ -311,10 +319,11 @@ export const createInvitation = async (
       authorization: `Bearer ${options.token}`
     }),
     body: JSON.stringify({
-      organizationId: options.organizationId,
-      email: options.email,
-      role: options.role ?? 'member'
-    })
+          organizationId: options.organizationId,
+          email: options.email,
+          role: options.role ?? 'member',
+          ...(options.membershipType ? { membershipType: options.membershipType } : {})
+        })
   })
 
   const body = await parseJsonOrThrow(response)
@@ -382,6 +391,125 @@ export const createUserWithOrgAndInvitation = async (
   }
 }
 
+// ---------------------------------------------------------------------------
+// Team with members factory
+// ---------------------------------------------------------------------------
+
+export const defaultTestBrandSettings = {
+  colors: { primary: '#6366F1', secondary: '#8B5CF6', accent: '#F59E0B', background: '#FFFFFF', text: '#1A1A2E' },
+  brandGuidelines: 'Test brand guidelines',
+  industry: 'technology',
+  targetAudience: 'Test audience'
+}
+
+export interface CreateTeamWithMembersOptions {
+  token: string
+  organizationId: string
+  teamName?: string
+  brandSettings?: {
+    colors: { primary: string; secondary: string; accent: string; background: string; text: string }
+    brandGuidelines: string
+    industry: string
+    targetAudience: string
+  }
+  members?: Array<{
+    userId: string
+  }>
+}
+
+export interface CreatedTeamWithMembers {
+  team: { id: string; name: string; organizationId: string }
+  members: Array<{ userId: string; teamId: string }>
+}
+
+export const createTeamWithMembers = async (
+  context: ApiFactoryContext,
+  options: CreateTeamWithMembersOptions
+): Promise<CreatedTeamWithMembers> => {
+  const teamName = options.teamName ?? `Team ${generateUniqueValue('team')}`
+
+  const teamRes = await fetch(`${context.baseUrl}/v1/teams`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${options.token}`,
+      ...context.testContext.headersForCase(`create-team-${teamName}`)
+    },
+    body: JSON.stringify({
+      organizationId: options.organizationId,
+      name: teamName,
+      brandSettings: options.brandSettings ?? defaultTestBrandSettings
+    })
+  })
+
+  if (!teamRes.ok) {
+    const body = await teamRes.text()
+    throw new Error(`createTeamWithMembers: team creation failed (${teamRes.status}): ${body}`)
+  }
+
+  const team = (await teamRes.json()) as { id: string; name: string; organizationId: string }
+  const addedMembers: Array<{ userId: string; teamId: string }> = []
+
+  if (options.members) {
+    for (const member of options.members) {
+      // Try API first (POST /v1/teams/:teamId/members)
+      const addRes = await fetch(`${context.baseUrl}/v1/teams/${team.id}/members`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${options.token}`,
+          ...context.testContext.headersForCase(`add-member-${member.userId}`)
+        },
+        body: JSON.stringify({ userId: member.userId })
+      })
+
+      if (addRes.ok) {
+        addedMembers.push({ userId: member.userId, teamId: team.id })
+      } else {
+        // Fallback to raw SQL
+        await context.testContext.withSchemaClient(async (client) => {
+          await client.query(
+            'INSERT INTO team_members (team_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [team.id, member.userId]
+          )
+        })
+        addedMembers.push({ userId: member.userId, teamId: team.id })
+      }
+    }
+  }
+
+  return { team, members: addedMembers }
+}
+
+export interface CreateUserWithOrgAndTeamOptions {
+  orgName?: string
+  teamName?: string
+}
+
+export interface CreatedUserWithOrgAndTeam {
+  user: CreatedUserSession
+  org: { id: string; name: string }
+  team: { id: string; name: string; organizationId: string }
+  token: string
+}
+
+export const createUserWithOrgAndTeam = async (
+  context: ApiFactoryContext,
+  options?: CreateUserWithOrgAndTeamOptions
+): Promise<CreatedUserWithOrgAndTeam> => {
+  const { user, org, token } = await createUserWithOrg(context, {
+    organization: { name: options?.orgName }
+  })
+
+  const { team } = await createTeamWithMembers(context, {
+    token,
+    organizationId: org.id,
+    teamName: options?.teamName
+  })
+
+  return { user, org, team, token }
+}
+
 export const withTestHeaders = (
   context: ApiFactoryContext,
   caseName: string,
@@ -390,3 +518,52 @@ export const withTestHeaders = (
 
 export const getTestCaseId = (context: ApiFactoryContext, caseName: string): string =>
   createTestCaseId(context.testContext.testRunId, caseName)
+
+/** Seed an organization's credit balance directly in the DB (for billing integration tests). */
+export const seedOrgCredits = async (
+  context: ApiFactoryContext,
+  orgId: string,
+  creditsBalanceDecimillicents: number
+): Promise<void> => {
+  await context.testContext.withSchemaClient(async (client) => {
+    await client.query(
+      `UPDATE organizations SET credits_balance = $1, updated_at = now() WHERE id = $2`,
+      [creditsBalanceDecimillicents, orgId]
+    )
+  })
+}
+
+/** Seed an organization's usage cap directly in the DB (for billing integration tests). */
+export const seedOrgUsageCap = async (
+  context: ApiFactoryContext,
+  orgId: string,
+  usageCapDecimillicents: number
+): Promise<void> => {
+  await context.testContext.withSchemaClient(async (client) => {
+    await client.query(
+      `UPDATE organizations SET usage_cap = $1, updated_at = now() WHERE id = $2`,
+      [usageCapDecimillicents, orgId]
+    )
+  })
+}
+
+/**
+ * Activate a Pro subscription on an organization (direct DB update).
+ * Used by tests that need upload/storage features which require a subscription.
+ */
+export const activateSubscription = async (
+  organizationId: string
+): Promise<void> => {
+  const { Client } = await import('pg')
+  const { getTestkitEnv } = await import('./env.js')
+  const client = new Client({ connectionString: getTestkitEnv().DATABASE_URL })
+  await client.connect()
+  try {
+    await client.query(
+      `UPDATE organizations SET is_subscribed = true, subscription_status = 'active', subscription_plan = 'pro' WHERE id = $1`,
+      [organizationId]
+    )
+  } finally {
+    await client.end()
+  }
+}

@@ -5,6 +5,29 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "import": "./dist/constants.js"
+    },
+    "./constants.js": {
+      "types": "./dist/constants.d.ts",
+      "import": "./dist/constants.js"
+    },
+    "./literals": {
+      "types": "./dist/literals.d.ts",
+      "import": "./dist/literals.js"
+    },
+    "./literals.js": {
+      "types": "./dist/literals.d.ts",
+      "import": "./dist/literals.js"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "tsc -b",
     "type-check": "tsc -b --pretty false",
@@ -12,9 +35,10 @@
     "test": "vitest run -c vitest.config.ts"
   },
   "dependencies": {
-    "effect": "^3.19.19"
+    "effect": "^3.21.0"
   },
   "devDependencies": {
-    "@tx-agent-kit/vitest-config": "workspace:*"
+    "@tx-agent-kit/vitest-config": "workspace:*",
+    "fast-check": "^4.6.0"
   }
 }

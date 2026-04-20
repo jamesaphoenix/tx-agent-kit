@@ -9,26 +9,14 @@ import {
 } from 'drizzle-orm'
 import { type UsageCategory } from '@tx-agent-kit/contracts'
 import { Effect, Schema } from 'effect'
-import { DB, provideDB } from '../client.js'
-import { usageRecordRowSchema, type UsageRecordRowShape } from '../effect-schemas/usage-records.js'
-import { dbDecodeFailed, toDbError, type DbError } from '../errors.js'
+import { usageRecordRowSchema } from '../effect-schemas/usage-records.js'
+import { dbDecodeFailed } from '../errors.js'
 import { usageRecords, type JsonObject } from '../schema.js'
-import { combinePredicates } from './sql-helpers.js'
+import { withDb, decodeFirst } from './repo-helpers.js'
+import { combinePredicates, createOptionalDecoder } from './sql-helpers.js'
 
 const decodeUsageRecordRows = Schema.decodeUnknown(Schema.Array(usageRecordRowSchema))
-const decodeUsageRecordRow = Schema.decodeUnknown(usageRecordRowSchema)
-
-const decodeNullableUsageRecord = (
-  value: unknown
-): Effect.Effect<UsageRecordRowShape | null, DbError> => {
-  if (value === null || value === undefined) {
-    return Effect.succeed(null)
-  }
-
-  return decodeUsageRecordRow(value).pipe(
-    Effect.mapError((error) => dbDecodeFailed('usage record decode failed', error))
-  )
-}
+const decode = createOptionalDecoder(usageRecordRowSchema, 'usage record')
 
 const parseBigIntLikeNumber = (value: unknown): number => {
   if (typeof value === 'number') {
@@ -69,7 +57,9 @@ const usageRecordSelectFields = {
   quantity: usageRecords.quantity,
   unitCostDecimillicents: usageRecords.unitCostDecimillicents,
   totalCostDecimillicents: usageRecords.totalCostDecimillicents,
+  marginMultiplier: usageRecords.marginMultiplier,
   referenceId: usageRecords.referenceId,
+  assetId: usageRecords.assetId,
   stripeUsageRecordId: usageRecords.stripeUsageRecordId,
   metadata: usageRecords.metadata,
   recordedAt: usageRecords.recordedAt,
@@ -88,27 +78,8 @@ export const usageRecordsRepository = {
     metadata?: JsonObject
     recordedAt?: Date
   }) =>
-    provideDB(
+    withDb('Failed to record usage', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
-
-        if (input.referenceId) {
-          const existingRows = yield* db
-            .select(usageRecordSelectFields)
-            .from(usageRecords)
-            .where(and(
-              eq(usageRecords.organizationId, input.organizationId),
-              eq(usageRecords.referenceId, input.referenceId)
-            ))
-            .limit(1)
-            .execute()
-
-          const existingRecord = yield* decodeNullableUsageRecord(existingRows[0] ?? null)
-          if (existingRecord) {
-            return existingRecord
-          }
-        }
-
         const rows = yield* db
           .insert(usageRecords)
           .values({
@@ -123,13 +94,19 @@ export const usageRecordsRepository = {
             recordedAt: input.recordedAt ?? sql`now()`
           })
           .onConflictDoNothing({
-            target: [usageRecords.organizationId, usageRecords.referenceId]
+            // Match the partial unique index in migration 0026 — conflict
+            // resolution only applies when reference_id is non-null. The
+            // `where` clause here mirrors the index predicate, otherwise
+            // Postgres rejects the statement with 42P10
+            // (infer_arbiter_indexes can't find a matching index).
+            target: [usageRecords.organizationId, usageRecords.referenceId],
+            where: sql`${usageRecords.referenceId} IS NOT NULL`
           })
           .returning()
           .execute()
 
         if (rows.length > 0) {
-          return yield* decodeNullableUsageRecord(rows[0] ?? null)
+          return yield* decodeFirst(rows, decode)
         }
 
         if (input.referenceId) {
@@ -143,17 +120,18 @@ export const usageRecordsRepository = {
             .limit(1)
             .execute()
 
-          return yield* decodeNullableUsageRecord(existingRows[0] ?? null)
+          return yield* decodeFirst(existingRows, decode)
         }
 
-        return yield* decodeNullableUsageRecord(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to record usage', error))),
+    ),
 
   updateStripeUsageRecordId: (id: string, stripeUsageRecordId: string) =>
-    provideDB(
+    withDb('Failed to update usage record stripe id', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
+        // tenant-scope: service-validated
+        // financial-audit: exempt (stripe_usage_record_id is metadata backfill, not a financial mutation)
         const rows = yield* db
           .update(usageRecords)
           .set({ stripeUsageRecordId })
@@ -161,14 +139,13 @@ export const usageRecordsRepository = {
           .returning()
           .execute()
 
-        return yield* decodeNullableUsageRecord(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to update usage record stripe id', error))),
+    ),
 
   findByReferenceId: (organizationId: string, referenceId: string) =>
-    provideDB(
+    withDb('Failed to find usage record by reference id', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .select(usageRecordSelectFields)
           .from(usageRecords)
@@ -179,9 +156,9 @@ export const usageRecordsRepository = {
           .limit(1)
           .execute()
 
-        return yield* decodeNullableUsageRecord(rows[0] ?? null)
+        return yield* decodeFirst(rows, decode)
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to find usage record by reference id', error))),
+    ),
 
   listForOrganization: (input: {
     organizationId: string
@@ -190,9 +167,9 @@ export const usageRecordsRepository = {
     recordedBefore?: Date
     limit?: number
   }) =>
-    provideDB(
+    withDb('Failed to list usage records', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
+        // tenant-scope: service-validated (buildListWhere includes organizationId)
         const rows = yield* db
           .select(usageRecordSelectFields)
           .from(usageRecords)
@@ -205,7 +182,7 @@ export const usageRecordsRepository = {
           Effect.mapError((error) => dbDecodeFailed('usage record list decode failed', error))
         )
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to list usage records', error))),
+    ),
 
   summarizeForPeriod: (input: {
     organizationId: string
@@ -213,9 +190,8 @@ export const usageRecordsRepository = {
     periodStart: Date
     periodEnd: Date
   }) =>
-    provideDB(
+    withDb('Failed to summarize usage records for period', (db) =>
       Effect.gen(function* () {
-        const db = yield* DB
         const rows = yield* db
           .select({
             totalQuantity: sql<number>`coalesce(sum(${usageRecords.quantity}), 0)`,
@@ -237,5 +213,5 @@ export const usageRecordsRepository = {
           totalCostDecimillicents: parseBigIntLikeNumber(row?.totalCostDecimillicents)
         }
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to summarize usage records for period', error)))
+    )
 }

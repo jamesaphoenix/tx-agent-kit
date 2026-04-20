@@ -1,6 +1,6 @@
 ---
 title: Docker Stack
-description: Docker Compose services for PostgreSQL, Redis, and the observability stack
+description: Docker Compose services for PostgreSQL, Redis, Langfuse, and the observability stack
 ---
 
 All shared infrastructure runs through `docker-compose.yml` under the `infra` profile. The Docker Compose project name is pinned to `tx-agent-kit` to allow sharing across multiple git worktrees.
@@ -31,6 +31,21 @@ Temporal is no longer part of the local Docker infra profile. Local development 
 | Port | 6379 |
 | Persistence | Append-only file (AOF) enabled |
 | Health check | `redis-cli ping` |
+
+### Langfuse
+
+| Property | Value |
+|----------|-------|
+| Web image | `langfuse/langfuse:3` |
+| Worker image | `langfuse/langfuse-worker:3` |
+| UI port | 3003 (configurable via `LANGFUSE_PORT`) |
+| Worker health port | 3030 (configurable via `LANGFUSE_WORKER_PORT`) |
+| Local login | `dev@tx-agent-kit.local` / `tx-agent-kit-local-langfuse` |
+| Backing services | Dedicated Postgres, ClickHouse, MinIO, and Redis containers |
+
+Langfuse stores LLM/GenAI traces only. Regular application traces continue through the OTEL collector and Jaeger.
+
+The Compose service passes `LANGFUSE_INIT_*` variables to Langfuse's headless initialization. `pnpm infra:ensure` then runs `scripts/langfuse/ensure-local-bootstrap.sh` to make the local org, project, user, password, and project membership deterministic even when the local Langfuse volume already exists. See [Langfuse](/docs/observability/langfuse) for details.
 
 ### OpenTelemetry Collector
 

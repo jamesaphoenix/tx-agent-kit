@@ -1,4 +1,4 @@
-import { Context, Effect, Layer } from 'effect'
+import { Context, Effect, Layer, Option } from 'effect'
 import { badRequest, conflict, notFound, unauthorized, type CoreError } from '../../../errors.js'
 import type { ListParams, PaginatedResult } from '../../../pagination.js'
 import {
@@ -12,33 +12,76 @@ import {
   isValidOrganizationName,
   normalizeInvitationEmail,
   normalizeOrganizationName,
-  toInvitation,
-  toOrganization,
   type CreateInvitationCommand,
   type CreateOrganizationCommand,
-  type Invitation,
+  type InvitationRecord,
+  type OrgMemberRecord,
   type OrgMemberRole,
+  type OrganizationRecord,
   type UpdateInvitationCommand,
-  type UpdateOrganizationCommand,
-  type Organization
+  type UpdateOrganizationCommand
 } from '../domain/organization-domain.js'
 import {
   InvitationEmailPort,
   OrganizationInvitationStorePort,
+  OrganizationMemberStorePort,
   OrganizationStorePort,
   OrganizationUsersPort
 } from '../ports/organization-ports.js'
 
 const hasInvitationReadAccess = (
-  principalUserId: string,
-  inviteeUserId: string | null,
+  principal: { userId: string; email: string },
+  invitation: InvitationRecord,
   organizationRole: OrgMemberRole | null
 ): boolean => {
-  if (inviteeUserId === principalUserId) {
+  if (invitation.inviteeUserId === principal.userId) {
     return true
   }
 
-  return organizationRole === 'owner' || organizationRole === 'admin'
+  if (normalizeInvitationEmail(invitation.email) === normalizeInvitationEmail(principal.email)) {
+    return true
+  }
+
+  return organizationRole === 'admin'
+}
+
+const invitationOrgwidePendingUniqueViolationCode = 'DB_INVITATION_ORGWIDE_PENDING_UNIQUE_VIOLATION'
+const invitationTeamPendingUniqueViolationCode = 'DB_INVITATION_TEAM_PENDING_UNIQUE_VIOLATION'
+
+const pendingInvitationConflictMessage = (teamId?: string): string =>
+  teamId
+    ? 'A pending invitation already exists for this email and workspace'
+    : 'A pending organization invitation already exists for this email'
+
+const getErrorCode = (cause: unknown, depth = 0): string | null => {
+  if (depth > 4 || typeof cause !== 'object' || cause === null) {
+    return null
+  }
+
+  const candidate = cause as {
+    readonly code?: unknown
+    readonly cause?: unknown
+    readonly error?: unknown
+  }
+  if (typeof candidate.code === 'string') {
+    return candidate.code
+  }
+
+  return getErrorCode(candidate.cause, depth + 1)
+    ?? getErrorCode(candidate.error, depth + 1)
+}
+
+const mapCreateInvitationError = (cause: unknown, teamId?: string): CoreError => {
+  const errorCode = getErrorCode(cause)
+  if (errorCode === invitationTeamPendingUniqueViolationCode) {
+    return conflict(pendingInvitationConflictMessage(teamId ?? 'workspace'), cause)
+  }
+
+  if (errorCode === invitationOrgwidePendingUniqueViolationCode) {
+    return conflict(pendingInvitationConflictMessage(), cause)
+  }
+
+  return badRequest('Failed to create invitation', cause)
 }
 
 export class OrganizationService extends Context.Tag('OrganizationService')<
@@ -47,42 +90,47 @@ export class OrganizationService extends Context.Tag('OrganizationService')<
     listForUser: (
       userId: string,
       params: ListParams
-    ) => Effect.Effect<PaginatedResult<Organization>, CoreError, OrganizationStorePort>
+    ) => Effect.Effect<PaginatedResult<OrganizationRecord>, CoreError, OrganizationStorePort>
     getById: (
       principal: { userId: string },
       organizationId: string
-    ) => Effect.Effect<Organization, CoreError, OrganizationStorePort>
+    ) => Effect.Effect<OrganizationRecord, CoreError, OrganizationStorePort>
     getManyByIds: (
       principal: { userId: string },
       ids: ReadonlyArray<string>
-    ) => Effect.Effect<ReadonlyArray<Organization>, CoreError, OrganizationStorePort>
-    createForUser: (userId: string, input: CreateOrganizationCommand, options?: { email?: string }) => Effect.Effect<Organization, CoreError, OrganizationStorePort>
+    ) => Effect.Effect<ReadonlyArray<OrganizationRecord>, CoreError, OrganizationStorePort>
+    createForUser: (userId: string, input: CreateOrganizationCommand, options?: { email?: string }) => Effect.Effect<OrganizationRecord, CoreError, OrganizationStorePort>
     updateById: (
       principal: { userId: string },
       organizationId: string,
       input: UpdateOrganizationCommand
-    ) => Effect.Effect<Organization, CoreError, OrganizationStorePort>
+    ) => Effect.Effect<OrganizationRecord, CoreError, OrganizationStorePort>
     removeById: (
       principal: { userId: string },
       organizationId: string
     ) => Effect.Effect<{ deleted: true }, CoreError, OrganizationStorePort>
     listInvitationsForUser: (
-      userId: string,
+      principal: { userId: string; email: string },
       params: ListParams
-    ) => Effect.Effect<PaginatedResult<Invitation>, CoreError, OrganizationInvitationStorePort>
+    ) => Effect.Effect<PaginatedResult<InvitationRecord>, CoreError, OrganizationInvitationStorePort>
+    listOrgInvitations: (
+      principal: { userId: string },
+      organizationId: string,
+      params: ListParams
+    ) => Effect.Effect<PaginatedResult<InvitationRecord>, CoreError, OrganizationStorePort | OrganizationInvitationStorePort>
     getInvitationById: (
       principal: { userId: string; email: string },
       invitationId: string
-    ) => Effect.Effect<Invitation, CoreError, OrganizationStorePort | OrganizationInvitationStorePort>
+    ) => Effect.Effect<InvitationRecord, CoreError, OrganizationStorePort | OrganizationInvitationStorePort>
     getManyInvitationsByIds: (
       principal: { userId: string; email: string },
       ids: ReadonlyArray<string>
-    ) => Effect.Effect<ReadonlyArray<Invitation>, CoreError, OrganizationStorePort | OrganizationInvitationStorePort>
+    ) => Effect.Effect<ReadonlyArray<InvitationRecord>, CoreError, OrganizationStorePort | OrganizationInvitationStorePort>
     updateInvitationById: (
       principal: { userId: string; email: string },
       invitationId: string,
       input: UpdateInvitationCommand
-    ) => Effect.Effect<Invitation, CoreError, OrganizationStorePort | OrganizationInvitationStorePort>
+    ) => Effect.Effect<InvitationRecord, CoreError, OrganizationStorePort | OrganizationInvitationStorePort>
     removeInvitationById: (
       principal: { userId: string; email: string },
       invitationId: string
@@ -91,7 +139,7 @@ export class OrganizationService extends Context.Tag('OrganizationService')<
       principal: { userId: string; email: string },
       input: CreateInvitationCommand
     ) => Effect.Effect<
-      Invitation,
+      InvitationRecord,
       CoreError,
       OrganizationStorePort | OrganizationInvitationStorePort | OrganizationUsersPort | InvitationEmailPort
     >
@@ -99,6 +147,15 @@ export class OrganizationService extends Context.Tag('OrganizationService')<
       principal: { userId: string; email: string },
       token: string
     ) => Effect.Effect<{ accepted: true }, CoreError, OrganizationInvitationStorePort>
+    getMemberRole: (
+      organizationId: string,
+      userId: string
+    ) => Effect.Effect<OrgMemberRole | null, CoreError, OrganizationStorePort>
+    listOrgMembers: (
+      principal: { userId: string },
+      organizationId: string,
+      params: ListParams
+    ) => Effect.Effect<PaginatedResult<OrgMemberRecord>, CoreError, OrganizationStorePort | OrganizationMemberStorePort>
   }
 >() {}
 
@@ -109,15 +166,10 @@ export const OrganizationServiceLive = Layer.effect(
       Effect.gen(function* () {
         const organizationStore = yield* OrganizationStorePort
         const page = yield* organizationStore.listForUser(userId, params).pipe(
-          Effect.mapError(() => badRequest('Failed to list organizations'))
+          Effect.mapError((cause) => badRequest('Failed to list organizations', cause))
         )
 
-        return {
-          data: page.data.map(toOrganization),
-          total: page.total,
-          nextCursor: page.nextCursor,
-          prevCursor: page.prevCursor
-        }
+        return page
       }),
 
     getById: (principal, organizationId: string) =>
@@ -125,22 +177,22 @@ export const OrganizationServiceLive = Layer.effect(
         const organizationStore = yield* OrganizationStorePort
 
         const organization = yield* organizationStore.getById(organizationId).pipe(
-          Effect.mapError(() => badRequest('Failed to fetch organization'))
+          Effect.mapError((cause) => badRequest('Failed to fetch organization', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('Organization not found')),
+            onSome: Effect.succeed
+          }))
         )
 
-        if (!organization) {
-          return yield* Effect.fail(notFound('Organization not found'))
-        }
-
         const isMember = yield* organizationStore.isMember(organizationId, principal.userId).pipe(
-          Effect.mapError(() => unauthorized('Failed to verify organization membership'))
+          Effect.mapError((cause) => unauthorized('Failed to verify organization membership', cause))
         )
 
         if (!isMember) {
           return yield* Effect.fail(unauthorized('Not allowed to access this organization'))
         }
 
-        return toOrganization(organization)
+        return organization
       }),
 
     getManyByIds: (principal, ids) =>
@@ -152,13 +204,13 @@ export const OrganizationServiceLive = Layer.effect(
         }
 
         const rows = yield* organizationStore.getManyByIdsForUser(principal.userId, ids).pipe(
-          Effect.mapError(() => badRequest('Failed to fetch organizations'))
+          Effect.mapError((cause) => badRequest('Failed to fetch organizations', cause))
         )
 
         const byId = new Map(rows.map((row) => [row.id, row] as const))
         return ids.flatMap((id) => {
           const row = byId.get(id)
-          return row ? [toOrganization(row)] : []
+          return row ? [row] : []
         })
       }),
 
@@ -181,33 +233,34 @@ export const OrganizationServiceLive = Layer.effect(
             payload: { organizationName: name, ownerUserId: userId, ownerEmail: options?.email ?? '' }
           }
         }).pipe(
-          Effect.mapError(() => badRequest('Failed to create organization'))
+          Effect.mapError((cause) => badRequest('Failed to create organization', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(badRequest('Organization creation failed')),
+            onSome: Effect.succeed
+          }))
         )
 
-        if (!created) {
-          return yield* Effect.fail(badRequest('Organization creation failed'))
-        }
-
-        return toOrganization(created)
+        return created
       }),
 
     updateById: (principal, organizationId: string, input) =>
       Effect.gen(function* () {
         const organizationStore = yield* OrganizationStorePort
 
-        const existing = yield* organizationStore.getById(organizationId).pipe(
-          Effect.mapError(() => badRequest('Failed to fetch organization'))
+        yield* organizationStore.getById(organizationId).pipe(
+          Effect.mapError((cause) => badRequest('Failed to fetch organization', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('Organization not found')),
+            onSome: Effect.succeed
+          }))
         )
-
-        if (!existing) {
-          return yield* Effect.fail(notFound('Organization not found'))
-        }
 
         const role = yield* organizationStore.getMemberRole(organizationId, principal.userId).pipe(
-          Effect.mapError(() => unauthorized('Not allowed to update organization'))
+          Effect.mapError((cause) => unauthorized('Not allowed to update organization', cause))
         )
 
-        if (!role || !canManageOrganization(role)) {
+        const roleValue = Option.getOrNull(role)
+        if (!roleValue || !canManageOrganization(roleValue)) {
           return yield* Effect.fail(unauthorized('Only admins and owners can update organizations'))
         }
 
@@ -223,49 +276,93 @@ export const OrganizationServiceLive = Layer.effect(
           id: organizationId,
           name: input.name === undefined ? undefined : normalizeOrganizationName(input.name),
           onboardingData: input.onboardingData
-        }).pipe(Effect.mapError(() => badRequest('Failed to update organization')))
+        }).pipe(
+          Effect.mapError((cause) => badRequest('Failed to update organization', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('Organization not found')),
+            onSome: Effect.succeed
+          }))
+        )
 
-        if (!updated) {
-          return yield* Effect.fail(notFound('Organization not found'))
-        }
-
-        return toOrganization(updated)
+        return updated
       }),
 
     removeById: (principal, organizationId: string) =>
       Effect.gen(function* () {
         const organizationStore = yield* OrganizationStorePort
 
-        const existing = yield* organizationStore.getById(organizationId).pipe(
-          Effect.mapError(() => badRequest('Failed to fetch organization'))
+        const organization = yield* organizationStore.getById(organizationId).pipe(
+          Effect.mapError((cause) => badRequest('Failed to fetch organization', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('Organization not found')),
+            onSome: Effect.succeed
+          }))
         )
-
-        if (!existing) {
-          return yield* Effect.fail(notFound('Organization not found'))
-        }
 
         const role = yield* organizationStore.getMemberRole(organizationId, principal.userId).pipe(
-          Effect.mapError(() => unauthorized('Not allowed to delete organization'))
+          Effect.mapError((cause) => unauthorized('Not allowed to delete organization', cause))
         )
 
-        if (!role || !canDeleteOrganization(role)) {
+        const roleValue = Option.getOrNull(role)
+        if (!roleValue || !canDeleteOrganization(roleValue)) {
           return yield* Effect.fail(unauthorized('Only organization owners can delete organizations'))
         }
 
-        return yield* organizationStore.remove(organizationId).pipe(
-          Effect.mapError(() => badRequest('Failed to delete organization'))
+        return yield* organizationStore.removeWithEvent({
+          id: organizationId,
+          event: {
+            eventType: 'organization.deleted',
+            aggregateType: 'organization',
+            payload: {
+              organizationId,
+              organizationName: organization.name,
+              deletedByUserId: principal.userId
+            }
+          }
+        }).pipe(
+          Effect.mapError((cause) => badRequest('Failed to delete organization', cause))
         )
       }),
 
-    listInvitationsForUser: (userId: string, params: ListParams) =>
+    listInvitationsForUser: (principal, params: ListParams) =>
       Effect.gen(function* () {
         const invitationStore = yield* OrganizationInvitationStorePort
-        const page = yield* invitationStore.listForInviteeUserId(userId, params).pipe(
-          Effect.mapError(() => badRequest('Failed to list invitations'))
+        const page = yield* invitationStore.listForInviteeUserId(
+          principal.userId,
+          normalizeInvitationEmail(principal.email),
+          params
+        ).pipe(
+          Effect.mapError((cause) => badRequest('Failed to list invitations', cause))
         )
 
         return {
-          data: page.data.map(toInvitation),
+          data: page.data,
+          total: page.total,
+          nextCursor: page.nextCursor,
+          prevCursor: page.prevCursor
+        }
+      }),
+
+    listOrgInvitations: (principal, organizationId: string, params: ListParams) =>
+      Effect.gen(function* () {
+        const organizationStore = yield* OrganizationStorePort
+        const invitationStore = yield* OrganizationInvitationStorePort
+
+        const role = yield* organizationStore.getMemberRole(organizationId, principal.userId).pipe(
+          Effect.mapError((cause) => unauthorized('Not a member of this organization', cause))
+        )
+
+        const roleValue = Option.getOrNull(role)
+        if (!roleValue || roleValue !== 'admin') {
+          return yield* Effect.fail(unauthorized('Only admins can list organization invitations'))
+        }
+
+        const page = yield* invitationStore.listForOrganization(organizationId, params).pipe(
+          Effect.mapError((cause) => badRequest('Failed to list organization invitations', cause))
+        )
+
+        return {
+          data: page.data,
           total: page.total,
           nextCursor: page.nextCursor,
           prevCursor: page.prevCursor
@@ -278,22 +375,22 @@ export const OrganizationServiceLive = Layer.effect(
         const organizationStore = yield* OrganizationStorePort
 
         const invitation = yield* invitationStore.getById(invitationId).pipe(
-          Effect.mapError(() => badRequest('Failed to fetch invitation'))
+          Effect.mapError((cause) => badRequest('Failed to fetch invitation', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('Invitation not found')),
+            onSome: Effect.succeed
+          }))
         )
-
-        if (!invitation) {
-          return yield* Effect.fail(notFound('Invitation not found'))
-        }
 
         const role = yield* organizationStore.getMemberRole(invitation.organizationId, principal.userId).pipe(
-          Effect.mapError(() => unauthorized('Failed to verify invitation access'))
+          Effect.mapError((cause) => unauthorized('Failed to verify invitation access', cause))
         )
 
-        if (!hasInvitationReadAccess(principal.userId, invitation.inviteeUserId, role)) {
+        if (!hasInvitationReadAccess(principal, invitation, Option.getOrNull(role))) {
           return yield* Effect.fail(unauthorized('Not allowed to access this invitation'))
         }
 
-        return toInvitation(invitation)
+        return invitation
       }),
 
     getManyInvitationsByIds: (principal, ids) =>
@@ -306,18 +403,18 @@ export const OrganizationServiceLive = Layer.effect(
         }
 
         const rows = yield* invitationStore.getManyByIds(ids).pipe(
-          Effect.mapError(() => badRequest('Failed to fetch invitations'))
+          Effect.mapError((cause) => badRequest('Failed to fetch invitations', cause))
         )
 
         const uniqueOrganizationIds = [...new Set(rows.map((row) => row.organizationId))]
         const organizationRoles = yield* organizationStore
           .getMemberRolesForUser(principal.userId, uniqueOrganizationIds)
-          .pipe(Effect.mapError(() => unauthorized('Failed to verify invitation access')))
+          .pipe(Effect.mapError((cause) => unauthorized('Failed to verify invitation access', cause)))
 
         const accessibleRows = rows.filter((invitation) =>
           hasInvitationReadAccess(
-            principal.userId,
-            invitation.inviteeUserId,
+            principal,
+            invitation,
             organizationRoles.get(invitation.organizationId) ?? null
           )
         )
@@ -325,7 +422,7 @@ export const OrganizationServiceLive = Layer.effect(
         const byId = new Map(accessibleRows.map((row) => [row.id, row] as const))
         return ids.flatMap((id) => {
           const row = byId.get(id)
-          return row ? [toInvitation(row)] : []
+          return row ? [row] : []
         })
       }),
 
@@ -335,18 +432,19 @@ export const OrganizationServiceLive = Layer.effect(
         const organizationStore = yield* OrganizationStorePort
 
         const existing = yield* invitationStore.getById(invitationId).pipe(
-          Effect.mapError(() => badRequest('Failed to fetch invitation'))
+          Effect.mapError((cause) => badRequest('Failed to fetch invitation', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('Invitation not found')),
+            onSome: Effect.succeed
+          }))
         )
-
-        if (!existing) {
-          return yield* Effect.fail(notFound('Invitation not found'))
-        }
 
         const role = yield* organizationStore.getMemberRole(existing.organizationId, principal.userId).pipe(
-          Effect.mapError(() => unauthorized('Not allowed to update invitation'))
+          Effect.mapError((cause) => unauthorized('Not allowed to update invitation', cause))
         )
 
-        if (!role || !canManageInvitation(role)) {
+        const roleValue = Option.getOrNull(role)
+        if (!roleValue || !canManageInvitation(roleValue)) {
           return yield* Effect.fail(unauthorized('Only admins and owners can update invitations'))
         }
 
@@ -362,17 +460,24 @@ export const OrganizationServiceLive = Layer.effect(
           return yield* Effect.fail(badRequest('Invitation status cannot be set to accepted manually'))
         }
 
+        if (input.status === 'revoked' && existing.status === 'revoked') {
+          return yield* Effect.fail(conflict('Invitation is already revoked'))
+        }
+
         const updated = yield* invitationStore.updateById({
           id: invitationId,
           role: input.role,
-          status: input.status
-        }).pipe(Effect.mapError(() => badRequest('Failed to update invitation')))
+          status: input.status,
+          ...(input.status === 'revoked' ? { revokedByUserId: principal.userId } : {})
+        }).pipe(
+          Effect.mapError((cause) => badRequest('Failed to update invitation', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('Invitation not found')),
+            onSome: Effect.succeed
+          }))
+        )
 
-        if (!updated) {
-          return yield* Effect.fail(notFound('Invitation not found'))
-        }
-
-        return toInvitation(updated)
+        return updated
       }),
 
     removeInvitationById: (principal, invitationId: string) =>
@@ -381,29 +486,38 @@ export const OrganizationServiceLive = Layer.effect(
         const organizationStore = yield* OrganizationStorePort
 
         const existing = yield* invitationStore.getById(invitationId).pipe(
-          Effect.mapError(() => badRequest('Failed to fetch invitation'))
+          Effect.mapError((cause) => badRequest('Failed to fetch invitation', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('Invitation not found')),
+            onSome: Effect.succeed
+          }))
         )
 
-        if (!existing) {
-          return yield* Effect.fail(notFound('Invitation not found'))
+        if (existing.status === 'revoked') {
+          // Idempotent: already revoked, just confirm deletion
+          return { deleted: true as const }
         }
 
         const role = yield* organizationStore.getMemberRole(existing.organizationId, principal.userId).pipe(
-          Effect.mapError(() => unauthorized('Not allowed to revoke invitation'))
+          Effect.mapError((cause) => unauthorized('Not allowed to revoke invitation', cause))
         )
 
-        if (!role || !canManageInvitation(role)) {
+        const roleValue = Option.getOrNull(role)
+        if (!roleValue || !canManageInvitation(roleValue)) {
           return yield* Effect.fail(unauthorized('Only admins and owners can revoke invitations'))
         }
 
-        const revoked = yield* invitationStore.updateById({
+        yield* invitationStore.updateById({
           id: invitationId,
-          status: 'revoked'
-        }).pipe(Effect.mapError(() => badRequest('Failed to revoke invitation')))
-
-        if (!revoked) {
-          return yield* Effect.fail(notFound('Invitation not found'))
-        }
+          status: 'revoked',
+          revokedByUserId: principal.userId
+        }).pipe(
+          Effect.mapError((cause) => badRequest('Failed to revoke invitation', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('Invitation not found')),
+            onSome: Effect.succeed
+          }))
+        )
 
         return { deleted: true as const }
       }),
@@ -422,65 +536,100 @@ export const OrganizationServiceLive = Layer.effect(
         const email = normalizeInvitationEmail(input.email)
 
         const inviterRole = yield* organizationStore.getMemberRole(input.organizationId, principal.userId).pipe(
-          Effect.mapError(() => unauthorized('Not allowed to invite'))
+          Effect.mapError((cause) => unauthorized('Not allowed to invite', cause))
         )
 
-        if (!inviterRole) {
+        if (Option.isNone(inviterRole)) {
           return yield* Effect.fail(unauthorized('Not allowed to invite'))
         }
 
-        if (!canCreateInvitation(inviterRole)) {
+        if (!canCreateInvitation(inviterRole.value)) {
           return yield* Effect.fail(unauthorized('Only admins and owners can create invitations'))
         }
 
-        const existingUser = yield* usersPort.findByEmail(email).pipe(
-          Effect.mapError(() => badRequest('Failed to look up invited user'))
-        )
-
-        if (!existingUser) {
-          return yield* Effect.fail(badRequest('Invited user must already have an account'))
+        if (input.membershipType === 'client' && !input.teamId) {
+          return yield* Effect.fail(badRequest('Client collaborator invitations must target a workspace'))
         }
 
-        const alreadyMember = yield* organizationStore.isMember(input.organizationId, existingUser.id).pipe(
-          Effect.mapError(() => badRequest('Failed to validate existing membership'))
+        if (input.teamId) {
+          const teamBelongsToOrganization = yield* invitationStore.teamBelongsToOrganization(input.teamId, input.organizationId).pipe(
+            Effect.mapError((cause) => badRequest('Failed to validate invitation workspace', cause))
+          )
+
+          if (!teamBelongsToOrganization) {
+            return yield* Effect.fail(badRequest('Workspace does not belong to organization'))
+          }
+        }
+
+        const existingUser = yield* usersPort.findByEmail(email).pipe(
+          Effect.mapError((cause) => badRequest('Failed to look up invited user', cause))
         )
+
+        const alreadyMember = Option.isSome(existingUser)
+          ? yield* organizationStore.isMember(input.organizationId, existingUser.value.id).pipe(
+            Effect.mapError((cause) => badRequest('Failed to validate existing membership', cause))
+          )
+          : false
 
         if (alreadyMember) {
           return yield* Effect.fail(conflict('User is already an organization member'))
         }
 
-        const created = yield* invitationStore.create({
+        const pendingInvitationExists = yield* invitationStore.pendingInvitationExists({
           organizationId: input.organizationId,
-          inviteeUserId: existingUser.id,
           email,
-          role: input.role,
-          invitedByUserId: principal.userId
-        }).pipe(Effect.mapError(() => badRequest('Failed to create invitation')))
+          ...(input.teamId ? { teamId: input.teamId } : {})
+        }).pipe(
+          Effect.mapError((cause) => badRequest('Failed to validate pending invitation uniqueness', cause))
+        )
 
-        if (!created) {
-          return yield* Effect.fail(badRequest('Invitation creation failed'))
+        if (pendingInvitationExists) {
+          return yield* Effect.fail(conflict(
+            input.teamId
+              ? 'A pending invitation already exists for this email and workspace'
+              : 'A pending organization invitation already exists for this email'
+          ))
         }
 
+        // The DB enforces one pending org-wide invitation per org/email and one
+        // pending scoped invitation per org/email/workspace. Org-wide and scoped
+        // invites may coexist because they grant different access surfaces.
+        const created = yield* invitationStore.create({
+          organizationId: input.organizationId,
+          inviteeUserId: Option.isSome(existingUser) ? existingUser.value.id : null,
+          email,
+          role: input.role,
+          invitedByUserId: principal.userId,
+          ...(input.teamId ? { teamId: input.teamId } : {}),
+          ...(input.membershipType ? { membershipType: input.membershipType } : {})
+        }).pipe(
+          Effect.mapError((cause) => mapCreateInvitationError(cause, input.teamId)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(badRequest('Invitation creation failed')),
+            onSome: Effect.succeed
+          }))
+        )
+
         const organization = yield* organizationStore.getById(input.organizationId).pipe(
-          Effect.mapError(() => badRequest('Failed to look up organization for email'))
+          Effect.mapError((cause) => badRequest('Failed to look up organization for email', cause))
         )
 
         const inviter = yield* usersPort.findById(principal.userId).pipe(
-          Effect.mapError(() => badRequest('Failed to look up inviter for email'))
+          Effect.mapError((cause) => badRequest('Failed to look up inviter for email', cause))
         )
 
         yield* emailPort.sendInvitationEmail({
           recipientEmail: email,
-          recipientName: existingUser.name,
-          organizationName: organization?.name ?? 'your organization',
-          inviterName: inviter?.name ?? 'A teammate',
+          recipientName: Option.match(existingUser, { onNone: () => email, onSome: (u) => u.name }),
+          organizationName: Option.match(organization, { onNone: () => 'your organization', onSome: (o) => o.name }),
+          inviterName: Option.match(inviter, { onNone: () => 'A teammate', onSome: (u) => u.name }),
           role: input.role,
           token: created.token
         }).pipe(
-          Effect.catchAll(() => Effect.void)
+          Effect.catchAll((_cause) => Effect.void)
         )
 
-        return toInvitation(created)
+        return created
       }),
 
     acceptInvitation: (principal, token: string) =>
@@ -491,15 +640,54 @@ export const OrganizationServiceLive = Layer.effect(
           return yield* Effect.fail(badRequest('Missing invitation token'))
         }
 
-        const accepted = yield* invitationStore.acceptByToken(token, principal.userId).pipe(
-          Effect.mapError(() => badRequest('Failed to accept invitation'))
+        // The store atomically enforces either a bound invitee user id or an
+        // email-only invite matching the authenticated principal email.
+        const accepted = yield* invitationStore.acceptByToken(
+          token,
+          principal.userId,
+          normalizeInvitationEmail(principal.email)
+        ).pipe(
+          Effect.mapError((cause) => badRequest('Failed to accept invitation', cause)),
+          Effect.flatMap(Option.match({
+            onNone: () => Effect.fail(notFound('Invitation not found or expired')),
+            onSome: Effect.succeed
+          }))
         )
 
-        if (!accepted) {
-          return yield* Effect.fail(notFound('Invitation not found or expired'))
+        if (accepted.inviteeUserId !== principal.userId) {
+          return yield* Effect.fail(unauthorized('Invitation does not belong to this user'))
         }
 
         return { accepted: true as const }
+      }),
+
+    getMemberRole: (organizationId, userId) =>
+      Effect.gen(function* () {
+        const organizationStore = yield* OrganizationStorePort
+        const role = yield* organizationStore.getMemberRole(organizationId, userId).pipe(
+          Effect.mapError((cause) => badRequest('Failed to retrieve member role', cause))
+        )
+        return Option.getOrNull(role)
+      }),
+
+    listOrgMembers: (principal, organizationId, params) =>
+      Effect.gen(function* () {
+        const organizationStore = yield* OrganizationStorePort
+        const memberStore = yield* OrganizationMemberStorePort
+
+        const isMember = yield* organizationStore.isMember(organizationId, principal.userId).pipe(
+          Effect.mapError((cause) => unauthorized('Failed to verify organization membership', cause))
+        )
+
+        if (!isMember) {
+          return yield* Effect.fail(unauthorized('Not allowed to access this organization'))
+        }
+
+        const page = yield* memberStore.listMembers(organizationId, params).pipe(
+          Effect.mapError((cause) => badRequest('Failed to list organization members', cause))
+        )
+
+        return page
       })
   })
 )

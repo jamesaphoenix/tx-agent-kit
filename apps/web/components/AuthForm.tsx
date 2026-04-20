@@ -1,10 +1,39 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState, type SyntheticEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { clientApi } from '../lib/client-api'
 import { notify } from '../lib/notify'
 import { sessionStoreActions } from '../stores/session-store'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+
+const Spinner = ({ className }: { className?: string }) => (
+  <svg
+    className={`animate-spin ${className ?? ''}`}
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden="true"
+  >
+    <circle
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="3"
+      className="opacity-20"
+    />
+    <path
+      d="M12 2a10 10 0 0 1 10 10"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
 export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; nextPath: string }) {
   const router = useRouter()
@@ -15,7 +44,9 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
   const [pending, setPending] = useState(false)
   const actionLabel = mode === 'sign-up' ? 'Create account' : 'Sign in'
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (
+    event: SyntheticEvent<HTMLFormElement, SubmitEvent>
+  ) => {
     event.preventDefault()
     if (pending) {
       return
@@ -36,9 +67,12 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
       notify.success(mode === 'sign-up' ? 'Account created successfully' : 'Signed in successfully')
       router.push(nextPath)
     } catch (error_) {
-      const message = error_ instanceof Error ? error_.message : 'Authentication failed'
+      const message = notify.apiError(
+        error_,
+        mode === 'sign-up' ? 'Failed to create account' : 'Failed to sign in',
+        { id: `auth-${mode}-error` }
+      )
       setError(message)
-      notify.error(message, { id: `auth-${mode}-error` })
     } finally {
       setPending(false)
     }
@@ -46,63 +80,74 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
 
   return (
     <form
-      className="auth-form"
+      className="space-y-4"
       onSubmit={(event) => {
         void onSubmit(event)
       }}
+      aria-busy={pending}
     >
       {mode === 'sign-up' && (
-        <div className="auth-field">
-          <label className="auth-label" htmlFor="auth-name">Name</label>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="auth-name">Name</Label>
+          <Input
             id="auth-name"
-            className="auth-input"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Jane Founder"
             required
+            disabled={pending}
           />
         </div>
       )}
 
-      <div className="auth-field">
-        <label className="auth-label" htmlFor="auth-email">Email</label>
-        <input
+      <div className="space-y-2">
+        <Label htmlFor="auth-email">Email</Label>
+        <Input
           id="auth-email"
-          className="auth-input"
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="you@company.com"
+          autoComplete="email"
           required
+          disabled={pending}
         />
       </div>
 
-      <div className="auth-field">
-        <label className="auth-label" htmlFor="auth-password">Password</label>
-        <input
+      <div className="space-y-2">
+        <Label htmlFor="auth-password">Password</Label>
+        <Input
           id="auth-password"
-          className="auth-input"
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="At least 8 characters"
+          autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
           minLength={8}
           required
+          disabled={pending}
         />
       </div>
 
-      <div className="auth-error-slot" aria-live="polite" aria-atomic="true">
+      <div className="min-h-[1.5rem]" aria-live="polite" aria-atomic="true">
         {error && (
-          <div className="auth-error" role="alert">
+          <div className="text-sm text-destructive" role="alert">
             {error}
           </div>
         )}
       </div>
 
-      <button className="auth-submit" type="submit" disabled={pending}>
-        {pending ? 'Working...' : actionLabel}
-      </button>
+      <Button className="w-full relative" type="submit" disabled={pending}>
+        <span className={pending ? 'opacity-0' : undefined}>{actionLabel}</span>
+        {pending && (
+          <span className="absolute inset-0 flex items-center justify-center gap-2">
+            <Spinner />
+            <span className="text-sm">
+              {mode === 'sign-up' ? 'Creating account...' : 'Signing in...'}
+            </span>
+          </span>
+        )}
+      </Button>
     </form>
   )
 }

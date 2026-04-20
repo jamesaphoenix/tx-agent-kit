@@ -1,5 +1,6 @@
 export interface TestkitEnv {
   DATABASE_URL: string | undefined
+  DATABASE_SCHEMA: string | undefined
   TESTKIT_COMMAND_TIMEOUT_MS: string | undefined
   INFRA_READY_TIMEOUT_SECONDS: string | undefined
   TESTKIT_INFRA_TIMEOUT_HEADROOM_SECONDS: string | undefined
@@ -14,11 +15,15 @@ export interface TestkitEnv {
   RUN_LIVE_TUNNEL_NEGATIVE_INTEGRATION: string | undefined
   LIVE_TUNNEL_MODE: string | undefined
   RUN_COMPOSE_E2E: string | undefined
+  WORKTREE_PORT_OFFSET: string | undefined
+  INTEGRATION_API_BASE_URL: string | undefined
+  INTEGRATION_AUTH_SECRET: string | undefined
 }
 
 export const getTestkitEnv = (): TestkitEnv => {
   return {
     DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_SCHEMA: process.env.DATABASE_SCHEMA,
     TESTKIT_COMMAND_TIMEOUT_MS: process.env.TESTKIT_COMMAND_TIMEOUT_MS,
     INFRA_READY_TIMEOUT_SECONDS: process.env.INFRA_READY_TIMEOUT_SECONDS,
     TESTKIT_INFRA_TIMEOUT_HEADROOM_SECONDS:
@@ -34,7 +39,10 @@ export const getTestkitEnv = (): TestkitEnv => {
     RUN_LIVE_TUNNEL_NEGATIVE_INTEGRATION:
       process.env.RUN_LIVE_TUNNEL_NEGATIVE_INTEGRATION,
     LIVE_TUNNEL_MODE: process.env.LIVE_TUNNEL_MODE,
-    RUN_COMPOSE_E2E: process.env.RUN_COMPOSE_E2E
+    RUN_COMPOSE_E2E: process.env.RUN_COMPOSE_E2E,
+    WORKTREE_PORT_OFFSET: process.env.WORKTREE_PORT_OFFSET,
+    INTEGRATION_API_BASE_URL: process.env.INTEGRATION_API_BASE_URL,
+    INTEGRATION_AUTH_SECRET: process.env.INTEGRATION_AUTH_SECRET
   }
 }
 

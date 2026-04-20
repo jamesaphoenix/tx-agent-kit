@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { config } from '../config'
 import { useIsAuthenticated, useIsSessionReady } from '../hooks/use-session-store'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export function WebsiteHeader() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -17,29 +19,48 @@ export function WebsiteHeader() {
   }, [])
 
   return (
-    <header className={`website-header${isScrolled ? ' website-header--scrolled' : ''}`}>
-      <div className="website-header-inner">
-        <Link href="/" className="website-logo">
-          <span className="website-logo-mark">tx</span>
-          <span className="website-logo-wordmark">{config.name}</span>
+    <header
+      className={cn(
+        'fixed top-0 w-full border-b border-border bg-white/80 backdrop-blur z-50 transition-shadow',
+        isScrolled && 'shadow-sm'
+      )}
+    >
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-xs font-extrabold text-white shadow-sm">
+            tx
+          </span>
+          <span className="text-sm font-semibold text-foreground">{config.name}</span>
         </Link>
 
-        <nav className="website-nav">
-          <Link href="/blog" className="website-nav-link">Blog</Link>
-          <Link href="/pricing" className="website-nav-link">Pricing</Link>
+        <nav aria-label="Main navigation" className="flex items-center gap-1">
+          <Link href="/blog" className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md">
+            Blog
+          </Link>
+          <Link href="/pricing" className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md">
+            Pricing
+          </Link>
           {(() => {
             if (isReady && isAuthenticated) {
-              return <Link href="/org" className="website-nav-cta">Go to app</Link>
+              return (
+                <Link href="/org" className={buttonVariants({ size: 'sm' })}>
+                  Go to app
+                </Link>
+              )
             }
             if (isReady) {
               return (
                 <>
-                  <Link href="/sign-in" className="website-nav-link">Sign in</Link>
-                  <Link href="/sign-up" className="website-nav-cta">Get started</Link>
+                  <Link href="/sign-in" className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md">
+                    Log In
+                  </Link>
+                  <Link href="/sign-up" className={buttonVariants({ size: 'sm' })}>
+                    Sign Up
+                  </Link>
                 </>
               )
             }
-            return <span className="website-nav-link" aria-hidden="true">...</span>
+            return <span className="px-3 py-1.5 text-sm text-muted-foreground" aria-hidden="true">...</span>
           })()}
         </nav>
       </div>

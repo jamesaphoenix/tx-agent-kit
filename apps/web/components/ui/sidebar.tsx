@@ -9,6 +9,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ComponentProps,
@@ -27,14 +28,30 @@ interface SidebarContextValue {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  /** True while the sidebar width is animating between expanded/collapsed */
+  transitioning: boolean
 }
 
 const SidebarContext = createContext<SidebarContextValue | null>(null)
 
-const SIDEBAR_WIDTH = '17.5rem'
-const SIDEBAR_WIDTH_MOBILE = '18rem'
-const SIDEBAR_WIDTH_ICON = '4.5rem'
-const SIDEBAR_KEYBOARD_SHORTCUT = 'b'
+const SIDEBAR_WIDTH = '16rem'
+const SIDEBAR_WIDTH_MOBILE = '16rem'
+const SIDEBAR_WIDTH_ICON = '3.5rem'
+const SIDEBAR_STORAGE_KEY = 'sidebar:open'
+
+const getPersistedOpen = (defaultOpen: boolean): boolean => {
+  if (typeof window === 'undefined') {
+    return defaultOpen
+  }
+  try {
+    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY)
+    if (stored === 'true') { return true }
+    if (stored === 'false') { return false }
+    return defaultOpen
+  } catch {
+    return defaultOpen
+  }
+}
 
 const classes = (...tokens: Array<string | false | null | undefined>): string => {
   return tokens.filter(Boolean).join(' ')
@@ -50,14 +67,6 @@ const getMobileMediaQuery = (): MediaQueryList | null => {
 
 const resolveMobileViewport = (): boolean => {
   return getMobileMediaQuery()?.matches ?? false
-}
-
-const isMacPlatform = (): boolean => {
-  if (typeof navigator === 'undefined') {
-    return false
-  }
-
-  return /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent)
 }
 
 const withAsChild = (
@@ -100,16 +109,32 @@ export const SidebarProvider = ({
   className,
   style
 }: SidebarProviderProps) => {
-  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(() => getPersistedOpen(defaultOpen))
   const [openMobile, setOpenMobile] = useState(false)
   const [isMobile, setIsMobile] = useState(resolveMobileViewport)
+  const [transitioning, setTransitioning] = useState(false)
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const open = openProp ?? uncontrolledOpen
   const state: SidebarState = open ? 'expanded' : 'collapsed'
 
   const setOpen = useCallback((nextOpen: boolean) => {
+    // Mark sidebar as transitioning for the duration of the CSS animation
+    setTransitioning(true)
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current)
+    }
+    transitionTimerRef.current = setTimeout(() => {
+      setTransitioning(false)
+    }, 300) // matches duration-300
+
     if (openProp === undefined) {
       setUncontrolledOpen(nextOpen)
+      try {
+        localStorage.setItem(SIDEBAR_STORAGE_KEY, String(nextOpen))
+      } catch {
+        // Ignore storage errors
+      }
     }
 
     onOpenChange?.(nextOpen)
@@ -148,31 +173,6 @@ export const SidebarProvider = ({
     }
   }, [isMobile])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== SIDEBAR_KEYBOARD_SHORTCUT) {
-        return
-      }
-
-      const modifierPressed = isMacPlatform() ? event.metaKey : event.ctrlKey
-      if (!modifierPressed) {
-        return
-      }
-
-      event.preventDefault()
-      toggleSidebar()
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [toggleSidebar])
-
   const contextValue = useMemo<SidebarContextValue>(() => ({
     state,
     open,
@@ -180,8 +180,9 @@ export const SidebarProvider = ({
     openMobile,
     setOpenMobile,
     isMobile,
-    toggleSidebar
-  }), [isMobile, open, openMobile, setOpen, state, toggleSidebar])
+    toggleSidebar,
+    transitioning
+  }), [isMobile, open, openMobile, setOpen, state, toggleSidebar, transitioning])
 
   const providerStyle = {
     '--sidebar-width': SIDEBAR_WIDTH,
@@ -193,7 +194,7 @@ export const SidebarProvider = ({
   return (
     <SidebarContext.Provider value={contextValue}>
       <div
-        className={classes('sidebar-provider', className)}
+        className={classes('flex w-full', className)}
         data-state={state}
         data-mobile={isMobile ? 'true' : 'false'}
         style={providerStyle}
@@ -233,19 +234,31 @@ export const Sidebar = ({
   const collapsedOffcanvas = collapsible === 'offcanvas' && state === 'collapsed'
 
   if (isMobile && collapsible !== 'none') {
+    let mobileTranslate: string
+    if (openMobile) {
+      mobileTranslate = 'translate-x-0'
+    } else if (side === 'right') {
+      mobileTranslate = 'translate-x-full'
+    } else {
+      mobileTranslate = '-translate-x-full'
+    }
+
     return (
       <>
         <button
           type="button"
-          className={classes('sidebar-mobile-overlay', openMobile && 'is-open')}
+          className={classes(
+            'fixed inset-0 z-40 bg-black/50 transition-opacity',
+            openMobile ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          )}
           aria-label="Close sidebar"
           onClick={() => setOpenMobile(false)}
         />
         <aside
           className={classes(
-            'sidebar-mobile-panel',
-            side === 'right' ? 'is-right' : 'is-left',
-            openMobile && 'is-open',
+            'fixed top-0 bottom-0 z-50 flex flex-col w-[var(--sidebar-width-mobile)] bg-sidebar-background border-r border-border transition-transform duration-300 ease-in-out',
+            side === 'right' ? 'right-0 border-l border-r-0' : 'left-0',
+            mobileTranslate,
             className
           )}
           data-side={side}
@@ -264,18 +277,18 @@ export const Sidebar = ({
   return (
     <aside
       className={classes(
-        'sidebar-root',
-        side === 'right' ? 'is-right' : 'is-left',
-        variant === 'floating' && 'is-floating',
-        variant === 'inset' && 'is-inset',
-        collapsedToIcon && 'is-collapsed-icon',
-        collapsedOffcanvas && 'is-collapsed-offcanvas',
+        'group sticky top-0 self-start flex flex-col h-dvh border-r border-border bg-sidebar-background transition-[width] duration-300 ease-in-out overflow-hidden',
+        collapsedToIcon && 'w-[var(--sidebar-width-icon)]',
+        !collapsedToIcon && !collapsedOffcanvas && 'w-[var(--sidebar-width)]',
+        collapsedOffcanvas && 'w-0 border-r-0',
+        side === 'right' && 'border-r-0 border-l border-border',
         className
       )}
       data-side={side}
       data-variant={variant}
       data-collapsible={collapsible}
       data-state={state}
+      data-icon-collapsed={collapsedToIcon ? '' : undefined}
       dir={dir}
       {...props}
     >
@@ -285,23 +298,23 @@ export const Sidebar = ({
 }
 
 export const SidebarInset = ({ className, ...props }: ComponentProps<'div'>) => {
-  return <div className={classes('sidebar-inset', className)} {...props} />
+  return <div className={classes('flex-1 min-w-0', className)} {...props} />
 }
 
 export const SidebarHeader = ({ className, ...props }: ComponentProps<'div'>) => {
-  return <div className={classes('sidebar-header', className)} {...props} />
+  return <div className={classes('shrink-0 bg-sidebar-background p-3 border-b border-border group-data-[icon-collapsed]:p-2', className)} {...props} />
 }
 
 export const SidebarFooter = ({ className, ...props }: ComponentProps<'div'>) => {
-  return <div className={classes('sidebar-footer', className)} {...props} />
+  return <div className={classes('mt-auto shrink-0 bg-sidebar-background p-3 border-t border-border group-data-[icon-collapsed]:p-2', className)} {...props} />
 }
 
 export const SidebarContent = ({ className, ...props }: ComponentProps<'div'>) => {
-  return <div className={classes('sidebar-content', className)} {...props} />
+  return <div className={classes('min-h-0 flex-1 overflow-y-auto p-2', className)} {...props} />
 }
 
 export const SidebarGroup = ({ className, ...props }: ComponentProps<'section'>) => {
-  return <section className={classes('sidebar-group', className)} {...props} />
+  return <section className={classes('py-2', className)} {...props} />
 }
 
 interface SidebarGroupLabelProps extends ComponentProps<'div'> {
@@ -314,7 +327,7 @@ export const SidebarGroupLabel = ({
   children,
   ...props
 }: SidebarGroupLabelProps) => {
-  const resolvedClass = classes('sidebar-group-label', className)
+  const resolvedClass = classes('px-2 py-1.5 text-xs font-medium text-muted-foreground group-data-[icon-collapsed]:hidden', className)
   if (asChild) {
     return withAsChild(children, resolvedClass, props)
   }
@@ -330,22 +343,22 @@ export const SidebarGroupAction = ({ className, ...props }: ComponentProps<'butt
   return (
     <button
       type="button"
-      className={classes('sidebar-group-action', className)}
+      className={classes('absolute right-2 top-2 flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer', className)}
       {...props}
     />
   )
 }
 
 export const SidebarGroupContent = ({ className, ...props }: ComponentProps<'div'>) => {
-  return <div className={classes('sidebar-group-content', className)} {...props} />
+  return <div className={classes('', className)} {...props} />
 }
 
 export const SidebarMenu = ({ className, ...props }: ComponentProps<'ul'>) => {
-  return <ul className={classes('sidebar-menu', className)} {...props} />
+  return <ul className={classes('list-none m-0 p-0 space-y-1', className)} {...props} />
 }
 
 export const SidebarMenuItem = ({ className, ...props }: ComponentProps<'li'>) => {
-  return <li className={classes('sidebar-menu-item', className)} {...props} />
+  return <li className={classes('relative', className)} {...props} />
 }
 
 interface SidebarMenuButtonProps extends ComponentProps<'button'> {
@@ -361,7 +374,12 @@ export const SidebarMenuButton = ({
   type = 'button',
   ...props
 }: SidebarMenuButtonProps) => {
-  const resolvedClass = classes('sidebar-menu-button', isActive && 'is-active', className)
+  const resolvedClass = classes(
+    'w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors overflow-hidden',
+    'group-data-[icon-collapsed]:justify-center group-data-[icon-collapsed]:px-0',
+    isActive && 'bg-accent text-foreground font-medium',
+    className
+  )
   const dataProps = {
     'data-active': isActive ? 'true' : 'false'
   }
@@ -380,7 +398,7 @@ export const SidebarMenuButton = ({
 export const SidebarMenuAction = ({ className, type = 'button', ...props }: ComponentProps<'button'>) => {
   return (
     <button
-      className={classes('sidebar-menu-action', className)}
+      className={classes('absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer opacity-0 group-hover:opacity-100', className)}
       type={type}
       {...props}
     />
@@ -388,15 +406,15 @@ export const SidebarMenuAction = ({ className, type = 'button', ...props }: Comp
 }
 
 export const SidebarMenuBadge = ({ className, ...props }: ComponentProps<'span'>) => {
-  return <span className={classes('sidebar-menu-badge', className)} {...props} />
+  return <span className={classes('ml-auto text-xs font-medium text-muted-foreground', className)} {...props} />
 }
 
 export const SidebarMenuSub = ({ className, ...props }: ComponentProps<'ul'>) => {
-  return <ul className={classes('sidebar-menu-sub', className)} {...props} />
+  return <ul className={classes('list-none m-0 pl-4 border-l border-border space-y-1', className)} {...props} />
 }
 
 export const SidebarMenuSubItem = ({ className, ...props }: ComponentProps<'li'>) => {
-  return <li className={classes('sidebar-menu-sub-item', className)} {...props} />
+  return <li className={classes('relative', className)} {...props} />
 }
 
 interface SidebarMenuSubButtonProps extends ComponentProps<'button'> {
@@ -410,7 +428,7 @@ export const SidebarMenuSubButton = ({
   type = 'button',
   ...props
 }: SidebarMenuSubButtonProps) => {
-  const resolvedClass = classes('sidebar-menu-sub-button', className)
+  const resolvedClass = classes('w-full flex items-center gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors', className)
   if (asChild) {
     return withAsChild(children, resolvedClass, props)
   }
@@ -428,9 +446,9 @@ interface SidebarMenuSkeletonProps extends HTMLAttributes<HTMLDivElement> {
 
 export const SidebarMenuSkeleton = ({ showIcon = true, className, ...props }: SidebarMenuSkeletonProps) => {
   return (
-    <div className={classes('sidebar-menu-skeleton', className)} {...props}>
-      {showIcon && <span className="sidebar-menu-skeleton-icon" />}
-      <span className="sidebar-menu-skeleton-line" />
+    <div className={classes('flex items-center gap-2 px-2 py-1.5', className)} {...props}>
+      {showIcon && <span className="w-4 h-4 rounded bg-muted animate-pulse shrink-0" />}
+      <span className="h-3 flex-1 rounded bg-muted animate-pulse" />
     </div>
   )
 }
@@ -440,7 +458,7 @@ export const SidebarTrigger = ({ className, onClick, ...props }: ComponentProps<
 
   return (
     <button
-      className={classes('sidebar-trigger', className)}
+      className={classes('w-8 h-8 flex items-center justify-center rounded-md hover:bg-accent cursor-pointer', className)}
       type="button"
       onClick={(event) => {
         onClick?.(event)
@@ -451,14 +469,14 @@ export const SidebarTrigger = ({ className, onClick, ...props }: ComponentProps<
       {...props}
     >
       <svg
-        className="sidebar-trigger-icon"
-        width="18"
-        height="18"
+        className="w-4 h-4"
+        width="15"
+        height="15"
         viewBox="0 0 24 24"
         fill="none"
         aria-hidden="true"
       >
-        <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       </svg>
       <span className="sr-only">Toggle Sidebar</span>
     </button>
@@ -470,7 +488,7 @@ export const SidebarRail = ({ className, onClick, ...props }: ComponentProps<'bu
 
   return (
     <button
-      className={classes('sidebar-rail', className)}
+      className={classes('absolute right-0 top-0 bottom-0 w-1 hover:bg-border cursor-col-resize', className)}
       type="button"
       onClick={(event) => {
         onClick?.(event)

@@ -80,12 +80,11 @@ pnpm openapi:generate    # Regenerate apps/api/openapi.json
 pnpm api:client:generate # Regenerate web API hooks from spec
 ```
 
-If you added database columns, create and run a migration:
+If you added database columns, run the migration pipeline:
 
 ```bash
-pnpm db:generate   # Generate a Drizzle migration
-pnpm db:migrate    # Apply the migration
-pnpm db:schemas:apply # Reconcile desired-state schema SQL
+pnpm db:migrate       # Apply Drizzle migrations from packages/infra/db/drizzle/migrations/
+pnpm db:schemas:apply # Reconcile desired-state schema SQL + enum sync
 ```
 
 ## The golden path

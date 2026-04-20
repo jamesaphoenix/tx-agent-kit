@@ -2,11 +2,43 @@ import js from '@eslint/js'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
+const noDeferredWorkPlugin = {
+  meta: { name: 'no-deferred-work', version: '0.1.0' },
+  rules: {
+    'no-todo-comments': {
+      meta: { type: 'problem', schema: [] },
+      create(context) {
+        const pattern = /\b(todo|fixme|hack)\b/i
+        return {
+          Program() {
+            for (const comment of context.sourceCode.getAllComments()) {
+              const match = pattern.exec(comment.value)
+              if (match) {
+                context.report({
+                  loc: comment.loc,
+                  message:
+                    `'${match[1].toUpperCase()}' comment found. ` +
+                    'Do not defer work — fix the root cause now. ' +
+                    'If it needs a design decision, ask the user. ' +
+                    'If code is intentionally skipped (e.g. it.skip), explain why in the skip reason, not a TODO.'
+                })
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 export const baseConfig = [
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {
     files: ['**/*.ts', '**/*.tsx'],
+    plugins: {
+      'no-deferred-work': noDeferredWorkPlugin
+    },
     languageOptions: {
       parserOptions: {
         projectService: {
@@ -22,13 +54,8 @@ export const baseConfig = [
     rules: {
       'no-constant-binary-expression': 'error',
       'no-console': 'error',
-      'no-warning-comments': [
-        'error',
-        {
-          terms: ['todo', 'fixme', 'hack'],
-          location: 'start'
-        }
-      ],
+      'no-warning-comments': 'off',
+      'no-deferred-work/no-todo-comments': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/ban-ts-comment': [
         'error',
@@ -105,7 +132,9 @@ export const baseConfig = [
       '**/*.test.ts',
       '**/*.test.tsx',
       '**/*.integration.test.ts',
-      '**/*.integration.test.tsx'
+      '**/*.integration.test.tsx',
+      '**/test-*.ts',
+      '**/test-*.tsx'
     ],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
@@ -124,11 +153,7 @@ export const baseConfig = [
       '@typescript-eslint/no-dynamic-delete': 'off'
     }
   },
-  // ── DB schema: pgTable deprecation is not actionable until drizzle migration ──
-  {
-    files: ['packages/infra/db/src/schema.ts'],
-    rules: {
-      '@typescript-eslint/no-deprecated': 'off'
-    }
-  }
+  // ── DB schema: pgTable extraConfig must use array syntax (not deprecated object syntax) ──
+  // The no-deprecated rule is now enabled for schema.ts since we migrated to array syntax.
+  // If this fires, convert `(t) => ({...})` to `(t) => [...]` in the pgTable call.
 ]

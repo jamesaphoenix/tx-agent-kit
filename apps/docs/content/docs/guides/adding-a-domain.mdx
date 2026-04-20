@@ -27,11 +27,15 @@ This creates the domain slice under `packages/core/src/domains/billing/`:
 
 ```
 packages/core/src/domains/billing/
+  events.ts                       # PUBLIC cross-domain event contract (the ONLY file siblings may import)
   domain/billing-domain.ts        # Entity types, value objects, pure rules
+  domain/billing-events.ts        # Event payload shapes (re-exported from events.ts)
   ports/billing-ports.ts          # Repository port with Effect Context.Tag
   application/billing-service.ts  # Use-case orchestration service
   adapters/billing-adapters.ts    # Adapter implementations
 ```
+
+The `events.ts` file at the domain root is structurally significant — it is the ONLY file other domains may import from this one. Everything else is private to the slice. See [DDD Pattern → Cross-domain boundaries](/docs/architecture/ddd-pattern#cross-domain-boundaries) for the rules and enforcement.
 
 If you also need database schema artifacts:
 

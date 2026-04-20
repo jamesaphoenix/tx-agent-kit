@@ -10,7 +10,8 @@ describe('getDbEnv', () => {
     vi.stubEnv('DATABASE_URL', 'postgres://custom:custom@db:5432/mydb')
 
     expect(getDbEnv()).toEqual({
-      DATABASE_URL: 'postgres://custom:custom@db:5432/mydb'
+      DATABASE_URL: 'postgres://custom:custom@db:5432/mydb',
+      DB_POOL_MAX: 20
     })
   })
 
@@ -19,7 +20,8 @@ describe('getDbEnv', () => {
     vi.stubEnv('NODE_ENV', 'development')
 
     expect(getDbEnv()).toEqual({
-      DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/tx_agent_kit'
+      DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/tx_agent_kit',
+      DB_POOL_MAX: 20
     })
   })
 
@@ -28,7 +30,8 @@ describe('getDbEnv', () => {
     vi.stubEnv('NODE_ENV', undefined)
 
     expect(getDbEnv()).toEqual({
-      DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/tx_agent_kit'
+      DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/tx_agent_kit',
+      DB_POOL_MAX: 20
     })
   })
 
@@ -55,7 +58,8 @@ describe('getDbEnv', () => {
     vi.stubEnv('NODE_ENV', 'production')
 
     expect(getDbEnv()).toEqual({
-      DATABASE_URL: 'postgres://prod:prod@prod-db:5432/proddb'
+      DATABASE_URL: 'postgres://prod:prod@prod-db:5432/proddb',
+      DB_POOL_MAX: 20
     })
   })
 })

@@ -150,7 +150,19 @@ describe('worktree setup integration', () => {
     'resolves unique offsets for large active-worktree batches within a practical latency budget',
     () => {
       const repoRoot = resolve(import.meta.dirname, '../../..')
-      const worktreeNames = Array.from({ length: 64 }, (_value, index) => `wt_batch_${index + 1}`)
+      // Batch size is configurable: locally we use 8 to keep the wall
+      // clock under 1s (each iteration spawns subshell calls into
+      // ports.sh, which dominates), in CI we crank it up to 64 to
+      // stress the algorithm's collision-resolution at scale. Set
+      // `WORKTREE_SETUP_BATCH_SIZE=64` to opt into the large run.
+      const requestedBatchSize = parsePositiveInt(
+        process.env.WORKTREE_SETUP_BATCH_SIZE,
+        process.env.CI === 'true' ? 64 : 8
+      )
+      const worktreeNames = Array.from(
+        { length: requestedBatchSize },
+        (_value, index) => `wt_batch_${index + 1}`
+      )
 
       const runPortResolutionBatch = (
         names: string[]

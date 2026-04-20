@@ -5,102 +5,101 @@ description: "API endpoints for the storage resource group"
 
 # storage Endpoints
 
-All endpoints require a valid Bearer token in the `Authorization` header.
-
 ## `POST /v1/storage/upload-url`
 
-Generate a presigned URL for uploading a file to R2.
-
-### Request body
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `key` | `string` | Yes | Object key (path) in the bucket |
-| `contentType` | `string` | Yes | MIME type of the file |
-| `expiresIn` | `number` | No | URL expiry in seconds (default: 3600) |
 
 ### Responses
 
 | Status | Description |
 |--------|-------------|
-| `200` | Success — returns `{ url: string }` |
-| `400` | Invalid request or storage operation failed |
+| `200` | Success |
+| `400` | The request did not match the expected schema |
 | `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
 | `500` | InternalError |
 
 ## `POST /v1/storage/download-url`
 
-Generate a presigned URL for downloading a file from R2.
-
-### Request body
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `key` | `string` | Yes | Object key to download |
-| `expiresIn` | `number` | No | URL expiry in seconds (default: 3600) |
 
 ### Responses
 
 | Status | Description |
 |--------|-------------|
-| `200` | Success — returns `{ url: string }` |
-| `400` | Invalid request or storage operation failed |
+| `200` | Success |
+| `400` | The request did not match the expected schema |
 | `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
 | `500` | InternalError |
 
 ## `POST /v1/storage/delete`
 
-Delete an object from the bucket.
-
-### Request body
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `key` | `string` | Yes | Object key to delete |
 
 ### Responses
 
 | Status | Description |
 |--------|-------------|
-| `200` | Success — returns `{ deleted: true }` |
-| `400` | Invalid request or storage operation failed |
+| `200` | Success |
+| `400` | The request did not match the expected schema |
 | `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
 | `500` | InternalError |
 
 ## `GET /v1/storage/objects`
 
-List objects in the bucket, optionally filtered by prefix.
 
 ### Parameters
 
 | Name | In | Type | Required | Description |
 |------|-----|------|----------|-------------|
-| `prefix` | query | `string` | No | Key prefix filter |
+| `prefix` | query | `string` | No | --- |
+
 
 ### Responses
 
 | Status | Description |
 |--------|-------------|
-| `200` | Success — returns `{ keys: string[] }` |
-| `400` | Invalid request or storage operation failed |
+| `200` | Success |
+| `400` | The request did not match the expected schema |
 | `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
 | `500` | InternalError |
 
 ## `GET /v1/storage/objects/{key}/metadata`
 
-Get metadata for a specific object.
 
 ### Parameters
 
 | Name | In | Type | Required | Description |
 |------|-----|------|----------|-------------|
-| `key` | path | `string` | Yes | Object key |
+| `key` | path | `string` | Yes | --- |
+
 
 ### Responses
 
 | Status | Description |
 |--------|-------------|
-| `200` | Success — returns `{ key, contentType, contentLength, lastModified, etag }` |
-| `400` | Invalid request or storage operation failed |
+| `200` | Success |
+| `400` | The request did not match the expected schema |
 | `401` | Unauthorized |
+| `402` | PaymentRequired |
+| `403` | Forbidden |
+| `404` | NotFound |
+| `409` | Conflict |
+| `429` | TooManyRequests |
 | `500` | InternalError |

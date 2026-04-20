@@ -20,7 +20,7 @@ export const getPool = (): Pool => {
     const connectionString = getDatabaseUrl()
     poolSingleton = new Pool({
       connectionString,
-      max: 20,
+      max: getDbEnv().DB_POOL_MAX,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 5000
     })
@@ -28,43 +28,54 @@ export const getPool = (): Pool => {
   return poolSingleton
 }
 
+export const resetPool = async (): Promise<void> => {
+  if (!poolSingleton) {
+    return
+  }
+
+  const activePool = poolSingleton
+  poolSingleton = undefined
+  await activePool.end()
+}
+
 export const db = drizzle({ client: getPool(), schema })
 
-const PgClientLive = PgClient.layer({
-  url: Redacted.make(getDatabaseUrl()),
-  types: {
-    getTypeParser: (typeId, format) => {
-      if (rawTimestampTypeIds.includes(typeId)) {
-        return (value: unknown) => value
-      }
-
-      const parser = types.getTypeParser(typeId, format) as (value: string) => unknown
-      return (value: unknown) => {
-        if (typeof value !== 'string') {
-          return value
+const makePgClientLive = () =>
+  PgClient.layer({
+    url: Redacted.make(getDatabaseUrl()),
+    types: {
+      getTypeParser: (typeId, format) => {
+        if (rawTimestampTypeIds.includes(typeId)) {
+          return (value: unknown) => value
         }
-        return parser(value)
+
+        const parser = types.getTypeParser(typeId, format) as (value: string) => unknown
+        return (value: unknown) => {
+          if (typeof value !== 'string') {
+            return value
+          }
+          return parser(value)
+        }
       }
     }
-  }
-})
+  })
 
 const makeDb = Effect.gen(function* () {
-  const client = yield* PgClient.PgClient
-  return PgDrizzle.drizzle(client, { schema })
+  yield* PgClient.PgClient
+  return yield* PgDrizzle.makeWithDefaults({ schema })
 })
 
 export type DbClient = Effect.Effect.Success<typeof makeDb>
 export class DB extends Context.Tag('@tx-agent-kit/db/DB')<DB, DbClient>() {}
 
 export const DBLive = Layer.scoped(DB, makeDb)
-const DBRuntimeLive = Layer.provide(DBLive, PgClientLive)
+const makeDBRuntimeLive = () => Layer.provide(DBLive, makePgClientLive())
 
 export const dbClientEffect: Effect.Effect<DbClient, unknown> = Effect.gen(function* () {
   return yield* DB
-}).pipe(Effect.provide(DBRuntimeLive))
+}).pipe(Effect.provide(makeDBRuntimeLive()))
 
 export const provideDB = <A, E, R>(
   effect: Effect.Effect<A, E, R | DB>
 ): Effect.Effect<A, E, Exclude<R, DB>> =>
-  effect.pipe(Effect.provide(DBRuntimeLive)) as Effect.Effect<A, E, Exclude<R, DB>>
+  effect.pipe(Effect.provide(makeDBRuntimeLive())) as Effect.Effect<A, E, Exclude<R, DB>>

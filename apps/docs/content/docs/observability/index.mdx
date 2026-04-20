@@ -3,7 +3,7 @@ title: Observability Overview
 description: OpenTelemetry-native observability with traces, metrics, and structured logs
 ---
 
-`tx-agent-kit` is built with OpenTelemetry-native observability. All three signal types (traces, metrics, and logs) are exported via OTLP to a centralized collector that routes them to the appropriate backend.
+`tx-agent-kit` is built with OpenTelemetry-native observability. All three standard signal types (traces, metrics, and logs) are exported via OTLP to a centralized collector that routes them to the appropriate backend. LLM/GenAI spans are additionally exported to Langfuse.
 
 ## Architecture
 
@@ -18,6 +18,10 @@ OTEL Collector
     +---> Prometheus (metrics)
     +---> Loki (logs via Promtail)
     +---> GCP Cloud Trace / Cloud Monitoring (staging/prod)
+
+Application LLM calls
+    |
+    +---> Langfuse (LLM/GenAI spans only)
 ```
 
 Applications never send telemetry directly to backends. The OTEL Collector acts as a single ingestion point and handles routing, batching, and retry logic. This decouples application instrumentation from backend choice.
@@ -51,7 +55,8 @@ The library produces structured JSON output with `timestamp`, `level`, `service`
 
 | Signal | Local backend | Production backend |
 |--------|--------------|-------------------|
-| Traces | Jaeger (`localhost:16686`) | GCP Cloud Trace |
+| Standard traces | Jaeger (`localhost:16686`) | GCP Cloud Trace |
+| LLM traces | Langfuse (`localhost:3003`) | Langfuse Cloud |
 | Metrics | Prometheus (`localhost:9090`) | GCP Cloud Monitoring |
 | Logs | Loki via Promtail (`localhost:3100`) | GCP Cloud Logging |
 
@@ -74,5 +79,6 @@ pnpm tsx scripts/test/emit-observability-smoke.ts
 | [Logging](/docs/observability/logging) | Structured logging with `@tx-agent-kit/logging` |
 | [Tracing](/docs/observability/tracing) | Distributed tracing with OpenTelemetry |
 | [Metrics](/docs/observability/metrics) | Application and infrastructure metrics |
+| [Langfuse](/docs/observability/langfuse) | LLM/GenAI trace viewer and local bootstrap |
 | [Sentry Spotlight](/docs/observability/spotlight) | Local error and trace viewer (no Sentry account needed) |
 | [Monitoring Stack](/docs/observability/monitoring-stack) | Local and production monitoring tools |

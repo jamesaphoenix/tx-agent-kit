@@ -74,7 +74,12 @@ mkdir -p "$(dirname "$TEMPORAL_LOG_FILE")"
 
 echo "Starting Temporal CLI dev server on $(temporal_cli_address)..."
 if [[ -n "$TEMPORAL_CLI_DB_FILENAME" ]]; then
-  nohup temporal server start-dev \
+  nohup env \
+    -u TEMPORAL_API_KEY \
+    -u TEMPORAL_TLS \
+    -u TEMPORAL_TLS_ENABLED \
+    -u TEMPORAL_TLS_SERVER_NAME \
+    temporal server start-dev \
     --ip "$TEMPORAL_CLI_ADDRESS" \
     --port "$TEMPORAL_CLI_PORT" \
     --ui-ip "$TEMPORAL_CLI_ADDRESS" \
@@ -83,7 +88,12 @@ if [[ -n "$TEMPORAL_CLI_DB_FILENAME" ]]; then
     --db-filename "$TEMPORAL_CLI_DB_FILENAME" \
     </dev/null >"$TEMPORAL_LOG_FILE" 2>&1 &
 else
-  nohup temporal server start-dev \
+  nohup env \
+    -u TEMPORAL_API_KEY \
+    -u TEMPORAL_TLS \
+    -u TEMPORAL_TLS_ENABLED \
+    -u TEMPORAL_TLS_SERVER_NAME \
+    temporal server start-dev \
     --ip "$TEMPORAL_CLI_ADDRESS" \
     --port "$TEMPORAL_CLI_PORT" \
     --ui-ip "$TEMPORAL_CLI_ADDRESS" \
