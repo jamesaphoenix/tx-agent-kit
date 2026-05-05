@@ -19,15 +19,15 @@
     "react-dom": "19.2.5"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.2",
+    "@tailwindcss/postcss": "^4.2.4",
     "@types/mdx": "^2.0.13",
     "@types/node": "^25.6.0",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
-    "postcss": "8.5.10",
+    "postcss": "8.5.14",
     "postcss-load-config": "6.0.1",
-    "tailwindcss": "^4.2.2",
+    "tailwindcss": "^4.2.4",
     "typescript": "^5.9.3",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   }
 }
