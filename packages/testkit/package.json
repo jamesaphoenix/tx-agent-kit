@@ -18,8 +18,8 @@
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/db": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
-    "effect": "^3.21.0",
-    "pg": "^8.20.0",
+    "effect": "^3.21.2",
+    "pg": "^8.21.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
