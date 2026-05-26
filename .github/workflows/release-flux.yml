@@ -98,6 +98,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # shellcheck disable=SC2012
           artifact_file="$(ls -t deploy/artifacts/images-*.env | head -n 1)"
           artifact_name="$(basename "$artifact_file")"
           echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
@@ -152,6 +153,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # shellcheck disable=SC2012
           artifact_file="$(ls -t deploy/artifacts/images-*.env | head -n 1)"
           artifact_name="$(basename "$artifact_file")"
           echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
@@ -251,7 +253,7 @@ jobs:
           git add deploy/gitops
           git commit -m "chore(gitops): update image refs for ${DEPLOY_ENV}"
           push_ok=0
-          for attempt in 1 2 3; do
+          for _attempt in 1 2 3; do
             git pull --rebase origin "${GITHUB_REF_NAME}"
             if git push origin "HEAD:${GITHUB_REF_NAME}"; then
               push_ok=1
@@ -354,7 +356,7 @@ jobs:
           git add deploy/gitops
           git commit -m "chore(gitops): update image refs for ${DEPLOY_ENV}"
           push_ok=0
-          for attempt in 1 2 3; do
+          for _attempt in 1 2 3; do
             git pull --rebase origin "${GITHUB_REF_NAME}"
             if git push origin "HEAD:${GITHUB_REF_NAME}"; then
               push_ok=1

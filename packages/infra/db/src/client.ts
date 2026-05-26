@@ -1,13 +1,15 @@
 import * as PgClient from '@effect/sql-pg/PgClient'
 import * as PgDrizzle from 'drizzle-orm/effect-postgres'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { Context, Effect, Layer, Redacted } from 'effect'
+import { Context, Effect, Layer, ManagedRuntime, Redacted } from 'effect'
+import type { ConnectionOptions } from 'node:tls'
 import { Pool } from 'pg'
 import { types } from 'pg'
 import { getDbEnv } from './env.js'
 import * as schema from './schema.js'
 
 let poolSingleton: Pool | undefined
+const dbRuntimeSingletons = new Map<string, ManagedRuntime.ManagedRuntime<DB, unknown>>()
 const rawTimestampTypeIds = [1184, 1114, 1082, 1186, 1231, 1115, 1185, 1187, 1182]
 
 const getDatabaseUrl = (): string => {
@@ -15,11 +17,44 @@ const getDatabaseUrl = (): string => {
   return env.DATABASE_URL
 }
 
+export const getPgSslConfigForDatabaseUrl = (
+  databaseUrl: string
+): boolean | ConnectionOptions | undefined => {
+  const parsedUrl = new URL(databaseUrl)
+  const sslMode = parsedUrl.searchParams.get('sslmode')?.toLowerCase()
+
+  if (sslMode === 'disable') {
+    return false
+  }
+
+  if (sslMode === 'require' || sslMode === 'prefer') {
+    return { rejectUnauthorized: false }
+  }
+
+  return undefined
+}
+
+export const normalizeDatabaseUrlForPgDriver = (databaseUrl: string): string => {
+  const parsedUrl = new URL(databaseUrl)
+  const sslMode = parsedUrl.searchParams.get('sslmode')?.toLowerCase()
+
+  if (
+    (sslMode === 'require' || sslMode === 'prefer') &&
+    !parsedUrl.searchParams.has('uselibpqcompat')
+  ) {
+    parsedUrl.searchParams.set('uselibpqcompat', 'true')
+  }
+
+  return parsedUrl.toString()
+}
+
 export const getPool = (): Pool => {
   if (!poolSingleton) {
-    const connectionString = getDatabaseUrl()
+    const databaseUrl = getDatabaseUrl()
+    const connectionString = normalizeDatabaseUrlForPgDriver(databaseUrl)
     poolSingleton = new Pool({
       connectionString,
+      ssl: getPgSslConfigForDatabaseUrl(databaseUrl),
       max: getDbEnv().DB_POOL_MAX,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 5000
@@ -29,6 +64,8 @@ export const getPool = (): Pool => {
 }
 
 export const resetPool = async (): Promise<void> => {
+  await disposeDBRuntimes()
+
   if (!poolSingleton) {
     return
   }
@@ -40,9 +77,10 @@ export const resetPool = async (): Promise<void> => {
 
 export const db = drizzle({ client: getPool(), schema })
 
-const makePgClientLive = () =>
+const makePgClientLive = (databaseUrl?: string) =>
   PgClient.layer({
-    url: Redacted.make(getDatabaseUrl()),
+    url: Redacted.make(normalizeDatabaseUrlForPgDriver(databaseUrl ?? getDatabaseUrl())),
+    ssl: getPgSslConfigForDatabaseUrl(databaseUrl ?? getDatabaseUrl()),
     types: {
       getTypeParser: (typeId, format) => {
         if (rawTimestampTypeIds.includes(typeId)) {
@@ -69,13 +107,47 @@ export type DbClient = Effect.Effect.Success<typeof makeDb>
 export class DB extends Context.Tag('@tx-agent-kit/db/DB')<DB, DbClient>() {}
 
 export const DBLive = Layer.scoped(DB, makeDb)
-const makeDBRuntimeLive = () => Layer.provide(DBLive, makePgClientLive())
+const makeDBRuntimeLive = (databaseUrl?: string) => Layer.provide(DBLive, makePgClientLive(databaseUrl))
 
-export const dbClientEffect: Effect.Effect<DbClient, unknown> = Effect.gen(function* () {
-  return yield* DB
-}).pipe(Effect.provide(makeDBRuntimeLive()))
+const getDBRuntime = (databaseUrl?: string): ManagedRuntime.ManagedRuntime<DB, unknown> => {
+  const resolvedDatabaseUrl = databaseUrl ?? getDatabaseUrl()
+  const existingRuntime = dbRuntimeSingletons.get(resolvedDatabaseUrl)
+  if (existingRuntime) {
+    return existingRuntime
+  }
+
+  const runtime = ManagedRuntime.make(makeDBRuntimeLive(resolvedDatabaseUrl))
+  dbRuntimeSingletons.set(resolvedDatabaseUrl, runtime)
+  return runtime
+}
+
+const disposeDBRuntimes = async (): Promise<void> => {
+  if (dbRuntimeSingletons.size === 0) {
+    return
+  }
+
+  const runtimes = Array.from(dbRuntimeSingletons.values())
+  dbRuntimeSingletons.clear()
+  await Promise.all(runtimes.map((runtime) => runtime.dispose()))
+}
+
+export const dbClientEffect: Effect.Effect<DbClient, unknown> = Effect.suspend(() =>
+  Effect.gen(function* () {
+    return yield* DB
+  }).pipe(Effect.provide(getDBRuntime()))
+)
 
 export const provideDB = <A, E, R>(
   effect: Effect.Effect<A, E, R | DB>
 ): Effect.Effect<A, E, Exclude<R, DB>> =>
-  effect.pipe(Effect.provide(makeDBRuntimeLive())) as Effect.Effect<A, E, Exclude<R, DB>>
+  Effect.suspend(() =>
+    effect.pipe(Effect.provide(getDBRuntime()))
+  ) as Effect.Effect<A, E, Exclude<R, DB>>
+
+export const provideDBWithUrl = <A, E, R>(
+  effect: Effect.Effect<A, E, R | DB>,
+  databaseUrl: string
+): Effect.Effect<A, E, Exclude<R, DB>> =>
+  Effect.suspend(() =>
+    effect.pipe(Effect.provide(getDBRuntime(databaseUrl)))
+  ) as Effect.Effect<A, E, Exclude<R, DB>>

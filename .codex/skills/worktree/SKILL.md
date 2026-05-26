@@ -63,17 +63,15 @@ worktree. That single invocation gives you:
 - A dedicated Postgres schema.
 - Helper scripts: `run-migrations.sh`, `reset-worktree-schema.sh`.
 
-**Raw `git worktree add` is blocked for Claude Code agents.** The project-scoped
-`.claude/settings.json` PreToolUse hook (`block-raw-git-worktree-add.sh`)
-intercepts `git worktree add` in Bash tool calls and denies them, telling
-the caller to use `create.sh` instead. Other `git worktree` subcommands
+**Raw `git worktree add` is blocked for Claude and Codex agents.** The
+project-scoped hooks call `.claude/hooks/block-raw-git-worktree-add.sh`,
+including commands like `git -C <repo> worktree add`, and deny them with
+instructions to use `create.sh` instead. Other `git worktree` subcommands
 (`list`, `remove`, `prune`, `lock`, `unlock`, `move`, `repair`) pass
 through untouched. If you genuinely need the raw command for a recovery
 scenario, set `ALLOW_RAW_GIT_WORKTREE_ADD=1` in the environment.
 
-**Codex agents:** The Claude hook does not intercept Codex shell commands —
-the same policy applies but is not mechanically enforced. Always use
-`./scripts/worktree/create.sh` yourself; do not invoke `git worktree add`
+Always use `./scripts/worktree/create.sh`; do not invoke `git worktree add`
 directly. A worktree created without `setup.sh` will have no port offset,
 no seeded secrets, and no Postgres schema, and both `pnpm dev` and
 `pnpm test:integration` will fail from it.

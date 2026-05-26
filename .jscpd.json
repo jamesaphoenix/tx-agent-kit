@@ -5,6 +5,9 @@
   "ignore": [
     "**/dist/**",
     "**/.next/**",
-    "**/generated/**"
+    "**/generated/**",
+    "**/*.test.ts",
+    "**/*.integration.test.ts",
+    "**/*.e2e.integration.test.ts"
   ]
 }

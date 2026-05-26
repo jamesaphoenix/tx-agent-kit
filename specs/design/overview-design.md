@@ -920,7 +920,7 @@ Complete list of data to delete/anonymise:
 | `post_status` | scheduled, publishing, published, failed, cancelled, cancelled_by_parent, unpublished |
 | `orchestrator_tool` | openrouter, fal_ai, elevenlabs, ffmpeg, remotion, transcribe, analyze_media |
 | `publish_flow` | save_to_draft, directly_push_content |
-| `social_platform` | tiktok, instagram, youtube, twitter, linkedin, facebook |
+| `social_platform` | tiktok, instagram, youtube, linkedin, facebook |
 | `subscription_status` | active, inactive, trialing, past_due, canceled, paused, unpaid |
 | `team_onboarding_status` | pending, partial, completed, expired, revoked |
 | `content_submission_status` | pending, approved, rejected, revision_requested |

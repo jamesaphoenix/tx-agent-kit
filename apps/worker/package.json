@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "dev": "bash -lc 'set -a; [[ -f ../../.env ]] && source ../../.env; set +a; export NODE_OPTIONS=\"--inspect=${WORKER_INSPECT_PORT:-9229}\"; lsof -ti :${WORKER_INSPECT_PORT:-9229} | xargs kill -9 2>/dev/null; exec tsx watch src/index.ts'",
+    "dev": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env ../../.env; ../../scripts/dev/kill-stale-service.sh worker; exec node --inspect=${WORKER_INSPECT_PORT:-9229} ../../node_modules/tsx/dist/cli.mjs watch src/index.ts'",
     "build": "tsc -b",
     "type-check": "tsc -b --pretty false",
     "lint": "eslint src --max-warnings=0",
@@ -26,9 +26,10 @@
     "@tx-agent-kit/email": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
     "@tx-agent-kit/observability": "workspace:*",
+    "@tx-agent-kit/redis": "workspace:*",
     "@tx-agent-kit/storage": "workspace:*",
     "@tx-agent-kit/stripe": "workspace:*",
-    "effect": "^3.21.0",
+    "effect": "^3.21.2",
     "sharp": "^0.34.5"
   },
   "devDependencies": {

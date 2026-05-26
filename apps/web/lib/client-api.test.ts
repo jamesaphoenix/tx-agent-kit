@@ -1,6 +1,15 @@
+import type { AuthResponse } from '@tx-agent-kit/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearAuthToken, readAuthToken, writeAuthToken } from './auth-token'
-import { ApiClientError, clientApi } from './client-api'
+import { ApiClientError, clientApi, restoreCurrentPrincipal } from './client-api'
+
+const restoredPrincipal = {
+  userId: '11111111-1111-4111-8111-111111111111',
+  email: 'restored@example.com',
+  organizationId: '22222222-2222-4222-8222-222222222222',
+  roles: ['admin' as const],
+  permissions: ['manage_billing' as const]
+}
 
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -52,10 +61,18 @@ describe('clientApi.restoreSession', () => {
     let resolveRefresh!: () => void
     const refreshSpy = vi.spyOn(clientApi, 'refreshSession').mockImplementationOnce(
       () =>
-        new Promise<void>((resolve) => {
+        new Promise<AuthResponse>((resolve) => {
           resolveRefresh = () => {
             writeAuthToken('restored-access-token')
-            resolve()
+            resolve({
+              token: 'restored-access-token',
+              user: {
+                id: restoredPrincipal.userId,
+                email: restoredPrincipal.email,
+                name: 'Restored User',
+                createdAt: '2026-05-22T00:00:00.000Z'
+              }
+            })
           }
         })
     )
@@ -71,5 +88,55 @@ describe('clientApi.restoreSession', () => {
 
     await expect(Promise.all([firstRestore, secondRestore])).resolves.toEqual([true, true])
     expect(readAuthToken()).toBe('restored-access-token')
+  })
+})
+
+describe('restoreCurrentPrincipal', () => {
+  it('uses the principal returned by refresh instead of making a second /me request', async () => {
+    const refreshSpy = vi.spyOn(clientApi, 'refreshSession').mockImplementationOnce(() => {
+      writeAuthToken('restored-access-token')
+      return Promise.resolve({
+        token: 'restored-access-token',
+        user: {
+          id: restoredPrincipal.userId,
+          email: restoredPrincipal.email,
+          name: 'Restored User',
+          createdAt: '2026-05-22T00:00:00.000Z'
+        },
+        principal: restoredPrincipal
+      })
+    })
+    const meSpy = vi.spyOn(clientApi, 'me').mockResolvedValueOnce({
+      ...restoredPrincipal,
+      email: 'should-not-load@example.com'
+    })
+
+    await expect(restoreCurrentPrincipal()).resolves.toEqual(restoredPrincipal)
+
+    expect(refreshSpy).toHaveBeenCalledTimes(1)
+    expect(meSpy).not.toHaveBeenCalled()
+    expect(readAuthToken()).toBe('restored-access-token')
+  })
+
+  it('falls back to /me when an older refresh response has no principal', async () => {
+    const refreshSpy = vi.spyOn(clientApi, 'refreshSession').mockImplementationOnce(() => {
+      writeAuthToken('legacy-restored-access-token')
+      return Promise.resolve({
+        token: 'legacy-restored-access-token',
+        user: {
+          id: restoredPrincipal.userId,
+          email: restoredPrincipal.email,
+          name: 'Restored User',
+          createdAt: '2026-05-22T00:00:00.000Z'
+        }
+      })
+    })
+    const meSpy = vi.spyOn(clientApi, 'me').mockResolvedValueOnce(restoredPrincipal)
+
+    await expect(restoreCurrentPrincipal()).resolves.toEqual(restoredPrincipal)
+
+    expect(refreshSpy).toHaveBeenCalledTimes(1)
+    expect(meSpy).toHaveBeenCalledTimes(1)
+    expect(readAuthToken()).toBe('legacy-restored-access-token')
   })
 })

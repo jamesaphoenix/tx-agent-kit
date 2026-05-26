@@ -15,6 +15,7 @@ COPY packages/infra/db/package.json packages/infra/db/package.json
 COPY packages/core/package.json packages/core/package.json
 COPY packages/infra/logging/package.json packages/infra/logging/package.json
 COPY packages/infra/observability/package.json packages/infra/observability/package.json
+COPY packages/infra/redis/package.json packages/infra/redis/package.json
 COPY packages/testkit/package.json packages/testkit/package.json
 COPY packages/tooling/vitest-config/package.json packages/tooling/vitest-config/package.json
 RUN pnpm install --frozen-lockfile
@@ -35,6 +36,7 @@ COPY --from=deps /app/packages/infra/db/package.json packages/infra/db/package.j
 COPY --from=deps /app/packages/core/package.json packages/core/package.json
 COPY --from=deps /app/packages/infra/logging/package.json packages/infra/logging/package.json
 COPY --from=deps /app/packages/infra/observability/package.json packages/infra/observability/package.json
+COPY --from=deps /app/packages/infra/redis/package.json packages/infra/redis/package.json
 COPY --from=deps /app/packages/testkit/package.json packages/testkit/package.json
 COPY --from=deps /app/packages/tooling/vitest-config/package.json packages/tooling/vitest-config/package.json
 RUN pnpm install --frozen-lockfile --prod
@@ -45,6 +47,7 @@ COPY --from=build /app/packages/infra/db/dist packages/infra/db/dist
 COPY --from=build /app/packages/core/dist packages/core/dist
 COPY --from=build /app/packages/infra/logging/dist packages/infra/logging/dist
 COPY --from=build /app/packages/infra/observability/dist packages/infra/observability/dist
+COPY --from=build /app/packages/infra/redis/dist packages/infra/redis/dist
 USER appuser
 EXPOSE 4000
 CMD ["node", "apps/api/dist/server.js"]

@@ -47,6 +47,7 @@ export interface AuthSession {
   token: string
   refreshToken: string
   user: AuthUser
+  principal?: AuthPrincipal
 }
 
 export interface GoogleAuthStartResult {

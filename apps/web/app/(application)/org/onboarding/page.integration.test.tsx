@@ -32,7 +32,7 @@ describe('OrganizationOnboardingPage integration', () => {
     )
     await user.type(
       await screen.findByLabelText('Workspace website'),
-      'https://octospark.example'
+      'https://tx-agent-kit.example'
     )
 
     // BrandSettingsFields requires industry, target audience, and brand guidelines

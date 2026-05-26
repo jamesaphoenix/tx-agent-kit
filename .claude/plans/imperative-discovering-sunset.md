@@ -2,7 +2,7 @@
 
 ## Context
 
-Deep audit of duplication across 8 layers of the Octospark monorepo conducted 2026-04-06. Research findings for future reference — no implementation planned yet.
+Deep audit of duplication across 8 layers of the source monorepo conducted 2026-04-06. Research findings for future reference — no implementation planned yet.
 
 ## Architecture: Contracts as Source of Truth
 

@@ -1,5 +1,5 @@
 const defaultAccountId = 'dc05faaea8d5f25755d84e55fe3a7d67'
-const defaultBucketName = 'octospark-dev'
+const defaultBucketName = 'tx-agent-kit-dev'
 const testAccessKeyId = 'test-r2-access-key-id'
 const testSecretAccessKey = 'test-r2-secret-access-key'
 
@@ -18,6 +18,9 @@ export interface StorageEnv {
   R2_BUCKET_NAME: string
   R2_ENDPOINT: string
 }
+
+export const getStorageMode = (): string =>
+  (process.env.TX_STORAGE_MODE ?? '').trim().toLowerCase()
 
 export const getStorageEnv = (): StorageEnv => {
   const accountId = readOptionalEnv('R2_ACCOUNT_ID') ?? defaultAccountId

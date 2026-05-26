@@ -174,10 +174,11 @@ export const createApiServerHarness = (
 
     output.length = 0
 
+    const testkitProcessEnv = getTestkitProcessEnv()
     const spawned = spawn(process.execPath, ['--import', 'tsx', apiServerEntryPath], {
       cwd: options.cwd,
       env: {
-        ...getTestkitProcessEnv(),
+        ...testkitProcessEnv,
         NODE_ENV: 'test',
         API_HOST: host,
         API_PORT: String(port),
@@ -186,6 +187,7 @@ export const createApiServerHarness = (
         API_CORS_ORIGIN: corsOrigin,
         AUTH_RATE_LIMIT_MAX_REQUESTS: '200',
         AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '200',
+        TX_STORAGE_MODE: testkitProcessEnv.TX_STORAGE_MODE ?? 'memory',
         DB_POOL_MAX: '5'
       },
       stdio: detached ? 'ignore' : ['ignore', 'pipe', 'pipe'],

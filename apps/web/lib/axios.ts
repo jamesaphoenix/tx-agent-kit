@@ -1,5 +1,6 @@
 import { getClientHttpTelemetry } from '@tx-agent-kit/observability/client'
 import type { AuthResponse } from '@tx-agent-kit/contracts'
+import type { SpanContext } from '@opentelemetry/api'
 import axios, {
   type AxiosError,
   type AxiosRequestConfig,
@@ -51,6 +52,42 @@ const requestTelemetryContexts = new WeakMap<
   RequestTelemetryContext
 >()
 
+const allZeroTraceId = '00000000000000000000000000000000'
+const allZeroSpanId = '0000000000000000'
+const traceIdPattern = /^[0-9a-f]{32}$/i
+const spanIdPattern = /^[0-9a-f]{16}$/i
+
+export const buildTraceparentHeaderValue = (
+  spanContext: SpanContext
+): string | null => {
+  if (
+    !traceIdPattern.test(spanContext.traceId) ||
+    !spanIdPattern.test(spanContext.spanId) ||
+    spanContext.traceId === allZeroTraceId ||
+    spanContext.spanId === allZeroSpanId
+  ) {
+    return null
+  }
+
+  const traceFlags = (spanContext.traceFlags & 0xff)
+    .toString(16)
+    .padStart(2, '0')
+
+  return `00-${spanContext.traceId}-${spanContext.spanId}-${traceFlags}`
+}
+
+const injectTraceparentHeader = (
+  config: InternalAxiosRequestConfig,
+  spanContext: SpanContext
+): void => {
+  const traceparent = buildTraceparentHeaderValue(spanContext)
+  if (traceparent === null) {
+    return
+  }
+
+  config.headers.set('traceparent', traceparent)
+}
+
 const nowMs = (): number => {
   if (typeof globalThis.performance !== 'undefined') {
     return globalThis.performance.now()
@@ -84,6 +121,7 @@ const startRequestTelemetry = (
       'url.path': path
     }
   })
+  injectTraceparentHeader(config, span.spanContext())
 
   requestTelemetryContexts.set(config, {
     span,

@@ -21,6 +21,7 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 }))
 
 vi.mock('./env.js', () => ({
+  getStorageMode: () => (process.env.TX_STORAGE_MODE ?? '').trim().toLowerCase(),
   getStorageEnv: () => ({
     R2_ACCOUNT_ID: 'test-account',
     R2_ACCESS_KEY_ID: 'test-key',
@@ -33,6 +34,7 @@ vi.mock('./env.js', () => ({
 describe('StorageService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    delete process.env.TX_STORAGE_MODE
   })
 
   const getService = async () => {
@@ -144,6 +146,33 @@ describe('StorageService', () => {
         lastModified,
         etag: '"abc123"'
       })
+    })
+  })
+
+  describe('memory mode', () => {
+    it('stores, lists, reads metadata, and deletes objects without S3', async () => {
+      process.env.TX_STORAGE_MODE = 'memory'
+      const service = await getService()
+
+      await Effect.runPromise(
+        service.putObject('memory/file.png', new Uint8Array([1, 2, 3]), 'image/png')
+      )
+
+      await expect(Effect.runPromise(service.getObject('memory/file.png'))).resolves.toEqual(
+        new Uint8Array([1, 2, 3])
+      )
+      await expect(Effect.runPromise(service.listObjects('memory/'))).resolves.toContain('memory/file.png')
+
+      const metadata = await Effect.runPromise(service.getObjectMetadata('memory/file.png'))
+      expect(metadata).toMatchObject({
+        key: 'memory/file.png',
+        contentType: 'image/png',
+        contentLength: 3
+      })
+
+      await Effect.runPromise(service.deleteObject('memory/file.png'))
+      await expect(Effect.runPromise(service.listObjects('memory/'))).resolves.not.toContain('memory/file.png')
+      expect(mockSend).not.toHaveBeenCalled()
     })
   })
 })

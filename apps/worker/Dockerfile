@@ -13,6 +13,7 @@ COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/infra/db/package.json packages/infra/db/package.json
 COPY packages/infra/logging/package.json packages/infra/logging/package.json
 COPY packages/infra/observability/package.json packages/infra/observability/package.json
+COPY packages/infra/redis/package.json packages/infra/redis/package.json
 COPY packages/temporal-client/package.json packages/temporal-client/package.json
 COPY packages/tooling/vitest-config/package.json packages/tooling/vitest-config/package.json
 RUN pnpm install --frozen-lockfile
@@ -31,6 +32,7 @@ COPY --from=deps /app/packages/contracts/package.json packages/contracts/package
 COPY --from=deps /app/packages/infra/db/package.json packages/infra/db/package.json
 COPY --from=deps /app/packages/infra/logging/package.json packages/infra/logging/package.json
 COPY --from=deps /app/packages/infra/observability/package.json packages/infra/observability/package.json
+COPY --from=deps /app/packages/infra/redis/package.json packages/infra/redis/package.json
 COPY --from=deps /app/packages/temporal-client/package.json packages/temporal-client/package.json
 COPY --from=deps /app/packages/tooling/vitest-config/package.json packages/tooling/vitest-config/package.json
 RUN pnpm install --frozen-lockfile --prod
@@ -39,6 +41,7 @@ COPY --from=build /app/packages/contracts/dist packages/contracts/dist
 COPY --from=build /app/packages/infra/db/dist packages/infra/db/dist
 COPY --from=build /app/packages/infra/logging/dist packages/infra/logging/dist
 COPY --from=build /app/packages/infra/observability/dist packages/infra/observability/dist
+COPY --from=build /app/packages/infra/redis/dist packages/infra/redis/dist
 COPY --from=build /app/packages/temporal-client/dist packages/temporal-client/dist
 USER appuser
 CMD ["node", "apps/worker/dist/index.js"]

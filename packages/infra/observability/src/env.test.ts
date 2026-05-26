@@ -9,8 +9,10 @@ const originalEnvSnapshot = { ...process.env }
 const resetObservedEnvKeys = () => {
   delete process.env.NODE_ENV
   delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+  delete process.env.OTEL_EXPORTER_OTLP_HEADERS
   delete process.env.OTEL_LOG_LEVEL
   delete process.env.OTEL_LOGS_EXPORTER
+  delete process.env.OTEL_RESOURCE_ATTRIBUTES
   delete process.env.LANGFUSE_ENABLED
   delete process.env.LANGFUSE_BASE_URL
   delete process.env.LANGFUSE_HOST
@@ -37,7 +39,9 @@ describe('getObservabilityEnv', () => {
     expect(getObservabilityEnv()).toEqual({
       OTEL_LOG_LEVEL: undefined,
       OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4320',
+      OTEL_EXPORTER_OTLP_HEADERS: {},
       OTEL_LOGS_EXPORTER: 'otlp',
+      OTEL_RESOURCE_ATTRIBUTES: {},
       NODE_ENV: 'development',
       LANGFUSE: {
         enabled: false,
@@ -55,8 +59,11 @@ describe('getObservabilityEnv', () => {
   it('returns explicit env overrides when provided', () => {
     process.env.NODE_ENV = 'production'
     process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://otel.example:4318'
+    process.env.OTEL_EXPORTER_OTLP_HEADERS = 'Authorization=Bearer test-token,x-scope=staging'
     process.env.OTEL_LOG_LEVEL = 'DEBUG'
     process.env.OTEL_LOGS_EXPORTER = 'none'
+    process.env.OTEL_RESOURCE_ATTRIBUTES =
+      'service.namespace=tx-agent-kit,cloud.region=europe-west3'
     process.env.LANGFUSE_ENABLED = 'true'
     process.env.LANGFUSE_BASE_URL = 'https://us.cloud.langfuse.com'
     process.env.LANGFUSE_PUBLIC_KEY = 'pk-lf-test'
@@ -69,7 +76,15 @@ describe('getObservabilityEnv', () => {
     expect(getObservabilityEnv()).toEqual({
       OTEL_LOG_LEVEL: 'debug',
       OTEL_EXPORTER_OTLP_ENDPOINT: 'http://otel.example:4318',
+      OTEL_EXPORTER_OTLP_HEADERS: {
+        Authorization: 'Bearer test-token',
+        'x-scope': 'staging'
+      },
       OTEL_LOGS_EXPORTER: 'none',
+      OTEL_RESOURCE_ATTRIBUTES: {
+        'service.namespace': 'tx-agent-kit',
+        'cloud.region': 'europe-west3'
+      },
       NODE_ENV: 'production',
       LANGFUSE: {
         enabled: true,
@@ -108,6 +123,24 @@ describe('getObservabilityEnv', () => {
 
     expect(() => getObservabilityEnv()).toThrow(
       'LANGFUSE_SAMPLE_RATE must be a number between 0 and 1'
+    )
+  })
+
+  it('rejects malformed OTLP headers', () => {
+    resetObservedEnvKeys()
+    process.env.OTEL_EXPORTER_OTLP_HEADERS = 'Authorization'
+
+    expect(() => getObservabilityEnv()).toThrow(
+      'OTEL_EXPORTER_OTLP_HEADERS must be comma-separated key=value pairs'
+    )
+  })
+
+  it('rejects malformed resource attributes', () => {
+    resetObservedEnvKeys()
+    process.env.OTEL_RESOURCE_ATTRIBUTES = 'service.namespace'
+
+    expect(() => getObservabilityEnv()).toThrow(
+      'OTEL_RESOURCE_ATTRIBUTES must be comma-separated key=value pairs'
     )
   })
 })

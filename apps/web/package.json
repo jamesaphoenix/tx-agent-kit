@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "lsof -ti :${WEB_PORT:-${PORT:-3000}} | xargs kill -9 2>/dev/null; next dev --webpack -p ${WEB_PORT:-${PORT:-3000}}",
+    "dev": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env ../../.env; port=${WEB_PORT:-${PORT:-3000}}; ../../scripts/dev/kill-stale-service.sh web; exec next dev --webpack -p \"${port}\"'",
     "build": "next build",
     "start": "next start -p ${WEB_PORT:-${PORT:-3000}}",
     "generate:api": "orval --config ./orval.config.ts",
@@ -38,7 +38,8 @@
     "shadcn": "^4.2.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
-    "tw-animate-css": "^1.4.0"
+    "tw-animate-css": "^1.4.0",
+    "@opentelemetry/api": "^1.9.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",

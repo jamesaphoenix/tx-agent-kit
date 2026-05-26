@@ -1,7 +1,4 @@
-import {
-  createSessionRestorer,
-  restoreAuthenticatedPrincipal
-} from '@tx-agent-kit/contracts'
+import { createSessionRestorer } from '@tx-agent-kit/contracts'
 import type {
   AuthPrincipal,
   AuthResponse,
@@ -116,18 +113,19 @@ const fail = (error: unknown, fallback: string): never => {
   throw new ApiClientError(getApiErrorMessage(error, fallback), getApiErrorStatus(error))
 }
 
-const persistAuthSession = (response: AuthResponse): void => {
+const persistAuthSession = (response: AuthResponse): AuthResponse => {
   writeAuthToken(response.token)
+  return response
 }
 
-const refreshSession = async (): Promise<void> => {
+const refreshSession = async (): Promise<AuthResponse> => {
   try {
     const { data } = await api.post<AuthResponse>(
       '/v1/auth/refresh',
       {},
       browserAuthSessionRequestConfig
     )
-    persistAuthSession(data)
+    return persistAuthSession(data)
   } catch (error) {
     if (getApiErrorStatus(error) === 401 || getApiErrorStatus(error) === 403) {
       clearAuthToken()
@@ -140,7 +138,9 @@ const refreshSession = async (): Promise<void> => {
 const restoreSession = createSessionRestorer({
   hasAccessToken: () => readAuthToken() !== null,
   canRefreshSession: () => true,
-  refreshSession: async () => clientApi.refreshSession(),
+  refreshSession: async () => {
+    await clientApi.refreshSession()
+  },
   serializeRefresh: withSerializedAuthRefresh
 })
 
@@ -178,27 +178,27 @@ const toListParams = (query: ListQuery | undefined): Record<string, string> => {
 }
 
 export const clientApi = {
-  signIn: async (input: SignInRequest): Promise<void> => {
+  signIn: async (input: SignInRequest): Promise<AuthResponse> => {
     try {
       const { data } = await api.post<AuthResponse>(
         '/v1/auth/sign-in',
         input,
         browserAuthSessionRequestConfig
       )
-      persistAuthSession(data)
+      return persistAuthSession(data)
     } catch (error) {
       return fail(error, 'Authentication failed')
     }
   },
 
-  signUp: async (input: SignUpRequest): Promise<void> => {
+  signUp: async (input: SignUpRequest): Promise<AuthResponse> => {
     try {
       const { data } = await api.post<AuthResponse>(
         '/v1/auth/sign-up',
         input,
         browserAuthSessionRequestConfig
       )
-      persistAuthSession(data)
+      return persistAuthSession(data)
     } catch (error) {
       return fail(error, 'Sign-up failed')
     }
@@ -394,11 +394,31 @@ export const clientApi = {
   }
 }
 
-export const restoreCurrentPrincipal = async (): Promise<AuthPrincipal | null> =>
-  restoreAuthenticatedPrincipal({
-    restoreSession,
-    loadPrincipal: clientApi.me,
-    clearCredentialsOnAuthError: () => {
-      clearAuthToken()
+export const restoreCurrentPrincipal = async (): Promise<AuthPrincipal | null> => {
+  if (readAuthToken() === null) {
+    try {
+      const restoredSession = await withSerializedAuthRefresh(() => clientApi.refreshSession())
+      if (restoredSession.principal) {
+        return restoredSession.principal
+      }
+    } catch (error) {
+      if (getApiErrorStatus(error) === 401 || getApiErrorStatus(error) === 403) {
+        clearAuthToken()
+        return null
+      }
+
+      throw error
     }
-  })
+  }
+
+  try {
+    return await clientApi.me()
+  } catch (error) {
+    if (getApiErrorStatus(error) === 401 || getApiErrorStatus(error) === 403) {
+      clearAuthToken()
+      return null
+    }
+
+    throw error
+  }
+}

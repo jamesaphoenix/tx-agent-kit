@@ -6,7 +6,7 @@ Source document pattern:
 
 Concrete example used for this reference:
 
-- `/Users/jamesaphoenix/Desktop/projects/just-understanding-data/octospark/specs/prd/contextual-prompt-bandit.md`
+- `/<some-source-path>/specs/prd/contextual-prompt-bandit.md`
 
 Why this is a strong PRD example:
 

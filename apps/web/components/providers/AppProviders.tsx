@@ -4,8 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
-import { getWebEnv } from '../../lib/env'
+import { getWebEnv, shouldRenderDeveloperTools } from '../../lib/env'
 import { NotifyToaster } from '../../lib/notify'
+import { NAVIGATION_QUERY_OPTIONS } from '../../lib/query-config'
 import { initializeWebSentry } from '../../lib/sentry'
 import { UrlStateProvider } from '../../lib/url-state'
 import { sessionStore } from '../../stores/session-store'
@@ -19,7 +20,7 @@ const createQueryClient = () => {
       queries: {
         retry: 1,
         refetchOnWindowFocus: false,
-        staleTime: 15_000
+        ...NAVIGATION_QUERY_OPTIONS
       },
       mutations: {
         retry: 0
@@ -42,7 +43,7 @@ export const resolveShouldRenderDevtools = (
     return false
   }
 
-  return nodeEnv !== 'production'
+  return shouldRenderDeveloperTools(nodeEnv)
 }
 
 export interface AppProvidersProps {

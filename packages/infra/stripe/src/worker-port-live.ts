@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { StripePort } from '@tx-agent-kit/core'
 import { Effect, Layer } from 'effect'
 import Stripe from 'stripe'
+import { readFailedPaymentIntentDetails } from './payment-intent-error.js'
 import { STRIPE_API_VERSION } from './port-live.js'
 
 /**
@@ -113,7 +114,7 @@ export const makeWorkerStripePortLive = (
             }
           } catch (error) {
             if (error instanceof Stripe.errors.StripeCardError) {
-              const failedIntent = error.payment_intent
+              const failedIntent = readFailedPaymentIntentDetails(error.payment_intent)
               const failedIntentId = failedIntent?.id ?? ''
               const isAuthRequired =
                 error.code === 'authentication_required' ||
@@ -124,7 +125,7 @@ export const makeWorkerStripePortLive = (
                   ? ('requires_action' as const)
                   : ('requires_payment_method' as const),
                 amountCharged: 0,
-                clientSecret: isAuthRequired ? (failedIntent?.client_secret ?? null) : null
+                clientSecret: isAuthRequired ? (failedIntent?.clientSecret ?? null) : null
               }
             }
             throw error instanceof Error ? error : new Error(String(error))

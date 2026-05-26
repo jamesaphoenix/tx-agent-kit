@@ -1,0 +1,63 @@
+{
+  "allowedProductLeakPathPrefixes": [
+    "docs/goals/octospark-infra-portability",
+    "scripts/lint/product-leak-policy.json",
+    "scripts/lint/enforce-product-leak-and-secret-policy.test.ts"
+  ],
+  "denyTerms": [
+    { "id": "octospark_lower", "value": "octospark" },
+    { "id": "octospark_title", "value": "Octospark" },
+    { "id": "octospark_upper", "value": "OCTOSPARK" },
+    { "id": "octospark_domain", "value": "octospark.ai" },
+    { "id": "octospark_vault", "value": "op://octospark-services" },
+    { "id": "octospark_package", "value": "@octospark/" },
+    { "id": "octospark_env_prefix", "value": "OCTOSPARK_" },
+    { "id": "octospark_social_smoke", "value": "social_product_observability_flow" },
+    { "id": "x_oauth_env_prefix", "value": "X_OAUTH_" },
+    { "id": "social_token_env_prefix", "value": "SOCIAL_TOKEN_" },
+    { "id": "twitter_token", "value": "twitter" },
+    { "id": "x_domain", "value": "x.com" }
+  ],
+  "skipPathPatterns": [
+    "(^|/)node_modules/",
+    "(^|/)\\.git/",
+    "(^|/)\\.next/",
+    "(^|/)dist/",
+    "(^|/)coverage/",
+    "(^|/)\\.turbo/",
+    "(^|/)\\.artifacts/",
+    "(^|/)pnpm-lock\\.yaml$"
+  ],
+  "secretScanPathPatterns": [
+    "^\\.env($|\\.)",
+    "^deploy/.+\\.env(\\.template)?$",
+    "^docker-compose.*\\.ya?ml$",
+    "^\\.github/workflows/.+\\.ya?ml$"
+  ],
+  "allowSecretValuePatterns": [
+    "^$",
+    "^op://",
+    "^\\$\\{\\{\\s*secrets\\.",
+    "^\\$\\{[A-Z0-9_]+(:[-?].*)?\\}$",
+    "^<[^>]+>$",
+    "^replace-with",
+    "^change-?me",
+    "^placeholder",
+    "^ci-",
+    "^dev-",
+    "^test-",
+    "^local-",
+    "^sk-lf-00000000-0000-4000-8000-000000000000$"
+  ],
+  "localSecretDefaultPaths": [
+    "docker-compose.yml"
+  ],
+  "localSecretDefaultValues": [
+    "admin",
+    "clickhouse",
+    "langfuse",
+    "minio",
+    "miniosecret",
+    "postgres"
+  ]
+}

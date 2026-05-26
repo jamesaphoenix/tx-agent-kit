@@ -52,6 +52,14 @@ if (typeof window.matchMedia !== 'function') {
   })
 }
 
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}
+
 vi.mock('sonner', () => ({
   Toaster: () => null,
   toast: {
@@ -87,7 +95,7 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-afterAll(() => {
+afterAll(async () => {
   configureExternalNavigationHandler(null)
-  teardownWebIntegrationSuite()
+  await teardownWebIntegrationSuite()
 })

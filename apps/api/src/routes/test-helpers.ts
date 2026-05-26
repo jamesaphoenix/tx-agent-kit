@@ -372,6 +372,9 @@ export const createTestFixture = (options?: {
   apiPort?: number
 }): TestFixture => {
   const authSecret = process.env.INTEGRATION_AUTH_SECRET ?? 'integration-shared-auth-secret-32ch'
+  if ((process.env.AUTH_SECRET ?? '').length < 32) {
+    process.env.AUTH_SECRET = authSecret
+  }
 
   // Point at the shared server by default. Tests that need process-local env
   // injection can pass an explicit port to spawn a dedicated API process.

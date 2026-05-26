@@ -64,6 +64,7 @@ import {
 } from '@tx-agent-kit/core'
 import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
+import { closeRedisClients } from '@tx-agent-kit/redis'
 import { flushApiSentry, initializeApiSentry } from './observability/sentry.js'
 import { Effect, Layer } from 'effect'
 import { createServer } from 'node:http'
@@ -73,6 +74,8 @@ import { authRateLimitMiddleware } from './middleware/auth-rate-limit.js'
 import { bodyLimitMiddleware } from './middleware/body-limit.js'
 import { getCorsConfig } from './middleware/cors.js'
 import { securityHeadersMiddleware } from './middleware/security-headers.js'
+import { serverTimingMiddleware } from './middleware/server-timing.js'
+import { traceContextMiddleware } from './middleware/trace-context.js'
 import { InvitationEmailPortLive } from './adapters/invitation-email.js'
 import { PasswordResetEmailPortLive } from './adapters/password-reset-email.js'
 import { GoogleOidcPortLive } from './adapters/google-oidc.js'
@@ -111,11 +114,13 @@ const ApiLive = HttpApiBuilder.api(TxAgentApi).pipe(
 )
 
 const MiddlewareLive = Layer.mergeAll(
+  HttpApiBuilder.middleware(traceContextMiddleware),
   HttpApiBuilder.middleware(authRateLimitMiddleware),
   HttpApiBuilder.middleware(bodyLimitMiddleware),
   HttpApiBuilder.middlewareCors(getCorsConfig()),
   HttpApiBuilder.middlewareOpenApi({ path: '/openapi.json' }),
   HttpApiSwagger.layer({ path: '/docs' }),
+  HttpApiBuilder.middleware(serverTimingMiddleware),
   // Security headers must be outermost (added last) so appendPreResponseHandler
   // runs before rate-limiter or body-limit short-circuit the pipeline.
   HttpApiBuilder.middleware(securityHeadersMiddleware)
@@ -265,7 +270,7 @@ export const main = (): void => {
 
     void (async () => {
       try {
-        await Promise.all([stopTelemetry(), flushApiSentry()])
+        await Promise.all([stopTelemetry(), flushApiSentry(), closeRedisClients()])
       } catch (telemetryError) {
         logger.error(
           'Telemetry shutdown error.',

@@ -8,10 +8,11 @@ import {
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Context, Effect, Layer } from 'effect'
-import { getStorageEnv } from './env.js'
+import { getStorageEnv, getStorageMode } from './env.js'
 import { StorageError } from './errors.js'
 
 const defaultPresignExpiresIn = 3600
+const memoryStorageMode = 'memory'
 
 export interface ObjectMetadata {
   key: string
@@ -53,7 +54,106 @@ export class Storage extends Context.Tag('@tx-agent-kit/storage/Storage')<
   StorageService
 >() {}
 
+interface MemoryObject {
+  readonly body: Uint8Array
+  readonly contentType: string
+  readonly lastModified: Date
+  readonly etag: string
+}
+
+const memoryObjects = new Map<string, MemoryObject>()
+
+const cloneBytes = (bytes: Uint8Array): Uint8Array =>
+  new Uint8Array(bytes)
+
+const makeMemoryStorageService = (): StorageService => ({
+  generateUploadUrl: (key) =>
+    Effect.succeed(`memory://tx-agent-kit/${encodeURIComponent(key)}`),
+
+  generateDownloadUrl: (key) =>
+    Effect.succeed(`memory://tx-agent-kit/${encodeURIComponent(key)}`),
+
+  putObject: (key, body, contentType) =>
+    Effect.sync(() => {
+      const storedBody = cloneBytes(body)
+      memoryObjects.set(key, {
+        body: storedBody,
+        contentType,
+        lastModified: new Date(),
+        etag: `"memory-${storedBody.byteLength}-${key.length}"`
+      })
+    }),
+
+  getObject: (key) =>
+    Effect.try({
+      try: () => {
+        const object = memoryObjects.get(key)
+        if (!object) {
+          throw new StorageError({
+            code: 'STORAGE_DOWNLOAD_FAILED',
+            message: `Object not found: ${key}`
+          })
+        }
+        return cloneBytes(object.body)
+      },
+      catch: (cause) => {
+        if (cause instanceof StorageError) {
+          return cause
+        }
+        return new StorageError({
+          code: 'STORAGE_DOWNLOAD_FAILED',
+          message: `Failed to download ${key}: ${cause instanceof Error ? cause.message : String(cause)}`
+        })
+      }
+    }),
+
+  deleteObject: (key) =>
+    Effect.sync(() => {
+      memoryObjects.delete(key)
+    }),
+
+  listObjects: (prefix) =>
+    Effect.sync(() =>
+      Array.from(memoryObjects.keys())
+        .filter((key) => prefix === undefined || key.startsWith(prefix))
+        .sort()
+    ),
+
+  getObjectMetadata: (key) =>
+    Effect.try({
+      try: () => {
+        const object = memoryObjects.get(key)
+        if (!object) {
+          throw new StorageError({
+            code: 'STORAGE_METADATA_FAILED',
+            message: `Object not found: ${key}`
+          })
+        }
+        return {
+          key,
+          contentType: object.contentType,
+          contentLength: object.body.byteLength,
+          lastModified: object.lastModified,
+          etag: object.etag
+        }
+      },
+      catch: (cause) => {
+        if (cause instanceof StorageError) {
+          return cause
+        }
+        return new StorageError({
+          code: 'STORAGE_METADATA_FAILED',
+          message: `Failed to get metadata for ${key}: ${cause instanceof Error ? cause.message : String(cause)}`
+        })
+      }
+    })
+})
+
 const makeStorageService = (): StorageService => {
+  if (getStorageMode() === memoryStorageMode) {
+    return makeMemoryStorageService()
+  }
+
   const env = getStorageEnv()
 
   const s3Client = new S3Client({

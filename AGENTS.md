@@ -105,13 +105,13 @@ Read `docs/QUALITY.md` for the full list. Highlights:
 **NEVER use the built-in `EnterWorktree` / `ExitWorktree` tools.** They create worktrees in
 `.claude/worktrees/` which is not our standardized location.
 
-Instead, use the **`.worktrees/`** folder at the repo root and create worktrees manually:
+Instead, use the sanctioned helper. It creates worktrees under **`.worktrees/`**
+and runs setup so env, ports, task queue, and schema are ready:
 
 ```bash
 # From repo root
-git worktree add -b feat/my-feature .worktrees/my-feature main
+./scripts/worktree/create.sh feat/my-feature main
 cd .worktrees/my-feature
-pnpm install
 ```
 
 Full conventions: `.claude/skills/worktree/SKILL.md`
@@ -301,12 +301,12 @@ afterAll(() => ctx.teardown())   // stop API, DROP SCHEMA
 | Test type | Port(s) | Env var override |
 |-----------|---------|------------------|
 | API integration | 4100 | `API_INTEGRATION_TEST_PORT` |
-| Web slot 1 | 4101 | `WEB_INTEGRATION_API_PORT` (base) |
-| Web slot 2 | 4111 | stride of 10 per slot |
-| Web slot 3 | 4121 | max 4 slots |
-| Web slot 4 | 4131 | `WEB_INTEGRATION_MAX_WORKERS` |
+| Web slot 1 | 4401 | `WEB_INTEGRATION_API_PORT` (base) |
+| Web slot 2 | 4411 | stride of 10 per slot |
+| Web slot 3 | 4421 | max 4 slots |
+| Web slot 4 | 4431 | `WEB_INTEGRATION_MAX_WORKERS` |
 
-Custom test files (e.g., `tenancy-model.integration.test.ts`) use their own port via `API_INTEGRATION_TEST_PORT_TENANCY=4101`.
+Custom test files (e.g., `tenancy-model.integration.test.ts`) use their own port via `API_INTEGRATION_TEST_PORT_TENANCY=<unique port>`.
 
 **Web integration tests** use `createWebFactoryContext()` + `renderWithProviders()`:
 ```typescript

@@ -71,6 +71,18 @@ describe('getWebEnv', () => {
     expect(env.STRIPE_PUBLISHABLE_KEY).toBeUndefined()
   })
 
+  it('uses empty service defaults in production-like environments', async () => {
+    mutableProcessEnv.NEXT_PUBLIC_NODE_ENV = 'preview'
+
+    const { getWebEnv: freshGetWebEnv, shouldRenderDeveloperTools } = await import('./env')
+    const env = freshGetWebEnv()
+
+    expect(env.API_BASE_URL).toBe('')
+    expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe('')
+    expect(env.NODE_ENV).toBe('preview')
+    expect(shouldRenderDeveloperTools(env.NODE_ENV)).toBe(false)
+  })
+
   it('returns cached object on repeated calls', async () => {
     mutableProcessEnv.NEXT_PUBLIC_API_BASE_URL = 'https://cache-api.example.com'
     mutableProcessEnv.NEXT_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT = 'https://cache-otel.example.com'

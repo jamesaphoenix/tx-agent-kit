@@ -1,0 +1,587 @@
+{
+  "$schema_version": "1.0.0",
+  "goal": "octospark-infra-portability",
+  "repo_role": "target",
+  "repo_path": "/Users/jamesaphoenix/Desktop/projects/just-understanding-data/tx-agent-kit",
+  "source_repo": "/Users/jamesaphoenix/Desktop/projects/just-understanding-data/octospark",
+  "created_at": "2026-05-23",
+  "last_updated": "2026-05-26",
+  "status": "local_validation_complete_pending_push_ci",
+  "approval_gate": {
+    "phase": "implementation_approved",
+    "inventory_path": "../octospark/docs/goals/octospark-infra-portability.inventory.json",
+    "requires_user_approval_before_migration": false,
+    "implementation_allowed": true,
+    "approved_by": "James",
+    "approved_at": "2026-05-25",
+    "notes": [
+      "James approved broad implementation for this target.",
+      "Implement all source inventory candidates with approval_status=approved and porting_decision=port_now.",
+      "The only rejected candidate is social_product_observability_flow; do not port it.",
+      "Product-shaped candidates must be generalized and target-owned."
+    ]
+  },
+  "phase_0_result": {
+    "status": "complete_pending_review",
+    "source_inventory_path": "../octospark/docs/goals/octospark-infra-portability.inventory.json",
+    "desktop_report_path": "/Users/jamesaphoenix/Desktop/octospark-infra-portability-investigation-report.md",
+    "overlay_assessment": {
+      "status": "complete_pending_review",
+      "recommendation": "Use an audited, allowlisted Octospark overlay/rebaseline experiment only after approval, then land reviewed product-scrubbed slices.",
+      "approval_status": "pending_review",
+      "product_overlay_rejected": true
+    },
+    "candidate_summary_for_tx_agent_kit": {
+      "high_value_port_now": [
+        "otel_legacy_span_scope_compat",
+        "browser_api_traceparent",
+        "structured_logging_trace_correlation",
+        "compose_env_port_overrides",
+        "loki_memberlist_pin",
+        "pg_ssl_effect_runtime_reuse",
+        "http_vcr_cassettes",
+        "ai_client_testability_openrouter_base_url",
+        "create_user_flake_hardening",
+        "op_aware_env_loading",
+        "web_env_production_like_defaults_and_devtools_gate",
+        "serialized_auth_refresh_result_preservation",
+        "lockfile_check_workflow",
+        "buildx_cache_capable_driver",
+        "dockerfile_workspace_dependency_closure",
+        "react_query_cache_rules",
+        "api_resource_hints_connection_warmup",
+        "server_timing_cors_exposure"
+      ],
+      "adapt_carefully": [
+        "txak_audited_overlay_rebaseline",
+        "startup_adopt_existing_ports",
+        "shared_persistent_integration_runner",
+        "mac_compose_release_workflow",
+        "bounded_compose_deploy",
+        "compose_runtime_parity",
+        "docker_cleanup_launchd",
+        "onepassword_env_templates_no_plaintext",
+        "public_openapi_agent_surface_filter",
+        "redis_client_quota_package",
+        "storage_in_memory_test_fallback",
+        "stripe_adapter_safety_fixes",
+        "coupling_analyzer_tooling_package",
+        "migration_product_leak_scanner",
+        "auth_session_principal_bootstrap",
+        "persistent_shell_transition_prefetch"
+      ],
+      "do_not_port_directly": [
+        "social_product_observability_flow",
+        "public_octospark_cli_mcp_packages",
+        "octospark_agent_skill_bundle",
+        "octospark_social_assets_billing_domain_tools",
+        "route_redirect_hardening",
+        "txak_product_overlay_rejection"
+      ]
+    }
+  },
+  "slices": [
+    {
+      "id": "observability",
+      "status": "trace_context_server_timing_effect_otel_ported_validated",
+      "touched_files": [
+        "apps/api/package.json",
+        "apps/api/src/middleware/cors.ts",
+        "apps/api/src/middleware/server-timing.ts",
+        "apps/api/src/middleware/trace-context.ts",
+        "apps/api/src/routes/health.integration.test.ts",
+        "apps/api/src/server-lib.ts",
+        "apps/web/lib/axios.ts",
+        "apps/web/lib/axios.test.ts",
+        "apps/web/package.json",
+        "packages/infra/observability/package.json",
+        "packages/infra/observability/src/effect.ts",
+        "packages/infra/observability/src/index.ts",
+        "pnpm-lock.yaml"
+      ],
+      "verification": [
+        "Read-only comparison confirmed missing trace-context middleware, server-timing middleware, and OTEL legacy span compatibility.",
+        "Extended pass added structured logging trace correlation, public OpenAPI filtering, and web error-boundary policy candidates.",
+        "Ported browser traceparent injection, API trace-context extraction, CORS trace header allowance/exposure, and Server-Timing/x-request-duration response headers.",
+        "Ported @effect/opentelemetry helper layer exports and aligned Effect runtime dependency versions to avoid private-type incompatibilities.",
+        "Validated: pnpm --filter @tx-agent-kit/api type-check passed.",
+        "Validated: pnpm --filter @tx-agent-kit/web type-check passed.",
+        "Validated: pnpm --filter @tx-agent-kit/web test -- apps/web/lib/axios.test.ts passed.",
+        "Validated: pnpm --filter @tx-agent-kit/observability type-check && pnpm --filter @tx-agent-kit/observability test passed.",
+        "Validated: touched-file ESLint passed for observability/web/API touched files.",
+        "Validated: set -a; source .artifacts/local-infra.env; set +a; pnpm test:infra:observability passed.",
+        "Validated: API_INTEGRATION_TEST_PORT_HEALTH=4305 pnpm --dir apps/api exec vitest run src/routes/health.integration.test.ts -c vitest.integration.config.ts passed."
+      ]
+    },
+    {
+      "id": "local-infra-docker-compose",
+      "status": "ported_validated_with_generated_port_handoff",
+      "touched_files": [
+        "docker-compose.yml",
+        "scripts/start-dev-services.sh",
+        "scripts/dev.sh",
+        "scripts/lib/source-env.sh",
+        "scripts/dev/kill-stale-service.sh",
+        "scripts/test/run-integration.sh",
+        "scripts/test-integration-quiet.sh",
+        "apps/api/package.json",
+        "apps/web/package.json",
+        "apps/worker/package.json",
+        ".gitignore"
+      ],
+      "verification": [
+        "Extended pass added repo-scoped stale dev service killer and R2 CORS runbook/script candidates.",
+        "Ported Loki memberlist advertise pin and compose port parameterization where missing.",
+        "Ported op-aware local env sourcing for dev, infra, and integration entrypoints.",
+        "Ported repo-scoped stale service cleanup for app dev scripts.",
+        "Product-leak scan on touched runtime/script files found no Octospark product/social leakage; only goal docs contain expected references.",
+        "Validated: INFRA_READY_TIMEOUT_SECONDS=90 pnpm infra:ensure passed after adopting/reusing/falling back around occupied local ports.",
+        "Validated: bash -n on touched shell scripts.",
+        "Validated: docker compose --profile infra config rendered successfully.",
+        "Validated: git diff --check passed.",
+        "Validated: jq empty on touched package/progress JSON.",
+        "Validated: pnpm lint:shell passed.",
+        "tx-agent-kit lacks the Loki memberlist advertise pin and newer startup mapped-port adoption behavior.",
+        "tx-agent-kit still has hardcoded compose ports for several services.",
+        "Ported generated .artifacts/local-infra.env handoff so integration runners validate the actual adopted/fallback Compose ports instead of stale defaults.",
+        "Fixed startup to distinguish caller-provided port overrides from .env defaults before sourcing .env.",
+        "Added node-exporter host port adoption/fallback and HTTP-service fallback when a mapped Docker port is shadowed by another localhost listener.",
+        "Changed source-env to fail fast on unresolved op:// references unless SOURCE_ENV_ALLOW_LITERAL_OP=1 is explicitly set.",
+        "Validated: negative source-env op:// path fails without op and explicit SOURCE_ENV_ALLOW_LITERAL_OP=1 preserves literal fallback.",
+        "Validated: pnpm infra:ensure generated current .artifacts/local-infra.env with actual service ports."
+      ]
+    },
+    {
+      "id": "db-test-harness",
+      "status": "db_connection_hardening_ported_validated",
+      "touched_files": [
+        "packages/infra/db/src/client.test.ts",
+        "packages/infra/db/src/client.ts"
+      ],
+      "verification": [
+        "DB client lacks current Octospark sslmode/runtime reuse hardening.",
+        "Existing api-server-harness.ts and testkit fallbacks should be preserved.",
+        "Ported Postgres sslmode=require/prefer handling, libpq-compatible URL normalization, Effect DB runtime reuse by DATABASE_URL, provideDBWithUrl, and resetPool runtime disposal while preserving target db export.",
+        "Validated: git diff --check passed.",
+        "Validated: pnpm --filter @tx-agent-kit/db test passed.",
+        "Validated: pnpm --filter @tx-agent-kit/db type-check passed.",
+        "Validated: pnpm exec eslint packages/infra/db/src/client.ts packages/infra/db/src/client.test.ts --max-warnings=0 passed."
+      ]
+    },
+    {
+      "id": "redis-runtime",
+      "status": "redis_package_testkit_namespace_shutdown_ported_validated",
+      "touched_files": [
+        "apps/api/Dockerfile",
+        "apps/api/package.json",
+        "apps/api/src/server-lib.ts",
+        "apps/api/tsconfig.json",
+        "apps/worker/Dockerfile",
+        "apps/worker/package.json",
+        "apps/worker/src/index.ts",
+        "apps/worker/tsconfig.json",
+        "packages/infra/redis/package.json",
+        "packages/infra/redis/src/index.ts",
+        "packages/infra/redis/src/redis-client.ts",
+        "packages/infra/redis/src/redis-client.test.ts",
+        "packages/infra/redis/src/redis-quota.ts",
+        "packages/infra/redis/src/redis-quota.test.ts",
+        "packages/infra/redis/tsconfig.json",
+        "packages/infra/redis/vitest.config.ts",
+        "packages/testkit/package.json",
+        "packages/testkit/src/env.ts",
+        "packages/testkit/src/index.ts",
+        "packages/testkit/src/redis-testkit.integration.test.ts",
+        "packages/testkit/src/redis-testkit.test.ts",
+        "packages/testkit/src/redis-testkit.ts",
+        "packages/testkit/tsconfig.json",
+        "scripts/test/vitest-global-setup.ts",
+        "tsconfig.json",
+        "pnpm-lock.yaml"
+      ],
+      "verification": [
+        "Redis container exists; packages/infra/redis and redis-testkit are missing.",
+        "Extended pass added Redis client/quota package and conditional shutdown lifecycle candidates.",
+        "Ported generic instrumented Redis client package with bounded connect/command timeouts, OTel command spans, shared client registry, and normalized quota limiter.",
+        "Ported testkit Redis helpers for health pings, prefix-scoped scans/deletes, quota test limiters, and repo/worktree/schema-aware key prefixes.",
+        "Adapted the key namespace beyond Octospark by adding a repo-root hash or TESTKIT_REDIS_NAMESPACE segment so trace-learn and tx-agent-kit can run against the same shared Redis without key collisions.",
+        "Ported API and worker shutdown hooks to close shared Redis clients.",
+        "Updated API and worker Dockerfiles so production image dependency closure includes packages/infra/redis.",
+        "Ported Redis URL hydration in global integration setup so tests use the Compose-assigned host port instead of assuming localhost:6379.",
+        "Validated: pnpm --filter @tx-agent-kit/redis test/type-check/lint passed.",
+        "Validated: pnpm --filter @tx-agent-kit/testkit test -- src/redis-testkit.test.ts passed.",
+        "Validated: pnpm --filter @tx-agent-kit/testkit type-check/lint passed.",
+        "Validated: pnpm --filter @tx-agent-kit/api type-check passed after Redis shutdown wiring.",
+        "Validated: pnpm --filter @tx-agent-kit/worker type-check passed after Redis shutdown wiring.",
+        "Validated: pnpm --filter @tx-agent-kit/testkit exec vitest run -c vitest.integration.config.ts src/redis-testkit.integration.test.ts passed against real local Redis."
+      ]
+    },
+    {
+      "id": "performance-routing",
+      "status": "api_auth_query_cache_resource_hints_protected_route_ported_validated",
+      "touched_files": [
+        "apps/api/src/mappers/auth-mapper.ts",
+        "apps/web/app/(application)/layout.tsx",
+        "apps/web/app/layout.tsx",
+        "apps/web/app/loading.tsx",
+        "apps/web/components/PageLoadingSpinner.tsx",
+        "apps/web/components/PageLoadingSpinner.test.tsx",
+        "apps/web/components/ProtectedClientRoute.tsx",
+        "apps/web/components/ProtectedClientRoute.test.tsx",
+        "apps/web/components/providers/AppProviders.tsx",
+        "apps/web/components/providers/AppProviders.test.tsx",
+        "apps/web/components/providers/AuthBootstrapProvider.tsx",
+        "apps/web/hooks/use-permissions.ts",
+        "apps/web/lib/api-resource-hints.tsx",
+        "apps/web/lib/api-resource-hints.test.tsx",
+        "apps/web/lib/auth-token.ts",
+        "apps/web/lib/auth-token.test.ts",
+        "apps/web/lib/client-api.ts",
+        "apps/web/lib/client-api.test.ts",
+        "apps/web/lib/env.ts",
+        "apps/web/lib/env.test.ts",
+        "apps/web/lib/query-config.ts",
+        "packages/contracts/src/auth.ts",
+        "packages/core/src/domains/auth/application/auth-service.ts",
+        "packages/core/src/domains/auth/domain/auth-domain.ts"
+      ],
+      "verification": [
+        "Ported API resource hints so the SPA warms the distinct API origin without hardcoding an Octospark domain.",
+        "Ported serialized auth refresh result preservation so concurrent 401 refreshes share the same returned token/session result.",
+        "Ported auth-session principal bootstrap, short principal burst cache, permissions initialData from principal, shared navigation query cache rules, and protected route loading fallback consolidation.",
+        "Ported production-like web env defaults and bootstrap skip behavior when no API URL is configured.",
+        "Ported accessible global loading boundary and reusable PageLoadingSpinner.",
+        "Validated: pnpm --filter @tx-agent-kit/contracts type-check passed.",
+        "Validated: pnpm --filter @tx-agent-kit/core type-check passed.",
+        "Validated: pnpm --filter @tx-agent-kit/api type-check passed.",
+        "Validated: pnpm --filter @tx-agent-kit/web test -- apps/web/components/ProtectedClientRoute.test.tsx apps/web/lib/client-api.test.ts apps/web/lib/env.test.ts apps/web/components/providers/AppProviders.test.tsx apps/web/hooks/use-permissions.test.tsx passed.",
+        "Validated: pnpm --filter @tx-agent-kit/web type-check passed.",
+        "Validated: pnpm --filter @tx-agent-kit/web lint passed."
+      ]
+    },
+    {
+      "id": "ci-deployment",
+      "status": "actionlint_lockfile_gate_ported_validated",
+      "touched_files": [
+        ".github/actionlint.yaml",
+        ".github/workflows/lockfile-check.yml",
+        ".github/workflows/integration-tests.yml",
+        ".github/workflows/release-flux.yml",
+        ".github/workflows/release-k8s.yml",
+        ".github/workflows/verify-k3s-staging.yml",
+        "scripts/deploy/ci/setup-mac-node-pnpm.sh"
+      ],
+      "verification": [
+        "release-compose.yml is missing.",
+        "Compose release and Docker cleanup are strong candidates after product name/path adaptation.",
+        "Extended pass added actionlint config, lockfile workflow, Buildx cache driver, Dockerfile dependency closure, deploy op selector rendering, and k3s/GKE fallback candidates.",
+        "Ported self-hosted mac-studio actionlint metadata and fast lockfile sync workflow.",
+        "Ported Mac runner Node 22/pnpm setup helper required by lockfile workflow.",
+        "Cleaned pre-existing workflow shellcheck findings so actionlint can run across all workflows.",
+        "Validated: actionlint .github/workflows/*.yml passed.",
+        "Validated: pnpm install --frozen-lockfile passed.",
+        "Validated: pnpm lint:shell and git diff --check passed."
+      ]
+    },
+    {
+      "id": "package-runtime-upgrades",
+      "status": "effect_otel_direct_dependencies_ported_validated_narrowly",
+      "touched_files": [
+        "apps/api/package.json",
+        "apps/web/package.json",
+        "packages/*/package.json",
+        "packages/infra/*/package.json",
+        "packages/infra/observability/package.json",
+        "pnpm-lock.yaml"
+      ],
+      "verification": [
+        "Tooling dependency deltas were identified; implementation should be isolated from behavior changes.",
+        "Aligned workspace Effect dependencies to ^3.21.2 and added direct @opentelemetry/api dependencies where imports were introduced.",
+        "Added @effect/opentelemetry dependency only to packages/infra/observability.",
+        "Added @modelcontextprotocol/sdk only to the new template MCP package.",
+        "Validated: pnpm install completed and pnpm-lock.yaml updated.",
+        "Validated: pnpm install --frozen-lockfile passed after CLI/MCP workspace additions.",
+        "Validated: package-level type-check/test gates for db, storage, observability, API, and web touched areas passed."
+      ]
+    },
+    {
+      "id": "github-actions",
+      "status": "actionlint_lockfile_gate_ported_validated",
+      "touched_files": [
+        ".github/actionlint.yaml",
+        ".github/workflows/lockfile-check.yml",
+        ".github/workflows/integration-tests.yml",
+        ".github/workflows/release-flux.yml",
+        ".github/workflows/release-k8s.yml",
+        ".github/workflows/verify-k3s-staging.yml",
+        "scripts/deploy/ci/setup-mac-node-pnpm.sh"
+      ],
+      "verification": [
+        "Workflow candidates are approval-gated and require actionlint/workflow evidence later.",
+        "Validated: actionlint .github/workflows/*.yml passed after adding actionlint config, lockfile workflow, and small shellcheck-compatible fixes to existing workflows."
+      ]
+    },
+    {
+      "id": "mcp-templates",
+      "status": "generic_introspection_mcp_template_ported_validated",
+      "touched_files": [
+        "packages/mcp/package.json",
+        "packages/mcp/tsconfig.json",
+        "packages/mcp/vitest.config.ts",
+        "packages/mcp/src/index.ts",
+        "packages/mcp/src/manifest.ts",
+        "packages/mcp/src/server.ts",
+        "packages/mcp/src/tools.ts",
+        "packages/mcp/src/tools.test.ts",
+        "package.json",
+        "tsconfig.base.json",
+        "tsconfig.json",
+        "pnpm-lock.yaml"
+      ],
+      "verification": [
+        "scripts/mcp wrappers exist; codex-config references a missing playwright wrapper.",
+        "Ported a standalone MCP template package that exposes generated list/describe/schema meta tools only.",
+        "Excluded Octospark product actions, social/post/account/billing/upload ergonomics, and direct API execution from this slice.",
+        "Validated: pnpm --filter @tx-agent-kit/mcp test passed.",
+        "Validated: pnpm --filter @tx-agent-kit/mcp type-check passed.",
+        "Validated: pnpm --filter @tx-agent-kit/mcp lint passed.",
+        "Validated: pnpm --filter @tx-agent-kit/mcp build passed."
+      ]
+    },
+    {
+      "id": "cli-templates",
+      "status": "generic_introspection_cli_template_ported_validated",
+      "touched_files": [
+        "packages/cli/package.json",
+        "packages/cli/tsconfig.json",
+        "packages/cli/vitest.config.ts",
+        "packages/cli/src/cli.ts",
+        "packages/cli/src/cli.test.ts",
+        "packages/cli/src/index.ts",
+        "packages/cli/src/output.ts",
+        "packages/cli/src/surfaces.ts",
+        "package.json",
+        "tsconfig.base.json",
+        "tsconfig.json",
+        "pnpm-lock.yaml"
+      ],
+      "verification": [
+        "Octospark CLI/MCP product packages were classified as template-only or rejected for direct migration.",
+        "Ported a standalone CLI template package that exposes generated surfaces list/describe and schema commands only.",
+        "Excluded Octospark product actions, auth token storage, device login, social/post/account/billing/upload ergonomics, and direct API execution from this slice.",
+        "Validated: pnpm --filter @tx-agent-kit/cli test passed.",
+        "Validated: pnpm --filter @tx-agent-kit/cli type-check passed.",
+        "Validated: pnpm --filter @tx-agent-kit/cli lint passed.",
+        "Validated: pnpm --filter @tx-agent-kit/cli build passed.",
+        "Validated: pnpm tx-agent-kit:cli -- surfaces list --fields key,cliCommand,mcpTool,apiStatus returned target-prefixed generated surfaces.",
+        "Validated: pnpm tx-agent-kit:cli -- schema auth.me returned the generated schema envelope."
+      ]
+    },
+    {
+      "id": "lint-tooling",
+      "status": "product_leak_scanner_ported_validated",
+      "touched_files": [
+        "package.json",
+        "scripts/lint/enforce-product-leak-and-secret-policy.mjs",
+        "scripts/lint/enforce-product-leak-and-secret-policy.test.ts",
+        "scripts/lint/product-leak-policy.json",
+        "scripts/generate-agent-client-surfaces.ts",
+        "scripts/lint/enforce-agent-client-surface-sync.mjs",
+        "packages/contracts/src/agent-client-surface.generated.json",
+        "packages/contracts/src/agent-client-surface.generated.ts",
+        "packages/contracts/src/agent-client-surface.policy.ts",
+        "packages/contracts/src/agent-client-surface.test.ts",
+        "packages/contracts/src/agent-client-surface.ts",
+        ".jscpd.json"
+      ],
+      "verification": [
+        "React Query rules, source hygiene rules, generated surface checks, and hook wiring candidates were identified.",
+        "Extended pass added coupling analyzer, batched quiet lint filters, quiet runner marker refinements, jscpd narrowing, and product-leak scanner candidates.",
+        "Ported a target-owned product-leak/plaintext-secret scanner with path-level product token checks and a focused Vitest suite.",
+        "Wired pnpm lint:product-leaks into package scripts and the invariant lint command.",
+        "Validated: pnpm exec vitest run scripts/lint/enforce-product-leak-and-secret-policy.test.ts -c scripts/vitest.config.ts passed.",
+        "Validated: pnpm lint:product-leaks passed.",
+        "Ported generated agent-client surface sync from OpenAPI with target-owned MCP prefix tx_agent_kit and generic route exclusions.",
+        "Validated: pnpm agent-surfaces:generate produced 80 generated operations.",
+        "Validated: pnpm agent-surfaces:check passed.",
+        "Validated: node scripts/lint/enforce-agent-client-surface-sync.mjs passed.",
+        "Validated: pnpm --filter @tx-agent-kit/contracts test -- agent-client-surface.test.ts passed.",
+        "Validated: pnpm lint:invariants passed with the product scanner included.",
+        "Validated: git diff --check passed after scanner and product-leak cleanup edits.",
+        "Ported jscpd test duplication gate narrowing so large integration/unit suites do not dominate source duplication budgets.",
+        "Validated: pnpm lint:jscpd passed after narrowing test-file ignores."
+      ]
+    },
+    {
+      "id": "agent-workflows",
+      "status": "worktree_guardrails_ported_validated",
+      "touched_files": [
+        ".claude/hooks/block-raw-git-worktree-add.sh",
+        ".claude/skills/worktree/SKILL.md",
+        ".codex/hooks.json",
+        ".codex/skills/worktree/SKILL.md",
+        "AGENTS.md",
+        "docs/agent-hooks.md",
+        "scripts/worktree/manage.sh"
+      ],
+      "verification": [
+        ".codex/hooks.json did not wire the raw worktree hook.",
+        "tx-agent-kit hook scripts still emitted explicit allow, unlike current Octospark.",
+        "Ported Codex raw git worktree hook wiring and newer hook pass-through behavior.",
+        "Updated raw-worktree guard to catch commands such as git -C <repo> worktree add.",
+        "Updated scripts/worktree/manage.sh to use .worktrees/<name> and delegate creation to scripts/worktree/create.sh.",
+        "Updated Claude and Codex worktree skills to describe shared hook enforcement.",
+        "Validated: bash -n scripts/worktree/manage.sh .claude/hooks/block-raw-git-worktree-add.sh passed.",
+        "Validated: jq empty .codex/hooks.json .claude/settings.json passed.",
+        "Validated: hook denies git -C /tmp/repo worktree add and emits no output for git worktree list.",
+        "Validated: pnpm worktree:ports example passed.",
+        "Validated: legacy worktrees/<name> manage-path scan over worktree scripts, skills, agent docs, and root instructions returned no matches."
+      ]
+    },
+    {
+      "id": "test-harness",
+      "status": "http_vcr_ai_fake_provider_factory_worker_ported_validated",
+      "touched_files": [
+        "apps/worker/src/workflows.ts",
+        "apps/worker/src/workflows/error-reasons.ts",
+        "apps/worker/src/workflows/error-reasons.test.ts",
+        "packages/infra/ai/src/embeddings.ts",
+        "packages/infra/ai/src/env.ts",
+        "packages/infra/ai/src/env.test.ts",
+        "packages/infra/ai/src/index.ts",
+        "packages/infra/ai/src/openrouter.ts",
+        "packages/testkit/src/api-factories.ts",
+        "packages/testkit/src/api-factories.test.ts",
+        "packages/testkit/src/env.ts",
+        "packages/tooling/http-vcr/package.json",
+        "packages/tooling/http-vcr/src/http-vcr.ts",
+        "packages/tooling/http-vcr/src/http-vcr.test.ts",
+        "packages/tooling/http-vcr/src/index.ts",
+        "packages/tooling/http-vcr/tsconfig.json",
+        "packages/tooling/http-vcr/vitest.config.ts",
+        "scripts/test/vitest-global-setup.ts"
+      ],
+      "verification": [
+        "Ported a standalone fetch-level HTTP VCR tooling package with deterministic cassette sanitization and no provider/product-specific names.",
+        "Ported OpenRouter base URL and HTTP client injection/reset hooks for AI tests without mutating process.env globally.",
+        "Ported a generic fake OpenRouter integration server in global Vitest setup for embeddings/responses provider-shape tests against real local infra.",
+        "Kept tx-agent-kit existing per-test fake OIDC topology instead of replacing it with Octospark global OIDC sidecar wiring.",
+        "Ported createUser retry/recovery for opaque generated-email sign-up flakes and partial login-session failures.",
+        "Ported stable worker failure reason formatting for nested causes and cleanup paths.",
+        "Validated: pnpm --filter @tx-agent-kit/http-vcr test/type-check/lint passed.",
+        "Validated: pnpm --filter @tx-agent-kit/ai test/type-check/lint passed.",
+        "Validated: pnpm --filter @tx-agent-kit/worker test -- apps/worker/src/workflows/error-reasons.test.ts passed.",
+        "Validated: pnpm --filter @tx-agent-kit/worker type-check/lint passed.",
+        "Validated: pnpm --filter @tx-agent-kit/testkit test -- src/api-factories.test.ts passed.",
+        "Validated: pnpm --filter @tx-agent-kit/testkit type-check/lint passed.",
+        "Validated: pnpm exec eslint scripts/test/vitest-global-setup.ts --max-warnings=0 passed."
+      ]
+    },
+    {
+      "id": "tx-agent-kit-overlay-assessment",
+      "status": "complete_pending_review",
+      "touched_files": [],
+      "verification": [
+        "Repo path confirmed at /Users/jamesaphoenix/Desktop/projects/just-understanding-data/tx-agent-kit.",
+        "Overlay assessment recommends allowlisted experiment only after approval.",
+        "Product-bearing overlay areas were classified as rejected.",
+        "Extended pass added migration_product_leak_scanner as a prerequisite for any approved overlay experiment.",
+        "Product-leak scanner is now ported and passing, including file path checks for source product tokens."
+      ]
+    },
+    {
+      "id": "docs-runbooks",
+      "status": "investigated_pending_approval",
+      "touched_files": [],
+      "verification": [
+        "Docs/runbooks should be adapted, not copied, due to deployment and product-specific details."
+      ]
+    },
+    {
+      "id": "secrets-env-product-leak",
+      "status": "initial_product_leak_cleanup_validated",
+      "touched_files": [
+        ".env.example",
+        ".claude/plans/imperative-discovering-sunset.md",
+        ".claude/skills/design-doc/references/contextual-prompt-bandit-subsystem-design-example.md",
+        ".claude/skills/overview-spec/references/project-overview-example.md",
+        ".claude/skills/prd/references/contextual-prompt-bandit-prd-example.md",
+        ".codex/skills/design-doc/references/contextual-prompt-bandit-subsystem-design-example.md",
+        ".codex/skills/overview-spec/references/project-overview-example.md",
+        ".codex/skills/prd/references/contextual-prompt-bandit-prd-example.md",
+        "specs/design/overview-design.md",
+        "specs/prd/assets-prd.md",
+        "specs/prd/billing-and-pricing-prd.md",
+        "specs/prd/temporal-workflows-prd.md",
+        "specs/prd/tenancy-model-prd.md",
+        "todo/github-actions/tx-agent-kit-services/",
+        "packages/infra/storage/src/env.ts",
+        "packages/infra/storage/src/env.test.ts",
+        "apps/web/app/(application)/org/onboarding/page.integration.test.tsx"
+      ],
+      "verification": [
+        "Replaced stale Octospark storage bucket defaults with tx-agent-kit-dev.",
+        "Replaced stale Octospark example onboarding URL with target-owned example URL.",
+        "For tx-agent-kit, replaced .env.example R2 op refs from octospark-services with understanding-data target-owned refs.",
+        "Validated: product-leak scan for Octospark/social tokens across docker-compose.yml, scripts, packages, apps, .github, and .env.example returned no matches outside docs/goals.",
+        "Validated: pnpm --filter @tx-agent-kit/storage test && pnpm --filter @tx-agent-kit/storage type-check passed.",
+        "Generalized bundled Claude/Codex skill reference examples so they no longer point at the Octospark source repo or embed social-product overview content.",
+        "Renamed overview reference examples from octospark-overview-example.md to project-overview-example.md.",
+        "Removed stale source-product naming from imported GitHub Actions todo paths and old research-plan wording.",
+        "Removed remaining source-product plan names and a social-platform token from legacy specs."
+      ]
+    }
+  ],
+  "migration_report": "docs/goals/octospark-infra-portability-migration-report.md",
+  "final_validation": {
+    "status": "passed_local",
+    "completed_at": "2026-05-26",
+    "commands": [
+      "pnpm lint:quiet",
+      "pnpm type-check:quiet",
+      "pnpm test:quiet",
+      "pnpm lint:invariants",
+      "pnpm lint:jscpd",
+      "pnpm api:client:generate",
+      "pnpm agent-surfaces:check",
+      "node scripts/lint/enforce-product-leak-and-secret-policy.mjs",
+      "TX_FORCE_FRESH_INTEGRATION_SETUP=1 INTEGRATION_MAX_WORKERS=6 INTEGRATION_TEST_TIMEOUT_MS=60000 pnpm test:integration:quiet"
+    ],
+    "integration_result": {
+      "test_files": "119 passed | 2 skipped",
+      "tests": "741 passed | 20 skipped",
+      "duration_seconds": 77,
+      "budget_seconds": 120
+    },
+    "focused_revalidations": [
+      "pnpm --filter @tx-agent-kit/storage exec vitest run -c vitest.integration.config.ts src/client.integration.test.ts",
+      "pnpm --filter @tx-agent-kit/testkit test -- src/api-factories.test.ts",
+      "pnpm --filter @tx-agent-kit/testkit test -- src/redis-testkit.test.ts",
+      "pnpm --filter @tx-agent-kit/api lint && pnpm --filter @tx-agent-kit/api type-check",
+      "pnpm --filter @tx-agent-kit/web type-check && pnpm --filter @tx-agent-kit/mobile type-check && pnpm --filter @tx-agent-kit/testkit type-check",
+      "pnpm exec eslint scripts/test/vitest-global-setup.ts --max-warnings=0",
+      "TX_FORCE_FRESH_INTEGRATION_SETUP=1 INTEGRATION_MAX_WORKERS=6 INTEGRATION_TEST_TIMEOUT_MS=60000 pnpm exec vitest run -c vitest.integration.workspace.ts \"apps/web/app/(application)/org/[orgId]/members/page.integration.test.tsx\""
+    ]
+  },
+  "blockers": [
+    "Deployment changes require real target staging/workflow evidence after local validation is clean.",
+    "CI workflow proof is pending until pushed."
+  ],
+  "notes": [
+    "DB connection hardening slice has been ported and locally validated.",
+    "First local-infra/env-loading slice has been ported and locally validated.",
+    "Implementation is in progress.",
+    "Use the Octospark source inventory as the authoritative remaining candidate list.",
+    "Observability trace-context/server-timing slice has been ported and validated against real local observability infrastructure.",
+    "Local infra startup now writes generated port handoff state for integration runners.",
+    "Initial product-leak cleanup removed stale Octospark runtime/config tokens outside goal docs.",
+    "CI hygiene slice added lockfile drift workflow and made existing workflows actionlint-clean.",
+    "Worktree guardrail slice now standardizes helpers and skills on .worktrees/<name> and enforces raw-worktree blocking in Codex too.",
+    "Performance/auth/query-cache slice has been ported and package-validated.",
+    "Test harness slice now includes HTTP VCR, fake OpenRouter, AI testability hooks, auth factory retry/recovery, and worker failure reason helpers.",
+    "Product-leak and plaintext-secret scanner is passing after the latest slices.",
+    "jscpd duplication gate now matches the generic test-file narrowing used in trace-learn.",
+    "Full local broad gates and real-infra integration are passing under budget as of 2026-05-26.",
+    "OpenAPI/Orval clients and agent client surfaces were regenerated or rechecked after validation."
+  ]
+}

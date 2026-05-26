@@ -190,6 +190,68 @@
                         }
                       },
                       "additionalProperties": false
+                    },
+                    "principal": {
+                      "type": "object",
+                      "required": [
+                        "userId",
+                        "email",
+                        "roles"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "$ref": "#/components/schemas/UUID"
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+                        },
+                        "organizationId": {
+                          "$ref": "#/components/schemas/UUID"
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "admin",
+                              "member",
+                              "viewer"
+                            ]
+                          }
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "view_organization",
+                              "manage_organization",
+                              "manage_organization_members",
+                              "manage_billing",
+                              "manage_team_members",
+                              "assign_roles",
+                              "create_teams",
+                              "delete_teams",
+                              "view_workflows",
+                              "create_workflows",
+                              "edit_workflows",
+                              "delete_workflows",
+                              "execute_workflows",
+                              "view_analytics",
+                              "export_analytics",
+                              "manage_integrations",
+                              "manage_api_keys",
+                              "view_assets",
+                              "upload_assets",
+                              "manage_assets",
+                              "delete_assets"
+                            ]
+                          }
+                        }
+                      },
+                      "additionalProperties": false
                     }
                   },
                   "additionalProperties": false
@@ -379,6 +441,68 @@
                         }
                       },
                       "additionalProperties": false
+                    },
+                    "principal": {
+                      "type": "object",
+                      "required": [
+                        "userId",
+                        "email",
+                        "roles"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "$ref": "#/components/schemas/UUID"
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+                        },
+                        "organizationId": {
+                          "$ref": "#/components/schemas/UUID"
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "admin",
+                              "member",
+                              "viewer"
+                            ]
+                          }
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "view_organization",
+                              "manage_organization",
+                              "manage_organization_members",
+                              "manage_billing",
+                              "manage_team_members",
+                              "assign_roles",
+                              "create_teams",
+                              "delete_teams",
+                              "view_workflows",
+                              "create_workflows",
+                              "edit_workflows",
+                              "delete_workflows",
+                              "execute_workflows",
+                              "view_analytics",
+                              "export_analytics",
+                              "manage_integrations",
+                              "manage_api_keys",
+                              "view_assets",
+                              "upload_assets",
+                              "manage_assets",
+                              "delete_assets"
+                            ]
+                          }
+                        }
+                      },
+                      "additionalProperties": false
                     }
                   },
                   "additionalProperties": false
@@ -558,6 +682,68 @@
                         },
                         "createdAt": {
                           "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "principal": {
+                      "type": "object",
+                      "required": [
+                        "userId",
+                        "email",
+                        "roles"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "$ref": "#/components/schemas/UUID"
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+                        },
+                        "organizationId": {
+                          "$ref": "#/components/schemas/UUID"
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "admin",
+                              "member",
+                              "viewer"
+                            ]
+                          }
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "view_organization",
+                              "manage_organization",
+                              "manage_organization_members",
+                              "manage_billing",
+                              "manage_team_members",
+                              "assign_roles",
+                              "create_teams",
+                              "delete_teams",
+                              "view_workflows",
+                              "create_workflows",
+                              "edit_workflows",
+                              "delete_workflows",
+                              "execute_workflows",
+                              "view_analytics",
+                              "export_analytics",
+                              "manage_integrations",
+                              "manage_api_keys",
+                              "view_assets",
+                              "upload_assets",
+                              "manage_assets",
+                              "delete_assets"
+                            ]
+                          }
                         }
                       },
                       "additionalProperties": false
@@ -1116,6 +1302,68 @@
                         },
                         "createdAt": {
                           "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "principal": {
+                      "type": "object",
+                      "required": [
+                        "userId",
+                        "email",
+                        "roles"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "$ref": "#/components/schemas/UUID"
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "a string matching the pattern ^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+                          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+                        },
+                        "organizationId": {
+                          "$ref": "#/components/schemas/UUID"
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "admin",
+                              "member",
+                              "viewer"
+                            ]
+                          }
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "view_organization",
+                              "manage_organization",
+                              "manage_organization_members",
+                              "manage_billing",
+                              "manage_team_members",
+                              "assign_roles",
+                              "create_teams",
+                              "delete_teams",
+                              "view_workflows",
+                              "create_workflows",
+                              "edit_workflows",
+                              "delete_workflows",
+                              "execute_workflows",
+                              "view_analytics",
+                              "export_analytics",
+                              "manage_integrations",
+                              "manage_api_keys",
+                              "view_assets",
+                              "upload_assets",
+                              "manage_assets",
+                              "delete_assets"
+                            ]
+                          }
                         }
                       },
                       "additionalProperties": false

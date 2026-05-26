@@ -9,12 +9,27 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
-if [[ -f ./.env ]]; then
-  set -a
+source_local_env() {
+  if [[ ! -f "$PROJECT_ROOT/.env" ]]; then
+    return 0
+  fi
+
   # shellcheck disable=SC1091
-  source ./.env
+  source "$PROJECT_ROOT/scripts/lib/source-env.sh"
+  source_env "$PROJECT_ROOT/.env"
+}
+
+source_generated_local_infra_env() {
+  local env_file="$PROJECT_ROOT/.artifacts/local-infra.env"
+  if [[ ! -f "$env_file" ]]; then
+    return 0
+  fi
+
+  set -a
+  # shellcheck disable=SC1090
+  source "$env_file"
   set +a
-fi
+}
 
 discover_integration_project_map() {
   node "$PROJECT_ROOT/scripts/lib/discover-integration-projects.mjs"
@@ -172,6 +187,8 @@ fi
 if [[ "${INTEGRATION_SKIP_INFRA_ENSURE:-0}" != "1" ]]; then
   echo "Ensuring integration infrastructure..."
   pnpm infra:ensure
+  source_local_env
+  source_generated_local_infra_env
 
   local_temporal_mode="${TEMPORAL_RUNTIME_MODE:-cli}"
   if [[ "$local_temporal_mode" == "cli" ]]; then
@@ -181,6 +198,8 @@ if [[ "${INTEGRATION_SKIP_INFRA_ENSURE:-0}" != "1" ]]; then
 
 else
   echo "Skipping infra ensure bootstrap (INTEGRATION_SKIP_INFRA_ENSURE=1)."
+  source_local_env
+  source_generated_local_infra_env
   if [[ "${INTEGRATION_SKIP_OBSERVABILITY:-0}" != "1" ]]; then
     echo "Observability health validation remains mandatory."
   fi

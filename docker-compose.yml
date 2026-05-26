@@ -36,7 +36,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: tx_agent_kit
     ports:
-      - '5432:5432'
+      - '${POSTGRES_PORT:-5432}:5432'
     shm_size: 256mb
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -50,9 +50,9 @@ services:
   jaeger:
     image: jaegertracing/jaeger:2.15.1
     ports:
-      - '16686:16686'
-      - '4317:4317'
-      - '4318:4318'
+      - '${JAEGER_UI_PORT:-16686}:16686'
+      - '${JAEGER_OTLP_GRPC_PORT:-4317}:4317'
+      - '${JAEGER_OTLP_HTTP_PORT:-4318}:4318'
     profiles: ['infra']
 
   prometheus:
@@ -67,12 +67,17 @@ services:
       - ./monitoring/local/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports:
-      - '9090:9090'
+      - '${PROMETHEUS_PORT:-9090}:9090'
     profiles: ['infra']
 
   loki:
     image: grafana/loki:3.6.6
-    command: -config.file=/etc/loki/loki-config.yml
+    command:
+      - -config.file=/etc/loki/loki-config.yml
+      # Loki 3.x still initializes memberlist in single-binary/inmemory mode.
+      # Docker Desktop can expose no eth0/en0 address to Loki's detector, so
+      # pin the local single-node advertise address explicitly.
+      - -memberlist.advertise-addr=127.0.0.1
     volumes:
       - ./monitoring/local/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki_data:/loki
@@ -125,7 +130,7 @@ services:
       - /sys:/host/sys:ro
       - /:/rootfs:ro
     ports:
-      - '9100:9100'
+      - '${NODE_EXPORTER_PORT:-9100}:9100'
     profiles: ['infra']
 
   otel-collector:
@@ -134,10 +139,10 @@ services:
     volumes:
       - ./monitoring/local/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - '4319:4317'
-      - '4320:4318'
-      - '8888:8888'
-      - '13133:13133'
+      - '${OTEL_GRPC_PORT:-4319}:4317'
+      - '${OTEL_HTTP_PORT:-4320}:4318'
+      - '${OTEL_METRICS_PORT:-8888}:8888'
+      - '${OTEL_HEALTH_PORT:-13133}:13133'
     depends_on:
       - jaeger
       - prometheus
@@ -151,7 +156,7 @@ services:
   spotlight:
     image: ghcr.io/getsentry/spotlight:latest
     ports:
-      - '8969:8969'
+      - '${SPOTLIGHT_PORT:-8969}:8969'
     healthcheck:
       test: ['CMD-SHELL', 'bash -c "echo > /dev/tcp/localhost/8969" || exit 1']
       interval: 10s
@@ -163,7 +168,7 @@ services:
     image: redis:8.6.0-alpine3.23
     command: ['redis-server', '--appendonly', 'yes']
     ports:
-      - '6379:6379'
+      - '${REDIS_PORT:-6379}:6379'
     volumes:
       - redis_data:/data
     healthcheck:

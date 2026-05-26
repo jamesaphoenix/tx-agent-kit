@@ -14,14 +14,10 @@
 set -euo pipefail
 
 emit_allow() {
-  cat <<'JSON'
-{
-  "hookSpecificOutput": {
-    "hookEventName": "PreToolUse",
-    "permissionDecision": "allow"
-  }
-}
-JSON
+  # Claude/Codex hook runners treat a successful hook with no permission decision
+  # as neutral/allowed. Returning `permissionDecision: "allow"` is rejected by
+  # newer runners; only emit explicit decisions for blocking paths.
+  return 0
 }
 
 emit_deny() {
@@ -71,17 +67,18 @@ if [[ "${ALLOW_RAW_GIT_WORKTREE_ADD:-}" == "1" ]]; then
 fi
 
 # Match `git worktree add` at a command boundary (start of string, after `;`,
-# after `&&`, after `|`, after a newline, etc.). We only block `add` — every
-# other worktree subcommand (list, remove, prune, lock, unlock, move, repair)
-# passes through.
+# after `&&`, after `|`, after a newline, etc.). We also allow common global
+# git options before the `worktree` subcommand so `git -C <repo> worktree add`
+# is blocked too. We only block `add` — every other worktree subcommand (list,
+# remove, prune, lock, unlock, move, repair) passes through.
 #
-# The regex allows arbitrary whitespace between `git`, `worktree`, and `add`,
-# but anchors on word boundaries so a script or file path containing the
-# literal text `git worktree add` in a comment or string doesn't trigger
-# false positives on non-invocation commands. We still err on the side of
-# safety: any Bash command that would actually execute `git worktree add`
-# is caught.
-if printf '%s' "$command_str" | grep -qE '(^|[;&|[:space:]])git[[:space:]]+worktree[[:space:]]+add($|[[:space:]])'; then
+# The regex allows arbitrary whitespace between tokens and covers common git
+# global options used by agents (`-C`, `-c`, `--git-dir`, `--work-tree`,
+# `--no-optional-locks`). It intentionally errs on the side of safety: any Bash
+# command that would actually execute raw worktree creation should be caught.
+git_global_option='(-C[[:space:]]+[^;&|[:space:]]+|-c[[:space:]]+[^;&|[:space:]]+|--config-env[[:space:]]+[^;&|[:space:]]+|--git-dir(=|[[:space:]]+)[^;&|[:space:]]+|--work-tree(=|[[:space:]]+)[^;&|[:space:]]+|--no-optional-locks|--literal-pathspecs)'
+raw_worktree_add_pattern="(^|[;&|[:space:]])git([[:space:]]+${git_global_option})*[[:space:]]+worktree[[:space:]]+add($|[[:space:]])"
+if printf '%s' "$command_str" | grep -qE "$raw_worktree_add_pattern"; then
   reason=$'Raw `git worktree add` is blocked in this repo.\n\nUse the sanctioned entry point instead:\n\n    ./scripts/worktree/create.sh <branch-name> [base-branch]\n\nIt creates the worktree from the primary checkout and then runs\nscripts/worktree/setup.sh against it so the new worktree has:\n  - a unique WORKTREE_PORT_OFFSET (so dev servers and integration tests\n    run in parallel across worktrees without port collisions),\n  - secrets seeded from the primary .env (R2, Sentry, Resend, etc.),\n  - a dedicated Postgres schema (DATABASE_URL already configured).\n\nExamples:\n    ./scripts/worktree/create.sh feat/tenancy-team-members\n    ./scripts/worktree/create.sh fix/billing-refund main\n\nIf you genuinely need the raw git command (recovery, rare edge case),\nset ALLOW_RAW_GIT_WORKTREE_ADD=1 in the environment and retry.'
   emit_deny "$reason"
   exit 0

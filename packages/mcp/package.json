@@ -1,0 +1,22 @@
+{
+  "name": "@tx-agent-kit/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b --force && chmod 755 dist/server.js",
+    "type-check": "tsc -b --pretty false",
+    "lint": "eslint src --max-warnings=0",
+    "test": "pnpm --filter @tx-agent-kit/cli build && vitest run -c vitest.config.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@tx-agent-kit/cli": "workspace:*",
+    "@tx-agent-kit/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@tx-agent-kit/vitest-config": "workspace:*"
+  }
+}

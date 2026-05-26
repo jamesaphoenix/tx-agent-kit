@@ -17,8 +17,9 @@
   "dependencies": {
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/db": "workspace:*",
+    "@tx-agent-kit/redis": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
-    "effect": "^3.21.0",
+    "effect": "^3.21.2",
     "pg": "^8.20.0",
     "uuid": "^13.0.0"
   },

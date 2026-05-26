@@ -94,6 +94,25 @@ describe('AppProviders', () => {
     expect(screen.queryByTestId('custom-dev-utils')).toBeNull()
   })
 
+  it('hides developer tools in preview and staging', async () => {
+    await renderAppProviders('preview')
+
+    expect(screen.queryByTestId('app-providers-child')).not.toBeNull()
+    expect(screen.queryByTestId('react-query-devtools')).toBeNull()
+    expect(screen.queryByTestId('tanstack-store-devtools')).toBeNull()
+    expect(screen.queryByTestId('custom-dev-utils')).toBeNull()
+
+    cleanup()
+    vi.resetModules()
+
+    await renderAppProviders('staging')
+
+    expect(screen.queryByTestId('app-providers-child')).not.toBeNull()
+    expect(screen.queryByTestId('react-query-devtools')).toBeNull()
+    expect(screen.queryByTestId('tanstack-store-devtools')).toBeNull()
+    expect(screen.queryByTestId('custom-dev-utils')).toBeNull()
+  })
+
   it('defaults to showing devtools when NODE_ENV is not set', async () => {
     await renderAppProviders(null)
 

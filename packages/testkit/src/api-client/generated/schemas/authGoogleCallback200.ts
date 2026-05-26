@@ -5,10 +5,12 @@
  * Contract for apps/api. Domain behavior is modeled as closed invariants at API boundaries.
  * OpenAPI spec version: 0.1.0
  */
+import type { AuthGoogleCallback200Principal } from './authGoogleCallback200Principal.js';
 import type { AuthGoogleCallback200User } from './authGoogleCallback200User.js';
 
 export type AuthGoogleCallback200 = {
   token: string;
   refreshToken?: string;
   user: AuthGoogleCallback200User;
+  principal?: AuthGoogleCallback200Principal;
 };

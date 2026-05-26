@@ -1,0 +1,3587 @@
+{
+  "generatedFrom": {
+    "openapi": "apps/api/openapi.json",
+    "policy": "packages/contracts/src/agent-client-surface.policy.ts"
+  },
+  "operations": [
+    {
+      "key": "assets.add_asset_to_collection",
+      "apiOperationId": "assets.addAssetToCollection",
+      "apiMethod": "POST",
+      "apiPath": "/v1/teams/{teamId}/collections/{collectionId}/assets",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "collectionId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "201",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets add-asset-to-collection",
+      "mcpTool": "tx_agent_kit_assets_add_asset_to_collection",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "assets.confirm_upload",
+      "apiOperationId": "assets.confirmUpload",
+      "apiMethod": "POST",
+      "apiPath": "/v1/teams/{teamId}/uploads/{uploadId}/confirm",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "uploadId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets confirm-upload",
+      "mcpTool": "tx_agent_kit_assets_confirm_upload",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "assets.create_collection",
+      "apiOperationId": "assets.createCollection",
+      "apiMethod": "POST",
+      "apiPath": "/v1/teams/{teamId}/collections",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "201",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets create-collection",
+      "mcpTool": "tx_agent_kit_assets_create_collection",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "assets.get_asset",
+      "apiOperationId": "assets.getAsset",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams/{teamId}/assets/{assetId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "assetId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets get-asset",
+      "mcpTool": "tx_agent_kit_assets_get_asset",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "assets.get_asset_signed_url",
+      "apiOperationId": "assets.getAssetSignedUrl",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams/{teamId}/assets/{assetId}/url",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "assetId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets get-asset-signed-url",
+      "mcpTool": "tx_agent_kit_assets_get_asset_signed_url",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "assets.get_asset_thumbnail_signed_url",
+      "apiOperationId": "assets.getAssetThumbnailSignedUrl",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams/{teamId}/assets/{assetId}/thumbnail-url",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "assetId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets get-asset-thumbnail-signed-url",
+      "mcpTool": "tx_agent_kit_assets_get_asset_thumbnail_signed_url",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "assets.list_assets",
+      "apiOperationId": "assets.listAssets",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams/{teamId}/assets",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "filter[assetType]",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets list-assets",
+      "mcpTool": "tx_agent_kit_assets_list_assets",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "assets.list_collection_assets",
+      "apiOperationId": "assets.listCollectionAssets",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams/{teamId}/collections/{collectionId}/assets",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "collectionId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "filter[assetType]",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets list-collection-assets",
+      "mcpTool": "tx_agent_kit_assets_list_collection_assets",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "assets.list_collections",
+      "apiOperationId": "assets.listCollections",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams/{teamId}/collections",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets list-collections",
+      "mcpTool": "tx_agent_kit_assets_list_collections",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "assets.remove_asset_from_collection",
+      "apiOperationId": "assets.removeAssetFromCollection",
+      "apiMethod": "DELETE",
+      "apiPath": "/v1/teams/{teamId}/collections/{collectionId}/assets/{assetId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "collectionId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "assetId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets remove-asset-from-collection",
+      "mcpTool": "tx_agent_kit_assets_remove_asset_from_collection",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "assets.remove_collection",
+      "apiOperationId": "assets.removeCollection",
+      "apiMethod": "DELETE",
+      "apiPath": "/v1/teams/{teamId}/collections/{collectionId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "collectionId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets remove-collection",
+      "mcpTool": "tx_agent_kit_assets_remove_collection",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "assets.request_upload",
+      "apiOperationId": "assets.requestUpload",
+      "apiMethod": "POST",
+      "apiPath": "/v1/teams/{teamId}/uploads/request",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "201",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets request-upload",
+      "mcpTool": "tx_agent_kit_assets_request_upload",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "assets.search_assets",
+      "apiOperationId": "assets.searchAssets",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams/{teamId}/assets/search",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [
+            {
+              "name": "query",
+              "in": "query",
+              "required": true,
+              "description": "a string at least 1 character(s) long"
+            },
+            {
+              "name": "semantic",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "filter[assetType]",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets search-assets",
+      "mcpTool": "tx_agent_kit_assets_search_assets",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "assets.soft_delete_asset",
+      "apiOperationId": "assets.softDeleteAsset",
+      "apiMethod": "DELETE",
+      "apiPath": "/v1/teams/{teamId}/assets/{assetId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "assetId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets soft-delete-asset",
+      "mcpTool": "tx_agent_kit_assets_soft_delete_asset",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "assets.update_asset_metadata",
+      "apiOperationId": "assets.updateAssetMetadata",
+      "apiMethod": "PATCH",
+      "apiPath": "/v1/teams/{teamId}/assets/{assetId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "assetId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets update-asset-metadata",
+      "mcpTool": "tx_agent_kit_assets_update_asset_metadata",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "assets.update_collection",
+      "apiOperationId": "assets.updateCollection",
+      "apiMethod": "PATCH",
+      "apiPath": "/v1/teams/{teamId}/collections/{collectionId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "collectionId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets update-collection",
+      "mcpTool": "tx_agent_kit_assets_update_collection",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "assets.upload_content",
+      "apiOperationId": "assets.uploadContent",
+      "apiMethod": "PUT",
+      "apiPath": "/v1/teams/{teamId}/uploads/{uploadId}/content",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "uploadId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "assets upload-content",
+      "mcpTool": "tx_agent_kit_assets_upload_content",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "auth.me",
+      "apiOperationId": "auth.me",
+      "apiMethod": "GET",
+      "apiPath": "/v1/auth/me",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "auth me",
+      "mcpTool": "tx_agent_kit_auth_me",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "billing.create_checkout_session",
+      "apiOperationId": "billing.createCheckoutSession",
+      "apiMethod": "POST",
+      "apiPath": "/v1/billing/checkout",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing create-checkout-session",
+      "mcpTool": "tx_agent_kit_billing_create_checkout_session",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "billing.create_portal_session",
+      "apiOperationId": "billing.createPortalSession",
+      "apiMethod": "POST",
+      "apiPath": "/v1/billing/portal",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing create-portal-session",
+      "mcpTool": "tx_agent_kit_billing_create_portal_session",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "billing.create_top_up_session",
+      "apiOperationId": "billing.createTopUpSession",
+      "apiMethod": "POST",
+      "apiPath": "/v1/billing/{organizationId}/top-up",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing create-top-up-session",
+      "mcpTool": "tx_agent_kit_billing_create_top_up_session",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "billing.dismiss_no_cap_reminder",
+      "apiOperationId": "billing.dismissNoCapReminder",
+      "apiMethod": "POST",
+      "apiPath": "/v1/billing/{organizationId}/no-cap-reminder/dismiss",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing dismiss-no-cap-reminder",
+      "mcpTool": "tx_agent_kit_billing_dismiss_no_cap_reminder",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "billing.get_auto_recharge_requires_action",
+      "apiOperationId": "billing.getAutoRechargeRequiresAction",
+      "apiMethod": "GET",
+      "apiPath": "/v1/billing/{organizationId}/auto-recharge/requires-action",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing get-auto-recharge-requires-action",
+      "mcpTool": "tx_agent_kit_billing_get_auto_recharge_requires_action",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "billing.get_billing_settings",
+      "apiOperationId": "billing.getBillingSettings",
+      "apiMethod": "GET",
+      "apiPath": "/v1/organizations/{organizationId}/billing",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing get-billing-settings",
+      "mcpTool": "tx_agent_kit_billing_get_billing_settings",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "billing.get_credit_balance",
+      "apiOperationId": "billing.getCreditBalance",
+      "apiMethod": "GET",
+      "apiPath": "/v1/billing/{organizationId}/credits",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing get-credit-balance",
+      "mcpTool": "tx_agent_kit_billing_get_credit_balance",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "billing.get_credit_history",
+      "apiOperationId": "billing.getCreditHistory",
+      "apiMethod": "GET",
+      "apiPath": "/v1/billing/{organizationId}/credits/history",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing get-credit-history",
+      "mcpTool": "tx_agent_kit_billing_get_credit_history",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "billing.get_no_cap_reminder",
+      "apiOperationId": "billing.getNoCapReminder",
+      "apiMethod": "GET",
+      "apiPath": "/v1/billing/{organizationId}/no-cap-reminder",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing get-no-cap-reminder",
+      "mcpTool": "tx_agent_kit_billing_get_no_cap_reminder",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "billing.get_usage_summary",
+      "apiOperationId": "billing.getUsageSummary",
+      "apiMethod": "GET",
+      "apiPath": "/v1/organizations/{organizationId}/usage",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [
+            {
+              "name": "category",
+              "in": "query",
+              "required": true
+            },
+            {
+              "name": "periodStart",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "periodEnd",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing get-usage-summary",
+      "mcpTool": "tx_agent_kit_billing_get_usage_summary",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "billing.update_billing_settings",
+      "apiOperationId": "billing.updateBillingSettings",
+      "apiMethod": "PATCH",
+      "apiPath": "/v1/organizations/{organizationId}/billing",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "billing update-billing-settings",
+      "mcpTool": "tx_agent_kit_billing_update_billing_settings",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "email_unsubscribe.get_unsubscribe",
+      "apiOperationId": "emailUnsubscribe.getUnsubscribe",
+      "apiMethod": "GET",
+      "apiPath": "/v1/email/unsubscribe",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [
+            {
+              "name": "token",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "email-unsubscribe get-unsubscribe",
+      "mcpTool": "tx_agent_kit_email_unsubscribe_get_unsubscribe",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "email_unsubscribe.post_unsubscribe",
+      "apiOperationId": "emailUnsubscribe.postUnsubscribe",
+      "apiMethod": "POST",
+      "apiPath": "/v1/email/unsubscribe",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "email-unsubscribe post-unsubscribe",
+      "mcpTool": "tx_agent_kit_email_unsubscribe_post_unsubscribe",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.accept_invitation",
+      "apiOperationId": "organizations.acceptInvitation",
+      "apiMethod": "POST",
+      "apiPath": "/v1/invitations/{token}/accept",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "token",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations accept-invitation",
+      "mcpTool": "tx_agent_kit_organizations_accept_invitation",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.add_org_member",
+      "apiOperationId": "organizations.addOrgMember",
+      "apiMethod": "POST",
+      "apiPath": "/v1/organizations/{organizationId}/members",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "201",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations add-org-member",
+      "mcpTool": "tx_agent_kit_organizations_add_org_member",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.create_invitation",
+      "apiOperationId": "organizations.createInvitation",
+      "apiMethod": "POST",
+      "apiPath": "/v1/invitations",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "201",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations create-invitation",
+      "mcpTool": "tx_agent_kit_organizations_create_invitation",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.create_organization",
+      "apiOperationId": "organizations.createOrganization",
+      "apiMethod": "POST",
+      "apiPath": "/v1/organizations",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "201",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations create-organization",
+      "mcpTool": "tx_agent_kit_organizations_create_organization",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.disable_member",
+      "apiOperationId": "organizations.disableMember",
+      "apiMethod": "POST",
+      "apiPath": "/v1/organizations/{organizationId}/members/{memberId}/disable",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "memberId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations disable-member",
+      "mcpTool": "tx_agent_kit_organizations_disable_member",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.enable_member",
+      "apiOperationId": "organizations.enableMember",
+      "apiMethod": "POST",
+      "apiPath": "/v1/organizations/{organizationId}/members/{memberId}/enable",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "memberId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations enable-member",
+      "mcpTool": "tx_agent_kit_organizations_enable_member",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.get_invitation",
+      "apiOperationId": "organizations.getInvitation",
+      "apiMethod": "GET",
+      "apiPath": "/v1/invitations/{invitationId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "invitationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations get-invitation",
+      "mcpTool": "tx_agent_kit_organizations_get_invitation",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "organizations.get_many_invitations",
+      "apiOperationId": "organizations.getManyInvitations",
+      "apiMethod": "POST",
+      "apiPath": "/v1/invitations/batch/get-many",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations get-many-invitations",
+      "mcpTool": "tx_agent_kit_organizations_get_many_invitations",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.get_many_organizations",
+      "apiOperationId": "organizations.getManyOrganizations",
+      "apiMethod": "POST",
+      "apiPath": "/v1/organizations/batch/get-many",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations get-many-organizations",
+      "mcpTool": "tx_agent_kit_organizations_get_many_organizations",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.get_organization",
+      "apiOperationId": "organizations.getOrganization",
+      "apiMethod": "GET",
+      "apiPath": "/v1/organizations/{organizationId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations get-organization",
+      "mcpTool": "tx_agent_kit_organizations_get_organization",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "organizations.list_invitations",
+      "apiOperationId": "organizations.listInvitations",
+      "apiMethod": "GET",
+      "apiPath": "/v1/invitations",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "filter[status]",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "filter[role]",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations list-invitations",
+      "mcpTool": "tx_agent_kit_organizations_list_invitations",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "organizations.list_org_invitations",
+      "apiOperationId": "organizations.listOrgInvitations",
+      "apiMethod": "GET",
+      "apiPath": "/v1/organizations/{organizationId}/invitations",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "filter[status]",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "filter[role]",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations list-org-invitations",
+      "mcpTool": "tx_agent_kit_organizations_list_org_invitations",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "organizations.list_org_members",
+      "apiOperationId": "organizations.listOrgMembers",
+      "apiMethod": "GET",
+      "apiPath": "/v1/organizations/{organizationId}/members",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations list-org-members",
+      "mcpTool": "tx_agent_kit_organizations_list_org_members",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "organizations.list_organizations",
+      "apiOperationId": "organizations.listOrganizations",
+      "apiMethod": "GET",
+      "apiPath": "/v1/organizations",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations list-organizations",
+      "mcpTool": "tx_agent_kit_organizations_list_organizations",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "organizations.remove_invitation",
+      "apiOperationId": "organizations.removeInvitation",
+      "apiMethod": "DELETE",
+      "apiPath": "/v1/invitations/{invitationId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "invitationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations remove-invitation",
+      "mcpTool": "tx_agent_kit_organizations_remove_invitation",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.remove_member",
+      "apiOperationId": "organizations.removeMember",
+      "apiMethod": "DELETE",
+      "apiPath": "/v1/organizations/{organizationId}/members/{memberId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "memberId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations remove-member",
+      "mcpTool": "tx_agent_kit_organizations_remove_member",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.remove_organization",
+      "apiOperationId": "organizations.removeOrganization",
+      "apiMethod": "DELETE",
+      "apiPath": "/v1/organizations/{organizationId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations remove-organization",
+      "mcpTool": "tx_agent_kit_organizations_remove_organization",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.transfer_ownership",
+      "apiOperationId": "organizations.transferOwnership",
+      "apiMethod": "POST",
+      "apiPath": "/v1/organizations/{organizationId}/transfer-ownership",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations transfer-ownership",
+      "mcpTool": "tx_agent_kit_organizations_transfer_ownership",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.update_invitation",
+      "apiOperationId": "organizations.updateInvitation",
+      "apiMethod": "PATCH",
+      "apiPath": "/v1/invitations/{invitationId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "invitationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations update-invitation",
+      "mcpTool": "tx_agent_kit_organizations_update_invitation",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.update_member_role",
+      "apiOperationId": "organizations.updateMemberRole",
+      "apiMethod": "PATCH",
+      "apiPath": "/v1/organizations/{organizationId}/members/{memberId}/role",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "memberId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations update-member-role",
+      "mcpTool": "tx_agent_kit_organizations_update_member_role",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "organizations.update_organization",
+      "apiOperationId": "organizations.updateOrganization",
+      "apiMethod": "PATCH",
+      "apiPath": "/v1/organizations/{organizationId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "organizations update-organization",
+      "mcpTool": "tx_agent_kit_organizations_update_organization",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "permissions.get_my_permissions",
+      "apiOperationId": "permissions.getMyPermissions",
+      "apiMethod": "GET",
+      "apiPath": "/v1/permissions/me",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "permissions get-my-permissions",
+      "mcpTool": "tx_agent_kit_permissions_get_my_permissions",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "permissions.get_permission_map",
+      "apiOperationId": "permissions.getPermissionMap",
+      "apiMethod": "GET",
+      "apiPath": "/v1/permissions",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "permissions get-permission-map",
+      "mcpTool": "tx_agent_kit_permissions_get_permission_map",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "roles.create_role",
+      "apiOperationId": "roles.createRole",
+      "apiMethod": "POST",
+      "apiPath": "/v1/roles",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "201",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "roles create-role",
+      "mcpTool": "tx_agent_kit_roles_create_role",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "roles.list_roles",
+      "apiOperationId": "roles.listRoles",
+      "apiMethod": "GET",
+      "apiPath": "/v1/roles",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "roles list-roles",
+      "mcpTool": "tx_agent_kit_roles_list_roles",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "roles.remove_role",
+      "apiOperationId": "roles.removeRole",
+      "apiMethod": "DELETE",
+      "apiPath": "/v1/roles/{roleId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "roleId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "roles remove-role",
+      "mcpTool": "tx_agent_kit_roles_remove_role",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "roles.update_role",
+      "apiOperationId": "roles.updateRole",
+      "apiMethod": "PATCH",
+      "apiPath": "/v1/roles/{roleId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "roleId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "roles update-role",
+      "mcpTool": "tx_agent_kit_roles_update_role",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "storage.delete_object",
+      "apiOperationId": "storage.deleteObject",
+      "apiMethod": "POST",
+      "apiPath": "/v1/storage/delete",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "storage delete-object",
+      "mcpTool": "tx_agent_kit_storage_delete_object",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "storage.generate_download_url",
+      "apiOperationId": "storage.generateDownloadUrl",
+      "apiMethod": "POST",
+      "apiPath": "/v1/storage/download-url",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "storage generate-download-url",
+      "mcpTool": "tx_agent_kit_storage_generate_download_url",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "storage.generate_upload_url",
+      "apiOperationId": "storage.generateUploadUrl",
+      "apiMethod": "POST",
+      "apiPath": "/v1/storage/upload-url",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "storage generate-upload-url",
+      "mcpTool": "tx_agent_kit_storage_generate_upload_url",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "storage.get_object_metadata",
+      "apiOperationId": "storage.getObjectMetadata",
+      "apiMethod": "GET",
+      "apiPath": "/v1/storage/objects/{key}/metadata",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "key",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "storage get-object-metadata",
+      "mcpTool": "tx_agent_kit_storage_get_object_metadata",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "storage.list_objects",
+      "apiOperationId": "storage.listObjects",
+      "apiMethod": "GET",
+      "apiPath": "/v1/storage/objects",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [
+            {
+              "name": "prefix",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "storage list-objects",
+      "mcpTool": "tx_agent_kit_storage_list_objects",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "storagemetering.get_storage_quota",
+      "apiOperationId": "storagemetering.getStorageQuota",
+      "apiMethod": "GET",
+      "apiPath": "/v1/organizations/{organizationId}/storage/quota",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "storagemetering get-storage-quota",
+      "mcpTool": "tx_agent_kit_storagemetering_get_storage_quota",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "storagemetering.get_storage_usage",
+      "apiOperationId": "storagemetering.getStorageUsage",
+      "apiMethod": "GET",
+      "apiPath": "/v1/organizations/{organizationId}/storage/usage",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "storagemetering get-storage-usage",
+      "mcpTool": "tx_agent_kit_storagemetering_get_storage_usage",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "teams.add_team_member",
+      "apiOperationId": "teams.addTeamMember",
+      "apiMethod": "POST",
+      "apiPath": "/v1/teams/{teamId}/members",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "201",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams add-team-member",
+      "mcpTool": "tx_agent_kit_teams_add_team_member",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "teams.create_review_token",
+      "apiOperationId": "teams.createReviewToken",
+      "apiMethod": "POST",
+      "apiPath": "/v1/teams/{teamId}/review-tokens",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "201",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams create-review-token",
+      "mcpTool": "tx_agent_kit_teams_create_review_token",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "teams.create_team",
+      "apiOperationId": "teams.createTeam",
+      "apiMethod": "POST",
+      "apiPath": "/v1/teams",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "201",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams create-team",
+      "mcpTool": "tx_agent_kit_teams_create_team",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "teams.disable_team_member",
+      "apiOperationId": "teams.disableTeamMember",
+      "apiMethod": "POST",
+      "apiPath": "/v1/teams/{teamId}/members/{memberId}/disable",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "memberId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams disable-team-member",
+      "mcpTool": "tx_agent_kit_teams_disable_team_member",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "teams.enable_team_member",
+      "apiOperationId": "teams.enableTeamMember",
+      "apiMethod": "POST",
+      "apiPath": "/v1/teams/{teamId}/members/{memberId}/enable",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "memberId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams enable-team-member",
+      "mcpTool": "tx_agent_kit_teams_enable_team_member",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "teams.get_team",
+      "apiOperationId": "teams.getTeam",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams/{teamId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams get-team",
+      "mcpTool": "tx_agent_kit_teams_get_team",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "teams.list_review_tokens",
+      "apiOperationId": "teams.listReviewTokens",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams/{teamId}/review-tokens",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams list-review-tokens",
+      "mcpTool": "tx_agent_kit_teams_list_review_tokens",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "teams.list_team_members",
+      "apiOperationId": "teams.listTeamMembers",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams/{teamId}/members",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams list-team-members",
+      "mcpTool": "tx_agent_kit_teams_list_team_members",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "teams.list_teams",
+      "apiOperationId": "teams.listTeams",
+      "apiMethod": "GET",
+      "apiPath": "/v1/teams",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [
+            {
+              "name": "organizationId",
+              "in": "query",
+              "required": true
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortBy",
+              "in": "query",
+              "required": false
+            },
+            {
+              "name": "sortOrder",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams list-teams",
+      "mcpTool": "tx_agent_kit_teams_list_teams",
+      "mutating": false,
+      "requiresConfirmation": false
+    },
+    {
+      "key": "teams.remove_team",
+      "apiOperationId": "teams.removeTeam",
+      "apiMethod": "DELETE",
+      "apiPath": "/v1/teams/{teamId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams remove-team",
+      "mcpTool": "tx_agent_kit_teams_remove_team",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "teams.remove_team_member",
+      "apiOperationId": "teams.removeTeamMember",
+      "apiMethod": "DELETE",
+      "apiPath": "/v1/teams/{teamId}/members/{memberId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "memberId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams remove-team-member",
+      "mcpTool": "tx_agent_kit_teams_remove_team_member",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "teams.revoke_review_token",
+      "apiOperationId": "teams.revokeReviewToken",
+      "apiMethod": "DELETE",
+      "apiPath": "/v1/teams/{teamId}/review-tokens/{tokenId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "tokenId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams revoke-review-token",
+      "mcpTool": "tx_agent_kit_teams_revoke_review_token",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "teams.update_team",
+      "apiOperationId": "teams.updateTeam",
+      "apiMethod": "PATCH",
+      "apiPath": "/v1/teams/{teamId}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams update-team",
+      "mcpTool": "tx_agent_kit_teams_update_team",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "teams.update_team_member_role",
+      "apiOperationId": "teams.updateTeamMemberRole",
+      "apiMethod": "PATCH",
+      "apiPath": "/v1/teams/{teamId}/members/{memberId}/role",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "teamId",
+              "in": "path",
+              "required": true
+            },
+            {
+              "name": "memberId",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": {
+          "required": true,
+          "contentTypes": [
+            "application/json"
+          ]
+        },
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams update-team-member-role",
+      "mcpTool": "tx_agent_kit_teams_update_team_member_role",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
+      "key": "teams.validate_review_token",
+      "apiOperationId": "teams.validateReviewToken",
+      "apiMethod": "GET",
+      "apiPath": "/v1/review/{token}",
+      "schema": {
+        "parameters": {
+          "path": [
+            {
+              "name": "token",
+              "in": "path",
+              "required": true
+            }
+          ],
+          "query": [],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "teams validate-review-token",
+      "mcpTool": "tx_agent_kit_teams_validate_review_token",
+      "mutating": false,
+      "requiresConfirmation": false
+    }
+  ],
+  "exclusions": [
+    {
+      "category": "healthcheck",
+      "rationale": "Health probes are operational endpoints, not user-facing agent actions.",
+      "operationIdPattern": "^health\\.",
+      "matchedOperationIds": [
+        "health.health"
+      ]
+    },
+    {
+      "category": "browser-auth",
+      "rationale": "Password, OAuth, refresh, reset, and destructive account routes are browser/web-app auth surfaces.",
+      "operationIdPattern": "^auth\\.(signUp|signIn|refreshSession|signOut|signOutAll|googleStart|googleCallback|forgotPassword|resetPassword|deleteMe)$",
+      "matchedOperationIds": [
+        "auth.deleteMe",
+        "auth.forgotPassword",
+        "auth.googleCallback",
+        "auth.googleStart",
+        "auth.refreshSession",
+        "auth.resetPassword",
+        "auth.signIn",
+        "auth.signOut",
+        "auth.signOutAll",
+        "auth.signUp"
+      ]
+    },
+    {
+      "category": "admin",
+      "rationale": "Admin routes are control-plane surfaces and should not be exposed by generated agent clients by default.",
+      "pathPattern": "^/v1/admin/",
+      "matchedOperationIds": [
+        "emailCampaigns.activateCampaign",
+        "emailCampaigns.addStep",
+        "emailCampaigns.archiveCampaign",
+        "emailCampaigns.cancelEnrollment",
+        "emailCampaigns.createCampaign",
+        "emailCampaigns.enrollUsers",
+        "emailCampaigns.getCampaign",
+        "emailCampaigns.getCampaignAnalytics",
+        "emailCampaigns.getStepAnalytics",
+        "emailCampaigns.listCampaigns",
+        "emailCampaigns.listEnrollments",
+        "emailCampaigns.listSteps",
+        "emailCampaigns.pauseCampaign",
+        "emailCampaigns.removeStep",
+        "emailCampaigns.resumeCampaign",
+        "emailCampaigns.updateCampaign",
+        "emailCampaigns.updateStep"
+      ]
+    },
+    {
+      "category": "webhook",
+      "rationale": "Inbound webhooks are server-to-server callbacks, not CLI or MCP tools.",
+      "pathPattern": "^/v1/webhooks/",
+      "matchedOperationIds": [
+        "billing.stripeWebhook",
+        "emailWebhooks.resendWebhook"
+      ]
+    },
+    {
+      "category": "local-dev",
+      "rationale": "Local development helpers should not be exposed by generated agent clients.",
+      "pathPattern": "^/v1/.*/dev(/|$)|^/v1/dev(/|$)",
+      "matchedOperationIds": [
+        "billing.completeLocalBillingSetup"
+      ]
+    }
+  ]
+}

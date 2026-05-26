@@ -5,9 +5,12 @@ import { createDbAuthContext } from './db-auth-context.js'
 import { createOrganizationAndTeam } from './api-factories.js'
 
 const apiCwd = resolve(dirname(fileURLToPath(import.meta.url)), '../../../apps/api')
+const apiPort = Number.parseInt(process.env.API_INTEGRATION_TEST_PORT_TESTKIT_AUTH ?? '4121', 10)
 
 const dbAuthContext = createDbAuthContext({
   apiCwd,
+  host: '127.0.0.1',
+  port: apiPort,
   authSecret: process.env.INTEGRATION_AUTH_SECRET ?? 'testkit-integration-auth-secret-32-chars',
   corsOrigin: '*',
   sql: {

@@ -23,6 +23,7 @@
     "test:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
+    "@effect/opentelemetry": "^0.63.0",
     "@langfuse/otel": "5.1.0",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-logs-otlp-http": "^0.214.0",
@@ -33,7 +34,8 @@
     "@opentelemetry/sdk-metrics": "^2.6.1",
     "@opentelemetry/sdk-node": "^0.214.0",
     "@opentelemetry/sdk-trace-base": "^2.6.1",
-    "@opentelemetry/semantic-conventions": "^1.40.0"
+    "@opentelemetry/semantic-conventions": "^1.40.0",
+    "effect": "^3.21.2"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*"

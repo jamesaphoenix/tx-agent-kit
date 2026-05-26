@@ -7,6 +7,7 @@ import {
 import { PAYMENT_GRACE_PERIOD_DAYS } from '@tx-agent-kit/contracts/constants'
 import type { activities, SerializedDomainEvent } from './activities.js'
 import type { billingActivities } from './billing-activities.js'
+import { formatWorkflowFailureReason } from './workflows/error-reasons.js'
 
 const {
   ping,
@@ -493,7 +494,7 @@ export async function outboxPollerWorkflow(batchSize: number): Promise<void> {
       if (error instanceof WorkflowExecutionAlreadyStartedError) {
         dispatched.push(event.id)
       } else {
-        const message = error instanceof Error ? error.message : String(error)
+        const message = formatWorkflowFailureReason(error)
         await markEventFailed(event.id, `Failed to dispatch child workflow for event type '${event.eventType}': ${message}`)
       }
     }

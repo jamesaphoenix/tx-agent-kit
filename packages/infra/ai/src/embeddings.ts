@@ -1,5 +1,6 @@
 import { Effect } from 'effect'
 import { OpenRouter } from '@openrouter/sdk'
+import type { HTTPClient } from '@openrouter/sdk/lib/http'
 import type {
   CreateEmbeddingsRequest,
   CreateEmbeddingsResponse
@@ -11,6 +12,16 @@ export type EmbeddingsRequest = CreateEmbeddingsRequest
 export type EmbeddingsResult = CreateEmbeddingsResponse
 
 let clientInstance: OpenRouter | null = null
+let httpClientOverride: HTTPClient | null = null
+
+export const resetEmbeddingsClientForTests = (): void => {
+  clientInstance = null
+}
+
+export const setEmbeddingsHttpClientForTests = (client: HTTPClient | null): void => {
+  httpClientOverride = client
+  clientInstance = null
+}
 
 const getClient = (): OpenRouter => {
   if (clientInstance) {
@@ -22,7 +33,11 @@ const getClient = (): OpenRouter => {
     throw new Error('OPENROUTER_API_KEY is required to call OpenRouter APIs')
   }
 
-  clientInstance = new OpenRouter({ apiKey: env.OPENROUTER_API_KEY })
+  clientInstance = new OpenRouter({
+    apiKey: env.OPENROUTER_API_KEY,
+    ...(httpClientOverride ? { httpClient: httpClientOverride } : {}),
+    ...(env.OPENROUTER_BASE_URL.length > 0 ? { serverURL: env.OPENROUTER_BASE_URL } : {})
+  })
   return clientInstance
 }
 

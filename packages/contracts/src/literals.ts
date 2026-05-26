@@ -22,6 +22,9 @@ export type MembershipType = (typeof membershipTypes)[number]
 export const authLoginProviders = ['password', 'google'] as const
 export type AuthLoginProvider = (typeof authLoginProviders)[number]
 
+export const agentClientOpenApiParameterLocations = ['path', 'query', 'header', 'cookie'] as const
+export type AgentClientOpenApiParameterLocation = (typeof agentClientOpenApiParameterLocations)[number]
+
 export const authLoginAuditStatuses = ['success', 'failure'] as const
 export type AuthLoginAuditStatus = (typeof authLoginAuditStatuses)[number]
 

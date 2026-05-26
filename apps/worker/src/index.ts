@@ -2,6 +2,7 @@ import { Client, Connection } from '@temporalio/client'
 import { NativeConnection, Worker } from '@temporalio/worker'
 import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
+import { closeRedisClients } from '@tx-agent-kit/redis'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -265,7 +266,10 @@ async function run(env: WorkerEnv): Promise<void> {
     try {
       await connection.close()
     } finally {
-      await stopTelemetry()
+      await Promise.all([
+        stopTelemetry(),
+        closeRedisClients()
+      ])
     }
   }
 }

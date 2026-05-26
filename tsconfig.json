@@ -19,6 +19,7 @@
   ],
   "references": [
     { "path": "./packages/contracts" },
+    { "path": "./packages/cli" },
     { "path": "./packages/infra/ai" },
     { "path": "./packages/infra/auth" },
     { "path": "./packages/infra/db" },
@@ -27,6 +28,8 @@
     { "path": "./packages/core" },
     { "path": "./packages/infra/logging" },
     { "path": "./packages/infra/observability" },
+    { "path": "./packages/infra/redis" },
+    { "path": "./packages/mcp" },
     { "path": "./packages/infra/storage" },
     { "path": "./packages/infra/stripe" },
     { "path": "./packages/temporal-client" },

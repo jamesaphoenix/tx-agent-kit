@@ -5,10 +5,12 @@
  * Contract for apps/api. Domain behavior is modeled as closed invariants at API boundaries.
  * OpenAPI spec version: 0.1.0
  */
+import type { AuthSignUp201Principal } from './authSignUp201Principal.js';
 import type { AuthSignUp201User } from './authSignUp201User.js';
 
 export type AuthSignUp201 = {
   token: string;
   refreshToken?: string;
   user: AuthSignUp201User;
+  principal?: AuthSignUp201Principal;
 };

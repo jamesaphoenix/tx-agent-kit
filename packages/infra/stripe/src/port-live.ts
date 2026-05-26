@@ -6,6 +6,7 @@ import { Effect, Layer } from 'effect'
 import Stripe from 'stripe'
 import type { StripeCheckoutPriceIds, StripePortConfig } from './config.js'
 import { toJsonObject } from './json.js'
+import { readFailedPaymentIntentDetails } from './payment-intent-error.js'
 
 /**
  * Shared Stripe SDK API version pin used by both the API and worker
@@ -411,7 +412,7 @@ export const makeStripePortLive = (
               // the consumer can decide whether to treat it as a 3DS
               // challenge instead of a hard decline.
               if (error instanceof Stripe.errors.StripeCardError) {
-                const failedIntent = error.payment_intent
+                const failedIntent = readFailedPaymentIntentDetails(error.payment_intent)
                 const failedIntentId = failedIntent?.id ?? ''
                 const isAuthRequired =
                   error.code === 'authentication_required' ||
@@ -422,7 +423,7 @@ export const makeStripePortLive = (
                     ? ('requires_action' as const)
                     : ('requires_payment_method' as const),
                   amountCharged: 0,
-                  clientSecret: isAuthRequired ? (failedIntent?.client_secret ?? null) : null
+                  clientSecret: isAuthRequired ? (failedIntent?.clientSecret ?? null) : null
                 }
               }
               throw error instanceof Error ? error : new Error(String(error))

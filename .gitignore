@@ -2,6 +2,7 @@ node_modules
 .playwright-cli
 .pnpm-store
 .turbo
+.artifacts/
 dist
 coverage
 .vitest

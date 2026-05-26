@@ -4,7 +4,7 @@ import { PathParamsContext } from 'next/dist/shared/lib/hooks-client-context.sha
 import { writeAuthToken } from '@/lib/auth-token'
 import { clientApi } from '@/lib/client-api'
 import { createUser, createOrganization, defaultTestBrandSettings, uploadTestAsset } from '@tx-agent-kit/testkit'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import MediaPage from '@/app/(application)/org/[orgId]/[teamId]/media/page'
 import { fireEvent, renderWithProviders, screen, userEvent, waitFor } from '../../../../../../integration/test-utils'
 import { createWebFactoryContext, integrationBaseUrl } from '../../../../../../integration/support/web-integration-context'
@@ -48,6 +48,28 @@ const getSharedFixture = (): SharedFixture => {
     throw new Error('MediaPage integration: shared fixture used before beforeAll ran')
   }
   return sharedFixture
+}
+
+const createSharedFixture = async (): Promise<SharedFixture> => {
+  const factoryContext = createWebFactoryContext()
+  const owner = await createUser(factoryContext, {
+    email: `media-owner-${randomUUID()}@example.com`,
+    password: 'media-pass-12345',
+    name: 'Media Test Owner'
+  })
+  writeAuthToken(owner.token)
+  const org = await createOrganization(factoryContext, {
+    token: owner.token,
+    name: 'Media Test Organization'
+  })
+  await activateSubscriptionInContext(factoryContext, org.id)
+  const uiTeam = await clientApi.createTeam({
+    organizationId: org.id,
+    name: 'Media Test Shared UI Team',
+    brandSettings: defaultTestBrandSettings
+  })
+
+  return { factoryContext, owner, org, uiTeam }
 }
 
 const activateSubscriptionInContext = async (
@@ -128,40 +150,12 @@ const seedAssetRows = async (teamId: string, count: number): Promise<void> => {
 // "found multiple elements" errors. Serial rendering is required for
 // React integration tests under pool:threads+isolate:false.
 describe('MediaPage integration', () => {
-  beforeAll(async () => {
-    const factoryContext = createWebFactoryContext()
-    const owner = await createUser(factoryContext, {
-      email: `media-owner-${randomUUID()}@example.com`,
-      password: 'media-pass-12345',
-      name: 'Media Test Owner'
-    })
-    writeAuthToken(owner.token)
-    const org = await createOrganization(factoryContext, {
-      token: owner.token,
-      name: 'Media Test Organization'
-    })
-    // Activate subscription so uploads are allowed (quota enforcement blocks
-    // non-subscribers). One activation covers every per-test team since the
-    // subscription is scoped to the organisation.
-    await activateSubscriptionInContext(factoryContext, org.id)
-    const uiTeam = await clientApi.createTeam({
-      organizationId: org.id,
-      name: 'Media Test Shared UI Team',
-      brandSettings: defaultTestBrandSettings
-    })
-    sharedFixture = { factoryContext, owner, org, uiTeam }
-  })
-
-  // vitest.integration.setup.ts registers a GLOBAL beforeEach that calls
-  // clearAuthToken() + window.localStorage.clear() between tests so cross-
-  // file state can't leak. That wipes the owner token we wrote in the
-  // hoisted beforeAll, so every test past the first one would hit
-  // "Missing Authorization header". Re-write the token here AFTER the
-  // global reset so each test still starts authenticated as the shared
-  // owner.
-  beforeEach(() => {
-    const { owner } = getSharedFixture()
-    writeAuthToken(owner.token)
+  // The web integration runner resets the shared schema before each test.
+  // Build the media fixture after that reset so auth tokens never point at
+  // rows deleted by the global integration setup.
+  beforeEach(async () => {
+    sharedFixture = await createSharedFixture()
+    writeAuthToken(sharedFixture.owner.token)
   })
 
   // ── Empty state ─────────────────────────────────────────────────────

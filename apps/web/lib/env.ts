@@ -1,6 +1,17 @@
-const defaultApiBaseUrl = 'http://localhost:4000'
-const defaultOtelEndpoint = 'http://localhost:4320'
-const defaultNodeEnv = 'development'
+const productionLikeNodeEnvs = new Set(['production', 'staging', 'preview'])
+
+const isProductionLikeRuntime = (): boolean => {
+  const explicit =
+    [process.env.NEXT_PUBLIC_NODE_ENV, process.env.NODE_ENV]
+      .find((value) => typeof value === 'string' && value.trim().length > 0) ?? ''
+  return productionLikeNodeEnvs.has(explicit.trim().toLowerCase())
+}
+
+const resolveDefault = (devValue: string): string =>
+  isProductionLikeRuntime() ? '' : devValue
+
+const defaultApiBaseUrl = resolveDefault('http://localhost:4000')
+const defaultOtelEndpoint = resolveDefault('http://localhost:4320')
 
 export interface WebEnv {
   API_BASE_URL: string
@@ -26,6 +37,11 @@ const parseOptionalString = (value: string | undefined): string | undefined => {
   return normalizedValue.length > 0 ? normalizedValue : undefined
 }
 
+export const shouldRenderDeveloperTools = (nodeEnv: string): boolean => {
+  const normalizedNodeEnv = nodeEnv.trim().toLowerCase()
+  return !productionLikeNodeEnvs.has(normalizedNodeEnv)
+}
+
 export const getWebEnv = (): WebEnv => {
   if (cachedEnv) {
     return cachedEnv
@@ -41,9 +57,9 @@ export const getWebEnv = (): WebEnv => {
       process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
       defaultOtelEndpoint,
     NODE_ENV:
-      process.env.NEXT_PUBLIC_NODE_ENV ??
-      (process.env.NODE_ENV as string | undefined) ??
-      defaultNodeEnv,
+      parseOptionalString(process.env.NEXT_PUBLIC_NODE_ENV) ??
+      parseOptionalString(process.env.NODE_ENV) ??
+      'development',
     SITE_URL:
       process.env.NEXT_PUBLIC_SITE_URL ??
       'http://localhost:3000',

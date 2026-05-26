@@ -19,12 +19,12 @@ depends_on: []
 supersedes: []
 implements: null
 last_reviewed_at: 2026-04-17
-plan: "~/.codex/plans/2026-03-28-octospark-system-design-subsystem-split.md"
+plan: "~/.codex/plans/2026-03-28-system-design-subsystem-split.md"
 ---
 
 # Plan
 
-> Full plan: `~/.codex/plans/2026-03-28-octospark-system-design-subsystem-split.md`
+> Full plan: `~/.codex/plans/2026-03-28-system-design-subsystem-split.md`
 
 This PRD is the lightweight companion to `assets-design`.
 It keeps the assets scope separately reviewable while the paired design doc owns detailed technical constraints.

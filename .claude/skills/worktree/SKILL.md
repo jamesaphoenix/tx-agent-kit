@@ -56,13 +56,13 @@ worktree. That single invocation gives you:
 - A dedicated Postgres schema.
 - Helper scripts: `run-migrations.sh`, `reset-worktree-schema.sh`.
 
-**Raw `git worktree add` is blocked.** The project-scoped
-`.claude/settings.json` PreToolUse hook (`block-raw-git-worktree-add.sh`)
-intercepts `git worktree add` in Bash tool calls and denies them, telling
-the caller to use `create.sh` instead. Other `git worktree` subcommands
-(`list`, `remove`, `prune`, `lock`, `unlock`, `move`, `repair`) pass
-through untouched. If you genuinely need the raw command for a recovery
-scenario, set `ALLOW_RAW_GIT_WORKTREE_ADD=1` in the environment.
+**Raw `git worktree add` is blocked.** The project-scoped Claude and Codex
+hooks call `.claude/hooks/block-raw-git-worktree-add.sh`, including commands
+like `git -C <repo> worktree add`, and deny them with instructions to use
+`create.sh` instead. Other `git worktree` subcommands (`list`, `remove`,
+`prune`, `lock`, `unlock`, `move`, `repair`) pass through untouched. If you
+genuinely need the raw command for a recovery scenario, set
+`ALLOW_RAW_GIT_WORKTREE_ADD=1` in the environment.
 
 **Agent tool `isolation: "worktree"`:** Claude Code's internal
 worktree creation on the Agent tool does NOT go through Bash, so the hook

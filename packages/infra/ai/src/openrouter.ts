@@ -1,5 +1,6 @@
 import { Effect } from 'effect'
 import { OpenRouter } from '@openrouter/sdk'
+import type { HTTPClient } from '@openrouter/sdk/lib/http'
 import type { CallModelInput, Tool } from '@openrouter/sdk'
 import type { ModelResult } from '@openrouter/sdk/lib/model-result'
 import { getAiEnv } from './env.js'
@@ -9,6 +10,16 @@ export type { CallModelInput, Tool }
 export type { ModelResult }
 
 let clientInstance: OpenRouter | null = null
+let httpClientOverride: HTTPClient | null = null
+
+export const resetOpenRouterClientForTests = (): void => {
+  clientInstance = null
+}
+
+export const setOpenRouterHttpClientForTests = (client: HTTPClient | null): void => {
+  httpClientOverride = client
+  clientInstance = null
+}
 
 const getClient = (): OpenRouter => {
   if (clientInstance) {
@@ -20,7 +31,11 @@ const getClient = (): OpenRouter => {
     throw new Error('OPENROUTER_API_KEY is required to call OpenRouter APIs')
   }
 
-  clientInstance = new OpenRouter({ apiKey: env.OPENROUTER_API_KEY })
+  clientInstance = new OpenRouter({
+    apiKey: env.OPENROUTER_API_KEY,
+    ...(httpClientOverride ? { httpClient: httpClientOverride } : {}),
+    ...(env.OPENROUTER_BASE_URL.length > 0 ? { serverURL: env.OPENROUTER_BASE_URL } : {})
+  })
   return clientInstance
 }
 

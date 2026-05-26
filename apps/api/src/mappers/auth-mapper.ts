@@ -17,7 +17,8 @@ export const toApiAuthSession = (
 ) => ({
   token: session.token,
   ...(options.includeRefreshToken === true ? { refreshToken: session.refreshToken } : {}),
-  user: toApiAuthUser(session.user)
+  user: toApiAuthUser(session.user),
+  ...(session.principal ? { principal: toApiAuthPrincipal(session.principal) } : {})
 })
 
 export const toApiAuthPrincipal = (principal: AuthPrincipal) => ({

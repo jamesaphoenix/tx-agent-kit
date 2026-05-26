@@ -20,7 +20,9 @@ export interface LangfuseEnv {
 export interface ObservabilityEnv {
   OTEL_LOG_LEVEL: string | undefined
   OTEL_EXPORTER_OTLP_ENDPOINT: string
+  OTEL_EXPORTER_OTLP_HEADERS: Readonly<Record<string, string>>
   OTEL_LOGS_EXPORTER: 'otlp' | 'none'
+  OTEL_RESOURCE_ATTRIBUTES: Readonly<Record<string, string>>
   NODE_ENV: string
   LANGFUSE: LangfuseEnv
 }
@@ -32,6 +34,35 @@ export interface ClientObservabilityEnv {
 
 const isTruthy = (value: string | undefined): boolean =>
   value === '1' || value?.toLowerCase() === 'true'
+
+const parseKeyValueList = (
+  envName: string,
+  value: string | undefined
+): Readonly<Record<string, string>> => {
+  if (value === undefined || value.trim().length === 0) {
+    return {}
+  }
+
+  const entries = value.split(',').map((entry) => entry.trim()).filter((entry) => entry.length > 0)
+  const parsed: Record<string, string> = {}
+
+  for (const entry of entries) {
+    const separatorIndex = entry.indexOf('=')
+    if (separatorIndex <= 0 || separatorIndex === entry.length - 1) {
+      throw new Error(`${envName} must be comma-separated key=value pairs`)
+    }
+
+    const key = entry.slice(0, separatorIndex).trim()
+    const parsedValue = entry.slice(separatorIndex + 1).trim()
+    if (key.length === 0 || parsedValue.length === 0) {
+      throw new Error(`${envName} must be comma-separated key=value pairs`)
+    }
+
+    parsed[key] = parsedValue
+  }
+
+  return parsed
+}
 
 const parseLangfuseSampleRate = (): number => {
   const raw = process.env.LANGFUSE_SAMPLE_RATE
@@ -103,7 +134,15 @@ export const getObservabilityEnv = (): ObservabilityEnv => {
     OTEL_LOG_LEVEL: logLevel,
     OTEL_EXPORTER_OTLP_ENDPOINT:
       process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? defaultOtelEndpoint,
+    OTEL_EXPORTER_OTLP_HEADERS: parseKeyValueList(
+      'OTEL_EXPORTER_OTLP_HEADERS',
+      process.env.OTEL_EXPORTER_OTLP_HEADERS
+    ),
     OTEL_LOGS_EXPORTER: logsExporter === 'none' ? 'none' : 'otlp',
+    OTEL_RESOURCE_ATTRIBUTES: parseKeyValueList(
+      'OTEL_RESOURCE_ATTRIBUTES',
+      process.env.OTEL_RESOURCE_ATTRIBUTES
+    ),
     NODE_ENV: nodeEnv,
     LANGFUSE: getLangfuseEnv(nodeEnv)
   }

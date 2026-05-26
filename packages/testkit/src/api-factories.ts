@@ -132,39 +132,112 @@ const withJsonHeaders = (
   }
 }
 
-export const createUser = async (
+const testkitRetryDelaysMs = [25, 100, 250] as const
+
+const wait = (delayMs: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, delayMs)
+  })
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const isLoginSessionCreationFailure = (status: number, body: unknown): boolean => {
+  if (status !== 401 || !isRecord(body)) {
+    return false
+  }
+
+  return body.message === 'Failed to create login session'
+}
+
+const isOpaqueSignUpFailure = (status: number, body: unknown): boolean => {
+  if (status !== 400 || !isRecord(body)) {
+    return false
+  }
+
+  return body.message === 'Sign-up failed'
+}
+
+const signInAfterPartialSignUp = async (
   context: ApiFactoryContext,
-  options: CreateUserOptions = {}
-): Promise<CreatedUserSession> => {
+  payload: { email: string; password: string; name: string }
+): Promise<FactoryAuthResponse> => {
+  let lastError: unknown
+
+  for (const delayMs of testkitRetryDelaysMs) {
+    await wait(delayMs)
+    try {
+      return await loginUser(context, {
+        email: payload.email,
+        password: payload.password
+      })
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw new Error(
+    `createUser sign-up created a user but could not recover the login session: ${String(lastError)}`
+  )
+}
+
+const buildCreateUserPayload = (
+  options: CreateUserOptions
+): { email: string; password: string; name: string } => {
   const seed = createUserFactory({
     email: options.email,
     name: options.name
   })
 
-  const payload = {
+  return {
     email: seed.email,
     password: options.password ?? 'factory-pass-12345',
     name: seed.name
   }
+}
 
-  const response = await fetch(toUrl(context, '/v1/auth/sign-up'), {
-    method: 'POST',
-    headers: withJsonHeaders(context, 'create-user'),
-    body: JSON.stringify(payload)
-  })
+export const createUser = async (
+  context: ApiFactoryContext,
+  options: CreateUserOptions = {}
+): Promise<CreatedUserSession> => {
+  const maxAttempts = options.email ? 1 : 3
+  let lastFailure: { status: number; body: unknown } | null = null
 
-  const body = await parseJsonOrThrow(response)
-  if (response.status !== 201) {
-    throw new Error(`createUser failed (${response.status}): ${JSON.stringify(body)}`)
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const payload = buildCreateUserPayload(options)
+    const response = await fetch(toUrl(context, '/v1/auth/sign-up'), {
+      method: 'POST',
+      headers: withJsonHeaders(context, 'create-user'),
+      body: JSON.stringify(payload)
+    })
+
+    const body = await parseJsonOrThrow(response)
+    if (response.status === 201) {
+      const decoded = decodeWithSchema(authResponseSchema, body, 'createUser')
+      return {
+        ...decoded,
+        refreshToken: requireRefreshToken(decoded, 'createUser'),
+        credentials: payload
+      }
+    }
+
+    if (isLoginSessionCreationFailure(response.status, body)) {
+      const recovered = await signInAfterPartialSignUp(context, payload)
+      return {
+        ...recovered,
+        credentials: payload
+      }
+    }
+
+    lastFailure = { status: response.status, body }
+    if (!isOpaqueSignUpFailure(response.status, body) || attempt === maxAttempts - 1) {
+      break
+    }
   }
 
-  const decoded = decodeWithSchema(authResponseSchema, body, 'createUser')
-
-  return {
-    ...decoded,
-    refreshToken: requireRefreshToken(decoded, 'createUser'),
-    credentials: payload
-  }
+  throw new Error(
+    `createUser failed (${lastFailure?.status ?? 'unknown'}): ${JSON.stringify(lastFailure?.body)}`
+  )
 }
 
 export const loginUser = async (

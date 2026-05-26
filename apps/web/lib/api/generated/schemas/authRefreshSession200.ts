@@ -5,10 +5,12 @@
  * Contract for apps/api. Domain behavior is modeled as closed invariants at API boundaries.
  * OpenAPI spec version: 0.1.0
  */
+import type { AuthRefreshSession200Principal } from './authRefreshSession200Principal';
 import type { AuthRefreshSession200User } from './authRefreshSession200User';
 
 export type AuthRefreshSession200 = {
   token: string;
   refreshToken?: string;
   user: AuthRefreshSession200User;
+  principal?: AuthRefreshSession200Principal;
 };

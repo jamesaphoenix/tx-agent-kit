@@ -53,7 +53,8 @@ export const resetPasswordResponseSchema = Schema.Struct({
 export const authResponseSchema = Schema.Struct({
   token: Schema.String,
   refreshToken: Schema.optional(Schema.String),
-  user: userSchema
+  user: userSchema,
+  principal: Schema.optional(authPrincipalSchema)
 })
 
 export const browserAuthResponseSchema = Schema.Struct({

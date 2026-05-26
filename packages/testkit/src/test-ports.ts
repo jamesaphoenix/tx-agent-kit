@@ -1,7 +1,7 @@
 /**
  * Resolves integration test ports using the worktree port offset.
  *
- * Main repo (WORKTREE_PORT_OFFSET=0): base ports (4100, 4101, etc.)
+ * Main repo (WORKTREE_PORT_OFFSET=0): base ports start at 4100.
  * Worktree (WORKTREE_PORT_OFFSET=316): offset ports (4416, 4417, etc.)
  *
  * This enables truly parallel integration test runs across worktrees

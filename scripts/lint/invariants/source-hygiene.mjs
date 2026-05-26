@@ -179,6 +179,7 @@ export const enforceNoDirectProcessEnvInSource = (errors) => {
     'packages/infra/email/src/env.ts',
     'packages/infra/storage/src/env.ts',
     'packages/testkit/src/env.ts',
+    'packages/tooling/http-vcr/src/env.ts',
     'packages/infra/db/src/seeds/seed-onboarding-drip.ts'
   ])
 

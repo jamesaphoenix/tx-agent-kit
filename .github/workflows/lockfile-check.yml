@@ -1,0 +1,33 @@
+name: Lockfile Check
+
+on:
+  pull_request:
+    paths:
+      - '**/package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lockfile-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lockfile-check:
+    name: Verify pnpm-lock.yaml is in sync with package.json
+    runs-on: [self-hosted, mac-studio]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Setup Node and pnpm
+        run: ./scripts/deploy/ci/setup-mac-node-pnpm.sh
+      - name: Install with frozen lockfile
+        run: |
+          if pnpm install --frozen-lockfile; then
+            echo "Lockfile is in sync with package.json files"
+          else
+            echo "::error::Lockfile is out of sync with package.json. Run 'pnpm install' locally and commit the updated pnpm-lock.yaml."
+            exit 1
+          fi

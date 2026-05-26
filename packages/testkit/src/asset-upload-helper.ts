@@ -1,7 +1,7 @@
 /**
  * Test helper for seeding media assets via the real two-phase upload flow.
- * Uses a 1x1 transparent PNG (67 bytes) as the dummy file, uploads it to
- * the real R2 dev bucket via presigned URL, then confirms the upload.
+ * Uses a 1x1 transparent PNG (67 bytes) as the dummy file, uploads it through
+ * the API content endpoint, then confirms the upload.
  */
 
 // 1x1 transparent PNG — smallest valid PNG file (67 bytes)
@@ -52,7 +52,7 @@ export interface UploadedAsset {
 /**
  * Seeds a media asset through the full two-phase upload flow:
  * 1. POST /teams/:teamId/uploads/request → get presigned URL
- * 2. PUT file bytes to R2 presigned URL
+ * 2. PUT file bytes to /teams/:teamId/uploads/:uploadId/content
  * 3. POST /teams/:teamId/uploads/:uploadId/confirm → creates asset record
  */
 export const uploadTestAsset = async (options: UploadAssetOptions): Promise<UploadedAsset> => {
@@ -100,16 +100,21 @@ export const uploadTestAsset = async (options: UploadAssetOptions): Promise<Uplo
     return await getRes.json() as UploadedAsset
   }
 
-  // Phase 2: PUT file to R2 presigned URL
-  const putRes = await fetch(requestData.presignedUrl, {
+  // Phase 2: PUT file through the API. This still exercises the real upload
+  // service and storage adapter while keeping integration tests on one API
+  // server instead of depending on external object storage.
+  const putRes = await fetch(`${options.baseUrl}/v1/teams/${options.teamId}/uploads/${requestData.uploadId}/content`, {
     method: 'PUT',
     body: Buffer.from(fileBytes),
-    headers: { 'Content-Type': mimeType }
+    headers: {
+      'Content-Type': mimeType,
+      authorization: `Bearer ${options.token}`
+    }
   })
 
   if (!putRes.ok) {
     const body = await putRes.text()
-    throw new Error(`R2 PUT failed (${putRes.status}): ${body}`)
+    throw new Error(`Upload content failed (${putRes.status}): ${body}`)
   }
 
   // Phase 3: Confirm upload

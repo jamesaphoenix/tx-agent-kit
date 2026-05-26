@@ -37,7 +37,7 @@ HELP
 
 worktree_path_from_name() {
   local name="$1"
-  echo "$ROOT_DIR/worktrees/$name"
+  echo "$ROOT_DIR/.worktrees/$name"
 }
 
 schema_exists() {
@@ -67,36 +67,16 @@ collect_active_worktree_names() {
 
 create_worktree() {
   local branch_name="${1:-}"
+  local base_branch="${2:-}"
   if ! validate_name "$branch_name" "branch name"; then
     exit 1
   fi
 
-  local worktree_path
-  worktree_path="$(worktree_path_from_name "$branch_name")"
-
-  if [[ -d "$worktree_path" ]]; then
-    log_error "Worktree already exists at $worktree_path"
-    exit 1
+  if [[ -n "$base_branch" ]]; then
+    "$SCRIPT_DIR/create.sh" "$branch_name" "$base_branch"
+  else
+    "$SCRIPT_DIR/create.sh" "$branch_name"
   fi
-
-  mkdir -p "$ROOT_DIR/worktrees"
-
-  cd "$ROOT_DIR"
-  if ! git worktree add "$worktree_path" -b "$branch_name" 2>/dev/null; then
-    git worktree add "$worktree_path" "$branch_name"
-  fi
-
-  log_success "Created worktree: worktrees/$branch_name"
-  log_info "Port allocation:"
-  mapfile -t active_worktree_names < <(collect_active_worktree_names)
-  get_port_summary "$branch_name" "${active_worktree_names[@]}" | while IFS= read -r line; do
-    printf '  %s\n' "$line"
-  done
-
-  printf '\n'
-  log_info "Next steps:"
-  printf '  1) %s setup %s\n' "$0" "$branch_name"
-  printf '  2) cd worktrees/%s && pnpm db:migrate && pnpm db:schemas:apply && pnpm dev\n' "$branch_name"
 }
 
 list_worktrees() {

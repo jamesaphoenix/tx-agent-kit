@@ -48,6 +48,8 @@ export type SqlMigrationFile = SqlFile
 
 const localDatabaseHosts = new Set(['localhost', '127.0.0.1', '::1'])
 const globalMigrationLockId = 4_602_001
+const resetRetryablePgErrorCodes = new Set(['40P01', '55P03', '57014'])
+const resetMaxAttempts = 3
 const sharedMigrationNameSet = new Set([
   '0001_core_saas.sql',
   '0015_restore_public_invitation_identity_trigger.sql',
@@ -63,6 +65,16 @@ const dropFunctionPattern =
   /(DROP FUNCTION IF EXISTS\s+)(?:(("(?:""|[^"])+?"|[A-Za-z_][A-Za-z0-9_$]*))\s*\.\s*)?((?:"(?:""|[^"])+?"|[A-Za-z_][A-Za-z0-9_$]*))(\s*\(\s*\)\s*CASCADE\s*;)/giu
 
 const quoteIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
+
+const delay = (milliseconds: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, milliseconds)
+  })
+
+const isRetryableResetError = (error: unknown): boolean => {
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' && resetRetryablePgErrorCodes.has(code)
+}
 
 export const scopeUnqualifiedFunctionDropsToSchema = (
   sql: string,
@@ -286,15 +298,29 @@ export const createSqlTestContext = (
     })
   }
 
+  const performResetWithRetry = async (): Promise<void> => {
+    for (let attempt = 1; attempt <= resetMaxAttempts; attempt += 1) {
+      try {
+        await performReset()
+        return
+      } catch (error) {
+        if (attempt >= resetMaxAttempts || !isRetryableResetError(error)) {
+          throw error
+        }
+        await delay(100 * attempt)
+      }
+    }
+  }
+
   const reset = async (): Promise<void> => {
     if (resetStrategy === 'deferred') {
       return
     }
-    await performReset()
+    await performResetWithRetry()
   }
 
   const flushReset = async (): Promise<void> => {
-    await performReset()
+    await performResetWithRetry()
   }
 
   const teardown = async (): Promise<void> => {

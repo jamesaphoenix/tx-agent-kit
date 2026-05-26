@@ -6,6 +6,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "./.claude/hooks/block-raw-git-worktree-add.sh",
+            "statusMessage": "Checking command for raw git worktree creation"
+          },
+          {
+            "type": "command",
             "command": "./.claude/hooks/block-integration-timeout-bump.sh",
             "statusMessage": "Checking command for INTEGRATION_TIMEOUT_SECONDS bypass"
           }

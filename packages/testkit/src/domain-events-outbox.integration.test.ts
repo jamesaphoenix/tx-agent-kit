@@ -22,9 +22,12 @@ import {
 } from './domain-events-outbox.js'
 
 const apiCwd = resolve(dirname(fileURLToPath(import.meta.url)), '../../../apps/api')
+const apiPort = Number.parseInt(process.env.API_INTEGRATION_TEST_PORT_DOMAIN_EVENTS ?? '4122', 10)
 
 const dbAuthContext = createDbAuthContext({
   apiCwd,
+  host: '127.0.0.1',
+  port: apiPort,
   authSecret: process.env.INTEGRATION_AUTH_SECRET ?? 'domain-events-integration-secret-32c',
   corsOrigin: '*',
   sql: {

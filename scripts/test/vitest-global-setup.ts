@@ -1,6 +1,7 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, statSync, utimesSync, writeFileSync, type Dirent } from 'node:fs'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { createConnection, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -128,6 +129,38 @@ if (!existsSync(dotenvPath)) {
 }
 loadDotenv({ path: dotenvPath })
 const stripeIntegrationTestMode = applyStripeIntegrationTestEnv(process.env)
+
+const resolveComposeHostPort = (
+  serviceName: string,
+  containerPort: string
+): string | undefined => {
+  try {
+    const output = execFileSync(
+      'docker',
+      ['compose', '-p', process.env.COMPOSE_PROJECT_NAME ?? 'tx-agent-kit', 'port', serviceName, containerPort],
+      {
+        cwd: projectRoot,
+        env: process.env,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore']
+      }
+    ).trim()
+
+    const port = output.match(/:(\d+)$/u)?.[1]
+    return port && port.length > 0 ? port : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const hydrateRedisIntegrationEnv = (): void => {
+  if (process.env.REDIS_URL) {
+    return
+  }
+
+  process.env.REDIS_PORT ??= resolveComposeHostPort('redis', '6379') ?? '6379'
+  process.env.REDIS_URL = `redis://127.0.0.1:${process.env.REDIS_PORT}`
+}
 
 // Worktree invariant: ensure required keys exist
 const isWorktreeRoot = projectRoot.includes('.worktrees') || existsSync(resolve(projectRoot, '..', '..', '.git'))
@@ -275,6 +308,163 @@ const worktreePortOffset = Number.parseInt(process.env.WORKTREE_PORT_OFFSET ?? '
 const integrationApiPort = 4100 + worktreePortOffset
 const integrationApiBaseUrl = `http://127.0.0.1:${integrationApiPort}`
 const sharedApiAuthSecret = 'integration-shared-auth-secret-32ch'
+const fakeOpenRouterPort = 4300 + worktreePortOffset
+const fakeOpenRouterBaseUrl = `http://127.0.0.1:${fakeOpenRouterPort}`
+
+const readRequestBody = async (request: IncomingMessage): Promise<string> => {
+  const chunks: Buffer[] = []
+  for await (const chunk of request as AsyncIterable<string | Buffer>) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk)
+  }
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+const sendJson = (response: ServerResponse, statusCode: number, payload: unknown): void => {
+  response.statusCode = statusCode
+  response.setHeader('content-type', 'application/json')
+  response.end(JSON.stringify(payload))
+}
+
+const killPortOccupant = (port: number): void => {
+  try {
+    execFileSync('bash', ['-c', `lsof -ti :${port} | xargs kill -9 2>/dev/null`], {
+      cwd: projectRoot,
+      stdio: 'ignore'
+    })
+  } catch {
+    // Nothing to kill.
+  }
+}
+
+const buildTestEmbedding = (dimensions: number): number[] =>
+  Array.from({ length: dimensions }, (_, index) => (index === 0 ? 1 : 0))
+
+const startFakeOpenRouterServer = async (): Promise<Server> => {
+  killPortOccupant(fakeOpenRouterPort)
+  const requests: Array<Record<string, unknown>> = []
+
+  const server = createServer((request, response) => {
+    void (async () => {
+      try {
+        const url = new URL(request.url ?? '/', fakeOpenRouterBaseUrl)
+
+        if (request.method === 'POST' && url.pathname === '/embeddings') {
+          const body = JSON.parse(await readRequestBody(request)) as Record<string, unknown>
+          const dimensions =
+            typeof body.dimensions === 'number' && body.dimensions > 0
+              ? body.dimensions
+              : 1536
+          requests.push({ __testPath: url.pathname, ...body })
+          sendJson(response, 200, {
+            object: 'list',
+            data: [
+              {
+                object: 'embedding',
+                embedding: buildTestEmbedding(dimensions),
+                index: 0
+              }
+            ],
+            model:
+              typeof body.model === 'string'
+                ? body.model
+                : 'openai/text-embedding-3-small',
+            usage: {
+              prompt_tokens: 8,
+              total_tokens: 8,
+              cost: 0.000_12
+            }
+          })
+          return
+        }
+
+        if (request.method === 'POST' && url.pathname === '/responses') {
+          const body = JSON.parse(await readRequestBody(request)) as Record<string, unknown>
+          requests.push({ __testPath: url.pathname, ...body })
+          sendJson(response, 200, {
+            id: 'resp_fake_ai_integration',
+            object: 'response',
+            created_at: Math.floor(Date.now() / 1000),
+            completed_at: Math.floor(Date.now() / 1000),
+            model: typeof body.model === 'string' ? body.model : 'openai/gpt-4.1-mini',
+            status: 'completed',
+            output: [
+              {
+                id: 'msg_fake_ai_integration',
+                type: 'message',
+                status: 'completed',
+                role: 'assistant',
+                content: [{ type: 'output_text', text: 'ok', annotations: [] }]
+              }
+            ],
+            output_text: 'ok',
+            error: null,
+            incomplete_details: null,
+            usage: {
+              input_tokens: 12,
+              input_tokens_details: { cached_tokens: 0 },
+              output_tokens: 3,
+              output_tokens_details: { reasoning_tokens: 0 },
+              total_tokens: 15,
+              cost: 0.000_21
+            },
+            temperature: null,
+            top_p: null,
+            presence_penalty: null,
+            frequency_penalty: null,
+            metadata: null,
+            tools: [],
+            tool_choice: 'auto',
+            parallel_tool_calls: true
+          })
+          return
+        }
+
+        if (request.method === 'GET' && url.pathname === '/__test/checkpoint') {
+          sendJson(response, 200, { cursor: requests.length })
+          return
+        }
+
+        if (request.method === 'GET' && url.pathname === '/__test/requests') {
+          const after = Number.parseInt(url.searchParams.get('after') ?? '0', 10)
+          const cursor = Number.isNaN(after) || after < 0 ? 0 : after
+          sendJson(response, 200, {
+            requests: requests.slice(cursor),
+            nextCursor: requests.length
+          })
+          return
+        }
+
+        sendJson(response, 404, { error: 'not_found' })
+      } catch (error: unknown) {
+        sendJson(response, 500, {
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
+    })()
+  })
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(fakeOpenRouterPort, '127.0.0.1', () => resolve())
+  })
+
+  process.env.OPENROUTER_API_KEY = 'integration-openrouter-test-key'
+  process.env.OPENROUTER_BASE_URL = fakeOpenRouterBaseUrl
+  process.env.INTEGRATION_FAKE_OPENROUTER_BASE_URL = fakeOpenRouterBaseUrl
+
+  return server
+}
+
+const closeServer = async (server: Server): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error) {
+        reject(error)
+        return
+      }
+      resolve()
+    })
+  })
 
 // Lockfiles for persistent server reuse across consecutive runs.
 // The files embed (WORKTREE_PORT_OFFSET, projectRootHash) so two filesystem
@@ -390,6 +580,7 @@ const tryReuseSharedApiServer = async (): Promise<ChildProcess | null> => {
   process.env.INTEGRATION_API_PORT = String(integrationApiPort)
   process.env.INTEGRATION_API_BASE_URL = integrationApiBaseUrl
   process.env.INTEGRATION_AUTH_SECRET = sharedApiAuthSecret
+  process.env.TX_INTEGRATION_SHARED_API_READY = '1'
 
   // Return a dummy ChildProcess-like stub so the caller's type signature
   // stays the same. `pid` reflects the reused PID; `exitCode` stays null;
@@ -437,6 +628,7 @@ const startSharedApiServer = async (): Promise<ChildProcess> => {
         API_CORS_ORIGIN: 'http://localhost:3000',
         AUTH_RATE_LIMIT_MAX_REQUESTS: '100000',
         AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '100000',
+        TX_STORAGE_MODE: process.env.TX_STORAGE_MODE ?? 'memory',
         ...stripeIntegrationTestEnvOverrides(process.env),
         // Sized for CONCURRENT stress integration tests overlapping within
         // a slot (e.g. billing-stale-reclaim-race's 100-parallel reclaim
@@ -486,6 +678,7 @@ const startSharedApiServer = async (): Promise<ChildProcess> => {
   process.env.INTEGRATION_API_PORT = String(integrationApiPort)
   process.env.INTEGRATION_API_BASE_URL = integrationApiBaseUrl
   process.env.INTEGRATION_AUTH_SECRET = sharedApiAuthSecret
+  process.env.TX_INTEGRATION_SHARED_API_READY = '1'
 
   if (apiProcess.pid !== undefined) {
     writeLockFile(apiLockfilePath, {
@@ -564,6 +757,7 @@ const startSharedWorker = async (): Promise<ChildProcess> => {
         ...process.env,
         NODE_ENV: 'test',
         AUTH_SECRET: sharedApiAuthSecret,
+        TX_STORAGE_MODE: process.env.TX_STORAGE_MODE ?? 'memory',
         ...stripeIntegrationTestEnvOverrides(process.env),
         // Worker concurrency is lower than API but still benefits from
         // headroom when multiple workflows run in parallel across slots.
@@ -648,11 +842,19 @@ export default async () => {
 
   await assertDockerInfraHealthy()
   runGlobalIntegrationSetup()
-  const sharedApiProcess = await startSharedApiServer()
-  const sharedWorkerProcess = await startSharedWorker()
+  hydrateRedisIntegrationEnv()
+  const fakeOpenRouterServer = await startFakeOpenRouterServer()
+  try {
+    const sharedApiProcess = await startSharedApiServer()
+    const sharedWorkerProcess = await startSharedWorker()
 
-  return async () => {
-    await stopSharedWorker(sharedWorkerProcess)
-    await stopSharedApiServer(sharedApiProcess)
+    return async () => {
+      await stopSharedWorker(sharedWorkerProcess)
+      await stopSharedApiServer(sharedApiProcess)
+      await closeServer(fakeOpenRouterServer)
+    }
+  } catch (error) {
+    await closeServer(fakeOpenRouterServer)
+    throw error
   }
 }

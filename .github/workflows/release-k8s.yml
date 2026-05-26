@@ -85,6 +85,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # shellcheck disable=SC2012
           artifact_file="$(ls -t deploy/artifacts/images-*.env | head -n 1)"
           artifact_name="$(basename "$artifact_file")"
           echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
@@ -139,6 +140,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # shellcheck disable=SC2012
           artifact_file="$(ls -t deploy/artifacts/images-*.env | head -n 1)"
           artifact_name="$(basename "$artifact_file")"
           echo "name=$artifact_name" >> "$GITHUB_OUTPUT"

@@ -1,7 +1,20 @@
-export { getAiEnv, type AiEnv } from './env.js'
+export {
+  clearAiEnvOverrides,
+  getAiEnv,
+  setAiEnvOverride,
+  type AiEnv
+} from './env.js'
 export { AiError } from './errors.js'
-export { callModel } from './openrouter.js'
-export { embeddingsGenerate } from './embeddings.js'
+export {
+  callModel,
+  resetOpenRouterClientForTests,
+  setOpenRouterHttpClientForTests
+} from './openrouter.js'
+export {
+  embeddingsGenerate,
+  resetEmbeddingsClientForTests,
+  setEmbeddingsHttpClientForTests
+} from './embeddings.js'
 export {
   tracedCallModel,
   withAgentStep,

@@ -20,12 +20,12 @@ depends_on: []
 supersedes: []
 implements: null
 last_reviewed_at: 2026-03-28
-plan: "~/.codex/plans/2026-03-28-octospark-system-design-subsystem-split.md"
+plan: "~/.codex/plans/2026-03-28-system-design-subsystem-split.md"
 ---
 
 # Plan
 
-> Full plan: `~/.codex/plans/2026-03-28-octospark-system-design-subsystem-split.md`
+> Full plan: `~/.codex/plans/2026-03-28-system-design-subsystem-split.md`
 
 This PRD is the lightweight companion to `temporal-workflows-design`.
 It keeps the temporal workflows scope separately reviewable while the paired design doc remains the detailed technical source of truth.

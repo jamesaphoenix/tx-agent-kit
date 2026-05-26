@@ -9,12 +9,9 @@ cd "$PROJECT_ROOT"
 
 source "$SCRIPT_DIR/lib/lock.sh"
 
-if [[ -f ./.env ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source ./.env
-  set +a
-fi
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/source-env.sh"
+source_env "$PROJECT_ROOT/.env"
 
 DEV_CLOUDFLARE_TUNNEL_LOCK_DIR="${DEV_CLOUDFLARE_TUNNEL_LOCK_DIR:-/tmp/tx-agent-kit-dev-tunnel.lock}"
 DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS="${DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS:-120}"

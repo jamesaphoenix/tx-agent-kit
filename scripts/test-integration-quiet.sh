@@ -6,6 +6,47 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/run-silent.sh"
 
+cd "$PROJECT_ROOT"
+
+should_source_local_env() {
+  if [[ ! -f "$PROJECT_ROOT/.env" ]]; then
+    return 1
+  fi
+
+  if [[ "${CI:-}" == "true" && "${TX_SOURCE_ENV_IN_CI:-0}" != "1" ]]; then
+    echo "Skipping local .env sourcing in CI (set TX_SOURCE_ENV_IN_CI=1 to opt in)."
+    return 1
+  fi
+
+  return 0
+}
+
+source_local_env() {
+  if ! should_source_local_env; then
+    return 0
+  fi
+
+  # Match scripts/test/run-integration.sh and dev entrypoints: materialize
+  # op:// references before Vitest global setup starts shared services.
+  # CI already provides its integration env explicitly; sourcing a generated
+  # .env there can replace those values with unresolved op:// placeholders.
+  # shellcheck disable=SC1091
+  source "$PROJECT_ROOT/scripts/lib/source-env.sh"
+  source_env "$PROJECT_ROOT/.env"
+}
+
+source_generated_local_infra_env() {
+  local env_file="$PROJECT_ROOT/.artifacts/local-infra.env"
+  if [[ ! -f "$env_file" ]]; then
+    return 0
+  fi
+
+  set -a
+  # shellcheck disable=SC1090
+  source "$env_file"
+  set +a
+}
+
 FILTER=""
 REQUEST_SKIP_PGTAP="${INTEGRATION_SKIP_PGTAP:-}"
 REQUEST_DRY_RUN="${INTEGRATION_DRY_RUN:-}"
@@ -73,6 +114,14 @@ should_run_observability_preflight() {
 }
 touch_observability_marker() {
   touch "$OBSERVABILITY_MARKER" 2>/dev/null || true
+}
+print_observability_preflight_skip_reason() {
+  if [[ "${INTEGRATION_SKIP_OBSERVABILITY:-0}" == "1" ]]; then
+    echo "  SKIP observability infra health (INTEGRATION_SKIP_OBSERVABILITY=1)"
+    return
+  fi
+
+  echo "  SKIP observability infra health (marker <1h; set TX_FORCE_FRESH_OBSERVABILITY_PREFLIGHT=1 to force)"
 }
 
 ARGS=("$@")
@@ -143,10 +192,18 @@ fi
 PREFLIGHT_FAILED=0
 
 if [[ "${INTEGRATION_SKIP_INFRA_ENSURE:-0}" != "1" ]]; then
-  # Run infra ensure + temporal startup + observability check in parallel
-  # All three are independent health checks that poll different services
+  # Run infra ensure first so adopted/fallback Compose ports can be handed
+  # back to this runner before observability validation starts.
   run_silent "infra ensure" "pnpm infra:ensure" &
   INFRA_PID=$!
+
+  if ! wait "$INFRA_PID"; then
+    echo "  FAIL infra ensure"
+    PREFLIGHT_FAILED=1
+  fi
+
+  source_local_env
+  source_generated_local_infra_env
 
   if [[ "${TEMPORAL_RUNTIME_MODE:-cli}" == "cli" ]]; then
     run_silent "temporal cli ensure" "pnpm temporal:dev:up" &
@@ -159,14 +216,8 @@ if [[ "${INTEGRATION_SKIP_INFRA_ENSURE:-0}" != "1" ]]; then
     run_silent "observability infra health" "pnpm test:infra:observability" &
     OBSERVABILITY_PID=$!
   else
-    echo "  SKIP observability infra health (marker <1h; set TX_FORCE_FRESH_OBSERVABILITY_PREFLIGHT=1 to force)"
+    print_observability_preflight_skip_reason
     OBSERVABILITY_PID=""
-  fi
-
-  # Wait for all preflight checks
-  if ! wait "$INFRA_PID"; then
-    echo "  FAIL infra ensure"
-    PREFLIGHT_FAILED=1
   fi
 
   if [[ -n "$TEMPORAL_PID" ]] && ! wait "$TEMPORAL_PID"; then
@@ -189,6 +240,8 @@ if [[ "${INTEGRATION_SKIP_INFRA_ENSURE:-0}" != "1" ]]; then
   fi
 else
   echo "Skipping infra ensure bootstrap (INTEGRATION_SKIP_INFRA_ENSURE=1)"
+  source_local_env
+  source_generated_local_infra_env
 
   if should_run_observability_preflight; then
     echo "Observability health check remains mandatory."
@@ -198,7 +251,7 @@ else
     fi
     touch_observability_marker
   else
-    echo "  SKIP observability infra health (marker <1h; set TX_FORCE_FRESH_OBSERVABILITY_PREFLIGHT=1 to force)"
+    print_observability_preflight_skip_reason
   fi
 fi
 
@@ -328,9 +381,16 @@ echo "Integration tests completed in ${vitest_elapsed}s (budget: ${INTEGRATION_T
 # Check for actual test failures (not just vitest worker crashes).
 # Vitest can exit non-zero due to unhandled worker fork errors even when all tests pass.
 has_test_failures="$(sed 's/\x1b\[[0-9;]*m//g' "$vitest_output_file" | grep -cE '[0-9]+ failed' || true)"
+has_no_discovered_tests="$(sed 's/\x1b\[[0-9;]*m//g' "$vitest_output_file" | grep -cE 'Test Files[[:space:]]+no tests|Tests[[:space:]]+no tests' || true)"
 
 if [[ "$has_test_failures" -gt 0 ]]; then
   echo "Integration tests failed"
+  rm -f "$vitest_output_file"
+  exit 1
+fi
+
+if [[ "$has_no_discovered_tests" -gt 0 ]]; then
+  echo "Integration tests failed (no tests discovered)"
   rm -f "$vitest_output_file"
   exit 1
 fi

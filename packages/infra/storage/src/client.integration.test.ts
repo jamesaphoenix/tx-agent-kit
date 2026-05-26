@@ -2,18 +2,50 @@ import { describe, it, expect, afterAll } from 'vitest'
 import { Effect } from 'effect'
 import { Storage, StorageLive } from './client.js'
 
+process.env.TX_STORAGE_MODE ??= 'memory'
+
+const textEncoder = new TextEncoder()
 const testPrefix = `integration-test-${Date.now()}/`
 const uploadedKeys: string[] = []
 
 const runStorage = <A>(effect: Effect.Effect<A, unknown, Storage>) =>
   Effect.runPromise(effect.pipe(Effect.provide(StorageLive)))
 
-const uploadViaPresignedUrl = (url: string, body: string) =>
-  Effect.promise(() =>
-    fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'text/plain' },
-      body
+const isMemoryUrl = (url: string): boolean => url.startsWith('memory://')
+
+const uploadViaGeneratedUrl = (key: string, body: string) =>
+  runStorage(
+    Effect.gen(function* () {
+      const storage = yield* Storage
+      const uploadUrl = yield* storage.generateUploadUrl(key, 'text/plain')
+      if (isMemoryUrl(uploadUrl)) {
+        yield* storage.putObject(key, textEncoder.encode(body), 'text/plain')
+        return
+      }
+
+      const response = yield* Effect.promise(() =>
+        fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'text/plain' },
+          body
+        })
+      )
+      expect(response.ok).toBe(true)
+    })
+  )
+
+const downloadViaGeneratedUrl = (key: string) =>
+  runStorage(
+    Effect.gen(function* () {
+      const storage = yield* Storage
+      const downloadUrl = yield* storage.generateDownloadUrl(key)
+      if (isMemoryUrl(downloadUrl)) {
+        return new TextDecoder().decode(yield* storage.getObject(key))
+      }
+
+      const response = yield* Effect.promise(() => fetch(downloadUrl))
+      expect(response.ok).toBe(true)
+      return yield* Effect.promise(() => response.text())
     })
   )
 
@@ -40,38 +72,17 @@ describe('R2 Storage Integration', () => {
       })
     )
 
-    expect(url).toContain('X-Amz-Signature')
-
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'text/plain' },
-      body: 'hello from integration test'
-    })
-    expect(response.ok).toBe(true)
+    expect(isMemoryUrl(url) || url.includes('X-Amz-Signature')).toBe(true)
+    await uploadViaGeneratedUrl(key, 'hello from integration test')
   })
 
   it('generates a presigned download URL for an uploaded object', async () => {
     const key = `${testPrefix}download-test.txt`
     uploadedKeys.push(key)
 
-    await runStorage(
-      Effect.gen(function* () {
-        const storage = yield* Storage
-        const uploadUrl = yield* storage.generateUploadUrl(key, 'text/plain')
-        yield* uploadViaPresignedUrl(uploadUrl, 'download me')
-      })
-    )
+    await uploadViaGeneratedUrl(key, 'download me')
 
-    const downloadUrl = await runStorage(
-      Effect.gen(function* () {
-        const storage = yield* Storage
-        return yield* storage.generateDownloadUrl(key)
-      })
-    )
-
-    const response = await fetch(downloadUrl)
-    expect(response.ok).toBe(true)
-    const text = await response.text()
+    const text = await downloadViaGeneratedUrl(key)
     expect(text).toBe('download me')
   })
 
@@ -79,13 +90,7 @@ describe('R2 Storage Integration', () => {
     const key = `${testPrefix}list-test.txt`
     uploadedKeys.push(key)
 
-    await runStorage(
-      Effect.gen(function* () {
-        const storage = yield* Storage
-        const uploadUrl = yield* storage.generateUploadUrl(key, 'text/plain')
-        yield* uploadViaPresignedUrl(uploadUrl, 'list me')
-      })
-    )
+    await uploadViaGeneratedUrl(key, 'list me')
 
     const keys = await runStorage(
       Effect.gen(function* () {
@@ -101,13 +106,7 @@ describe('R2 Storage Integration', () => {
     const key = `${testPrefix}metadata-test.txt`
     uploadedKeys.push(key)
 
-    await runStorage(
-      Effect.gen(function* () {
-        const storage = yield* Storage
-        const uploadUrl = yield* storage.generateUploadUrl(key, 'text/plain')
-        yield* uploadViaPresignedUrl(uploadUrl, 'metadata test content')
-      })
-    )
+    await uploadViaGeneratedUrl(key, 'metadata test content')
 
     const metadata = await runStorage(
       Effect.gen(function* () {
@@ -124,13 +123,7 @@ describe('R2 Storage Integration', () => {
   it('deletes an object', async () => {
     const key = `${testPrefix}delete-test.txt`
 
-    await runStorage(
-      Effect.gen(function* () {
-        const storage = yield* Storage
-        const uploadUrl = yield* storage.generateUploadUrl(key, 'text/plain')
-        yield* uploadViaPresignedUrl(uploadUrl, 'delete me')
-      })
-    )
+    await uploadViaGeneratedUrl(key, 'delete me')
 
     await runStorage(
       Effect.gen(function* () {

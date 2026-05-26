@@ -90,9 +90,16 @@ const resolveSharedServer = (): { baseUrl: string; authSecret: string } | undefi
 }
 
 export const createDbAuthContext = (options: CreateDbAuthContextOptions): DbAuthContext => {
-  // Only use the shared server when the caller did NOT explicitly provide a port.
-  // Explicit port means the caller needs a dedicated server (e.g. different env vars).
-  const sharedServer = options.port === undefined ? resolveSharedServer() : undefined
+  const env = getTestkitEnv()
+  const workspaceSharedApiReady = env.TX_INTEGRATION_SHARED_API_READY === '1'
+  // Shared API reuse is opt-in unless the root Vitest workspace global setup
+  // started the shared API for this run. Tests that need an isolated API
+  // process should pass an explicit port and use the per-context harness.
+  const sharedServer =
+    options.port === undefined &&
+    (options.api?.reuseHealthyServer === true || workspaceSharedApiReady)
+      ? resolveSharedServer()
+      : undefined
 
   const testContext = createSqlTestContext(options.sql)
 

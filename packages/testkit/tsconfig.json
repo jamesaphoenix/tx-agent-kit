@@ -5,5 +5,9 @@
     "outDir": "dist"
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../contracts" }, { "path": "../infra/db" }]
+  "references": [
+    { "path": "../contracts" },
+    { "path": "../infra/db" },
+    { "path": "../infra/redis" }
+  ]
 }

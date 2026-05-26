@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { Context, Effect, Layer, Option } from 'effect'
 import { badRequest, conflict, notFound, unauthorized, type CoreError } from '../../../errors.js'
 import {
@@ -89,7 +89,7 @@ const buildSession = (
 ): Effect.Effect<
   AuthSession,
   CoreError,
-  AuthLoginSessionPort | AuthLoginRefreshTokenPort | SessionTokenPort
+  AuthLoginSessionPort | AuthLoginRefreshTokenPort | SessionTokenPort | AuthOrganizationMembershipPort
 > =>
   Effect.gen(function* () {
     const loginSessionPort = yield* AuthLoginSessionPort
@@ -122,12 +122,128 @@ const buildSession = (
       .issueForSession(createdSession.sessionId)
       .pipe(Effect.mapError((cause) => unauthorized('Failed to issue refresh token', cause)))
 
+    const principal = yield* buildPrincipalForUser(user, createdSession.sessionId)
+
     return {
       token,
       refreshToken: refresh.refreshToken,
-      user: toAuthUser(user)
+      user: toAuthUser(user),
+      principal
     }
   })
+
+const buildPrincipalForUser = (
+  user: AuthUserRecord,
+  sessionId: string
+): Effect.Effect<AuthPrincipal, CoreError, AuthOrganizationMembershipPort> =>
+  Effect.gen(function* () {
+    const membershipPort = yield* AuthOrganizationMembershipPort
+    const primaryMembershipOpt = yield* membershipPort.getPrimaryMembershipForUser(user.id).pipe(
+      Effect.mapError((cause) => unauthorized('Failed to load authenticated principal', cause))
+    )
+    const primaryMembership = Option.getOrUndefined(primaryMembershipOpt)
+
+    return toAuthPrincipal({
+      sub: user.id,
+      email: user.email,
+      sid: sessionId,
+      organizationId: primaryMembership?.organizationId,
+      role: primaryMembership?.role,
+      permissions: primaryMembership?.permissions ?? []
+    })
+  })
+
+const principalResolutionCacheTtlMs = 2000
+
+interface CachedPrincipalResolution {
+  principal: AuthPrincipal
+  expiresAtMs: number
+}
+
+const hashPrincipalCacheKey = (token: string): string =>
+  createHash('sha256').update(token, 'utf8').digest('base64url')
+
+const createPrincipalResolutionCache = () => {
+  const byTokenHash = new Map<string, CachedPrincipalResolution>()
+  const tokenHashesBySessionId = new Map<string, Set<string>>()
+  const tokenHashesByUserId = new Map<string, Set<string>>()
+
+  const removeTokenHash = (tokenHash: string): void => {
+    const cached = byTokenHash.get(tokenHash)
+    if (!cached) {
+      return
+    }
+
+    byTokenHash.delete(tokenHash)
+
+    const sessionId = cached.principal.sessionId
+    if (sessionId) {
+      const sessionHashes = tokenHashesBySessionId.get(sessionId)
+      sessionHashes?.delete(tokenHash)
+      if (sessionHashes?.size === 0) {
+        tokenHashesBySessionId.delete(sessionId)
+      }
+    }
+
+    const userHashes = tokenHashesByUserId.get(cached.principal.userId)
+    userHashes?.delete(tokenHash)
+    if (userHashes?.size === 0) {
+      tokenHashesByUserId.delete(cached.principal.userId)
+    }
+  }
+
+  return {
+    get: (token: string): AuthPrincipal | undefined => {
+      const tokenHash = hashPrincipalCacheKey(token)
+      const cached = byTokenHash.get(tokenHash)
+      if (!cached) {
+        return undefined
+      }
+
+      if (cached.expiresAtMs <= Date.now()) {
+        removeTokenHash(tokenHash)
+        return undefined
+      }
+
+      return cached.principal
+    },
+
+    set: (token: string, principal: AuthPrincipal): void => {
+      if (!principal.sessionId) {
+        return
+      }
+
+      const tokenHash = hashPrincipalCacheKey(token)
+      removeTokenHash(tokenHash)
+      byTokenHash.set(tokenHash, {
+        principal,
+        expiresAtMs: Date.now() + principalResolutionCacheTtlMs
+      })
+
+      const sessionHashes = tokenHashesBySessionId.get(principal.sessionId) ?? new Set<string>()
+      sessionHashes.add(tokenHash)
+      tokenHashesBySessionId.set(principal.sessionId, sessionHashes)
+
+      const userHashes = tokenHashesByUserId.get(principal.userId) ?? new Set<string>()
+      userHashes.add(tokenHash)
+      tokenHashesByUserId.set(principal.userId, userHashes)
+    },
+
+    invalidateSession: (sessionId: string): void => {
+      const tokenHashes = [...(tokenHashesBySessionId.get(sessionId) ?? [])]
+      for (const tokenHash of tokenHashes) {
+        removeTokenHash(tokenHash)
+      }
+    },
+
+    invalidateUser: (userId: string): void => {
+      const tokenHashes = [...(tokenHashesByUserId.get(userId) ?? [])]
+      for (const tokenHash of tokenHashes) {
+        removeTokenHash(tokenHash)
+      }
+    }
+  }
+}
 
 export class AuthService extends Context.Tag('AuthService')<
   AuthService,
@@ -138,7 +254,7 @@ export class AuthService extends Context.Tag('AuthService')<
     ) => Effect.Effect<
       AuthSession,
       CoreError,
-      AuthUsersPort | PasswordHasherPort | SessionTokenPort | AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthLoginAuditPort
+      AuthUsersPort | PasswordHasherPort | SessionTokenPort | AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthOrganizationMembershipPort | AuthLoginAuditPort
     >
     signIn: (
       input: SignInCommand,
@@ -146,14 +262,14 @@ export class AuthService extends Context.Tag('AuthService')<
     ) => Effect.Effect<
       AuthSession,
       CoreError,
-      AuthUsersPort | PasswordHasherPort | SessionTokenPort | AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthLoginAuditPort
+      AuthUsersPort | PasswordHasherPort | SessionTokenPort | AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthOrganizationMembershipPort | AuthLoginAuditPort
     >
     refreshSession: (
       input: RefreshSessionCommand
     ) => Effect.Effect<
       AuthSession,
       CoreError,
-      AuthUsersPort | SessionTokenPort | AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthLoginAuditPort
+      AuthUsersPort | SessionTokenPort | AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthOrganizationMembershipPort | AuthLoginAuditPort
     >
     signOutSession: (
       principal: AuthPrincipal
@@ -177,7 +293,7 @@ export class AuthService extends Context.Tag('AuthService')<
     ) => Effect.Effect<
       AuthSession,
       CoreError,
-      AuthUsersPort | PasswordHasherPort | SessionTokenPort | AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthLoginIdentityPort | GoogleOidcPort | AuthLoginAuditPort
+      AuthUsersPort | PasswordHasherPort | SessionTokenPort | AuthLoginSessionPort | AuthLoginRefreshTokenPort | AuthOrganizationMembershipPort | AuthLoginIdentityPort | GoogleOidcPort | AuthLoginAuditPort
     >
     requestPasswordReset: (
       input: ForgotPasswordCommand,
@@ -206,7 +322,10 @@ export class AuthService extends Context.Tag('AuthService')<
 
 export const AuthServiceLive = Layer.effect(
   AuthService,
-  Effect.succeed({
+  Effect.sync(() => {
+    const principalCache = createPrincipalResolutionCache()
+
+    return {
     signUp: (input, context = {}) =>
       Effect.gen(function* () {
         const usersPort = yield* AuthUsersPort
@@ -264,6 +383,9 @@ export const AuthServiceLive = Layer.effect(
         )
 
         const session = yield* buildSession(created, 'password', context)
+        if (session.principal) {
+          principalCache.set(session.token, session.principal)
+        }
 
         yield* recordAuditEvent({
           userId: created.id,
@@ -330,6 +452,9 @@ export const AuthServiceLive = Layer.effect(
         }
 
         const session = yield* buildSession(user, 'password', context)
+        if (session.principal) {
+          principalCache.set(session.token, session.principal)
+        }
 
         yield* recordAuditEvent({
           userId: user.id,
@@ -423,11 +548,15 @@ export const AuthServiceLive = Layer.effect(
           metadata: { sessionId: activeSession.sessionId }
         })
 
-        return {
+        const principal = yield* buildPrincipalForUser(user, activeSession.sessionId)
+        const session = {
           token,
           refreshToken: rotated.refreshToken,
-          user: toAuthUser(user)
+          user: toAuthUser(user),
+          principal
         }
+        principalCache.set(token, principal)
+        return session
       }),
 
     signOutSession: (principal) =>
@@ -446,6 +575,7 @@ export const AuthServiceLive = Layer.effect(
         yield* loginSessionPort.revokeById(principal.sessionId).pipe(
           Effect.mapError((cause) => badRequest('Failed to revoke session', cause))
         )
+        principalCache.invalidateSession(principal.sessionId)
 
         yield* recordAuditEvent({
           userId: principal.userId,
@@ -473,6 +603,7 @@ export const AuthServiceLive = Layer.effect(
         const revokedSessions = yield* loginSessionPort.revokeAllForUser(principal.userId).pipe(
           Effect.catchAll((_cause) => Effect.succeed(0))
         )
+        principalCache.invalidateUser(principal.userId)
 
         yield* recordAuditEvent({
           userId: principal.userId,
@@ -735,6 +866,7 @@ export const AuthServiceLive = Layer.effect(
         yield* loginSessionPort.revokeAllForUser(tokenPrincipal.userId).pipe(
           Effect.catchAll((_cause) => Effect.void)
         )
+        principalCache.invalidateUser(tokenPrincipal.userId)
 
         yield* recordAuditEvent({
           userId: tokenPrincipal.userId,
@@ -857,5 +989,6 @@ export const AuthServiceLive = Layer.effect(
 
         return { deleted: true as const }
       })
+    }
   })
 )

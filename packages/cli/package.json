@@ -1,0 +1,20 @@
+{
+  "name": "@tx-agent-kit/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b --force && chmod 755 dist/cli.js",
+    "type-check": "tsc -b --pretty false",
+    "lint": "eslint src --max-warnings=0",
+    "test": "pnpm --filter @tx-agent-kit/contracts build && vitest run -c vitest.config.ts"
+  },
+  "dependencies": {
+    "@tx-agent-kit/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@tx-agent-kit/vitest-config": "workspace:*"
+  }
+}

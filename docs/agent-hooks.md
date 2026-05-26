@@ -1,41 +1,80 @@
-# Agent test-budget hooks
+# Agent command hooks
 
-Block agents (Claude Code, Codex, anything else that drives Bash through a
-`PreToolUse` hook layer) from bumping `INTEGRATION_TIMEOUT_SECONDS=` to
-silence slow integration tests.
+Agent command hooks block shortcuts that bypass repository invariants before a
+Claude Code or Codex shell command runs.
 
-The harness budgets integration tests at **120 seconds locally** (300 in CI).
-Bumping the budget hides the actual problem — slow tests that should be
-refactored. Each individual integration test should land under ~5s and the
-full suite should land under ~90s wall-clock.
+Current hooks:
 
-The hook is enforced at the agent layer (per-tool, before execution) so a
-careless `INTEGRATION_TIMEOUT_SECONDS=180 pnpm test:integration:quiet` is
-rejected with a stderr message instead of silently extending the deadline.
+- `block-raw-git-worktree-add.sh` blocks raw `git worktree add` so agents use
+  `./scripts/worktree/create.sh`, which also runs `setup.sh` for env, ports,
+  task queue, and schema setup.
+- `block-integration-timeout-bump.sh` blocks `INTEGRATION_TIMEOUT_SECONDS=` so
+  agents cannot hide slow integration tests by raising the harness budget.
 
-**There is NO escape hatch.** The only way to make a slow run fit the
-budget is to refactor the slow tests so the suite fits inside it. If you
-need to debug a hang in a single file, use `pnpm vitest run <path>`
-directly — that bypasses the harness budget without touching this gate.
+## Raw Worktree Creation Hook
 
-## Shared shell script
+Raw `git worktree add` is blocked because it skips repository setup. The setup
+helper gives each worktree:
 
-Both Claude Code and Codex use the **same** PreToolUse JSON envelope
-(`hookSpecificOutput.permissionDecision: "deny"` with a
-`permissionDecisionReason`). Both wire the same shell script, so the
-rejection logic only lives in one place:
+- secrets seeded from the primary checkout `.env`
+- a deterministic `WORKTREE_PORT_OFFSET`
+- worktree-specific API, web, mobile, and worker ports
+- a worktree-specific `DATABASE_SCHEMA` and `DATABASE_URL`
+- a worktree-specific Temporal task queue
+- OTEL endpoint defaults
+- `run-migrations.sh` and `reset-worktree-schema.sh`
 
+Allowed:
+
+```bash
+./scripts/worktree/create.sh feat/my-feature main
+./scripts/worktree/setup.sh .worktrees/existing-feature
+git worktree list
+git worktree remove .worktrees/old-feature
 ```
+
+Blocked:
+
+```bash
+git worktree add .worktrees/my-feature main
+git -C /path/to/repo worktree add .worktrees/my-feature main
+```
+
+There is a recovery escape hatch only for unusual broken states:
+
+```bash
+ALLOW_RAW_GIT_WORKTREE_ADD=1 git worktree add .worktrees/recovery main
+```
+
+If that escape hatch is used, run `./scripts/worktree/setup.sh <path>`
+immediately afterwards.
+
+## Integration Test-Budget Hook
+
+Agents are blocked from bumping `INTEGRATION_TIMEOUT_SECONDS=` to silence slow
+integration tests.
+
+The harness budgets integration tests at 120 seconds locally and 300 seconds in
+CI. Bumping the budget hides slow tests that should be refactored. Use a direct
+single-file Vitest command for debugging a hang instead of changing the harness
+budget.
+
+There is no escape hatch for this hook.
+
+## Shared Shell Scripts
+
+Both Claude Code and Codex use the same PreToolUse JSON envelope:
+`hookSpecificOutput.permissionDecision: "deny"` with a
+`permissionDecisionReason`. Rejection logic lives in these scripts:
+
+```text
+.claude/hooks/block-raw-git-worktree-add.sh
 .claude/hooks/block-integration-timeout-bump.sh
 ```
 
-The script reads JSON from stdin, extracts `tool_input.command`, greps it
-for `INTEGRATION_TIMEOUT_SECONDS=` at a word boundary, and emits the deny
-envelope on a match.
+## Claude Code Wiring
 
-## Claude Code wiring
-
-Already enabled in this repo via `.claude/settings.json`:
+Enabled via `.claude/settings.json`:
 
 ```json
 {
@@ -59,12 +98,9 @@ Already enabled in this repo via `.claude/settings.json`:
 }
 ```
 
-Claude Code resolves `$CLAUDE_PROJECT_DIR` to the worktree root, so the
-script path works in every checkout without modification.
+## Codex Wiring
 
-## Codex wiring
-
-Already enabled in this repo via `.codex/hooks.json`:
+Enabled via `.codex/hooks.json`:
 
 ```json
 {
@@ -73,6 +109,11 @@ Already enabled in this repo via `.codex/hooks.json`:
       {
         "matcher": "Bash",
         "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/block-raw-git-worktree-add.sh",
+            "statusMessage": "Checking command for raw git worktree creation"
+          },
           {
             "type": "command",
             "command": "./.claude/hooks/block-integration-timeout-bump.sh",
@@ -85,58 +126,38 @@ Already enabled in this repo via `.codex/hooks.json`:
 }
 ```
 
-Codex hooks live at `~/.codex/hooks.json` (user-level) or
-`<repo>/.codex/hooks.json` (project-level). The project-level config in
-this repo applies whenever Codex runs from the worktree root. Codex
-resolves the relative `./` path against the cwd Codex was launched in.
+Codex resolves the relative `./` path against the cwd Codex was launched in.
 
-> Reference: <https://developers.openai.com/codex/hooks>
+## Manual Smoke Tests
 
-## Manual smoke tests
+Worktree hook:
 
 ```bash
-# Negative — passes through.
+echo '{"tool_name":"Bash","tool_input":{"command":"git worktree list"}}' \
+  | bash .claude/hooks/block-raw-git-worktree-add.sh
+
+echo '{"tool_name":"Bash","tool_input":{"command":"./scripts/worktree/create.sh feat/example main"}}' \
+  | bash .claude/hooks/block-raw-git-worktree-add.sh
+
+echo '{"tool_name":"Bash","tool_input":{"command":"git worktree add .worktrees/example main"}}' \
+  | bash .claude/hooks/block-raw-git-worktree-add.sh
+
+echo '{"tool_name":"Bash","tool_input":{"command":"git -C /tmp/repo worktree add .worktrees/example main"}}' \
+  | bash .claude/hooks/block-raw-git-worktree-add.sh
+```
+
+Integration timeout hook:
+
+```bash
 echo '{"tool_name":"Bash","tool_input":{"command":"pnpm test:integration:quiet api"}}' \
   | bash .claude/hooks/block-integration-timeout-bump.sh
 
-# Positive — rejected with the long error message.
 echo '{"tool_name":"Bash","tool_input":{"command":"INTEGRATION_TIMEOUT_SECONDS=180 pnpm test"}}' \
   | bash .claude/hooks/block-integration-timeout-bump.sh
 
-# Positive — also rejected even when the env var sits mid-command.
 echo '{"tool_name":"Bash","tool_input":{"command":"CI=true INTEGRATION_TIMEOUT_SECONDS=300 ./scripts/test-integration-quiet.sh"}}' \
   | bash .claude/hooks/block-integration-timeout-bump.sh
 ```
 
-All three should exit `0` — the JSON `permissionDecision` field carries
-the allow/deny verdict to the agent, not the shell exit code.
-
-## Why this matters
-
-Two things are true at once:
-
-1. The harness runner already prints `Slow tests detected: SLOW (Xms): test name` on
-   every run, so the offenders are already named.
-2. Agents under autonomous loops have no incentive to fix slow tests on
-   their own — the path of least resistance is "bump the env var until the
-   thing passes." That's how a 60s test suite turns into a 300s test
-   suite turns into a flake-tolerant `--retry 3` test suite over a
-   quarter.
-
-The hook closes the easy escape and forces the agent to read the slow-test
-output and act on it. Strict mode (no opt-out) is intentional: every agent
-that hits this gate must do the actual refactor work, not the easy
-sidestep.
-
-## Adding a new agent
-
-If you wire up another autonomous agent (Cursor, Aider, Continue, or your
-own MCP-driven loop) and it has its own pre-command hook system:
-
-1. Point its hook at the same `.claude/hooks/block-integration-timeout-bump.sh`
-   script. The deny-envelope JSON is the de-facto standard for both
-   Claude Code and Codex; if your agent uses a different envelope shape,
-   write a thin shim in your hook config that translates it.
-2. If the agent doesn't support hooks, document the constraint in its
-   project README so humans review its commands. There's no enforcement
-   layer left if the agent can't be intercepted.
+The shell exit code is `0` for hook handling; the JSON `permissionDecision`
+field carries the allow or deny verdict to the agent.

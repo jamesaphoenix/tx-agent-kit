@@ -1,7 +1,8 @@
 'use client'
 
-import type { OrgMemberRole, PermissionAction } from '@tx-agent-kit/contracts'
+import type { AuthPrincipal, OrgMemberRole, PermissionAction } from '@tx-agent-kit/contracts'
 import { usePermissionsGetPermissionMap, usePermissionsGetMyPermissions } from '@/lib/api/generated/permissions/permissions'
+import type { PermissionsGetMyPermissions200 } from '@/lib/api/generated/schemas/permissionsGetMyPermissions200'
 import { hasAnyPermission, hasPermission } from '@/lib/permissions'
 import { useCurrentPrincipal } from './use-session-store'
 
@@ -14,13 +15,29 @@ export interface MyPermissionsResult {
 export const usePermissionMap = () =>
   usePermissionsGetPermissionMap({ query: { staleTime: 60_000 } })
 
+const principalPermissionsInitialData = (principal: AuthPrincipal | null): PermissionsGetMyPermissions200 | undefined => {
+  if (principal === null) {
+    return undefined
+  }
+
+  const role = principal.roles[0]
+  return {
+    ...(principal.organizationId ? { organizationId: principal.organizationId } : {}),
+    ...(role ? { role } : {}),
+    isOwner: false,
+    permissions: [...principal.permissions]
+  }
+}
+
 export const useMyPermissions = () => {
   const principal = useCurrentPrincipal()
+  const initialData = principalPermissionsInitialData(principal)
 
-  return usePermissionsGetMyPermissions({
+  return usePermissionsGetMyPermissions<PermissionsGetMyPermissions200 | undefined>({
     query: {
       enabled: principal !== null,
-      staleTime: 15_000
+      staleTime: 15_000,
+      ...(initialData ? { initialData } : {})
     }
   })
 }

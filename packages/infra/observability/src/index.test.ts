@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReadableSpan } from '@opentelemetry/sdk-trace-base'
 import type { ObservabilityEnv } from './env.js'
 import { nodeServiceStartupMetricName } from './metrics-registry.js'
 
@@ -53,7 +54,17 @@ const isDefaultExportSpanMock = vi.fn(() => true)
 const getObservabilityEnvMock = vi.fn<() => ObservabilityEnv>(() => ({
   OTEL_LOG_LEVEL: 'debug',
   OTEL_EXPORTER_OTLP_ENDPOINT: 'http://otel.example:4318',
+  OTEL_EXPORTER_OTLP_HEADERS: {
+    Authorization: 'Bearer otlp-token',
+    'x-scope': 'staging'
+  },
   OTEL_LOGS_EXPORTER: 'otlp',
+  OTEL_RESOURCE_ATTRIBUTES: {
+    'service.namespace': 'tx-agent-kit',
+    'cloud.region': 'europe-west3',
+    'service.name': 'should-be-overridden',
+    'deployment.environment.name': 'should-also-be-overridden'
+  },
   NODE_ENV: 'staging',
   LANGFUSE: {
     enabled: false,
@@ -81,10 +92,28 @@ interface NodeSdkOptionsForTest {
   spanProcessors?: readonly unknown[]
 }
 
+interface InstrumentationScopeForTest {
+  readonly name: string
+  readonly version?: string
+  readonly schemaUrl?: string
+}
+
+const batchSpanProcessorForceFlushMock = vi.fn(() => Promise.resolve(undefined))
+const batchSpanProcessorOnStartMock = vi.fn()
+const batchSpanProcessorOnEndingMock = vi.fn()
+const batchSpanProcessorOnEndMock = vi.fn()
+const batchSpanProcessorShutdownMock = vi.fn(() => Promise.resolve(undefined))
 const batchSpanProcessorConstructorMock = vi.fn(function MockBatchSpanProcessor(
   exporter: unknown
 ) {
-  return { exporter }
+  return {
+    exporter,
+    forceFlush: batchSpanProcessorForceFlushMock,
+    onStart: batchSpanProcessorOnStartMock,
+    onEnding: batchSpanProcessorOnEndingMock,
+    onEnd: batchSpanProcessorOnEndMock,
+    shutdown: batchSpanProcessorShutdownMock
+  }
 })
 
 vi.mock('@opentelemetry/api', () => ({
@@ -159,17 +188,29 @@ describe('telemetry lifecycle', () => {
     expect(getObservabilityEnvMock).toHaveBeenCalledTimes(1)
 
     expect(otlpTraceExporterConstructorMock).toHaveBeenCalledWith({
-      url: 'http://otel.example:4318/v1/traces'
+      url: 'http://otel.example:4318/v1/traces',
+      headers: {
+        Authorization: 'Bearer otlp-token',
+        'x-scope': 'staging'
+      }
     })
 
     expect(otlpLogExporterConstructorMock).toHaveBeenCalledWith({
-      url: 'http://otel.example:4318/v1/logs'
+      url: 'http://otel.example:4318/v1/logs',
+      headers: {
+        Authorization: 'Bearer otlp-token',
+        'x-scope': 'staging'
+      }
     })
 
     expect(batchLogRecordProcessorConstructorMock).toHaveBeenCalledTimes(1)
 
     expect(otlpMetricExporterConstructorMock).toHaveBeenCalledWith({
-      url: 'http://otel.example:4318/v1/metrics'
+      url: 'http://otel.example:4318/v1/metrics',
+      headers: {
+        Authorization: 'Bearer otlp-token',
+        'x-scope': 'staging'
+      }
     })
 
     expect(metricReaderConstructorMock).toHaveBeenCalledWith(
@@ -180,6 +221,8 @@ describe('telemetry lifecycle', () => {
 
     expect(resourceFromAttributesMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        'service.namespace': 'tx-agent-kit',
+        'cloud.region': 'europe-west3',
         'service.name': 'tx-agent-kit-test-service',
         'deployment.environment.name': 'staging'
       })
@@ -217,7 +260,9 @@ describe('telemetry lifecycle', () => {
     getObservabilityEnvMock.mockReturnValueOnce({
       OTEL_LOG_LEVEL: 'info',
       OTEL_EXPORTER_OTLP_ENDPOINT: 'http://otel.example:4318',
+      OTEL_EXPORTER_OTLP_HEADERS: {},
       OTEL_LOGS_EXPORTER: 'none',
+      OTEL_RESOURCE_ATTRIBUTES: {},
       NODE_ENV: 'staging',
       LANGFUSE: {
         enabled: false,
@@ -245,7 +290,9 @@ describe('telemetry lifecycle', () => {
     getObservabilityEnvMock.mockReturnValueOnce({
       OTEL_LOG_LEVEL: 'info',
       OTEL_EXPORTER_OTLP_ENDPOINT: 'http://otel.example:4318',
+      OTEL_EXPORTER_OTLP_HEADERS: {},
       OTEL_LOGS_EXPORTER: 'none',
+      OTEL_RESOURCE_ATTRIBUTES: {},
       NODE_ENV: 'staging',
       LANGFUSE: {
         enabled: true,
@@ -283,6 +330,95 @@ describe('telemetry lifecycle', () => {
     expect(nodeSdkOptions?.spanProcessors).toHaveLength(2)
 
     await telemetryModule.stopTelemetry()
+  })
+
+  it('exposes reusable OTLP trace processor and resource helpers for Temporal workflow sinks', async () => {
+    const telemetryModule = await import('./index.js')
+
+    const resource = telemetryModule.makeTelemetryResource('tx-agent-kit-worker')
+    const spanProcessor = telemetryModule.makeOtlpTraceSpanProcessor()
+
+    expect(resource).toEqual(
+      expect.objectContaining({
+        'service.namespace': 'tx-agent-kit',
+        'cloud.region': 'europe-west3',
+        'service.name': 'tx-agent-kit-worker',
+        'deployment.environment.name': 'staging'
+      })
+    )
+    expect(otlpTraceExporterConstructorMock).toHaveBeenCalledWith({
+      url: 'http://otel.example:4318/v1/traces',
+      headers: {
+        Authorization: 'Bearer otlp-token',
+        'x-scope': 'staging'
+      }
+    })
+    expect(batchSpanProcessorConstructorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: {
+          url: 'http://otel.example:4318/v1/traces',
+          headers: {
+            Authorization: 'Bearer otlp-token',
+            'x-scope': 'staging'
+          }
+        }
+      })
+    )
+    await spanProcessor.forceFlush()
+    expect(batchSpanProcessorForceFlushMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('normalizes legacy Temporal workflow spans before OTLP export', async () => {
+    const telemetryModule = await import('./index.js')
+
+    const spanProcessor = telemetryModule.makeOtlpTraceSpanProcessor()
+    const temporalReadableSpan = {
+      name: 'RunWorkflow:billingWorkflow',
+      instrumentationLibrary: {
+        name: '@temporalio/interceptor-workflow',
+        version: '1.17.1'
+      }
+    } as unknown as ReadableSpan
+
+    spanProcessor.onEnd(temporalReadableSpan)
+
+    expect(batchSpanProcessorOnEndMock).toHaveBeenCalledTimes(1)
+    const normalizedSpan = batchSpanProcessorOnEndMock.mock.calls[0]?.[0] as
+      | (ReadableSpan & {
+          readonly instrumentationScope?: InstrumentationScopeForTest
+          readonly instrumentationLibrary?: InstrumentationScopeForTest
+        })
+      | undefined
+
+    expect(normalizedSpan).toBeDefined()
+    expect(normalizedSpan).not.toBe(temporalReadableSpan)
+    expect(normalizedSpan?.instrumentationScope).toEqual({
+      name: '@temporalio/interceptor-workflow',
+      version: '1.17.1'
+    })
+    expect(normalizedSpan?.instrumentationLibrary).toEqual({
+      name: '@temporalio/interceptor-workflow',
+      version: '1.17.1'
+    })
+    await expect(spanProcessor.shutdown()).resolves.toBeUndefined()
+  })
+
+  it('passes modern OpenTelemetry spans through without cloning', async () => {
+    const telemetryModule = await import('./index.js')
+
+    const spanProcessor = telemetryModule.makeOtlpTraceSpanProcessor()
+    const readableSpan = {
+      name: 'GET /v1/me',
+      instrumentationScope: {
+        name: '@opentelemetry/instrumentation-http',
+        version: '0.218.0'
+      }
+    } as unknown as ReadableSpan
+
+    spanProcessor.onEnd(readableSpan)
+
+    expect(batchSpanProcessorOnEndMock).toHaveBeenCalledTimes(1)
+    expect(batchSpanProcessorOnEndMock.mock.calls[0]?.[0]).toBe(readableSpan)
   })
 
   it('emits a smoke span and counter using global tracer and meter', async () => {

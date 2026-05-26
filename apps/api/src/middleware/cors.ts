@@ -22,7 +22,14 @@ export const getCorsConfig = () => {
   return {
     allowedOrigins,
     allowedMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'] as const,
-    allowedHeaders: ['Content-Type', 'Authorization', browserAuthSessionModeHeaderName],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      browserAuthSessionModeHeaderName,
+      'traceparent',
+      'tracestate'
+    ],
+    exposedHeaders: ['server-timing', 'x-request-duration-ms'],
     credentials: originEnv !== '*',
     maxAge: 3600
   }

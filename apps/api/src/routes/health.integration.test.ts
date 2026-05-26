@@ -11,8 +11,13 @@ import {
 } from './test-helpers.js'
 
 const uid = randomUUID().slice(0, 8)
+const apiPort = Number.parseInt(
+  process.env.API_INTEGRATION_TEST_PORT_HEALTH ?? '4105',
+  10
+)
 
 const { dbAuthContext, request } = createTestFixture({
+  apiPort,
   schemaPrefix: 'api_infra'
 })
 
@@ -29,6 +34,8 @@ describe('api infra integration', () => {
     expect(health.body.status).toBe('healthy')
     expect(health.body.service).toBe('tx-agent-kit-api')
     expect(health.body.timestamp).toBeTruthy()
+    expect(health.response.headers.get('server-timing')).toMatch(/^app;dur=\d+\.\d$/)
+    expect(Number(health.response.headers.get('x-request-duration-ms'))).toBeGreaterThanOrEqual(0)
     expect(durationMs).toBeLessThan(healthReadinessLatencyBudgetMs)
   })
 
@@ -85,13 +92,19 @@ describe('api infra integration', () => {
       headers: {
         origin: 'http://localhost:3000',
         'access-control-request-method': 'POST',
-        'access-control-request-headers': `content-type,authorization,${browserAuthSessionModeHeaderName}`,
+        'access-control-request-headers': `content-type,authorization,${browserAuthSessionModeHeaderName},traceparent,tracestate`,
         ...dbAuthContext.testContext.headersForCase('cors-allowed-preflight')
       }
     })
 
     const allowedOriginHeader = allowedPreflight.headers.get('access-control-allow-origin')
+    const allowedHeaders = allowedPreflight.headers.get('access-control-allow-headers')
+    const exposedHeaders = allowedPreflight.headers.get('access-control-expose-headers')
     expect(allowedOriginHeader).toBe('http://localhost:3000')
+    expect(allowedHeaders).toContain('traceparent')
+    expect(allowedHeaders).toContain('tracestate')
+    expect(exposedHeaders).toContain('server-timing')
+    expect(exposedHeaders).toContain('x-request-duration-ms')
 
     const disallowedPreflight = await fetch(`${dbAuthContext.baseUrl}/v1/auth/sign-in`, {
       method: 'OPTIONS',
