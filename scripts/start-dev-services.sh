@@ -30,7 +30,11 @@ LANGFUSE_MINIO_CONSOLE_PORT_PROVIDED="${LANGFUSE_MINIO_CONSOLE_PORT+x}"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/source-env.sh"
-source_env "$PROJECT_ROOT/.env"
+if [[ "${CI:-}" == "true" && "${TX_SOURCE_ENV_IN_CI:-0}" != "1" ]]; then
+  echo "Skipping local .env sourcing in CI (set TX_SOURCE_ENV_IN_CI=1 to opt in)."
+else
+  source_env "$PROJECT_ROOT/.env"
+fi
 
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-tx-agent-kit}"
 OTEL_GRPC_PORT="${OTEL_GRPC_PORT:-4319}"

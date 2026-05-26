@@ -1,6 +1,6 @@
 # Octospark Infra Portability Migration Report
 
-Status: local implementation validated; push/CI evidence pending
+Status: local implementation validated; CI follow-up fix pending push
 Last updated: 2026-05-26
 
 ## What Was Ported
@@ -34,10 +34,12 @@ Last updated: 2026-05-26
 - Generated OpenAPI/Orval clients were refreshed with `pnpm api:client:generate`; agent surfaces rechecked clean after generation.
 - Product-leak/plaintext-secret scanner passed in both standalone and invariant-gate runs.
 - `git diff --check` and progress JSON parsing passed after the latest updates.
+- CI env-source follow-up passed locally: `bash -n scripts/start-dev-services.sh scripts/test/run-integration.sh`, `pnpm lint:shell`, and `CI=true TX_SOURCE_ENV_IN_CI=0 pnpm infra:ensure`.
+- The CI-mode infra check skipped local `.env` sourcing, reproducing the fixed GitHub Actions boundary where `.env` contains `op://` refs but `op` is not on PATH.
 
 ## Remaining Risks
 
-- CI workflow proof is still pending until the branch is pushed and GitHub Actions run.
+- The first post-push GitHub Actions integration run failed during `Ensure infrastructure` because `.env` contains `op://` refs and `op` is not on PATH; the CI env-source guard is locally validated and needs a post-fix rerun after push.
 - Deployment changes are locally validated but not proven by a real tx-agent-kit staging release run yet.
 - The overlay/rebaseline path remains documentation-only; using it still requires a separate product-leak-gated approval and isolated branch.
 - jscpd still reports existing clone candidates below the configured failure threshold; no new blocking duplication remains.

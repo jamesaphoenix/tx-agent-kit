@@ -14,6 +14,11 @@ source_local_env() {
     return 0
   fi
 
+  if [[ "${CI:-}" == "true" && "${TX_SOURCE_ENV_IN_CI:-0}" != "1" ]]; then
+    echo "Skipping local .env sourcing in CI (set TX_SOURCE_ENV_IN_CI=1 to opt in)."
+    return 0
+  fi
+
   # shellcheck disable=SC1091
   source "$PROJECT_ROOT/scripts/lib/source-env.sh"
   source_env "$PROJECT_ROOT/.env"
