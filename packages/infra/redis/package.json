@@ -17,7 +17,7 @@
     "rate-limiter-flexible": "^11.1.0"
   },
   "devDependencies": {
-    "@opentelemetry/sdk-trace-base": "^2.6.1",
+    "@opentelemetry/sdk-trace-base": "^2.7.1",
     "@tx-agent-kit/vitest-config": "workspace:*"
   }
 }
