@@ -6,7 +6,7 @@
   "source_repo": "/Users/jamesaphoenix/Desktop/projects/just-understanding-data/octospark",
   "created_at": "2026-05-23",
   "last_updated": "2026-05-26",
-  "status": "local_validation_complete_ci_race_fix_ready_to_push",
+  "status": "validated_pushed_ci_passed",
   "approval_gate": {
     "phase": "implementation_approved",
     "inventory_path": "../octospark/docs/goals/octospark-infra-portability.inventory.json",
@@ -570,9 +570,7 @@
     ]
   },
   "blockers": [
-    "Deployment changes require real target staging/workflow evidence after local validation is clean.",
-    "GitHub Actions run 26425929409 passed the previous CI env-source failure boundary and then exposed a real auto-recharge parallel idempotency race.",
-    "The post-lock auto-recharge race fix is locally validated and needs a post-fix GitHub Actions rerun after push."
+    "Deployment changes require real target staging/workflow evidence after local validation is clean."
   ],
   "notes": [
     "DB connection hardening slice has been ported and locally validated.",
@@ -593,6 +591,7 @@
     "First post-push tx-agent-kit GitHub Actions integration run failed in Ensure infrastructure because .env contains op:// refs and op was not on PATH.",
     "CI-mode infra startup now skips local .env sourcing unless TX_SOURCE_ENV_IN_CI=1; local CI-mode pnpm infra:ensure passed.",
     "GitHub Actions run 26425929409 passed Ensure infrastructure and failed later on billing-activities.integration.test.ts:801, proving the original op:// CI failure was fixed.",
-    "Auto-recharge now rechecks that the attempt is still pending after acquiring the advisory lock, preventing stale concurrent workers from calling Stripe after another worker terminalizes the attempt."
+    "Auto-recharge now rechecks that the attempt is still pending after acquiring the advisory lock, preventing stale concurrent workers from calling Stripe after another worker terminalizes the attempt.",
+    "GitHub Actions integration run 26426342111 passed end to end in 10m04s after the env-source and auto-recharge race fixes."
   ]
 }

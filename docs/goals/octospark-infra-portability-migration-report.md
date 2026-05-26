@@ -1,6 +1,6 @@
 # Octospark Infra Portability Migration Report
 
-Status: local implementation validated; CI race fix pending push
+Status: validated locally and in GitHub Actions
 Last updated: 2026-05-26
 
 ## What Was Ported
@@ -40,10 +40,10 @@ Last updated: 2026-05-26
 - Ported a post-advisory-lock attempt-state recheck so stale concurrent workers skip a terminalized auto-recharge attempt before calling Stripe.
 - Focused regression passed: `TX_FORCE_FRESH_INTEGRATION_SETUP=1 INTEGRATION_TEST_TIMEOUT_MS=60000 pnpm --dir apps/worker exec vitest run src/billing-activities.integration.test.ts -c vitest.integration.config.ts -t "parallel invocation"`.
 - Full local real-infra integration passed again after the race fix: 119 passed files / 741 passed tests in 70s under the 120s local budget.
+- GitHub Actions integration run `26426342111` passed end to end in 10m04s, including build, infra startup, integration suites, pgTAP, and Temporal integration.
 
 ## Remaining Risks
 
-- Post-fix GitHub Actions proof is pending after push; the previous run proved the env-source fix by passing `Ensure infrastructure` but failed on the now-fixed auto-recharge race.
 - Deployment changes are locally validated but not proven by a real tx-agent-kit staging release run yet.
 - The overlay/rebaseline path remains documentation-only; using it still requires a separate product-leak-gated approval and isolated branch.
 - jscpd still reports existing clone candidates below the configured failure threshold; no new blocking duplication remains.
