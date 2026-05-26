@@ -1,6 +1,6 @@
 # Octospark Infra Portability Migration Report
 
-Status: local implementation validated; CI follow-up fix pending push
+Status: local implementation validated; CI race fix pending push
 Last updated: 2026-05-26
 
 ## What Was Ported
@@ -36,10 +36,14 @@ Last updated: 2026-05-26
 - `git diff --check` and progress JSON parsing passed after the latest updates.
 - CI env-source follow-up passed locally: `bash -n scripts/start-dev-services.sh scripts/test/run-integration.sh`, `pnpm lint:shell`, and `CI=true TX_SOURCE_ENV_IN_CI=0 pnpm infra:ensure`.
 - The CI-mode infra check skipped local `.env` sourcing, reproducing the fixed GitHub Actions boundary where `.env` contains `op://` refs but `op` is not on PATH.
+- GitHub Actions run `26425929409` passed the prior `Ensure infrastructure` failure boundary, then exposed a real auto-recharge race in `billing-activities.integration.test.ts`.
+- Ported a post-advisory-lock attempt-state recheck so stale concurrent workers skip a terminalized auto-recharge attempt before calling Stripe.
+- Focused regression passed: `TX_FORCE_FRESH_INTEGRATION_SETUP=1 INTEGRATION_TEST_TIMEOUT_MS=60000 pnpm --dir apps/worker exec vitest run src/billing-activities.integration.test.ts -c vitest.integration.config.ts -t "parallel invocation"`.
+- Full local real-infra integration passed again after the race fix: 119 passed files / 741 passed tests in 70s under the 120s local budget.
 
 ## Remaining Risks
 
-- The first post-push GitHub Actions integration run failed during `Ensure infrastructure` because `.env` contains `op://` refs and `op` is not on PATH; the CI env-source guard is locally validated and needs a post-fix rerun after push.
+- Post-fix GitHub Actions proof is pending after push; the previous run proved the env-source fix by passing `Ensure infrastructure` but failed on the now-fixed auto-recharge race.
 - Deployment changes are locally validated but not proven by a real tx-agent-kit staging release run yet.
 - The overlay/rebaseline path remains documentation-only; using it still requires a separate product-leak-gated approval and isolated branch.
 - jscpd still reports existing clone candidates below the configured failure threshold; no new blocking duplication remains.

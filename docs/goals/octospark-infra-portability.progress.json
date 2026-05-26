@@ -6,7 +6,7 @@
   "source_repo": "/Users/jamesaphoenix/Desktop/projects/just-understanding-data/octospark",
   "created_at": "2026-05-23",
   "last_updated": "2026-05-26",
-  "status": "local_validation_complete_ci_followup_ready_to_push",
+  "status": "local_validation_complete_ci_race_fix_ready_to_push",
   "approval_gate": {
     "phase": "implementation_approved",
     "inventory_path": "../octospark/docs/goals/octospark-infra-portability.inventory.json",
@@ -548,12 +548,13 @@
       "TX_FORCE_FRESH_INTEGRATION_SETUP=1 INTEGRATION_MAX_WORKERS=6 INTEGRATION_TEST_TIMEOUT_MS=60000 pnpm test:integration:quiet",
       "bash -n scripts/start-dev-services.sh scripts/test/run-integration.sh",
       "pnpm lint:shell",
-      "CI=true TX_SOURCE_ENV_IN_CI=0 pnpm infra:ensure"
+      "CI=true TX_SOURCE_ENV_IN_CI=0 pnpm infra:ensure",
+      "TX_FORCE_FRESH_INTEGRATION_SETUP=1 INTEGRATION_TEST_TIMEOUT_MS=60000 pnpm --dir apps/worker exec vitest run src/billing-activities.integration.test.ts -c vitest.integration.config.ts -t \"parallel invocation\""
     ],
     "integration_result": {
       "test_files": "119 passed | 2 skipped",
       "tests": "741 passed | 20 skipped",
-      "duration_seconds": 77,
+      "duration_seconds": 70,
       "budget_seconds": 120
     },
     "focused_revalidations": [
@@ -564,13 +565,14 @@
       "pnpm --filter @tx-agent-kit/web type-check && pnpm --filter @tx-agent-kit/mobile type-check && pnpm --filter @tx-agent-kit/testkit type-check",
       "pnpm exec eslint scripts/test/vitest-global-setup.ts --max-warnings=0",
       "TX_FORCE_FRESH_INTEGRATION_SETUP=1 INTEGRATION_MAX_WORKERS=6 INTEGRATION_TEST_TIMEOUT_MS=60000 pnpm exec vitest run -c vitest.integration.workspace.ts \"apps/web/app/(application)/org/[orgId]/members/page.integration.test.tsx\"",
-      "CI=true TX_SOURCE_ENV_IN_CI=0 pnpm infra:ensure skipped local .env sourcing and reused healthy shared infra"
+      "CI=true TX_SOURCE_ENV_IN_CI=0 pnpm infra:ensure skipped local .env sourcing and reused healthy shared infra",
+      "TX_FORCE_FRESH_INTEGRATION_SETUP=1 INTEGRATION_TEST_TIMEOUT_MS=60000 pnpm --dir apps/worker exec vitest run src/billing-activities.integration.test.ts -c vitest.integration.config.ts -t \"parallel invocation\""
     ]
   },
   "blockers": [
     "Deployment changes require real target staging/workflow evidence after local validation is clean.",
-    "The first post-push GitHub Actions integration run failed during infrastructure startup because unresolved op:// references were sourced without op on PATH.",
-    "The CI env-source guard is locally validated and needs a post-fix GitHub Actions rerun after push."
+    "GitHub Actions run 26425929409 passed the previous CI env-source failure boundary and then exposed a real auto-recharge parallel idempotency race.",
+    "The post-lock auto-recharge race fix is locally validated and needs a post-fix GitHub Actions rerun after push."
   ],
   "notes": [
     "DB connection hardening slice has been ported and locally validated.",
@@ -589,6 +591,8 @@
     "Full local broad gates and real-infra integration are passing under budget as of 2026-05-26.",
     "OpenAPI/Orval clients and agent client surfaces were regenerated or rechecked after validation.",
     "First post-push tx-agent-kit GitHub Actions integration run failed in Ensure infrastructure because .env contains op:// refs and op was not on PATH.",
-    "CI-mode infra startup now skips local .env sourcing unless TX_SOURCE_ENV_IN_CI=1; local CI-mode pnpm infra:ensure passed."
+    "CI-mode infra startup now skips local .env sourcing unless TX_SOURCE_ENV_IN_CI=1; local CI-mode pnpm infra:ensure passed.",
+    "GitHub Actions run 26425929409 passed Ensure infrastructure and failed later on billing-activities.integration.test.ts:801, proving the original op:// CI failure was fixed.",
+    "Auto-recharge now rechecks that the attempt is still pending after acquiring the advisory lock, preventing stale concurrent workers from calling Stripe after another worker terminalizes the attempt."
   ]
 }

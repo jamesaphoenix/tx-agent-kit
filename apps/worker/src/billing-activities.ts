@@ -228,17 +228,28 @@ const runAutoRechargeTrigger = async (
     return
   }
 
-  const chargeAttemptId = attemptId
-  const program = Effect.gen(function* () {
-    const billingService = yield* BillingService
-    return yield* billingService.chargeAutoRecharge({
-      organizationId: orgId,
-      attemptId: chargeAttemptId,
-      amountDecimillicents: amount
-    })
-  }).pipe(Effect.provide(BillingServiceRuntimeLive))
-
   try {
+    const lockedAttempt = await runEffect(autoRechargeAttemptsRepository.findById(attemptId))
+    if (Option.isNone(lockedAttempt) || lockedAttempt.value.status !== 'pending') {
+      logger.info('Auto-recharge trigger skipped: attempt is no longer pending after lock acquisition.', {
+        orgId,
+        attemptId,
+        status: Option.isSome(lockedAttempt) ? lockedAttempt.value.status : 'missing'
+      })
+      return
+    }
+
+    isRetry = lockedAttempt.value.retriedFromAttemptId !== null
+    const chargeAttemptId = attemptId
+    const program = Effect.gen(function* () {
+      const billingService = yield* BillingService
+      return yield* billingService.chargeAutoRecharge({
+        organizationId: orgId,
+        attemptId: chargeAttemptId,
+        amountDecimillicents: amount
+      })
+    }).pipe(Effect.provide(BillingServiceRuntimeLive))
+
     const result = await Effect.runPromise(
       program.pipe(
         Effect.mapError((e) => {

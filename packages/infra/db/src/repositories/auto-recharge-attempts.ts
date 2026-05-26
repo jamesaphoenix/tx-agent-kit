@@ -86,6 +86,20 @@ export const autoRechargeAttemptsRepository = {
       })
     ),
 
+  findById: (attemptId: string) =>
+    withDb('Failed to find auto recharge attempt', (db) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select()
+          .from(autoRechargeAttempts)
+          .where(eq(autoRechargeAttempts.id, attemptId))
+          .limit(1)
+          .execute()
+
+        return yield* decodeFirst(rows, decodeAutoRechargeAttempt)
+      })
+    ),
+
   findLatestRequiresActionChallenge: (organizationId: string) =>
     withDb('Failed to find latest auto recharge requires_action challenge', (db) =>
       Effect.gen(function* () {
