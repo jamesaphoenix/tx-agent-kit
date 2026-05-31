@@ -6,6 +6,44 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  # Per-container CPU/RAM usage. Reads the host Docker socket (mounted read-only).
+  # `container_labels_sanitization` rewrites Docker label keys into valid
+  # Prometheus/OTel attribute names. We enable only the two ratio gauges the
+  # dashboards use (CPU% + memory%). Usage-only: no memory limits are enforced.
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    container_labels_sanitization: true
+    collection_interval: 30s
+    metrics:
+      container.cpu.utilization:
+        enabled: true
+      container.memory.percent:
+        enabled: true
+
+  # Host-level CPU/RAM. Inside the collector container the real host (the Colima
+  # VM on Mac, the GCE node on GCP) is mounted at /hostfs (read-only). These
+  # numbers describe the resource envelope the containers run inside, NOT the
+  # physical host.
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+          system.memory.usage:
+            enabled: true
+      load:
+      filesystem:
+        metrics:
+          system.filesystem.utilization:
+            enabled: true
+
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
@@ -32,6 +70,26 @@ processors:
       - key: deployment.environment.name
         value: ${NODE_ENV}
         action: upsert
+  # Promote docker_stats' `container.name` resource attribute to a datapoint
+  # attribute so per-container breakdowns get a real `container_name` label.
+  # The `where` guard makes it a no-op for hostmetrics/app metrics.
+  transform/container_labels:
+    error_mode: ignore
+    metric_statements:
+      - context: datapoint
+        statements:
+          - set(attributes["container_name"], resource.attributes["container.name"]) where resource.attributes["container.name"] != nil
+  # Drop docker_stats default byte/counter metrics we don't chart (keep only the
+  # two ratio gauges); also keep only THIS compose-project's containers so foreign
+  # stacks on the same host aren't double-counted. Non-container metrics pass
+  # through untouched. OTEL_DOCKERSTATS_PROJECT = the compose project name.
+  filter/container_noise:
+    error_mode: ignore
+    metrics:
+      metric:
+        - IsMatch(name, "container\\..*") and name != "container.cpu.utilization" and name != "container.memory.percent"
+      datapoint:
+        - attributes["container_name"] != nil and not IsMatch(attributes["container_name"], "${OTEL_DOCKERSTATS_PROJECT:-octospark}-.*")
 
 exporters:
   googlecloud:
@@ -50,8 +108,8 @@ service:
       exporters: [googlecloud]
 
     metrics:
-      receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, resource, batch]
+      receivers: [otlp, docker_stats, hostmetrics]
+      processors: [memory_limiter, resourcedetection, resource, transform/container_labels, filter/container_noise, batch]
       exporters: [googlecloud]
 
     logs:
