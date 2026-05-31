@@ -20,7 +20,17 @@ export const effectConsistencyConfig = [
         {
           selector: 'NewExpression[callee.name="Promise"]',
           message:
-            'Use Effect.promise() or Effect.tryPromise() instead of new Promise(). Raw Promise bypasses the Effect error channel.'
+            'Use Effect.tryPromise() instead of new Promise(). Raw Promise bypasses the Effect error channel.'
+        },
+        // ── Ban Effect.promise() (use Effect.tryPromise) ───────────────
+        // Effect.promise() assumes the promise NEVER rejects — a rejection
+        // becomes an unhandled Effect *defect* that bypasses mapCoreError's
+        // log+Sentry mapping (a silent failure). Always use Effect.tryPromise
+        // so a rejection is a typed, logged, observable error.
+        {
+          selector: 'CallExpression[callee.object.name="Effect"][callee.property.name="promise"]',
+          message:
+            'Use Effect.tryPromise() instead of Effect.promise(): a promise rejection under Effect.promise becomes a silent defect that bypasses the log+Sentry boundary. tryPromise keeps it in the observable error channel.'
         }
       ]
     }
