@@ -89,7 +89,7 @@ processors:
       metric:
         - IsMatch(name, "container\\..*") and name != "container.cpu.utilization" and name != "container.memory.percent"
       datapoint:
-        - attributes["container_name"] != nil and not IsMatch(attributes["container_name"], "${OTEL_DOCKERSTATS_PROJECT:-octospark}-.*")
+        - attributes["container_name"] != nil and not IsMatch(attributes["container_name"], "${OTEL_DOCKERSTATS_PROJECT:-tx-agent-kit}-.*")
 
 exporters:
   googlecloud:

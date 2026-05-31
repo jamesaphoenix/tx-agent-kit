@@ -28,6 +28,9 @@ env:
   AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '100'
   # Empty disables the rate-limit bypass (fails closed); CI keeps loose limits above.
   AUTH_RATE_LIMIT_BYPASS_TOKEN: ''
+  # Empty secret disables Turnstile so factory sign-ups need no captcha token.
+  TURNSTILE_SECRET_KEY: ''
+  TURNSTILE_VERIFY_URL: ''
   RESEND_API_KEY: ''
   RESEND_FROM_EMAIL: ''
   RESEND_WEBHOOK_SECRET: ''

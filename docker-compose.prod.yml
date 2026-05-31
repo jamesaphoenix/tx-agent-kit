@@ -14,8 +14,8 @@ services:
       # docker_stats sees every container on the host (Colima VM). The
       # collector's filter/container_noise keeps only this compose project's
       # containers so a staging+prod host never double-counts and the dashboard
-      # excludes foreign stacks. Defaults to "octospark" if unset.
-      OTEL_DOCKERSTATS_PROJECT: ${COMPOSE_PROJECT_NAME:-octospark}
+      # excludes foreign stacks. Defaults to "tx-agent-kit" if unset.
+      OTEL_DOCKERSTATS_PROJECT: ${COMPOSE_PROJECT_NAME:-tx-agent-kit}
     command:
       - --config=/etc/otel-collector/otel-collector.${OTEL_COLLECTOR_BACKEND:-gcp}.yaml
     volumes:

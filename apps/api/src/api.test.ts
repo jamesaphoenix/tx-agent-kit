@@ -8,7 +8,7 @@ describe('api error mapping', () => {
   })
 
   it('reclassified infra failures (internalError) map to 500, never a silent 4xx', () => {
-    // Observability regression guard (backport octospark e5d148b90/f18172c41):
+    // Observability regression guard (backport upstream e5d148b90/f18172c41):
     // transient repository/port failures are now classified as internalError
     // (INTERNAL_ERROR / 500) by the service layer instead of a silent
     // badRequest (400). At the API boundary they MUST map to InternalError so

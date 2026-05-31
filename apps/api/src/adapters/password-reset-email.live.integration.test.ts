@@ -15,8 +15,8 @@ import { PasswordResetEmailPortLive } from './password-reset-email.js'
  * still proving the live HTTP path works.
  *
  *   RUN_LIVE_INTEGRATION=1 \
- *   RESEND_API_KEY=$(op read 'op://octospark-services/dev/RESEND_API_KEY') \
- *   RESEND_FROM_EMAIL=<verified-domain-address> WEB_BASE_URL=https://octospark.ai \
+ *   RESEND_API_KEY=$(op read 'op://your-vault/dev/RESEND_API_KEY') \
+ *   RESEND_FROM_EMAIL=<verified-domain-address> WEB_BASE_URL=https://example.com \
  *   pnpm --filter @tx-agent-kit/api test:integration password-reset-email.live
  */
 

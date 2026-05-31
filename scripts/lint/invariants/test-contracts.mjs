@@ -70,10 +70,27 @@ export const enforceColocatedTestConventions = (errors) => {
         .replace(/\.test\.tsx?$/u, '')
 
       const sourceDir = dirname(sourceFile)
-      const sourceTs = resolve(sourceDir, `${baseName}.ts`)
-      const sourceTsx = resolve(sourceDir, `${baseName}.tsx`)
+      // Resolve dotted/hyphen test modifiers (foo.live.test, foo.listener.test,
+      // foo-bypass.test) back to their base source module, so a wiring/variant
+      // test colocates with the module it exercises.
+      const sourceBaseNames = new Set([baseName])
+      const hyphenPrefix = baseName.split('-')[0]
+      const dottedPrefix = baseName.split('.')[0]
+      if (hyphenPrefix) {
+        sourceBaseNames.add(hyphenPrefix)
+      }
+      if (dottedPrefix) {
+        sourceBaseNames.add(dottedPrefix)
+      }
 
-      if (!existsSync(sourceTs) && !existsSync(sourceTsx)) {
+      const hasColocatedSource = [...sourceBaseNames].some((sourceBaseName) =>
+        existsSync(resolve(sourceDir, `${sourceBaseName}.ts`)) ||
+        existsSync(resolve(sourceDir, `${sourceBaseName}.tsx`))
+      )
+
+      if (!hasColocatedSource) {
+        const sourceTs = resolve(sourceDir, `${baseName}.ts`)
+        const sourceTsx = resolve(sourceDir, `${baseName}.tsx`)
         errors.push(
           [
             'Test colocation invariant:',
