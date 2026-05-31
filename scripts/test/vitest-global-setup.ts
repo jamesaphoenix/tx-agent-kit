@@ -628,6 +628,10 @@ const startSharedApiServer = async (): Promise<ChildProcess> => {
         API_CORS_ORIGIN: 'http://localhost:3000',
         AUTH_RATE_LIMIT_MAX_REQUESTS: '100000',
         AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '100000',
+        // Disable Turnstile for the factory-driven sign-up suite — createUser
+        // posts to /v1/auth/sign-up without a captcha token. An empty secret
+        // makes getTurnstileConfig() return null, skipping enforcement.
+        TURNSTILE_SECRET_KEY: '',
         TX_STORAGE_MODE: process.env.TX_STORAGE_MODE ?? 'memory',
         ...stripeIntegrationTestEnvOverrides(process.env),
         // Sized for CONCURRENT stress integration tests overlapping within

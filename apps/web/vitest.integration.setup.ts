@@ -35,6 +35,9 @@ import { configureExternalNavigationHandler } from './lib/url-state'
 
 process.env.NEXT_PUBLIC_API_BASE_URL = integrationBaseUrl
 process.env.API_BASE_URL = integrationBaseUrl
+// Disable Turnstile gating in web tests: AuthForm submits sign-up without a
+// captcha token, and the spawned API runs with TURNSTILE_SECRET_KEY='' too.
+delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 // Reset cached env and update the axios instance to use the test server URL
 resetWebEnvCache()
 api.defaults.baseURL = integrationBaseUrl

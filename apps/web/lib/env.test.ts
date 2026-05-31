@@ -12,7 +12,8 @@ const envKeys = [
   'NEXT_PUBLIC_NODE_ENV',
   'NODE_ENV',
   'NEXT_PUBLIC_SENTRY_DSN',
-  'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY'
+  'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
+  'NEXT_PUBLIC_TURNSTILE_SITE_KEY'
 ] as const
 
 const clearEnvOverrides = (): void => {
@@ -34,6 +35,7 @@ describe('getWebEnv', () => {
     mutableProcessEnv.NEXT_PUBLIC_SENTRY_DSN =
       'https://public@sentry.example.com/123'
     mutableProcessEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
+    mutableProcessEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY = '0x4AAAAAABkt4rBEZWUwzoI-'
 
     const { getWebEnv: freshGetWebEnv } = await import('./env')
     const env = freshGetWebEnv()
@@ -43,6 +45,12 @@ describe('getWebEnv', () => {
     expect(env.NODE_ENV).toBe('staging')
     expect(env.SENTRY_DSN).toBe('https://public@sentry.example.com/123')
     expect(env.STRIPE_PUBLISHABLE_KEY).toBe('pk_test_123')
+    expect(env.TURNSTILE_SITE_KEY).toBe('0x4AAAAAABkt4rBEZWUwzoI-')
+  })
+
+  it('leaves the Turnstile site key undefined when unset', async () => {
+    const { getWebEnv: freshGetWebEnv } = await import('./env')
+    expect(freshGetWebEnv().TURNSTILE_SITE_KEY).toBeUndefined()
   })
 
   it('falls back to non-public values', async () => {
