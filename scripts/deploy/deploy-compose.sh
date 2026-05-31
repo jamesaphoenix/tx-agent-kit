@@ -104,10 +104,16 @@ fi
 
 if [[ "${RUN_SMOKE:-1}" == "1" ]]; then
   API_EXTERNAL_BASE_URL=""
+  # Trusted bypass for the API's own auth rate-limit middleware: the smoke check
+  # does real sign-ups, and several deploys per hour from one egress IP would
+  # otherwise exhaust the per-IP sign-up budget and 429. The smoke test forwards
+  # this token via the x-auth-rate-limit-bypass header (no-op when unconfigured).
+  SMOKE_RATE_LIMIT_BYPASS_TOKEN=""
   while IFS='=' read -r key value; do
     if [[ "$key" == "API_EXTERNAL_BASE_URL" ]]; then
       API_EXTERNAL_BASE_URL="$value"
-      break
+    elif [[ "$key" == "AUTH_RATE_LIMIT_BYPASS_TOKEN" ]]; then
+      SMOKE_RATE_LIMIT_BYPASS_TOKEN="$value"
     fi
   done < "$RENDERED_ENV_FILE"
 
@@ -117,5 +123,5 @@ if [[ "${RUN_SMOKE:-1}" == "1" ]]; then
   fi
 
   echo "Running smoke checks against ${API_EXTERNAL_BASE_URL}"
-  API_BASE_URL="$API_EXTERNAL_BASE_URL" "$SCRIPT_DIR/smoke-api.sh"
+  API_BASE_URL="$API_EXTERNAL_BASE_URL" AUTH_RATE_LIMIT_BYPASS_TOKEN="$SMOKE_RATE_LIMIT_BYPASS_TOKEN" "$SCRIPT_DIR/smoke-api.sh"
 fi

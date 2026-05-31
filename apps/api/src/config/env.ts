@@ -11,6 +11,7 @@ const requiredApiEnvShape = {
   AUTH_RATE_LIMIT_WINDOW_MS: Schema.optional(Schema.String),
   AUTH_RATE_LIMIT_MAX_REQUESTS: Schema.optional(Schema.String),
   AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: Schema.optional(Schema.String),
+  AUTH_RATE_LIMIT_BYPASS_TOKEN: Schema.optional(Schema.String),
   TURNSTILE_SECRET_KEY: Schema.optional(Schema.String),
   TURNSTILE_VERIFY_URL: Schema.optional(Schema.String),
   RESEND_API_KEY: Schema.optional(Schema.String),
@@ -176,6 +177,17 @@ export const getAuthRateLimitConfig = (): AuthRateLimitConfig => {
     maxIpRequests,
     maxIdentifierRequests
   }
+}
+
+/**
+ * Optional shared secret that lets a TRUSTED caller (the deploy smoke test)
+ * bypass auth rate limiting via the `x-auth-rate-limit-bypass` header. Returns
+ * null when unset/blank, so the bypass is impossible unless explicitly
+ * configured — dev and unconfigured environments can never bypass.
+ */
+export const getAuthRateLimitBypassToken = (): string | null => {
+  const token = getApiEnv().AUTH_RATE_LIMIT_BYPASS_TOKEN?.trim()
+  return token && token.length > 0 ? token : null
 }
 
 export interface TurnstileConfig {

@@ -1,9 +1,37 @@
+import { timingSafeEqual } from 'node:crypto'
 import { HttpMiddleware, HttpServerRequest, HttpServerResponse } from '@effect/platform'
 import { authRateLimitedPaths } from '@tx-agent-kit/contracts'
 import { Effect, Option } from 'effect'
-import { getAuthRateLimitConfig, getTrustProxy } from '../config/env.js'
+import { getAuthRateLimitBypassToken, getAuthRateLimitConfig, getTrustProxy } from '../config/env.js'
 
 const rateLimitedPaths = new Set<string>(authRateLimitedPaths)
+
+// A trusted caller (the deploy smoke test) may bypass the limiter by sending
+// this header with the configured secret. Constant-time compared, and only
+// honored when AUTH_RATE_LIMIT_BYPASS_TOKEN is set — external traffic can't set
+// it without knowing the secret, and unconfigured envs can never bypass.
+const BYPASS_HEADER = 'x-auth-rate-limit-bypass'
+
+const constantTimeEquals = (a: string, b: string): boolean => {
+  const aBuf = Buffer.from(a)
+  const bBuf = Buffer.from(b)
+  if (aBuf.length !== bBuf.length) {
+    return false
+  }
+  return timingSafeEqual(aBuf, bBuf)
+}
+
+const hasValidRateLimitBypass = (request: HttpServerRequest.HttpServerRequest): boolean => {
+  const expected = getAuthRateLimitBypassToken()
+  if (expected === null) {
+    return false
+  }
+  const provided = request.headers[BYPASS_HEADER]
+  if (typeof provided !== 'string' || provided.length === 0) {
+    return false
+  }
+  return constantTimeEquals(provided, expected)
+}
 
 const MAX_BUCKETS = 50_000
 
@@ -109,6 +137,12 @@ export const authRateLimitMiddleware = HttpMiddleware.make((httpApp) =>
     const path = parsePathname(request.url)
 
     if (!rateLimitedPaths.has(path)) {
+      return yield* httpApp
+    }
+
+    // Trusted bypass (deploy smoke test) — skip the limiter so repeated deploys
+    // from one egress IP don't exhaust the per-IP sign-up budget.
+    if (hasValidRateLimitBypass(request)) {
       return yield* httpApp
     }
 

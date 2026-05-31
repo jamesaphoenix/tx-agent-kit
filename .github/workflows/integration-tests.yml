@@ -26,6 +26,8 @@ env:
   AUTH_RATE_LIMIT_WINDOW_MS: '60000'
   AUTH_RATE_LIMIT_MAX_REQUESTS: '100'
   AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '100'
+  # Empty disables the rate-limit bypass (fails closed); CI keeps loose limits above.
+  AUTH_RATE_LIMIT_BYPASS_TOKEN: ''
   RESEND_API_KEY: ''
   RESEND_FROM_EMAIL: ''
   RESEND_WEBHOOK_SECRET: ''
