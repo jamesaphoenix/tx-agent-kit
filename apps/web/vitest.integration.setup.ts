@@ -1,7 +1,11 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, configure } from '@testing-library/react'
 
-configure({ asyncUtilTimeout: 5000 })
+// Web integration tests drive a REAL API + DB behind every waitFor/findBy. Under
+// parallel worker load a single round-trip can exceed the testing-library default
+// (1000ms) or a tight 5s, producing flaky timeouts on redirects/success messages.
+// 15s gives real I/O headroom while staying well under the per-test timeout.
+configure({ asyncUtilTimeout: 15_000 })
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 import { clearAuthToken } from './lib/auth-token'
 import { resetIntegrationRouterLocation } from './integration/support/next-router-context'
