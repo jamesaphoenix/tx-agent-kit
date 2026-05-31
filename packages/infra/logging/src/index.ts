@@ -295,3 +295,8 @@ export const createPerfLogger = (
 
 const loggingEnv = getLoggingEnv()
 export const defaultLogger = createLogger(loggingEnv.SERVICE_NAME)
+
+// Bridge that routes Effect.log* through the structured pipeline above.
+// (Re-exported at the end so `createLogger` is initialized before the bridge
+// module's top-level `createLogger` import resolves.)
+export { makeEffectLoggerLayer } from './effect-logger.js'

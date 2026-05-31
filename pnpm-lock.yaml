@@ -601,6 +601,9 @@ importers:
       '@opentelemetry/api-logs':
         specifier: ^0.214.0
         version: 0.214.0
+      effect:
+        specifier: ^3.21.2
+        version: 3.21.2
     devDependencies:
       '@tx-agent-kit/vitest-config':
         specifier: workspace:*
