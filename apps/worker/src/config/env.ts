@@ -14,6 +14,18 @@ export interface WorkerEnv {
   DATABASE_URL: string
   WORKER_ENABLE_SCHEDULES: boolean
   OUTBOX_POLL_BATCH_SIZE: number
+  /**
+   * Backstop sweep cadence for the event-driven outbox dispatcher. The dispatcher
+   * is woken by Postgres NOTIFY; this timer is the safety net that catches any
+   * missed notification. Cheap (a lock-free DB read), so a low value is fine.
+   */
+  OUTBOX_BACKSTOP_INTERVAL_SECONDS: number
+  /**
+   * Postgres connection string for the dispatcher's LISTEN session. MUST be a
+   * direct / session-mode connection (never a transaction pooler — LISTEN is
+   * per-session). Falls back to `DATABASE_URL` when unset.
+   */
+  OUTBOX_LISTENER_DATABASE_URL: string
   OUTBOX_STUCK_THRESHOLD_MINUTES: number
   OUTBOX_PRUNE_RETENTION_DAYS: number
   /**
@@ -229,6 +241,15 @@ export const getWorkerEnv = (): WorkerEnv => {
     50
   )
 
+  const resolvedBackstopInterval = parsePositiveIntegerEnv(
+    'OUTBOX_BACKSTOP_INTERVAL_SECONDS',
+    process.env.OUTBOX_BACKSTOP_INTERVAL_SECONDS,
+    10
+  )
+
+  const resolvedListenerDatabaseUrl =
+    parseOptionalStringEnv(process.env.OUTBOX_LISTENER_DATABASE_URL) ?? databaseUrl
+
   const resolvedStuckThreshold = parsePositiveIntegerEnv(
     'OUTBOX_STUCK_THRESHOLD_MINUTES',
     process.env.OUTBOX_STUCK_THRESHOLD_MINUTES,
@@ -256,6 +277,8 @@ export const getWorkerEnv = (): WorkerEnv => {
       nodeEnv !== 'test'
     ),
     OUTBOX_POLL_BATCH_SIZE: resolvedBatchSize,
+    OUTBOX_BACKSTOP_INTERVAL_SECONDS: resolvedBackstopInterval,
+    OUTBOX_LISTENER_DATABASE_URL: resolvedListenerDatabaseUrl,
     OUTBOX_STUCK_THRESHOLD_MINUTES: resolvedStuckThreshold,
     OUTBOX_PRUNE_RETENTION_DAYS: resolvedPruneRetention,
     RESERVATION_RECLAIM_MAX_AGE_SECONDS: resolvedReservationReclaimMaxAge,

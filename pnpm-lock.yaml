@@ -437,6 +437,9 @@ importers:
       effect:
         specifier: ^3.21.2
         version: 3.21.2
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -447,6 +450,9 @@ importers:
       '@tx-agent-kit/vitest-config':
         specifier: workspace:*
         version: link:../../packages/tooling/vitest-config
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
 
   packages/cli:
     dependencies:
@@ -9125,9 +9131,6 @@ packages:
     peerDependencies:
       pg: '>=8.0'
 
-  pg-protocol@1.12.0:
-    resolution: {integrity: sha512-uOANXNRACNdElMXJ0tPz6RBM0XQ61nONGAwlt8da5zs/iUOOCLBQOHSXnrC6fMsvtjxbOJrZZl5IScGv+7mpbg==}
-
   pg-protocol@1.13.0:
     resolution: {integrity: sha512-zzdvXfS6v89r6v7OcFCHfHlyG/wvry1ALxZo4LqgUoy7W9xhBDMaqOuMiF3qEV45VqsN6rdlcehHrfDtlCPc8w==}
 
@@ -16504,7 +16507,7 @@ snapshots:
   '@types/pg@8.20.0':
     dependencies:
       '@types/node': 25.6.0
-      pg-protocol: 1.12.0
+      pg-protocol: 1.13.0
       pg-types: 2.2.0
 
   '@types/prop-types@15.7.15': {}
@@ -20686,8 +20689,6 @@ snapshots:
   pg-pool@3.13.0(pg@8.20.0):
     dependencies:
       pg: 8.20.0
-
-  pg-protocol@1.12.0: {}
 
   pg-protocol@1.13.0: {}
 

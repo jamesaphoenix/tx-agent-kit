@@ -90,6 +90,9 @@ export const codeQualityConfig = [
       'apps/api/src/server-lib.ts',
       'apps/api/src/openapi.ts',
       'apps/worker/src/index.ts',
+      // Event-loop dispatcher: NOTIFY callbacks + backstop timer are inherently
+      // fire-and-forget; the single-flight trigger never rejects.
+      'apps/worker/src/dispatch/outbox-dispatcher.ts',
       'packages/testkit/src/command-entrypoints.ts',
       'packages/infra/observability/src/client.ts',
       'packages/tooling/scaffold/src/cli.ts'

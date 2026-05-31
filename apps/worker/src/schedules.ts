@@ -40,66 +40,26 @@ const isScheduleAlreadyExists = (error: unknown): boolean =>
   error instanceof ScheduleAlreadyRunning
   || (isGrpcServiceError(error) && (error.code as number) === GRPC_ALREADY_EXISTS)
 
-export async function ensureOutboxPollerSchedule(
-  client: Client,
-  taskQueue: string,
-  intervalSeconds: number,
-  batchSize: number
-): Promise<void> {
+/**
+ * Remove the legacy 5s outbox-poller schedule.
+ *
+ * The outbox is now drained by the event-driven dispatcher (`dispatch/outbox-dispatcher.ts`,
+ * woken by Postgres NOTIFY), so the schedule must be deleted or it keeps cold-starting
+ * `outboxPollerWorkflow` every 5s and burning Temporal Actions. Idempotent: a missing
+ * schedule is the success case. Runs on every worker boot so the orphaned Cloud
+ * schedule is reaped the first time the new code deploys.
+ */
+export async function deleteOutboxPollerScheduleIfExists(client: Client): Promise<void> {
   const handle = client.schedule.getHandle(OUTBOX_POLLER_SCHEDULE_ID)
 
   try {
-    await handle.describe()
-    await handle.update((prev) => ({
-      ...prev,
-      spec: {
-        intervals: [{ every: `${intervalSeconds}s` }]
-      },
-      action: {
-        type: 'startWorkflow' as const,
-        workflowType: 'outboxPollerWorkflow',
-        taskQueue,
-        args: [batchSize]
-      },
-      policies: {
-        ...prev.policies,
-        overlap: ScheduleOverlapPolicy.SKIP
-      }
-    }))
-    logger.info('Updated outbox poller schedule.', { intervalSeconds, batchSize })
+    await handle.delete()
+    logger.info('Deleted legacy outbox poller schedule (replaced by event-driven dispatcher).')
   } catch (error: unknown) {
-    const isNotFound = isScheduleNotFound(error)
-
-    if (!isNotFound) {
-      throw error
+    if (isScheduleNotFound(error)) {
+      return
     }
-
-    try {
-      await client.schedule.create({
-        scheduleId: OUTBOX_POLLER_SCHEDULE_ID,
-        spec: {
-          intervals: [{ every: `${intervalSeconds}s` }]
-        },
-        action: {
-          type: 'startWorkflow',
-          workflowType: 'outboxPollerWorkflow',
-          taskQueue,
-          args: [batchSize]
-        },
-        policies: {
-          overlap: ScheduleOverlapPolicy.SKIP
-        }
-      })
-      logger.info('Created outbox poller schedule.', { intervalSeconds, batchSize })
-    } catch (createError: unknown) {
-      const isAlreadyExists = isScheduleAlreadyExists(createError)
-
-      if (!isAlreadyExists) {
-        throw createError
-      }
-
-      logger.info('Outbox poller schedule already created by another worker instance.')
-    }
+    throw error
   }
 }
 

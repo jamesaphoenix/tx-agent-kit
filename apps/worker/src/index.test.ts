@@ -24,7 +24,12 @@ const workerCreateMock = vi.fn(() => Promise.resolve({
   run: workerRunMock,
   shutdown: workerShutdownMock
 }))
-const ensureOutboxPollerScheduleMock = vi.fn(() => Promise.resolve(undefined))
+const deleteOutboxPollerScheduleIfExistsMock = vi.fn(() => Promise.resolve(undefined))
+const outboxDispatcherStopMock = vi.fn(() => Promise.resolve(undefined))
+const startOutboxDispatcherMock = vi.fn(() => ({
+  drain: vi.fn(() => Promise.resolve(undefined)),
+  stop: outboxDispatcherStopMock
+}))
 const ensureStuckEventsResetScheduleMock = vi.fn(() => Promise.resolve(undefined))
 const ensurePrunePublishedScheduleMock = vi.fn(() => Promise.resolve(undefined))
 const ensureRetentionCleanerScheduleMock = vi.fn(() => Promise.resolve(undefined))
@@ -37,6 +42,8 @@ const defaultWorkerEnv = {
   DATABASE_URL: 'postgresql://localhost:5432/test',
   WORKER_ENABLE_SCHEDULES: true,
   OUTBOX_POLL_BATCH_SIZE: 50,
+  OUTBOX_BACKSTOP_INTERVAL_SECONDS: 10,
+  OUTBOX_LISTENER_DATABASE_URL: 'postgresql://localhost:5432/test',
   OUTBOX_STUCK_THRESHOLD_MINUTES: 5,
   OUTBOX_PRUNE_RETENTION_DAYS: 30,
   RESERVATION_RECLAIM_MAX_AGE_SECONDS: 7200,
@@ -101,7 +108,7 @@ vi.mock('./campaign-activities.js', () => ({
 }))
 
 vi.mock('./schedules.js', () => ({
-  ensureOutboxPollerSchedule: ensureOutboxPollerScheduleMock,
+  deleteOutboxPollerScheduleIfExists: deleteOutboxPollerScheduleIfExistsMock,
   ensureStuckEventsResetSchedule: ensureStuckEventsResetScheduleMock,
   ensurePrunePublishedSchedule: ensurePrunePublishedScheduleMock,
   ensureRetentionCleanerSchedule: ensureRetentionCleanerScheduleMock,
@@ -112,6 +119,10 @@ vi.mock('./schedules.js', () => ({
 
 vi.mock('./campaign-schedules.js', () => ({
   ensureEmailSendsPruneSchedule: ensureEmailSendsPruneScheduleMock
+}))
+
+vi.mock('./dispatch/outbox-dispatcher.js', () => ({
+  startOutboxDispatcher: startOutboxDispatcherMock
 }))
 
 vi.mock('./observability/sentry.js', () => ({
@@ -174,8 +185,10 @@ describe('worker bootstrap telemetry wiring', () => {
       expect(captureWorkerExceptionMock).not.toHaveBeenCalled()
     })
 
+    expect(startOutboxDispatcherMock).toHaveBeenCalledTimes(1)
+    expect(deleteOutboxPollerScheduleIfExistsMock).toHaveBeenCalledTimes(1)
     expect(workerRunMock.mock.invocationCallOrder[0]).toBeLessThan(
-      ensureOutboxPollerScheduleMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+      deleteOutboxPollerScheduleIfExistsMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     )
   })
 
@@ -193,7 +206,8 @@ describe('worker bootstrap telemetry wiring', () => {
       expect(stopTelemetryMock).toHaveBeenCalledTimes(1)
     })
 
-    expect(ensureOutboxPollerScheduleMock).not.toHaveBeenCalled()
+    expect(deleteOutboxPollerScheduleIfExistsMock).not.toHaveBeenCalled()
+    expect(startOutboxDispatcherMock).not.toHaveBeenCalled()
     expect(ensureStuckEventsResetScheduleMock).not.toHaveBeenCalled()
     expect(ensurePrunePublishedScheduleMock).not.toHaveBeenCalled()
     expect(ensureRetentionCleanerScheduleMock).not.toHaveBeenCalled()

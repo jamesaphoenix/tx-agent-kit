@@ -17,12 +17,16 @@ import {
 import {
   ensureAutoRechargeRetrySchedule,
   ensureStorageReconcileSchedule,
-  ensureOutboxPollerSchedule,
+  deleteOutboxPollerScheduleIfExists,
   ensurePrunePublishedSchedule,
   ensureReleaseStaleReservationsSchedule,
   ensureRetentionCleanerSchedule,
   ensureStuckEventsResetSchedule
 } from './schedules.js'
+import {
+  startOutboxDispatcher,
+  type OutboxDispatcherHandle
+} from './dispatch/outbox-dispatcher.js'
 import { ensureEmailSendsPruneSchedule } from './campaign-schedules.js'
 import {
   captureWorkerException,
@@ -114,6 +118,7 @@ async function run(env: WorkerEnv): Promise<void> {
     })
 
     let clientConnection: Connection | undefined
+    let outboxDispatcher: OutboxDispatcherHandle | null = null
     let tlsConfig: Record<string, unknown> = {}
     if (typeof connOpts.tls === 'object') {
       tlsConfig = {
@@ -191,12 +196,18 @@ async function run(env: WorkerEnv): Promise<void> {
       })
 
       if (env.WORKER_ENABLE_SCHEDULES) {
-        await ensureOutboxPollerSchedule(
-          temporalClient,
-          env.TEMPORAL_TASK_QUEUE,
-          5,
-          env.OUTBOX_POLL_BATCH_SIZE
-        )
+        // The outbox is drained by the event-driven dispatcher (Postgres NOTIFY
+        // + backstop sweep), not a 5s poller schedule. Reap the legacy schedule
+        // if a prior deploy left it behind, then start the listener loop.
+        await deleteOutboxPollerScheduleIfExists(temporalClient)
+
+        outboxDispatcher = startOutboxDispatcher({
+          client: temporalClient,
+          defaultTaskQueue: env.TEMPORAL_TASK_QUEUE,
+          batchSize: env.OUTBOX_POLL_BATCH_SIZE,
+          backstopIntervalSeconds: env.OUTBOX_BACKSTOP_INTERVAL_SECONDS,
+          listenerDatabaseUrl: env.OUTBOX_LISTENER_DATABASE_URL
+        })
 
         await ensureStuckEventsResetSchedule(
           temporalClient,
@@ -265,6 +276,7 @@ async function run(env: WorkerEnv): Promise<void> {
     } finally {
       process.off('SIGINT', onSigint)
       process.off('SIGTERM', onSigterm)
+      await outboxDispatcher?.stop()
       shutdownWorkerIfRunning(worker, env.TEMPORAL_TASK_QUEUE)
       shutdownWorkerIfRunning(emailCampaignWorker, env.EMAIL_CAMPAIGNS_TASK_QUEUE)
       await Promise.allSettled([

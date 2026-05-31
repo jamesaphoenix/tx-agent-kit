@@ -378,12 +378,20 @@ for (const filePath of repoFiles) {
 }
 
 // ─── Rule 6: Event Handler Completeness ─────────────────────────────
+// The event→workflow dispatch table now lives in `dispatch/resolve-dispatch.ts`
+// (the worker-owned event-driven dispatcher), not in a Temporal workflow, so the
+// `dispatch/` dir is scanned alongside `workflows*.ts` for handler-case coverage.
 const workerSrcDir = resolve(repoRoot, 'apps/worker/src')
 const workflowFiles = existsSync(workerSrcDir)
   ? listFilesRecursively(workerSrcDir).filter(
       (f) => {
         const name = f.split('/').pop() ?? ''
-        return name.startsWith('workflows') && name.endsWith('.ts') && !name.includes('.test.')
+        const inDispatchDir = f.includes('/apps/worker/src/dispatch/')
+        const isHandlerFile =
+          (name.startsWith('workflows') || (inDispatchDir && name.startsWith('resolve-dispatch')))
+          && name.endsWith('.ts')
+          && !name.includes('.test.')
+        return isHandlerFile
       }
     )
   : []

@@ -30,10 +30,12 @@
     "@tx-agent-kit/storage": "workspace:*",
     "@tx-agent-kit/stripe": "workspace:*",
     "effect": "^3.21.2",
+    "pg": "^8.20.0",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@tx-agent-kit/testkit": "workspace:*",
-    "@tx-agent-kit/vitest-config": "workspace:*"
+    "@tx-agent-kit/vitest-config": "workspace:*",
+    "@types/pg": "^8.20.0"
   }
 }
