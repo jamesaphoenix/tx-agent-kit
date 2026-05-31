@@ -17,7 +17,6 @@
   "dependencies": {
     "@effect/platform": "^0.96.0",
     "@effect/platform-node": "^0.106.0",
-    "@sentry/node": "^10.48.0",
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/core": "workspace:*",
     "@tx-agent-kit/db": "workspace:*",

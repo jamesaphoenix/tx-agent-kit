@@ -6,16 +6,30 @@ import {
   initializeApiSentry
 } from './sentry.js'
 
-const { sentryCaptureExceptionMock, sentryFlushMock, sentryInitMock } = vi.hoisted(() => ({
-  sentryCaptureExceptionMock: vi.fn(),
-  sentryFlushMock: vi.fn(() => Promise.resolve(true)),
-  sentryInitMock: vi.fn()
-}))
+// The reporter (init/race/trace/withScope) is tested in
+// @tx-agent-kit/observability/sentry; here we mock it and assert the API
+// wrapper resolves the right DSN/spotlight and forwards capture/flush/reset.
+// The real end-to-end @sentry/node wiring is covered by
+// sentry.integration.test.ts.
+const { initializeMock, captureExceptionMock, captureScopedMock, flushMock, resetMock } = vi.hoisted(
+  () => ({
+    initializeMock: vi.fn(() => Promise.resolve(true)),
+    captureExceptionMock: vi.fn(),
+    captureScopedMock: vi.fn(),
+    flushMock: vi.fn(() => Promise.resolve()),
+    resetMock: vi.fn()
+  })
+)
 
-vi.mock('@sentry/node', () => ({
-  init: sentryInitMock,
-  captureException: sentryCaptureExceptionMock,
-  flush: sentryFlushMock
+vi.mock('@tx-agent-kit/observability/sentry', () => ({
+  SENTRY_SPOTLIGHT_PLACEHOLDER_DSN: 'https://spotlight@local/0',
+  createSentryReporter: () => ({
+    initialize: initializeMock,
+    captureException: captureExceptionMock,
+    captureScoped: captureScopedMock,
+    flush: flushMock,
+    reset: resetMock
+  })
 }))
 
 const baseApiEnv = {
@@ -29,108 +43,75 @@ const baseApiEnv = {
   SENTRY_SPOTLIGHT: undefined as string | undefined
 }
 
-describe('api sentry wiring', () => {
+describe('api sentry wrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    _resetApiSentryForTest()
   })
 
-  it('skips initialization when DSN is missing and spotlight is off', async () => {
-    const initialized = await initializeApiSentry(baseApiEnv)
+  it('passes no DSN (spotlight off) so the reporter skips init', async () => {
+    await initializeApiSentry(baseApiEnv)
 
-    captureApiException(new Error('should-not-send'))
-    await flushApiSentry()
-
-    expect(initialized).toBe(false)
-    expect(sentryInitMock).not.toHaveBeenCalled()
-    expect(sentryCaptureExceptionMock).not.toHaveBeenCalled()
-    expect(sentryFlushMock).not.toHaveBeenCalled()
-  })
-
-  it('initializes once and captures exceptions when DSN is configured', async () => {
-    const firstInitialize = await initializeApiSentry({
-      ...baseApiEnv,
-      NODE_ENV: 'production',
-      API_SENTRY_DSN: 'https://api@sentry.example.com/123'
+    expect(initializeMock).toHaveBeenCalledWith({
+      dsn: undefined,
+      environment: 'development',
+      spotlightEnabled: false,
+      component: 'api'
     })
-    const secondInitialize = await initializeApiSentry({
+  })
+
+  it('resolves API_SENTRY_DSN and tags component=api', async () => {
+    await initializeApiSentry({
       ...baseApiEnv,
       NODE_ENV: 'production',
       API_SENTRY_DSN: 'https://api@sentry.example.com/123'
     })
 
-    captureApiException(new Error('boom'))
-    await flushApiSentry()
-
-    expect(firstInitialize).toBe(true)
-    expect(secondInitialize).toBe(false)
-    expect(sentryInitMock).toHaveBeenCalledTimes(1)
-    expect(sentryInitMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dsn: 'https://api@sentry.example.com/123',
-        environment: 'production',
-        tracesSampleRate: 0,
-        spotlight: false
-      })
-    )
-    expect(sentryCaptureExceptionMock).toHaveBeenCalledTimes(1)
-    expect(sentryFlushMock).toHaveBeenCalledWith(2000)
-  })
-
-  it('initializes with spotlight when SENTRY_SPOTLIGHT is true and no DSN', async () => {
-    const initialized = await initializeApiSentry({
-      ...baseApiEnv,
-      SENTRY_SPOTLIGHT: 'true'
+    expect(initializeMock).toHaveBeenCalledWith({
+      dsn: 'https://api@sentry.example.com/123',
+      environment: 'production',
+      spotlightEnabled: false,
+      component: 'api'
     })
+  })
 
-    expect(initialized).toBe(true)
-    expect(sentryInitMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dsn: 'https://spotlight@local/0',
-        tracesSampleRate: 1.0,
-        spotlight: true
-      })
+  it('uses the spotlight placeholder DSN when SENTRY_SPOTLIGHT=true and no real DSN', async () => {
+    await initializeApiSentry({ ...baseApiEnv, SENTRY_SPOTLIGHT: 'true' })
+
+    expect(initializeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ dsn: 'https://spotlight@local/0', spotlightEnabled: true })
     )
   })
 
-  it('initializes with spotlight and real DSN when both are configured', async () => {
-    const initialized = await initializeApiSentry({
+  it('treats SENTRY_SPOTLIGHT=1 as truthy and prefers a real DSN when both are set', async () => {
+    await initializeApiSentry({
       ...baseApiEnv,
       API_SENTRY_DSN: 'https://api@sentry.example.com/123',
-      SENTRY_SPOTLIGHT: 'true'
-    })
-
-    expect(initialized).toBe(true)
-    expect(sentryInitMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dsn: 'https://api@sentry.example.com/123',
-        tracesSampleRate: 1.0,
-        spotlight: true
-      })
-    )
-  })
-
-  it('treats SENTRY_SPOTLIGHT=1 as truthy', async () => {
-    const initialized = await initializeApiSentry({
-      ...baseApiEnv,
       SENTRY_SPOTLIGHT: '1'
     })
 
-    expect(initialized).toBe(true)
-    expect(sentryInitMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        spotlight: true
-      })
+    expect(initializeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ dsn: 'https://api@sentry.example.com/123', spotlightEnabled: true })
     )
   })
 
-  it('skips when spotlight is false and no DSN', async () => {
-    const initialized = await initializeApiSentry({
-      ...baseApiEnv,
-      SENTRY_SPOTLIGHT: 'false'
-    })
+  it('treats SENTRY_SPOTLIGHT=false as off (no DSN, no init)', async () => {
+    await initializeApiSentry({ ...baseApiEnv, SENTRY_SPOTLIGHT: 'false' })
 
-    expect(initialized).toBe(false)
-    expect(sentryInitMock).not.toHaveBeenCalled()
+    expect(initializeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ dsn: undefined, spotlightEnabled: false })
+    )
+  })
+
+  it('forwards process-level exceptions to the reporter', () => {
+    captureApiException(new Error('boom'))
+    expect(captureExceptionMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('flushes and resets through the reporter', async () => {
+    await flushApiSentry()
+    _resetApiSentryForTest()
+
+    expect(flushMock).toHaveBeenCalledWith(2000)
+    expect(resetMock).toHaveBeenCalledTimes(1)
   })
 })

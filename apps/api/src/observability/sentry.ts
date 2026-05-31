@@ -1,30 +1,13 @@
+import {
+  createSentryReporter,
+  SENTRY_SPOTLIGHT_PLACEHOLDER_DSN
+} from '@tx-agent-kit/observability/sentry'
 import type { ApiEnv } from '../config/env.js'
 
-const spotlightPlaceholderDsn = 'https://spotlight@local/0'
-
-interface SentryNodeModule {
-  init: (options: {
-    dsn: string
-    environment: string
-    tracesSampleRate: number
-    spotlight?: boolean
-  }) => void
-  captureException: (error: unknown) => unknown
-  flush: (timeout?: number) => PromiseLike<unknown>
-}
-
-let isInitialized = false
-let initializationPromise: Promise<boolean> | null = null
-let sentryModule: SentryNodeModule | null = null
-
-const resolveSentryModule = async (): Promise<SentryNodeModule> => {
-  if (sentryModule) {
-    return sentryModule
-  }
-
-  sentryModule = await import('@sentry/node')
-  return sentryModule
-}
+// Thin API binding over the shared Sentry reporter (init/race/trace/withScope
+// live in @tx-agent-kit/observability/sentry). Only the DSN resolution is
+// API-specific.
+const reporter = createSentryReporter()
 
 const parseBooleanString = (value: string | undefined): boolean => {
   if (!value) {
@@ -35,70 +18,24 @@ const parseBooleanString = (value: string | undefined): boolean => {
   return normalized === 'true' || normalized === '1'
 }
 
-export const initializeApiSentry = async (env: ApiEnv): Promise<boolean> => {
-  if (isInitialized) {
-    return false
-  }
-
-  if (initializationPromise) {
-    return initializationPromise
-  }
-
+export const initializeApiSentry = (env: ApiEnv): Promise<boolean> => {
   const spotlightEnabled = parseBooleanString(env.SENTRY_SPOTLIGHT)
-  const dsn = env.API_SENTRY_DSN ?? (spotlightEnabled ? spotlightPlaceholderDsn : undefined)
+  const dsn = env.API_SENTRY_DSN ?? (spotlightEnabled ? SENTRY_SPOTLIGHT_PLACEHOLDER_DSN : undefined)
 
-  if (!dsn) {
-    return false
-  }
-
-  initializationPromise = (async () => {
-    const Sentry = await resolveSentryModule()
-    Sentry.init({
-      dsn,
-      environment: env.NODE_ENV,
-      tracesSampleRate: spotlightEnabled ? 1.0 : 0,
-      spotlight: spotlightEnabled
-    })
-
-    isInitialized = true
-    return true
-  })()
-
-  const currentInitialization = initializationPromise
-
-  return (async () => {
-    try {
-      return await currentInitialization
-    } catch {
-      isInitialized = false
-      sentryModule = null
-      return false
-    } finally {
-      if (initializationPromise === currentInitialization) {
-        initializationPromise = null
-      }
-    }
-  })()
+  return reporter.initialize({
+    dsn,
+    environment: env.NODE_ENV,
+    spotlightEnabled,
+    component: 'api'
+  })
 }
 
 export const captureApiException = (error: unknown): void => {
-  if (!isInitialized || !sentryModule) {
-    return
-  }
-
-  sentryModule.captureException(error)
+  reporter.captureException(error)
 }
 
-export const flushApiSentry = async (): Promise<void> => {
-  if (!isInitialized || !sentryModule) {
-    return
-  }
-
-  await sentryModule.flush(2000)
-}
+export const flushApiSentry = (): Promise<void> => reporter.flush(2000)
 
 export const _resetApiSentryForTest = (): void => {
-  isInitialized = false
-  initializationPromise = null
-  sentryModule = null
+  reporter.reset()
 }

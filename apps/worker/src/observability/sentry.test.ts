@@ -6,16 +6,30 @@ import {
   initializeWorkerSentry
 } from './sentry.js'
 
-const { sentryCaptureExceptionMock, sentryFlushMock, sentryInitMock } = vi.hoisted(() => ({
-  sentryCaptureExceptionMock: vi.fn(),
-  sentryFlushMock: vi.fn(() => Promise.resolve(true)),
-  sentryInitMock: vi.fn()
-}))
+// The reporter (init/race/trace/withScope) is tested in
+// @tx-agent-kit/observability/sentry; here we mock it and assert the worker
+// wrapper resolves the right DSN/spotlight and forwards capture/flush/reset.
+// The real end-to-end @sentry/node wiring is covered by
+// sentry.integration.test.ts.
+const { initializeMock, captureExceptionMock, captureScopedMock, flushMock, resetMock } = vi.hoisted(
+  () => ({
+    initializeMock: vi.fn(() => Promise.resolve(true)),
+    captureExceptionMock: vi.fn(),
+    captureScopedMock: vi.fn(),
+    flushMock: vi.fn(() => Promise.resolve()),
+    resetMock: vi.fn()
+  })
+)
 
-vi.mock('@sentry/node', () => ({
-  init: sentryInitMock,
-  captureException: sentryCaptureExceptionMock,
-  flush: sentryFlushMock
+vi.mock('@tx-agent-kit/observability/sentry', () => ({
+  SENTRY_SPOTLIGHT_PLACEHOLDER_DSN: 'https://spotlight@local/0',
+  createSentryReporter: () => ({
+    initialize: initializeMock,
+    captureException: captureExceptionMock,
+    captureScoped: captureScopedMock,
+    flush: flushMock,
+    reset: resetMock
+  })
 }))
 
 const baseEnv = {
@@ -42,39 +56,27 @@ const baseEnv = {
   RESEND_FROM_EMAIL: undefined,
   WEB_BASE_URL: undefined,
   EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
-    STRIPE_SECRET_KEY: undefined
+  STRIPE_SECRET_KEY: undefined
 }
 
-describe('worker sentry wiring', () => {
+describe('worker sentry wrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    _resetWorkerSentryForTest()
   })
 
-  it('skips initialization when DSN is missing and spotlight is off', async () => {
-    const initialized = await initializeWorkerSentry(baseEnv)
+  it('passes no DSN (spotlight off) so the reporter skips init', async () => {
+    await initializeWorkerSentry(baseEnv)
 
-    captureWorkerException(new Error('should-not-send'))
-    await flushWorkerSentry()
-
-    expect(initialized).toBe(false)
-    expect(sentryInitMock).not.toHaveBeenCalled()
-    expect(sentryCaptureExceptionMock).not.toHaveBeenCalled()
-    expect(sentryFlushMock).not.toHaveBeenCalled()
-  })
-
-  it('initializes once and captures exceptions when DSN is configured', async () => {
-    const firstInitialize = await initializeWorkerSentry({
-      ...baseEnv,
-      NODE_ENV: 'production',
-      DATABASE_URL: 'postgresql://localhost:5432/prod',
-      TEMPORAL_RUNTIME_MODE: 'cloud',
-      TEMPORAL_ADDRESS: 'cloud.temporal.io:7233',
-      TEMPORAL_API_KEY: 'key',
-      TEMPORAL_TLS_ENABLED: true,
-      WORKER_SENTRY_DSN: 'https://worker@sentry.example.com/123'
+    expect(initializeMock).toHaveBeenCalledWith({
+      dsn: undefined,
+      environment: 'development',
+      spotlightEnabled: false,
+      component: 'worker'
     })
-    const secondInitialize = await initializeWorkerSentry({
+  })
+
+  it('resolves WORKER_SENTRY_DSN and tags component=worker', async () => {
+    await initializeWorkerSentry({
       ...baseEnv,
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://localhost:5432/prod',
@@ -85,54 +87,47 @@ describe('worker sentry wiring', () => {
       WORKER_SENTRY_DSN: 'https://worker@sentry.example.com/123'
     })
 
-    captureWorkerException(new Error('boom'))
-    await flushWorkerSentry()
-
-    expect(firstInitialize).toBe(true)
-    expect(secondInitialize).toBe(false)
-    expect(sentryInitMock).toHaveBeenCalledTimes(1)
-    expect(sentryInitMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dsn: 'https://worker@sentry.example.com/123',
-        environment: 'production',
-        tracesSampleRate: 0,
-        spotlight: false
-      })
-    )
-    expect(sentryCaptureExceptionMock).toHaveBeenCalledTimes(1)
-    expect(sentryFlushMock).toHaveBeenCalledWith(2000)
-  })
-
-  it('initializes with spotlight when SENTRY_SPOTLIGHT is true and no DSN', async () => {
-    const initialized = await initializeWorkerSentry({
-      ...baseEnv,
-      SENTRY_SPOTLIGHT: true
+    expect(initializeMock).toHaveBeenCalledWith({
+      dsn: 'https://worker@sentry.example.com/123',
+      environment: 'production',
+      spotlightEnabled: false,
+      component: 'worker'
     })
+  })
 
-    expect(initialized).toBe(true)
-    expect(sentryInitMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dsn: 'https://spotlight@local/0',
-        tracesSampleRate: 1.0,
-        spotlight: true
-      })
+  it('uses the spotlight placeholder DSN when SENTRY_SPOTLIGHT=true and no real DSN', async () => {
+    await initializeWorkerSentry({ ...baseEnv, SENTRY_SPOTLIGHT: true })
+
+    expect(initializeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ dsn: 'https://spotlight@local/0', spotlightEnabled: true })
     )
   })
 
-  it('initializes with spotlight and real DSN when both are configured', async () => {
-    const initialized = await initializeWorkerSentry({
+  it('prefers a real DSN over the spotlight placeholder when both are set', async () => {
+    await initializeWorkerSentry({
       ...baseEnv,
       WORKER_SENTRY_DSN: 'https://worker@sentry.example.com/123',
       SENTRY_SPOTLIGHT: true
     })
 
-    expect(initialized).toBe(true)
-    expect(sentryInitMock).toHaveBeenCalledWith(
+    expect(initializeMock).toHaveBeenCalledWith(
       expect.objectContaining({
         dsn: 'https://worker@sentry.example.com/123',
-        tracesSampleRate: 1.0,
-        spotlight: true
+        spotlightEnabled: true
       })
     )
+  })
+
+  it('forwards process-level exceptions to the reporter', () => {
+    captureWorkerException(new Error('boom'))
+    expect(captureExceptionMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('flushes and resets through the reporter', async () => {
+    await flushWorkerSentry()
+    _resetWorkerSentryForTest()
+
+    expect(flushMock).toHaveBeenCalledWith(2000)
+    expect(resetMock).toHaveBeenCalledTimes(1)
   })
 })
