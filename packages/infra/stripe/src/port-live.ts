@@ -14,7 +14,7 @@ import { readFailedPaymentIntentDetails } from './payment-intent-error.js'
  */
 export const STRIPE_API_VERSION = '2025-10-29.clover' as const
 
-const stripeLogger = createLogger('stripe')
+const stripeLogger = createLogger('tx-agent-kit-stripe')
 
 const resolveCheckoutPriceIds = (
   config: StripePortConfig,

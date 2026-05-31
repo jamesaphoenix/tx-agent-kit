@@ -10,7 +10,7 @@ import { BadRequest, TxAgentApi, mapCoreError } from '../api.js'
 import { getApiEnv } from '../config/env.js'
 import { verifyUnsubscribeToken } from '../utils/unsubscribe-token.js'
 
-const logger = createLogger('email-unsubscribe')
+const logger = createLogger('tx-agent-kit-api').child('email-unsubscribe')
 
 export const EmailUnsubscribeRouteKind = 'custom' as const
 

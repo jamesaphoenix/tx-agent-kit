@@ -448,3 +448,32 @@ test('allows Effect.tryPromise()', async () => {
     rules: await effectConsistencyRule()
   })
 })
+
+// ── effect-consistency: createLogger service-name prefix ────────────────
+test('flags a bare (non-prefixed) createLogger service name', async () => {
+  const rules = await effectConsistencyRule()
+  for (const name of ['db', 'stripe', 'email-webhooks']) {
+    await expectError(
+      {
+        code: `const createLogger = (s) => ({ child: () => ({}) })\nexport const l = createLogger('${name}')`,
+        rules
+      },
+      'no-restricted-syntax'
+    )
+  }
+})
+
+test('allows tx-agent-kit- prefixed names, .child() args, and non-literal service args', async () => {
+  await expectClean({
+    code: [
+      "const createLogger = (s) => ({ child: (x) => ({}) })",
+      "const serviceName = 'tx-agent-kit-worker-dynamic'",
+      "export const a = createLogger('tx-agent-kit-db')",
+      // .child('<subsystem>') args are bare by design — only the first arg is the service name.
+      "export const b = createLogger('tx-agent-kit-api').child('email-webhooks')",
+      // non-literal service args (e.g. the Effect bridge) are untouched.
+      "export const c = createLogger(serviceName)"
+    ].join('\n'),
+    rules: await effectConsistencyRule()
+  })
+})

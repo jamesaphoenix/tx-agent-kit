@@ -1,7 +1,7 @@
 import { createLogger } from '@tx-agent-kit/logging'
 import * as Schema from 'effect/Schema'
 
-const dbLogger = createLogger('db')
+const dbLogger = createLogger('tx-agent-kit-db')
 
 export class DbError extends Schema.TaggedError<DbError>()('DbError', {
   code: Schema.String,

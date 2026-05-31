@@ -11,7 +11,7 @@ import { createLogger } from '@tx-agent-kit/logging'
 const GRPC_NOT_FOUND = 5
 const GRPC_ALREADY_EXISTS = 6
 
-const logger = createLogger('tx-agent-kit-campaign-schedules')
+const logger = createLogger('tx-agent-kit-worker-campaign-schedules')
 const EMAIL_SENDS_PRUNE_SCHEDULE_ID = 'email-sends-prune-schedule'
 
 const isScheduleNotFound = (error: unknown): boolean =>
