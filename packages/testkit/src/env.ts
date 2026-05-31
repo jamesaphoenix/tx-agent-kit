@@ -26,6 +26,15 @@ export interface TestkitEnv {
   INTEGRATION_API_BASE_URL: string | undefined
   TX_INTEGRATION_SHARED_API_READY: string | undefined
   INTEGRATION_AUTH_SECRET: string | undefined
+  /**
+   * Opt-in gate for tests that hit REAL external third-party services (live,
+   * non-deterministic, credentialed, billable). Covers multiple providers —
+   * OpenRouter/AI generation + embeddings, and transactional email (Resend).
+   * Off by default so the standard integration suite stays hermetic. Live
+   * social-provider tests have their own dedicated switch
+   * (`RUN_SOCIAL_MEDIA_ACCOUNTS_AGAINST_REAL_PROVIDERS`).
+   */
+  RUN_LIVE_INTEGRATION: string | undefined
 }
 
 export const getTestkitEnv = (): TestkitEnv => {
@@ -54,7 +63,8 @@ export const getTestkitEnv = (): TestkitEnv => {
     WORKTREE_PORT_OFFSET: process.env.WORKTREE_PORT_OFFSET,
     INTEGRATION_API_BASE_URL: process.env.INTEGRATION_API_BASE_URL,
     TX_INTEGRATION_SHARED_API_READY: process.env.TX_INTEGRATION_SHARED_API_READY,
-    INTEGRATION_AUTH_SECRET: process.env.INTEGRATION_AUTH_SECRET
+    INTEGRATION_AUTH_SECRET: process.env.INTEGRATION_AUTH_SECRET,
+    RUN_LIVE_INTEGRATION: process.env.RUN_LIVE_INTEGRATION
   }
 }
 
