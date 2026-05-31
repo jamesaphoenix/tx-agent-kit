@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Option } from 'effect'
-import { badRequest, conflict, forbidden, notFound, unauthorized, type CoreError } from '../../../errors.js'
+import { badRequest, conflict, forbidden, internalError, notFound, type CoreError } from '../../../errors.js'
 import type { ListParams, PaginatedResult } from '../../../pagination.js'
 import {
   isValidBrandSettings,
@@ -16,6 +16,9 @@ import {
   TeamStorePort,
   TeamOrganizationMembershipPort
 } from '../ports/team-ports.js'
+
+const toCoreInternal = (message: string) => (cause: unknown): CoreError =>
+  internalError(message, cause)
 
 export class TeamService extends Context.Tag('TeamService')<
   TeamService,
@@ -123,13 +126,13 @@ const requireOrgMembership = (organizationId: string, userId: string) =>
   Effect.gen(function* () {
     const orgMembershipPort = yield* TeamOrganizationMembershipPort
     const isMember = yield* orgMembershipPort.isMember(organizationId, userId).pipe(
-      Effect.mapError((cause) => unauthorized('Failed to verify organization membership', cause))
+      Effect.mapError(toCoreInternal('Failed to verify organization membership'))
     )
     if (!isMember) {
       return yield* Effect.fail(forbidden('Not allowed to access this organization'))
     }
     const disabledAt = yield* orgMembershipPort.getOrgMemberDisabledAt(organizationId, userId).pipe(
-      Effect.mapError((cause) => unauthorized('Failed to check membership disabled status', cause))
+      Effect.mapError(toCoreInternal('Failed to check membership disabled status'))
     )
     if (disabledAt !== null) {
       return yield* Effect.fail(forbidden('Your organization membership has been disabled'))
@@ -140,7 +143,7 @@ const requireOrgAdmin = (organizationId: string, userId: string) =>
   Effect.gen(function* () {
     const orgMembershipPort = yield* TeamOrganizationMembershipPort
     const role = yield* orgMembershipPort.getMemberRole(organizationId, userId).pipe(
-      Effect.mapError((cause) => unauthorized('Failed to verify organization role', cause))
+      Effect.mapError(toCoreInternal('Failed to verify organization role'))
     )
     if (role !== 'admin') {
       return yield* Effect.fail(forbidden('Only admins can manage team members'))
@@ -153,7 +156,7 @@ const requireOrgAdminOrTeamMembership = (organizationId: string, teamId: string,
 
     const orgMembershipPort = yield* TeamOrganizationMembershipPort
     const role = yield* orgMembershipPort.getMemberRole(organizationId, userId).pipe(
-      Effect.mapError((cause) => unauthorized('Failed to verify organization role', cause))
+      Effect.mapError(toCoreInternal('Failed to verify organization role'))
     )
 
     if (role === 'admin') {
@@ -162,7 +165,7 @@ const requireOrgAdminOrTeamMembership = (organizationId: string, teamId: string,
 
     const teamStore = yield* TeamStorePort
     const teamMember = yield* teamStore.getMemberByTeamAndUser(teamId, userId).pipe(
-      Effect.mapError((cause) => unauthorized('Failed to resolve team membership', cause)),
+      Effect.mapError(toCoreInternal('Failed to resolve team membership')),
       Effect.flatMap(Option.match({
         onNone: () => Effect.fail(forbidden('You are not a member of this team')),
         onSome: Effect.succeed
@@ -184,13 +187,13 @@ export const TeamServiceLive = Layer.effect(
 
         const orgMembershipPort = yield* TeamOrganizationMembershipPort
         const role = yield* orgMembershipPort.getMemberRole(organizationId, principal.userId).pipe(
-          Effect.mapError((cause) => unauthorized('Failed to verify organization role', cause))
+          Effect.mapError(toCoreInternal('Failed to verify organization role'))
         )
         const page = yield* (role === 'admin'
           ? teamStore.list(organizationId, params)
           : teamStore.listForMember(organizationId, principal.userId, params)
         ).pipe(
-          Effect.mapError((cause) => badRequest('Failed to list teams', cause))
+          Effect.mapError(toCoreInternal('Failed to list teams'))
         )
 
         return page
@@ -201,7 +204,7 @@ export const TeamServiceLive = Layer.effect(
         const teamStore = yield* TeamStorePort
 
         const team = yield* teamStore.getById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -234,7 +237,7 @@ export const TeamServiceLive = Layer.effect(
           website: input.website ?? null,
           brandSettings: input.brandSettings
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to create team', cause)),
+          Effect.mapError(toCoreInternal('Failed to create team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(badRequest('Team creation failed')),
             onSome: Effect.succeed
@@ -245,9 +248,9 @@ export const TeamServiceLive = Layer.effect(
         // The auto-join trigger may have already added them as 'member' — the role
         // parameter triggers onConflictDoUpdate to promote to admin.
         yield* teamStore.addMember({ teamId: created.id, userId: principal.userId, role: 'admin' }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to add creator as team member', cause)),
+          Effect.mapError(toCoreInternal('Failed to add creator as team member')),
           Effect.flatMap(Option.match({
-            onNone: () => Effect.fail(badRequest('Failed to add creator as team member')),
+            onNone: () => Effect.fail(internalError('Failed to add creator as team member')),
             onSome: Effect.succeed
           }))
         )
@@ -260,7 +263,7 @@ export const TeamServiceLive = Layer.effect(
         const teamStore = yield* TeamStorePort
 
         const existing = yield* teamStore.getById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -299,7 +302,7 @@ export const TeamServiceLive = Layer.effect(
         }
 
         const updated = yield* teamStore.update(patch).pipe(
-          Effect.mapError((cause) => badRequest('Failed to update team', cause)),
+          Effect.mapError(toCoreInternal('Failed to update team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -314,7 +317,7 @@ export const TeamServiceLive = Layer.effect(
         const teamStore = yield* TeamStorePort
 
         const existing = yield* teamStore.getById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -337,7 +340,7 @@ export const TeamServiceLive = Layer.effect(
             }
           }
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to delete team', cause))
+          Effect.mapError(toCoreInternal('Failed to delete team'))
         )
       }),
 
@@ -347,7 +350,7 @@ export const TeamServiceLive = Layer.effect(
         const orgMembershipPort = yield* TeamOrganizationMembershipPort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -359,16 +362,16 @@ export const TeamServiceLive = Layer.effect(
 
         // Verify target user is a member of the same organization
         const targetIsMember = yield* orgMembershipPort.isMember(team.organizationId, userId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to verify user membership', cause))
+          Effect.mapError(toCoreInternal('Failed to verify user membership'))
         )
         if (!targetIsMember) {
           return yield* Effect.fail(notFound('User is not a member of this organization'))
         }
 
         const added = yield* teamStore.addMember({ teamId, userId }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to add team member', cause)),
+          Effect.mapError(toCoreInternal('Failed to add team member')),
           Effect.flatMap(Option.match({
-            onNone: () => Effect.fail(badRequest('Failed to add team member')),
+            onNone: () => Effect.fail(internalError('Failed to add team member')),
             onSome: Effect.succeed
           }))
         )
@@ -381,7 +384,7 @@ export const TeamServiceLive = Layer.effect(
         const teamStore = yield* TeamStorePort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -392,7 +395,7 @@ export const TeamServiceLive = Layer.effect(
         yield* requireOrgAdmin(team.organizationId, principal.userId)
 
         return yield* teamStore.removeMember(teamId, userId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to remove team member', cause))
+          Effect.mapError(toCoreInternal('Failed to remove team member'))
         )
       }),
 
@@ -401,7 +404,7 @@ export const TeamServiceLive = Layer.effect(
         const teamStore = yield* TeamStorePort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -411,7 +414,7 @@ export const TeamServiceLive = Layer.effect(
         yield* requireOrgAdminOrTeamMembership(team.organizationId, teamId, principal.userId)
 
         return yield* teamStore.listMembers(teamId, params).pipe(
-          Effect.mapError((cause) => badRequest('Failed to list team members', cause))
+          Effect.mapError(toCoreInternal('Failed to list team members'))
         )
       }),
 
@@ -421,7 +424,7 @@ export const TeamServiceLive = Layer.effect(
         const orgMembershipPort = yield* TeamOrganizationMembershipPort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -433,7 +436,7 @@ export const TeamServiceLive = Layer.effect(
 
         // Verify target user is a member of the same organization
         const targetIsMember = yield* orgMembershipPort.isMember(team.organizationId, userId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to verify user membership', cause))
+          Effect.mapError(toCoreInternal('Failed to verify user membership'))
         )
         if (!targetIsMember) {
           return yield* Effect.fail(notFound('User is not a member of this organization'))
@@ -441,7 +444,7 @@ export const TeamServiceLive = Layer.effect(
 
         // Check if user is already a member of the team
         const existingOpt = yield* teamStore.getMemberByTeamAndUser(teamId, userId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to check existing team member', cause))
+          Effect.mapError(toCoreInternal('Failed to check existing team member'))
         )
 
         if (Option.isSome(existingOpt)) {
@@ -449,9 +452,9 @@ export const TeamServiceLive = Layer.effect(
         }
 
         const added = yield* teamStore.addMember({ teamId, userId }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to add team member', cause)),
+          Effect.mapError(toCoreInternal('Failed to add team member')),
           Effect.flatMap(Option.match({
-            onNone: () => Effect.fail(badRequest('Failed to add team member')),
+            onNone: () => Effect.fail(internalError('Failed to add team member')),
             onSome: Effect.succeed
           }))
         )
@@ -464,7 +467,7 @@ export const TeamServiceLive = Layer.effect(
         const teamStore = yield* TeamStorePort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -474,7 +477,7 @@ export const TeamServiceLive = Layer.effect(
         yield* requireOrgMembership(team.organizationId, principal.userId)
 
         const member = yield* teamStore.getMemberById(memberId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team member', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team member')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team member not found')),
             onSome: Effect.succeed
@@ -493,7 +496,7 @@ export const TeamServiceLive = Layer.effect(
         const teamStore = yield* TeamStorePort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -504,7 +507,7 @@ export const TeamServiceLive = Layer.effect(
         yield* requireOrgAdmin(team.organizationId, principal.userId)
 
         const existing = yield* teamStore.getMemberById(memberId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team member', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team member')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team member not found')),
             onSome: Effect.succeed
@@ -516,7 +519,7 @@ export const TeamServiceLive = Layer.effect(
         }
 
         const updated = yield* teamStore.updateMemberRole(memberId, roleId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to update team member role', cause)),
+          Effect.mapError(toCoreInternal('Failed to update team member role')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team member not found')),
             onSome: Effect.succeed
@@ -531,7 +534,7 @@ export const TeamServiceLive = Layer.effect(
         const teamStore = yield* TeamStorePort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -542,7 +545,7 @@ export const TeamServiceLive = Layer.effect(
         yield* requireOrgAdmin(team.organizationId, principal.userId)
 
         const existing = yield* teamStore.getMemberById(memberId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team member', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team member')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team member not found')),
             onSome: Effect.succeed
@@ -554,7 +557,7 @@ export const TeamServiceLive = Layer.effect(
         }
 
         const disabled = yield* teamStore.disableMemberById(memberId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to disable team member', cause)),
+          Effect.mapError(toCoreInternal('Failed to disable team member')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team member not found')),
             onSome: Effect.succeed
@@ -569,7 +572,7 @@ export const TeamServiceLive = Layer.effect(
         const teamStore = yield* TeamStorePort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -580,7 +583,7 @@ export const TeamServiceLive = Layer.effect(
         yield* requireOrgAdmin(team.organizationId, principal.userId)
 
         const existing = yield* teamStore.getMemberById(memberId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team member', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team member')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team member not found')),
             onSome: Effect.succeed
@@ -592,7 +595,7 @@ export const TeamServiceLive = Layer.effect(
         }
 
         const enabled = yield* teamStore.enableMemberById(memberId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to enable team member', cause)),
+          Effect.mapError(toCoreInternal('Failed to enable team member')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team member not found')),
             onSome: Effect.succeed
@@ -607,7 +610,7 @@ export const TeamServiceLive = Layer.effect(
         const teamStore = yield* TeamStorePort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -618,7 +621,7 @@ export const TeamServiceLive = Layer.effect(
         yield* requireOrgAdmin(team.organizationId, principal.userId)
 
         const existing = yield* teamStore.getMemberById(memberId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team member', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team member')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team member not found')),
             onSome: Effect.succeed
@@ -630,7 +633,7 @@ export const TeamServiceLive = Layer.effect(
         }
 
         yield* teamStore.removeMemberById(memberId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to remove team member', cause))
+          Effect.mapError(toCoreInternal('Failed to remove team member'))
         )
 
         return { deleted: true as const }
@@ -642,7 +645,7 @@ export const TeamServiceLive = Layer.effect(
         const tokenStore = yield* ContentReviewTokenStorePort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -664,7 +667,7 @@ export const TeamServiceLive = Layer.effect(
           reviewerEmail: input.reviewerEmail ?? null,
           createdBy: principal.userId
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to create review token', cause)),
+          Effect.mapError(toCoreInternal('Failed to create review token')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(badRequest('Review token creation failed')),
             onSome: Effect.succeed
@@ -680,7 +683,7 @@ export const TeamServiceLive = Layer.effect(
         const tokenStore = yield* ContentReviewTokenStorePort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -690,7 +693,7 @@ export const TeamServiceLive = Layer.effect(
         yield* requireOrgMembership(team.organizationId, principal.userId)
 
         return yield* tokenStore.list(teamId, params).pipe(
-          Effect.mapError((cause) => badRequest('Failed to list review tokens', cause))
+          Effect.mapError(toCoreInternal('Failed to list review tokens'))
         )
       }),
 
@@ -700,7 +703,7 @@ export const TeamServiceLive = Layer.effect(
         const tokenStore = yield* ContentReviewTokenStorePort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch team', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Team not found')),
             onSome: Effect.succeed
@@ -711,7 +714,7 @@ export const TeamServiceLive = Layer.effect(
         yield* requireOrgAdmin(team.organizationId, principal.userId)
 
         const existing = yield* tokenStore.getById(tokenId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch review token', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch review token')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Review token not found')),
             onSome: Effect.succeed
@@ -723,7 +726,7 @@ export const TeamServiceLive = Layer.effect(
         }
 
         yield* tokenStore.revoke(tokenId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to revoke review token', cause))
+          Effect.mapError(toCoreInternal('Failed to revoke review token'))
         )
 
         return { deleted: true as const }
@@ -734,7 +737,7 @@ export const TeamServiceLive = Layer.effect(
         const tokenStore = yield* ContentReviewTokenStorePort
 
         const foundOpt = yield* tokenStore.findByToken(token).pipe(
-          Effect.mapError((cause) => badRequest('Failed to validate review token', cause))
+          Effect.mapError(toCoreInternal('Failed to validate review token'))
         )
 
         if (Option.isNone(foundOpt)) {

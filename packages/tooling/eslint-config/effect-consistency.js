@@ -46,6 +46,22 @@ export const effectConsistencyConfig = [
           message:
             'Use Effect.tryPromise() instead of Effect.promise(): a promise rejection under Effect.promise becomes a silent defect that bypasses the log+Sentry boundary. tryPromise keeps it in the observable error channel.'
         },
+        // ── Ban infra failure mapped to a 4xx client error ─────────────
+        // A "Failed to <verb>" message denotes a repository/port/infra CALL
+        // failing — that is a 500 server fault, NOT the client's fault.
+        // Mapping it to badRequest/unauthorized/conflict/forbidden/notFound
+        // returns the wrong status AND (for 4xx with no recognizable cause)
+        // can be demoted to a warn that never reaches Sentry. Use
+        // internalError(...) / withInternalError(...) / toCoreInternal(...)
+        // so the failure is always logged + captured. Genuine client errors
+        // should describe the client problem ("Invalid …", "… already
+        // exists", "Not allowed …"), never "Failed to …".
+        {
+          selector:
+            'CallExpression[callee.name=/^(badRequest|unauthorized|conflict|forbidden|notFound)$/][arguments.0.value=/^Failed to /]',
+          message:
+            "A 'Failed to …' message is an infra/port-call failure (a 500), not a 4xx client error. Use internalError() / withInternalError() / toCoreInternal() so it is logged + sent to Sentry. If this is genuinely the client's fault, describe the client problem instead of 'Failed to …'."
+        },
         createLoggerServiceNamePrefixRule
       ]
     }

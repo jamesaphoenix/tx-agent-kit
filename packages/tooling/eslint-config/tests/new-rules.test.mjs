@@ -477,3 +477,44 @@ test('allows tx-agent-kit- prefixed names, .child() args, and non-literal servic
     rules: await effectConsistencyRule()
   })
 })
+
+// ── effect-consistency: infra failure must not be a 4xx client error ────
+// The rule lives in effect-consistency.js as a `no-restricted-syntax` selector.
+// We pull the exact rule options off the published config (via the shared
+// effectConsistencyRule helper) so the test tracks the real selector.
+test("no-infra-failure-as-client-error flags badRequest('Failed to …')", async () => {
+  await expectError(
+    {
+      code: "const badRequest = (m) => m\nexport const e = badRequest('Failed to load widget')",
+      rules: await effectConsistencyRule()
+    },
+    'no-restricted-syntax'
+  )
+})
+
+test('no-infra-failure-as-client-error flags unauthorized/conflict/notFound "Failed to …"', async () => {
+  const rules = await effectConsistencyRule()
+  for (const ctor of ['unauthorized', 'conflict', 'forbidden', 'notFound']) {
+    await expectError(
+      {
+        code: `const ${ctor} = (m) => m\nexport const e = ${ctor}('Failed to read row')`,
+        rules
+      },
+      'no-restricted-syntax'
+    )
+  }
+})
+
+test('no-infra-failure-as-client-error allows genuine client errors + internalError', async () => {
+  await expectClean({
+    code: [
+      "const badRequest = (m) => m",
+      "const conflict = (m) => m",
+      "const internalError = (m) => m",
+      "export const a = badRequest('Invalid widget payload')",
+      "export const b = conflict('Widget already exists')",
+      "export const c = internalError('Failed to load widget')"
+    ].join('\n'),
+    rules: await effectConsistencyRule()
+  })
+})
