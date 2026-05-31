@@ -1,3 +1,4 @@
+import { trace } from '@opentelemetry/api'
 import { logs, SeverityNumber, type AnyValue, type AnyValueMap } from '@opentelemetry/api-logs'
 import { getLoggingEnv } from './env.js'
 
@@ -122,6 +123,29 @@ const writeLog = (entry: StructuredLogEntry): void => {
 }
 
 const withScope = (service: string, scope: string): string => `${service}:${scope}`
+
+/**
+ * The single place we read OTEL trace correlation from the active span. Shared
+ * by the structured logger AND the Sentry reporter
+ * (`@tx-agent-kit/observability/sentry`) so log entries and Sentry issues link
+ * to the SAME trace, resolved the SAME way. Returns undefined when there is no
+ * active span with a valid (non-empty) trace id. Lives here because logging is
+ * the lowest layer that needs it; observability depends on logging, not the
+ * reverse.
+ */
+export const getActiveSpanContext = ():
+  | { traceId: string; spanId: string; traceFlags: number }
+  | undefined => {
+  const spanContext = trace.getActiveSpan()?.spanContext()
+  if (!spanContext?.traceId) {
+    return undefined
+  }
+  return {
+    traceId: spanContext.traceId,
+    spanId: spanContext.spanId,
+    traceFlags: spanContext.traceFlags
+  }
+}
 
 const createEntry = (
   service: string,

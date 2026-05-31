@@ -1,4 +1,4 @@
-import { trace } from '@opentelemetry/api'
+import { getActiveSpanContext } from '@tx-agent-kit/logging'
 
 /**
  * Shared Sentry error-reporting core for the backend services (API + worker).
@@ -67,20 +67,6 @@ export interface SentryReporter {
   captureScoped: (error: unknown, capture: ScopedCapture) => void
   flush: (timeoutMs?: number) => Promise<void>
   reset: () => void
-}
-
-/**
- * Resolve the active OTEL trace/span ids so each Sentry issue links back to the
- * full distributed trace (web → api → worker) in Jaeger/Spotlight. The Effect
- * OTEL tracer registers spans on the global OTEL context, so `getActiveSpan`
- * returns the current span when called inside the handler/activity fiber.
- */
-const resolveActiveTrace = (): { traceId: string; spanId: string } | undefined => {
-  const spanContext = trace.getActiveSpan()?.spanContext()
-  if (!spanContext?.traceId) {
-    return undefined
-  }
-  return { traceId: spanContext.traceId, spanId: spanContext.spanId }
 }
 
 const toFingerprintPart = (value: string | undefined): string =>
@@ -155,7 +141,9 @@ export const createSentryReporter = (): SentryReporter => {
       return
     }
 
-    const activeTrace = resolveActiveTrace()
+    // Trace correlation is read via the shared logging primitive so Sentry tags
+    // and structured logs link to the same trace, the same way.
+    const activeTrace = getActiveSpanContext()
     mod.withScope((scope) => {
       scope.setTag('error_boundary', capture.boundary)
       if (capture.tags) {

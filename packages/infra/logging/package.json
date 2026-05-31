@@ -12,6 +12,7 @@
     "test": "vitest run -c vitest.config.ts"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/api-logs": "^0.214.0",
     "effect": "^3.21.2"
   },

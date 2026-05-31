@@ -598,6 +598,9 @@ importers:
 
   packages/infra/logging:
     dependencies:
+      '@opentelemetry/api':
+        specifier: ^1.9.1
+        version: 1.9.1
       '@opentelemetry/api-logs':
         specifier: ^0.214.0
         version: 0.214.0

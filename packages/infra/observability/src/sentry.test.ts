@@ -41,12 +41,16 @@ vi.mock('@sentry/node', () => ({
   flush: sentryFlushMock
 }))
 
-const { getActiveSpanMock } = vi.hoisted(() => ({
-  getActiveSpanMock: vi.fn<() => unknown>(() => undefined)
+const { getActiveSpanContextMock } = vi.hoisted(() => ({
+  getActiveSpanContextMock: vi.fn<() => { traceId: string; spanId: string; traceFlags: number } | undefined>(
+    () => undefined
+  )
 }))
 
-vi.mock('@opentelemetry/api', () => ({
-  trace: { getActiveSpan: getActiveSpanMock }
+// The reporter reads trace correlation via the shared logging primitive, so we
+// mock that seam (not @opentelemetry/api) to drive the trace-tag tests.
+vi.mock('@tx-agent-kit/logging', () => ({
+  getActiveSpanContext: getActiveSpanContextMock
 }))
 
 const baseInit = {
@@ -59,7 +63,7 @@ const baseInit = {
 describe('createSentryReporter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    getActiveSpanMock.mockReturnValue(undefined)
+    getActiveSpanContextMock.mockReturnValue(undefined)
   })
 
   it('is a no-op until initialized', async () => {
@@ -155,11 +159,10 @@ describe('createSentryReporter', () => {
     const reporter = createSentryReporter()
     await reporter.initialize(baseInit)
 
-    getActiveSpanMock.mockReturnValue({
-      spanContext: () => ({
-        traceId: '0af7651916cd43dd8448eb211c80319c',
-        spanId: 'b7ad6b7169203331'
-      })
+    getActiveSpanContextMock.mockReturnValue({
+      traceId: '0af7651916cd43dd8448eb211c80319c',
+      spanId: 'b7ad6b7169203331',
+      traceFlags: 1
     })
 
     reporter.captureScoped(new Error('boom'), { boundary: 'worker_activity' })

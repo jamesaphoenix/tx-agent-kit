@@ -7,15 +7,17 @@ interface OTelLogRecord {
   attributes: Record<string, unknown>
 }
 
-const { otelEmitMock, otelGetLoggerMock } = vi.hoisted(() => {
+const { otelEmitMock, otelGetLoggerMock, traceGetActiveSpanMock } = vi.hoisted(() => {
   const otelEmitMock = vi.fn<(record: OTelLogRecord) => void>()
   const otelGetLoggerMock = vi.fn(() => ({
     emit: otelEmitMock
   }))
+  const traceGetActiveSpanMock = vi.fn<() => unknown>(() => undefined)
 
   return {
     otelEmitMock,
-    otelGetLoggerMock
+    otelGetLoggerMock,
+    traceGetActiveSpanMock
   }
 })
 
@@ -31,12 +33,46 @@ vi.mock('@opentelemetry/api-logs', () => ({
   }
 }))
 
-import { createLogger } from './index.js'
+vi.mock('@opentelemetry/api', () => ({
+  trace: { getActiveSpan: traceGetActiveSpanMock }
+}))
+
+import { createLogger, getActiveSpanContext } from './index.js'
 import { getLoggingEnv } from './env.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
   delete process.env.LOG_LEVEL
+})
+
+describe('getActiveSpanContext', () => {
+  it('returns undefined when there is no active span', () => {
+    expect(getActiveSpanContext()).toBeUndefined()
+  })
+
+  it('returns the active span trace correlation', () => {
+    traceGetActiveSpanMock.mockReturnValue({
+      spanContext: () => ({
+        traceId: '0af7651916cd43dd8448eb211c80319c',
+        spanId: 'b7ad6b7169203331',
+        traceFlags: 1
+      })
+    })
+
+    expect(getActiveSpanContext()).toEqual({
+      traceId: '0af7651916cd43dd8448eb211c80319c',
+      spanId: 'b7ad6b7169203331',
+      traceFlags: 1
+    })
+  })
+
+  it('returns undefined when the span context has no trace id', () => {
+    traceGetActiveSpanMock.mockReturnValue({
+      spanContext: () => ({ traceId: '', spanId: '', traceFlags: 0 })
+    })
+
+    expect(getActiveSpanContext()).toBeUndefined()
+  })
 })
 
 describe('createLogger', () => {
