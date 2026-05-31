@@ -15,6 +15,7 @@
     "test:integration:temporal": "vitest run -c vitest.temporal.integration.config.ts"
   },
   "dependencies": {
+    "@temporalio/activity": "^1.16.0",
     "@temporalio/client": "^1.16.0",
     "@temporalio/common": "^1.16.0",
     "@temporalio/worker": "^1.16.0",

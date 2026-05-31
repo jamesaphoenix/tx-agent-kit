@@ -392,6 +392,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@temporalio/activity':
+        specifier: ^1.16.0
+        version: 1.16.0
       '@temporalio/client':
         specifier: ^1.16.0
         version: 1.16.0
