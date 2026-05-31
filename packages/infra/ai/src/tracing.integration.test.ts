@@ -6,7 +6,9 @@ import {
 } from '@tx-agent-kit/observability'
 import { tracedCallModel, withAgentStep, withAgentTrace } from './tracing.js'
 
-const shouldRunAiIntegration = process.env.RUN_AI_INTEGRATION === '1'
+// Unified live-service gate (see testkit env RUN_LIVE_INTEGRATION): the umbrella
+// opt-in for tests hitting real external third parties (AI/OpenRouter, Resend).
+const shouldRunAiIntegration = process.env.RUN_LIVE_INTEGRATION === '1'
 
 describe('AI tracing integration', () => {
   describe('tracedCallModel', () => {

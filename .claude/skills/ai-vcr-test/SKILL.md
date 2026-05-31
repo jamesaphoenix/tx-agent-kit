@@ -1,6 +1,6 @@
 ---
 name: ai-vcr-test
-description: Build and use the VCR (Video Cassette Recorder) test caching system for AI integration tests. Use when adding new AI tests, converting existing RUN_AI_INTEGRATION tests to cached replay, or managing cassette recordings.
+description: Build and use the VCR (Video Cassette Recorder) test caching system for AI integration tests. Use when adding new AI tests, converting existing RUN_LIVE_INTEGRATION tests to cached replay, or managing cassette recordings.
 argument-hint: <suite-name>
 ---
 
@@ -605,9 +605,9 @@ describe('my AI feature', () => {
 })
 ```
 
-## Steps — Converting an Existing `RUN_AI_INTEGRATION` Test
+## Steps — Converting an Existing `RUN_LIVE_INTEGRATION` Test
 
-This converts tests that currently require a live API key and `RUN_AI_INTEGRATION=1`.
+This converts tests that currently require a live API key and `RUN_LIVE_INTEGRATION=1`.
 
 ### 1. Add testkit VCR dependency
 
@@ -625,7 +625,7 @@ Ensure the package has `@tx-agent-kit/testkit` as a `devDependency`:
 
 **Before:**
 ```typescript
-const shouldRunAiIntegration = process.env.RUN_AI_INTEGRATION === '1'
+const shouldRunAiIntegration = process.env.RUN_LIVE_INTEGRATION === '1'
 describe.skipIf(!shouldRunAiIntegration)('AI tracing integration', () => {
 ```
 
