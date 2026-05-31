@@ -518,3 +518,53 @@ test('no-infra-failure-as-client-error allows genuine client errors + internalEr
     rules: await effectConsistencyRule()
   })
 })
+
+// ── domain-invariants: createLogger banned in core application/services ──
+// Domain/application code must log via the bridged Effect.log* (which routes
+// into the same structured + OTEL pipeline), never the raw createLogger.
+// Enforced as a no-restricted-imports path on the core application/services
+// block(s) — and that block must keep its existing co-located bans.
+test('no-restricted-imports: createLogger is banned in core application/services', async () => {
+  const { domainInvariantConfig } = await import('../domain-invariants.js')
+
+  let banConfig = null
+  for (const config of domainInvariantConfig) {
+    const rule = config.rules && config.rules['no-restricted-imports']
+    if (!rule) { continue }
+    const files = config.files || []
+    if (!files.some((f) => f.includes('application/**'))) { continue }
+    const opts = rule[1]
+    const hasBan = (opts.paths || []).some(
+      (p) => p.name === '@tx-agent-kit/logging' && (p.importNames || []).includes('createLogger')
+    )
+    if (hasBan) { banConfig = opts }
+  }
+
+  assert.ok(banConfig, 'createLogger should be banned in a core application/services block')
+
+  // The ban must be ADDITIVE — an existing application-layer ban must survive.
+  const pathNames = (banConfig.paths || []).map((p) => p.name)
+  assert.ok(
+    pathNames.includes('@tx-agent-kit/auth') || pathNames.includes('effect/Schema'),
+    'an existing application-layer ban (auth / effect/Schema) must remain alongside the createLogger ban'
+  )
+
+  const rule = { 'no-restricted-imports': ['error', banConfig] }
+  // Flags the createLogger value import...
+  await expectError(
+    {
+      code: "import { createLogger } from '@tx-agent-kit/logging'\nexport const l = createLogger('x')",
+      rules: rule
+    },
+    'no-restricted-imports'
+  )
+  // ...but allows type-only imports from the same module and the bridged Effect.log*.
+  await expectClean({
+    code: [
+      "import type { LogContext } from '@tx-agent-kit/logging'",
+      "import { Effect } from 'effect'",
+      "export const e = (c: LogContext) => Effect.logError('boom', c)"
+    ].join('\n'),
+    rules: rule
+  })
+})

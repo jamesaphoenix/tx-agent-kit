@@ -256,6 +256,19 @@ export const domainInvariantConfig = [
     files: ['packages/core/**/application/**/*.{ts,tsx}', 'packages/core/**/services/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', withGlobalRestrictions({
+        paths: [{
+          // Domain/application code must log via Effect.logError/logWarning/
+          // logInfo/logDebug, NOT the structured createLogger directly. The
+          // Effect→createLogger bridge (makeEffectLoggerLayer) routes Effect.log*
+          // into the SAME structured + OTEL + trace-correlated pipeline, so
+          // domain logs stay first-class and there is exactly one logging path.
+          // createLogger is for the layers that own a runtime (apps/api,
+          // apps/worker, packages/infra/*) and for adapters bridging to infra.
+          name: '@tx-agent-kit/logging',
+          importNames: ['createLogger'],
+          message:
+            'Use Effect.logError/logWarning/logInfo/logDebug in domain/application code, not createLogger. The Effect→createLogger bridge routes Effect.log* into the same structured + OTEL pipeline. Reserve createLogger for runtime-owning layers (apps/api, apps/worker, packages/infra/*) and infra-bridging adapters.'
+        }],
         patterns: [{
           group: ['**/repositories/domain-events*', '@tx-agent-kit/db'],
           message: 'Service layer must not import domain events repository directly. Use port methods (e.g., createWithEvent) to write events transactionally.'
@@ -992,6 +1005,19 @@ export const domainInvariantConfig = [
               name: 'effect/Schema',
               message:
                 'Decode/validate payloads at route boundaries. Application use-cases should receive already-typed command objects.'
+            },
+            {
+              // Domain/application code logs via Effect.logError/logWarning/
+              // logInfo/logDebug — the Effect→createLogger bridge
+              // (makeEffectLoggerLayer) routes those into the SAME structured +
+              // OTEL + trace-correlated pipeline, so there is exactly one
+              // logging path. createLogger belongs to runtime-owning layers
+              // (apps/api, apps/worker, packages/infra/*) and infra-bridging
+              // adapters, never the domain application layer.
+              name: '@tx-agent-kit/logging',
+              importNames: ['createLogger'],
+              message:
+                'Use Effect.logError/logWarning/logInfo/logDebug in domain/application code, not createLogger. The Effect→createLogger bridge routes Effect.log* into the same structured + OTEL pipeline. Reserve createLogger for runtime-owning layers (apps/api, apps/worker, packages/infra/*) and infra-bridging adapters.'
             }
           ],
           patterns: [

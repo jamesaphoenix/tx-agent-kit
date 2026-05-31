@@ -145,15 +145,19 @@ export const toDbError = (context: string, cause: unknown): DbError => {
     return cause
   }
 
+  // DB-layer breadcrumb only (debug, not error). The actual fault is logged
+  // once at its boundary — the API's mapCoreError or the worker's activity
+  // error boundary — so logging error here too would double-log every DB
+  // failure. pgCode/constraint stay as a local detail.
   if (typeof cause === 'object' && cause !== null) {
     const pgError = extractPostgresError(cause)
     if (pgError) {
       const code = typeof pgError.code === 'string' ? pgError.code : ''
       const constraint = typeof pgError.constraint === 'string' ? pgError.constraint : ''
-      dbLogger.error(context, { pgCode: code, constraint, pgMessage: toErrorMessage(pgError) })
+      dbLogger.debug(context, { pgCode: code, constraint, pgMessage: toErrorMessage(pgError) })
     } else {
       const tag = (cause as { _tag?: string })._tag
-      dbLogger.error(context, { errorType: tag ?? 'unknown', detail: toErrorMessage(cause) })
+      dbLogger.debug(context, { errorType: tag ?? 'unknown', detail: toErrorMessage(cause) })
     }
   }
 
