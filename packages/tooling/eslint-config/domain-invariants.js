@@ -685,6 +685,13 @@ export const domainInvariantConfig = [
       'apps/web/components/ui/**',
       'apps/web/components/AppSidebar.tsx',
       'apps/web/components/devtools/**',
+      // global-error REPLACES the root layout when an uncaught error escapes it,
+      // so it renders before any provider/theme tree is mounted and MUST use a
+      // raw <button> — the shadcn <Button> depends on context that does not
+      // exist in this dependency-free boundary. Same self-contained rationale
+      // that lets `next build` prerender /_global-error cleanly for the E2E
+      // prod target.
+      'apps/web/app/global-error.tsx',
       '**/*.test.*',
       '**/*.integration.test.*'
     ],

@@ -11,7 +11,10 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run -c vitest.config.ts",
-    "test:integration": "vitest run -c vitest.integration.config.ts"
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "e2e:build": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env ../../.env; export NODE_ENV=production; export NEXT_PUBLIC_API_BASE_URL=\"${NEXT_PUBLIC_API_BASE_URL:-http://localhost:${API_PORT:-4000}}\"; exec next build --webpack'",
+    "e2e:serve": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env ../../.env; export NODE_ENV=production; export NEXT_PUBLIC_API_BASE_URL=\"${NEXT_PUBLIC_API_BASE_URL:-http://localhost:${API_PORT:-4000}}\"; exec next start -p \"${WEB_PORT:-${PORT:-3000}}\"'",
+    "test:e2e": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env ../../.env; E2E_WALL_CLOCK_BUDGET_SECONDS=120; if command -v timeout >/dev/null 2>&1; then exec timeout --kill-after=10 \"${E2E_WALL_CLOCK_BUDGET_SECONDS}\" pnpm exec playwright test --config e2e/playwright.config.ts; elif command -v gtimeout >/dev/null 2>&1; then exec gtimeout --kill-after=10 \"${E2E_WALL_CLOCK_BUDGET_SECONDS}\" pnpm exec playwright test --config e2e/playwright.config.ts; else exec node ../../scripts/e2e/wall-clock-watchdog.mjs \"${E2E_WALL_CLOCK_BUDGET_SECONDS}\" pnpm exec playwright test --config e2e/playwright.config.ts; fi'"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",
@@ -45,6 +48,7 @@
     "@tailwindcss/postcss": "^4.2.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@playwright/test": "^1.59.1",
     "@testing-library/user-event": "^14.6.1",
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",

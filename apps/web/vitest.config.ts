@@ -16,7 +16,11 @@ export default mergeConfig(
         '**/.next/**',
         '**/coverage/**',
         '**/*.integration.test.ts',
-        '**/*.integration.test.tsx'
+        '**/*.integration.test.tsx',
+        // Playwright browser E2E specs use `@playwright/test`'s `test()` runner,
+        // not vitest. Keep them out of the unit runner.
+        '**/e2e/**',
+        '**/*.e2e.test.ts'
       ]
     },
     resolve: {
