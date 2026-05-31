@@ -423,3 +423,28 @@ test('no-restricted-imports cascade: infra/db is NOT drizzle-restricted', async 
   const patternGroups = (lastConfig.patterns || []).flatMap((p) => p.group || [])
   assert.ok(!patternGroups.includes('drizzle-orm'), 'drizzle-orm should NOT be banned in infra/db')
 })
+
+// ── effect-consistency: ban Effect.promise (use Effect.tryPromise) ──────
+const effectConsistencyRule = async () => {
+  const { effectConsistencyConfig } = await import('../effect-consistency.js')
+  return {
+    'no-restricted-syntax': effectConsistencyConfig[0].rules['no-restricted-syntax']
+  }
+}
+
+test('bans Effect.promise() (silent defect on rejection)', async () => {
+  await expectError(
+    {
+      code: "const Effect = { promise: (f) => f }\nexport const e = Effect.promise(() => Promise.resolve(1))",
+      rules: await effectConsistencyRule()
+    },
+    'no-restricted-syntax'
+  )
+})
+
+test('allows Effect.tryPromise()', async () => {
+  await expectClean({
+    code: "const Effect = { tryPromise: (o) => o }\nexport const e = Effect.tryPromise({ try: () => Promise.resolve(1), catch: (c) => c })",
+    rules: await effectConsistencyRule()
+  })
+})
