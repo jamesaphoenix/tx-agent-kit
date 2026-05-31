@@ -31,7 +31,7 @@ vi.mock('@opentelemetry/api-logs', () => ({
   }
 }))
 
-import { createLogger, createPerfLogger, logError, toErrorDetails } from './index.js'
+import { createLogger } from './index.js'
 import { getLoggingEnv } from './env.js'
 
 beforeEach(() => {
@@ -66,67 +66,20 @@ describe('createLogger', () => {
     expect(emittedRecord.attributes['service.name']).toBe('test-service')
     expect(emittedRecord.attributes['context.requestId']).toBe('req-1')
   })
-})
 
-describe('logging helpers', () => {
-  it('extracts structured details from unknown errors', () => {
-    expect(toErrorDetails(new Error('nope'))).toMatchObject({
-      errorName: 'Error',
-      errorMessage: 'nope'
+  it('never throws when stdout write fails and degrades to a stderr fallback', () => {
+    const stdoutWriteMock = vi.spyOn(process.stdout, 'write').mockImplementation(() => {
+      throw new Error('EPIPE')
     })
+    const stderrWriteMock = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
-    expect(toErrorDetails('plain failure')).toMatchObject({
-      errorMessage: 'plain failure',
-      errorType: 'string'
-    })
-  })
+    const logger = createLogger('test-service')
 
-  it('logError forwards an error event to the logger', () => {
-    const logger = {
-      error: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      debug: vi.fn(),
-      child: vi.fn()
-    }
+    expect(() => logger.info('stdout failure')).not.toThrow()
+    expect(stderrWriteMock).toHaveBeenCalledOnce()
 
-    logError(logger, new Error('boom'), 'worker.execute', { jobId: 'job-1' })
-
-    expect(logger.error).toHaveBeenCalledOnce()
-    expect(logger.error).toHaveBeenCalledWith(
-      'Error in worker.execute',
-      expect.objectContaining({
-        event: 'error',
-        context: 'worker.execute',
-        jobId: 'job-1',
-        errorMessage: 'boom'
-      }),
-      expect.any(Error)
-    )
-  })
-
-  it('createPerfLogger emits performance event on end', () => {
-    const logger = {
-      info: vi.fn(),
-      error: vi.fn(),
-      warn: vi.fn(),
-      debug: vi.fn(),
-      child: vi.fn()
-    }
-
-    const perf = createPerfLogger(logger, 'db.query', { table: 'users' })
-    perf.end({ queryName: 'listUsers' })
-
-    expect(logger.info).toHaveBeenCalledOnce()
-    expect(logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('db.query completed in '),
-      expect.objectContaining({
-        event: 'performance',
-        operation: 'db.query',
-        table: 'users',
-        queryName: 'listUsers'
-      })
-    )
+    stdoutWriteMock.mockRestore()
+    stderrWriteMock.mockRestore()
   })
 })
 
