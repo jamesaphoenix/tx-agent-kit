@@ -802,11 +802,22 @@ export const AuthServiceLive = Layer.effect(
           Effect.mapError((cause) => badRequest('Failed to process forgot-password request', cause))
         )
 
+        // Best-effort: a failed email send (provider outage, rejected
+        // recipient, transient 5xx) MUST NOT change the response. Otherwise an
+        // existing account whose email fails returns an error while a missing
+        // account returns 202 — an account-enumeration oracle — and any
+        // email-provider outage would fail every real user's reset. The token is
+        // already persisted, so the user can retry; we always return the generic 202.
         yield* passwordResetEmailPort.sendPasswordResetEmail({
           email: user.email,
           name: user.name,
           token
-        }).pipe(Effect.mapError((cause) => badRequest('Failed to process forgot-password request', cause)))
+        }).pipe(
+          Effect.tapError((cause) =>
+            Effect.logError('Failed to send password reset email; returning generic response', { cause })
+          ),
+          Effect.catchAll(() => Effect.void)
+        )
 
         yield* recordAuditEvent({
           userId: user.id,
