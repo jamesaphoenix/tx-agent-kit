@@ -122,7 +122,17 @@ import {
   creditBalanceResponseSchema,
   creditEntryTypeSchema
 } from '@tx-agent-kit/contracts'
+import {
+  causeLogContext,
+  findRootCauseError,
+  shouldLogEffectCause
+} from '@tx-agent-kit/observability/effect-cause-summary'
 import * as Schema from 'effect/Schema'
+import {
+  getApiRequestContext,
+  markApiErrorReported
+} from './observability/request-context.js'
+import { captureApiMappedError } from './observability/sentry.js'
 
 export class BadRequest extends Schema.TaggedError<BadRequest>()('BadRequest', {
   message: Schema.String
@@ -158,9 +168,82 @@ export class InternalError extends Schema.TaggedError<InternalError>()('Internal
 
 const apiLogger = createLogger('tx-agent-kit-api')
 
-export const mapCoreError = (error: unknown): BadRequest | Unauthorized | Forbidden | PaymentRequired | NotFound | Conflict | InternalError => {
+type MappedCoreError = BadRequest | Unauthorized | Forbidden | PaymentRequired | NotFound | Conflict | InternalError
+
+// UNAUTHORIZED failures whose root cause is an expected JWT/JWS condition
+// (expired/invalid token) are ordinary client noise, not a server fault — they
+// are logged at warn and never sent to Sentry.
+const expectedUnauthorizedRootCauseTags = new Set([
+  'JWTExpired',
+  'JWTClaimValidationFailed',
+  'JWTInvalid',
+  'JWSInvalid',
+  'JWSSignatureVerificationFailed'
+])
+
+const isExpectedUnauthorizedAuthFailure = (error: { code?: string; cause?: unknown }): boolean => {
+  if (error.code !== 'UNAUTHORIZED') {
+    return false
+  }
+
+  const context = causeLogContext(error.cause)
+  const rootCauseTag = typeof context.rootCauseTag === 'string' ? context.rootCauseTag : undefined
+  const rootCauseType = typeof context.rootCauseType === 'string' ? context.rootCauseType : undefined
+
+  return (
+    (rootCauseTag !== undefined && expectedUnauthorizedRootCauseTags.has(rootCauseTag)) ||
+    (rootCauseType !== undefined && expectedUnauthorizedRootCauseTags.has(rootCauseType))
+  )
+}
+
+// A mapping is report-worthy (error level + Sentry) when it is a 500, an
+// unmapped/unknown code, or its Effect cause is itself reportable. Everything
+// else is an expected client error → warn, no Sentry.
+const shouldCaptureCoreErrorMapping = (error: { code?: string; cause?: unknown }): boolean => {
+  if (isExpectedUnauthorizedAuthFailure(error)) {
+    return false
+  }
+
+  return error.code === 'INTERNAL_ERROR' || error.code === undefined || shouldLogEffectCause(error.cause)
+}
+
+// PRIMARY error boundary: log each mapped CoreError exactly once (5xx/unknown →
+// error + Sentry, expected 4xx → warn), enriched with the active request
+// context, then mark the request so the last-resort effectCauseLoggingMiddleware
+// skips it (no double-log). See middleware/effect-cause-logging.ts.
+const logCoreErrorMapping = (
+  error: { _tag: string; code?: string; message?: string; cause?: unknown },
+  httpErrorTag: MappedCoreError['_tag']
+): void => {
+  const causeContext = causeLogContext(error.cause)
+  const context = {
+    ...getApiRequestContext(),
+    tag: error._tag,
+    code: error.code,
+    httpErrorTag,
+    message: error.message,
+    ...causeContext
+  }
+  const reportWorthy = shouldCaptureCoreErrorMapping(error)
+  const logMessage = typeof causeContext.rootCauseMessage === 'string'
+    ? causeContext.rootCauseMessage
+    : error.message ?? 'CoreError mapped to HTTP error'
+
+  if (reportWorthy) {
+    apiLogger.error(logMessage, context)
+    captureApiMappedError(findRootCauseError(error.cause) ?? new Error(logMessage), context)
+  } else {
+    apiLogger.warn(logMessage, context)
+  }
+
+  // This request's fault is now logged at the boundary; tell the last-resort
+  // effect-cause middleware to skip it so we never double-log the same error.
+  markApiErrorReported()
+}
+
+export const mapCoreError = (error: unknown): MappedCoreError => {
   if (error && typeof error === 'object' && '_tag' in error) {
-    const e = error as { _tag: string; code?: string; message?: string }
+    const e = error as { _tag: string; code?: string; message?: string; cause?: unknown }
 
     // Pass through already-mapped API error types (idempotent when double-mapped)
     switch (e._tag) {
@@ -181,41 +264,43 @@ export const mapCoreError = (error: unknown): BadRequest | Unauthorized | Forbid
     }
 
     const message = e.message ?? 'Internal server error'
-    const cause = 'cause' in e ? e.cause : undefined
-
-    if (e.code === 'BAD_REQUEST' || e.code === 'INTERNAL_ERROR' || e.code === 'UNAUTHORIZED' || e.code === 'FORBIDDEN' || e.code === 'PAYMENT_REQUIRED') {
-      let causeDetail: unknown
-      if (cause instanceof Error) {
-        causeDetail = { message: cause.message, stack: cause.stack }
-      } else if (cause != null) {
-        causeDetail = typeof cause === 'object' ? JSON.stringify(cause) : String(cause as string | number | boolean)
-      }
-      apiLogger.error('CoreError mapped to HTTP error', { code: e.code, message: e.message, cause: causeDetail })
-    }
 
     switch (e.code) {
       case 'BAD_REQUEST':
+        logCoreErrorMapping(e, 'BadRequest')
         return new BadRequest({ message })
       case 'UNAUTHORIZED':
+        logCoreErrorMapping(e, 'Unauthorized')
         return new Unauthorized({ message })
       case 'FORBIDDEN':
+        logCoreErrorMapping(e, 'Forbidden')
         return new Forbidden({ message })
       case 'PAYMENT_REQUIRED':
+        logCoreErrorMapping(e, 'PaymentRequired')
         return new PaymentRequired({ message })
       case 'NOT_FOUND':
+        logCoreErrorMapping(e, 'NotFound')
         return new NotFound({ message })
       case 'CONFLICT':
+        logCoreErrorMapping(e, 'Conflict')
         return new Conflict({ message })
       case 'INTERNAL_ERROR':
+        logCoreErrorMapping(e, 'InternalError')
         return new InternalError({ message: 'Internal server error' })
       case undefined:
       default:
-        apiLogger.error('Unmapped core error code fell through to 500', { tag: e._tag, code: e.code, message: e.message })
+        logCoreErrorMapping(e, 'InternalError')
         return new InternalError({ message: 'Internal server error' })
     }
   }
 
-  apiLogger.error('Non-CoreError fell through to 500', { error: String(error) })
+  const context = {
+    ...getApiRequestContext(),
+    ...causeLogContext(error)
+  }
+  apiLogger.error('Non-CoreError fell through to 500', context)
+  captureApiMappedError(new Error('Non-CoreError fell through to 500'), context)
+  markApiErrorReported()
   return new InternalError({ message: 'Internal server error' })
 }
 

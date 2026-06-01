@@ -73,6 +73,8 @@ import { getApiEnv, getSubscriptionGuardEnabled } from './config/env.js'
 import { authRateLimitMiddleware } from './middleware/auth-rate-limit.js'
 import { bodyLimitMiddleware } from './middleware/body-limit.js'
 import { getCorsConfig } from './middleware/cors.js'
+import { effectCauseLoggingMiddleware } from './middleware/effect-cause-logging.js'
+import { requestContextMiddleware } from './middleware/request-context.js'
 import { securityHeadersMiddleware } from './middleware/security-headers.js'
 import { serverTimingMiddleware } from './middleware/server-timing.js'
 import { traceContextMiddleware } from './middleware/trace-context.js'
@@ -114,6 +116,12 @@ const ApiLive = HttpApiBuilder.api(TxAgentApi).pipe(
 )
 
 const MiddlewareLive = Layer.mergeAll(
+  // Establishes per-request AsyncLocalStorage context (method/path + the
+  // errorReported dedup cell). Must precede effectCauseLoggingMiddleware.
+  HttpApiBuilder.middleware(requestContextMiddleware),
+  // Last-resort boundary: logs+captures causes that bypass mapCoreError, and
+  // skips any request mapCoreError already reported (log-once dedup).
+  HttpApiBuilder.middleware(effectCauseLoggingMiddleware),
   HttpApiBuilder.middleware(traceContextMiddleware),
   HttpApiBuilder.middleware(authRateLimitMiddleware),
   HttpApiBuilder.middleware(bodyLimitMiddleware),
