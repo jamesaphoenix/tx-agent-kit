@@ -10,7 +10,7 @@ import { Effect } from 'effect'
 import { BadRequest, InternalError, TxAgentApi, mapCoreError } from '../api.js'
 import { getApiEnv } from '../config/env.js'
 
-const logger = createLogger('email-webhooks')
+const logger = createLogger('tx-agent-kit-api').child('email-webhooks')
 
 export const EmailWebhooksRouteKind = 'custom' as const
 

@@ -3,8 +3,10 @@
 import { useState, type SyntheticEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { clientApi } from '../lib/client-api'
+import { getWebEnv } from '../lib/env'
 import { notify } from '../lib/notify'
 import { sessionStoreActions } from '../stores/session-store'
+import { TurnstileWidget } from './TurnstileWidget'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -42,7 +44,12 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const actionLabel = mode === 'sign-up' ? 'Create account' : 'Sign in'
+
+  // Only gate sign-up, and only when a Turnstile site key is configured.
+  const turnstileSiteKey = mode === 'sign-up' ? getWebEnv().TURNSTILE_SITE_KEY : undefined
+  const turnstileRequired = Boolean(turnstileSiteKey)
 
   const onSubmit = async (
     event: SyntheticEvent<HTMLFormElement, SubmitEvent>
@@ -56,7 +63,7 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
 
     try {
       if (mode === 'sign-up') {
-        await clientApi.signUp({ email, password, name })
+        await clientApi.signUp({ email, password, name }, turnstileToken ?? undefined)
       } else {
         await clientApi.signIn({ email, password })
       }
@@ -129,6 +136,10 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
         />
       </div>
 
+      {turnstileSiteKey && (
+        <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstileToken} />
+      )}
+
       <div className="min-h-[1.5rem]" aria-live="polite" aria-atomic="true">
         {error && (
           <div className="text-sm text-destructive" role="alert">
@@ -137,7 +148,11 @@ export function AuthForm({ mode, nextPath }: { mode: 'sign-in' | 'sign-up'; next
         )}
       </div>
 
-      <Button className="w-full relative" type="submit" disabled={pending}>
+      <Button
+        className="w-full relative"
+        type="submit"
+        disabled={pending || (turnstileRequired && !turnstileToken)}
+      >
         <span className={pending ? 'opacity-0' : undefined}>{actionLabel}</span>
         {pending && (
           <span className="absolute inset-0 flex items-center justify-center gap-2">

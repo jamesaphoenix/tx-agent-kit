@@ -112,6 +112,18 @@ const enforceWebClientOnlyContracts = () => {
         return false
       }
 
+      // The root layout (apps/web/app/layout.tsx) is a thin Server Component
+      // shell: it holds the `<html>`/`<body>` wrapper, the font, and the route
+      // segment config (`export const dynamic = 'force-dynamic'`) — segment
+      // config can ONLY be read from a server module. The client provider tree
+      // lives in its `'use client'` child (app/root-client.tsx). Forcing dynamic
+      // rendering app-wide is what lets `next build` (the E2E prod target)
+      // succeed for this fully client-rendered SPA. Same rationale as the
+      // (website) server-component exemption above.
+      if (normalized.endsWith('/apps/web/app/layout.tsx')) {
+        return false
+      }
+
       return true
     })
 

@@ -11,6 +11,9 @@ const requiredApiEnvShape = {
   AUTH_RATE_LIMIT_WINDOW_MS: Schema.optional(Schema.String),
   AUTH_RATE_LIMIT_MAX_REQUESTS: Schema.optional(Schema.String),
   AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: Schema.optional(Schema.String),
+  AUTH_RATE_LIMIT_BYPASS_TOKEN: Schema.optional(Schema.String),
+  TURNSTILE_SECRET_KEY: Schema.optional(Schema.String),
+  TURNSTILE_VERIFY_URL: Schema.optional(Schema.String),
   RESEND_API_KEY: Schema.optional(Schema.String),
   RESEND_FROM_EMAIL: Schema.optional(Schema.String),
   WEB_BASE_URL: Schema.optional(Schema.String),
@@ -173,6 +176,48 @@ export const getAuthRateLimitConfig = (): AuthRateLimitConfig => {
     windowMs: parsePositiveInt(env.AUTH_RATE_LIMIT_WINDOW_MS, 60_000),
     maxIpRequests,
     maxIdentifierRequests
+  }
+}
+
+/**
+ * Optional shared secret that lets a TRUSTED caller (the deploy smoke test)
+ * bypass auth rate limiting via the `x-auth-rate-limit-bypass` header. Returns
+ * null when unset/blank, so the bypass is impossible unless explicitly
+ * configured — dev and unconfigured environments can never bypass.
+ */
+export const getAuthRateLimitBypassToken = (): string | null => {
+  const token = getApiEnv().AUTH_RATE_LIMIT_BYPASS_TOKEN?.trim()
+  return token && token.length > 0 ? token : null
+}
+
+export interface TurnstileConfig {
+  readonly secretKey: string
+  readonly verifyUrl: string
+}
+
+// Cloudflare Turnstile siteverify endpoint (overridable for tests).
+const TURNSTILE_DEFAULT_VERIFY_URL =
+  'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+
+/**
+ * Returns Turnstile config when a secret is configured, else null.
+ *
+ * Enforcement is purely presence-gated: with no `TURNSTILE_SECRET_KEY`
+ * the sign-up handler skips the check entirely. The integration harness
+ * relies on this — it spawns the API with `TURNSTILE_SECRET_KEY=''` so
+ * the factory-driven sign-up suite never needs a captcha token.
+ */
+export const getTurnstileConfig = (): TurnstileConfig | null => {
+  const env = getApiEnv()
+  const secretKey = env.TURNSTILE_SECRET_KEY?.trim()
+  if (!secretKey) {
+    return null
+  }
+
+  const verifyUrl = env.TURNSTILE_VERIFY_URL?.trim()
+  return {
+    secretKey,
+    verifyUrl: verifyUrl && verifyUrl.length > 0 ? verifyUrl : TURNSTILE_DEFAULT_VERIFY_URL
   }
 }
 

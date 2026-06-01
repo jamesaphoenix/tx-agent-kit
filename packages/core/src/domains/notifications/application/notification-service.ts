@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from 'effect'
-import { badRequest, type CoreError } from '../../../errors.js'
+import { internalError, type CoreError } from '../../../errors.js'
 import type {
   CreateNotificationCommand,
   ListNotificationsCommand,
@@ -7,6 +7,9 @@ import type {
   NotificationRecord
 } from '../domain/notification-domain.js'
 import { NotificationStorePort } from '../ports/notification-ports.js'
+
+const toCoreInternal = (message: string) => (cause: unknown): CoreError =>
+  internalError(message, cause)
 
 /**
  * Notification service — the Phase 1 application layer for the
@@ -54,7 +57,7 @@ export const NotificationServiceLive = Layer.succeed(NotificationService, {
       const store = yield* NotificationStorePort
       return yield* store
         .create(input)
-        .pipe(Effect.mapError((cause) => badRequest('Failed to create notification', cause)))
+        .pipe(Effect.mapError(toCoreInternal('Failed to create notification')))
     }),
 
   createBatch: (inputs) =>
@@ -62,7 +65,7 @@ export const NotificationServiceLive = Layer.succeed(NotificationService, {
       const store = yield* NotificationStorePort
       return yield* store
         .createBatch(inputs)
-        .pipe(Effect.mapError((cause) => badRequest('Failed to create notifications batch', cause)))
+        .pipe(Effect.mapError(toCoreInternal('Failed to create notifications batch')))
     }),
 
   listForUser: (input) =>
@@ -70,7 +73,7 @@ export const NotificationServiceLive = Layer.succeed(NotificationService, {
       const store = yield* NotificationStorePort
       return yield* store
         .listForUser(input)
-        .pipe(Effect.mapError((cause) => badRequest('Failed to list notifications', cause)))
+        .pipe(Effect.mapError(toCoreInternal('Failed to list notifications')))
     }),
 
   markRead: (input) =>
@@ -78,7 +81,7 @@ export const NotificationServiceLive = Layer.succeed(NotificationService, {
       const store = yield* NotificationStorePort
       return yield* store
         .markRead(input)
-        .pipe(Effect.mapError((cause) => badRequest('Failed to mark notification read', cause)))
+        .pipe(Effect.mapError(toCoreInternal('Failed to mark notification read')))
     }),
 
   countUnread: (input) =>
@@ -86,6 +89,6 @@ export const NotificationServiceLive = Layer.succeed(NotificationService, {
       const store = yield* NotificationStorePort
       return yield* store
         .countUnread(input)
-        .pipe(Effect.mapError((cause) => badRequest('Failed to count unread notifications', cause)))
+        .pipe(Effect.mapError(toCoreInternal('Failed to count unread notifications')))
     })
 })

@@ -13,6 +13,14 @@
     "./client": {
       "types": "./dist/client.d.ts",
       "default": "./dist/client.js"
+    },
+    "./effect-cause-summary": {
+      "types": "./dist/effect-cause-summary.d.ts",
+      "default": "./dist/effect-cause-summary.js"
+    },
+    "./sentry": {
+      "types": "./dist/sentry.d.ts",
+      "default": "./dist/sentry.js"
     }
   },
   "scripts": {
@@ -35,6 +43,8 @@
     "@opentelemetry/sdk-node": "^0.214.0",
     "@opentelemetry/sdk-trace-base": "^2.6.1",
     "@opentelemetry/semantic-conventions": "^1.40.0",
+    "@sentry/node": "^10.48.0",
+    "@tx-agent-kit/logging": "workspace:*",
     "effect": "^3.21.2"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { Context, Effect, Layer, Option } from 'effect'
-import { badRequest, conflict, notFound, unauthorized, type CoreError } from '../../../errors.js'
+import { badRequest, conflict, internalError, notFound, unauthorized, type CoreError } from '../../../errors.js'
 import {
   type CompleteGoogleAuthCommand,
   type ForgotPasswordCommand,
@@ -104,9 +104,9 @@ const buildSession = (
         createdUserAgent: context.userAgent ?? null
       })
       .pipe(
-        Effect.mapError((cause) => unauthorized('Failed to create login session', cause)),
+        Effect.mapError(toCoreInternal('Failed to create login session')),
         Effect.flatMap(Option.match({
-          onNone: () => Effect.fail(unauthorized('Failed to create login session')),
+          onNone: () => Effect.fail(internalError('Failed to create login session')),
           onSome: Effect.succeed
         }))
       )
@@ -116,11 +116,11 @@ const buildSession = (
       email: user.email,
       pwd: user.passwordChangedAt.getTime(),
       sid: createdSession.sessionId
-    }).pipe(Effect.mapError((cause) => unauthorized('Failed to create access token', cause)))
+    }).pipe(Effect.mapError(toCoreInternal('Failed to create access token')))
 
     const refresh = yield* refreshTokenPort
       .issueForSession(createdSession.sessionId)
-      .pipe(Effect.mapError((cause) => unauthorized('Failed to issue refresh token', cause)))
+      .pipe(Effect.mapError(toCoreInternal('Failed to issue refresh token')))
 
     const principal = yield* buildPrincipalForUser(user, createdSession.sessionId)
 
@@ -139,7 +139,7 @@ const buildPrincipalForUser = (
   Effect.gen(function* () {
     const membershipPort = yield* AuthOrganizationMembershipPort
     const primaryMembershipOpt = yield* membershipPort.getPrimaryMembershipForUser(user.id).pipe(
-      Effect.mapError((cause) => unauthorized('Failed to load authenticated principal', cause))
+      Effect.mapError(toCoreInternal('Failed to load authenticated principal'))
     )
     const primaryMembership = Option.getOrUndefined(primaryMembershipOpt)
 
@@ -244,6 +244,9 @@ const createPrincipalResolutionCache = () => {
     }
   }
 }
+
+const toCoreInternal = (message: string) => (cause: unknown): CoreError =>
+  internalError(message, cause)
 
 export class AuthService extends Context.Tag('AuthService')<
   AuthService,
@@ -537,7 +540,7 @@ export const AuthServiceLive = Layer.effect(
           email: user.email,
           pwd: user.passwordChangedAt.getTime(),
           sid: activeSession.sessionId
-        }).pipe(Effect.mapError((cause) => unauthorized('Failed to issue access token', cause)))
+        }).pipe(Effect.mapError(toCoreInternal('Failed to issue access token')))
 
         yield* recordAuditEvent({
           userId: user.id,
@@ -573,7 +576,7 @@ export const AuthServiceLive = Layer.effect(
         )
 
         yield* loginSessionPort.revokeById(principal.sessionId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to revoke session', cause))
+          Effect.mapError(toCoreInternal('Failed to revoke session'))
         )
         principalCache.invalidateSession(principal.sessionId)
 
@@ -626,7 +629,7 @@ export const AuthServiceLive = Layer.effect(
             ipAddress: input.ipAddress ?? null,
             statePrefix: input.statePrefix
           })
-          .pipe(Effect.mapError((cause) => badRequest('Failed to start Google authorization', cause)))
+          .pipe(Effect.mapError(toCoreInternal('Failed to start Google authorization')))
       }),
 
     completeGoogleAuth: (input) =>
@@ -658,11 +661,11 @@ export const AuthServiceLive = Layer.effect(
         const linkedIdentityOpt = yield* identityPort.findByProviderSubject({
           provider: 'google',
           providerSubject: identity.providerSubject
-        }).pipe(Effect.mapError((cause) => badRequest('Failed to read Google identity link', cause)))
+        }).pipe(Effect.mapError(toCoreInternal('Failed to read Google identity link')))
 
         let userOpt: Option.Option<AuthUserRecord> = Option.isSome(linkedIdentityOpt)
           ? yield* usersPort.findById(linkedIdentityOpt.value.userId).pipe(
-              Effect.mapError((cause) => badRequest('Failed to read linked user', cause))
+              Effect.mapError(toCoreInternal('Failed to read linked user'))
             )
           : Option.none()
 
@@ -670,7 +673,7 @@ export const AuthServiceLive = Layer.effect(
 
         if (Option.isNone(userOpt)) {
           const existingUserOpt = yield* usersPort.findByEmail(normalizedEmail).pipe(
-            Effect.mapError((cause) => badRequest('Failed to read existing user', cause))
+            Effect.mapError(toCoreInternal('Failed to read existing user'))
           )
 
           if (Option.isSome(existingUserOpt)) {
@@ -678,7 +681,7 @@ export const AuthServiceLive = Layer.effect(
           } else {
             const syntheticPassword = randomBytes(64).toString('base64url')
             const syntheticPasswordHash = yield* passwordHasher.hash(syntheticPassword).pipe(
-              Effect.mapError((cause) => badRequest('Failed to generate Google account credentials', cause))
+              Effect.mapError(toCoreInternal('Failed to generate Google account credentials'))
             )
 
             userOpt = yield* usersPort.create({
@@ -703,7 +706,7 @@ export const AuthServiceLive = Layer.effect(
           const existingProviderLinkOpt = yield* identityPort.findByUserProvider({
             userId: user.id,
             provider: 'google'
-          }).pipe(Effect.mapError((cause) => badRequest('Failed to read existing Google link', cause)))
+          }).pipe(Effect.mapError(toCoreInternal('Failed to read existing Google link')))
 
           if (Option.isNone(existingProviderLinkOpt)) {
             const linkResultOpt = yield* identityPort.linkIdentity({
@@ -718,7 +721,7 @@ export const AuthServiceLive = Layer.effect(
                   ? Effect.succeed(Option.none())
                   : Effect.fail(error)
               ),
-              Effect.mapError((cause) => badRequest('Failed to link Google identity', cause))
+              Effect.mapError(toCoreInternal('Failed to link Google identity'))
             )
             didLinkIdentity = Option.isSome(linkResultOpt)
           }
@@ -777,7 +780,7 @@ export const AuthServiceLive = Layer.effect(
 
         const email = normalizeEmail(input.email)
         const userOpt = yield* usersPort.findByEmail(email).pipe(
-          Effect.mapError((cause) => badRequest('Failed to process forgot-password request', cause))
+          Effect.mapError(toCoreInternal('Failed to process forgot-password request'))
         )
 
         if (Option.isNone(userOpt)) {
@@ -795,18 +798,29 @@ export const AuthServiceLive = Layer.effect(
         const user = userOpt.value
 
         yield* passwordResetTokenPort.revokeTokensForUser(user.id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to process forgot-password request', cause))
+          Effect.mapError(toCoreInternal('Failed to process forgot-password request'))
         )
 
         const token = yield* passwordResetTokenPort.createToken(user.id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to process forgot-password request', cause))
+          Effect.mapError(toCoreInternal('Failed to process forgot-password request'))
         )
 
+        // Best-effort: a failed email send (provider outage, rejected
+        // recipient, transient 5xx) MUST NOT change the response. Otherwise an
+        // existing account whose email fails returns an error while a missing
+        // account returns 202 — an account-enumeration oracle — and any
+        // email-provider outage would fail every real user's reset. The token is
+        // already persisted, so the user can retry; we always return the generic 202.
         yield* passwordResetEmailPort.sendPasswordResetEmail({
           email: user.email,
           name: user.name,
           token
-        }).pipe(Effect.mapError((cause) => badRequest('Failed to process forgot-password request', cause)))
+        }).pipe(
+          Effect.tapError((cause) =>
+            Effect.logError('Failed to send password reset email; returning generic response', { cause })
+          ),
+          Effect.catchAll(() => Effect.void)
+        )
 
         yield* recordAuditEvent({
           userId: user.id,
@@ -845,7 +859,7 @@ export const AuthServiceLive = Layer.effect(
         const updatedUser = yield* usersPort
           .updatePasswordHash(tokenPrincipal.userId, passwordHash)
           .pipe(
-            Effect.mapError((cause) => badRequest('Failed to reset password', cause)),
+            Effect.mapError(toCoreInternal('Failed to reset password')),
             Effect.flatMap(Option.match({
               onNone: () => Effect.fail(notFound('User not found')),
               onSome: Effect.succeed
@@ -947,7 +961,7 @@ export const AuthServiceLive = Layer.effect(
         const refreshTokenPort = yield* AuthLoginRefreshTokenPort
 
         const existing = yield* usersPort.findById(principal.userId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to read user', cause)),
+          Effect.mapError(toCoreInternal('Failed to read user')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('User not found')),
             onSome: Effect.succeed
@@ -955,7 +969,7 @@ export const AuthServiceLive = Layer.effect(
         )
 
         const ownedOrganizationCount = yield* organizationOwnershipPort.countOwnedByUser(principal.userId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to validate organization ownership', cause))
+          Effect.mapError(toCoreInternal('Failed to validate organization ownership'))
         )
 
         if (ownedOrganizationCount > 0) {
@@ -971,7 +985,7 @@ export const AuthServiceLive = Layer.effect(
         )
 
         yield* usersPort.deleteById(principal.userId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to delete user', cause)),
+          Effect.mapError(toCoreInternal('Failed to delete user')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('User not found')),
             onSome: Effect.succeed

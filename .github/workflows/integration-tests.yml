@@ -26,6 +26,8 @@ env:
   AUTH_RATE_LIMIT_WINDOW_MS: '60000'
   AUTH_RATE_LIMIT_MAX_REQUESTS: '100'
   AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '100'
+  # Empty disables the rate-limit bypass (fails closed); CI keeps loose limits above.
+  AUTH_RATE_LIMIT_BYPASS_TOKEN: ''
   RESEND_API_KEY: ''
   RESEND_FROM_EMAIL: ''
   RESEND_WEBHOOK_SECRET: ''
@@ -96,3 +98,74 @@ jobs:
         run: pnpm test:db:pgtap --skip-setup
       - name: Run Temporal integration suite
         run: pnpm test:temporal:integration
+
+  e2e:
+    name: Web E2E (browser)
+    runs-on: ubuntu-latest
+    # The Playwright TEST RUN is hard-capped at 120s by globalTimeout in
+    # apps/web/e2e/playwright.config.ts AND by the portable process-kill wrapper
+    # in the test:e2e script. The production BUILD is a SEPARATE prerequisite
+    # step (`Build web (production)`) and is NOT counted against that 120s
+    # budget. This job-level ceiling covers build + serve + the bounded test
+    # step; it is generous on purpose (a real `next build` runs here) — the
+    # un-widenable 120s budget that enforce-e2e-budget.mjs guards binds the TEST
+    # RUN, not this job. The dedicated test step below carries its own
+    # `timeout-minutes: 2` so the bounded run cannot drag on.
+    timeout-minutes: 15
+    env:
+      WEB_PORT: '3000'
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.28.0 --activate
+          pnpm --version
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browser (chromium)
+        run: pnpm --filter @tx-agent-kit/web exec playwright install --with-deps chromium
+      - name: Build packages
+        run: pnpm exec turbo run build --filter='./packages/**'
+      - name: Configure local env files
+        run: pnpm env:configure
+      - name: Ensure infrastructure
+        run: pnpm infra:ensure
+      # PREREQUISITE (not in the 120s test budget): produce the Next.js prod
+      # build the E2E suite serves. Lazy-compiled dev bundles are the typical
+      # first-attempt flake; the prod build has no lazy compile.
+      - name: Build web (production)
+        run: pnpm --filter @tx-agent-kit/web run e2e:build
+      # Start the api and the prebuilt prod web server, then poll BOTH for a 200
+      # before the bounded test step. Playwright's webServer block also reuses
+      # this already-running prod web server.
+      - name: Start api
+        run: pnpm dev:api &
+      - name: Start web (production server)
+        run: pnpm --filter @tx-agent-kit/web run e2e:serve &
+      - name: Wait for api + web readiness
+        run: |
+          api_port="${API_PORT:-4000}"
+          web_port="${WEB_PORT:-3000}"
+          poll() {
+            local name="$1" url="$2"
+            for i in $(seq 1 120); do
+              if curl -fsS -o /dev/null "$url"; then
+                echo "$name ready after ${i}s ($url)"
+                return 0
+              fi
+              sleep 1
+            done
+            echo "$name did NOT become ready at $url within 120s" >&2
+            return 1
+          }
+          poll api "http://localhost:${api_port}/health"
+          poll web "http://localhost:${web_port}/"
+      # The BOUNDED test run — the only step the 120s budget binds. Its own
+      # timeout-minutes:2 is the CI backstop for the test-run wall-clock.
+      - name: Run Web E2E suite
+        timeout-minutes: 2
+        run: pnpm --filter @tx-agent-kit/web run test:e2e

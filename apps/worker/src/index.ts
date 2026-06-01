@@ -1,5 +1,6 @@
 import { Client, Connection } from '@temporalio/client'
 import { NativeConnection, Worker } from '@temporalio/worker'
+import { ActivityErrorBoundaryInterceptor } from './activity-error-boundary.js'
 import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
 import { closeRedisClients } from '@tx-agent-kit/redis'
@@ -71,6 +72,14 @@ async function run(env: WorkerEnv): Promise<void> {
 
   startTelemetry('tx-agent-kit-worker')
 
+  // Centralized activity error boundary: logs + Sentry-captures every activity
+  // failure once (parity with the API's mapCoreError boundary), then re-throws
+  // unchanged so Temporal retry semantics are untouched. Registered as an
+  // activity inbound interceptor over all run sites.
+  const activityInterceptors = [
+    () => ({ inbound: new ActivityErrorBoundaryInterceptor() })
+  ]
+
   const connOpts = resolveWorkerTemporalConnectionOptions(env)
 
   const connection = await NativeConnection.connect(connOpts)
@@ -88,6 +97,7 @@ async function run(env: WorkerEnv): Promise<void> {
       taskQueue: env.TEMPORAL_TASK_QUEUE,
       workflowsPath: workflowSourcePath,
       activities: combinedActivities,
+      interceptors: { activity: activityInterceptors },
       shutdownGraceTime: '30s',
       ...testPollerOptions
     })
@@ -98,6 +108,7 @@ async function run(env: WorkerEnv): Promise<void> {
       taskQueue: env.EMAIL_CAMPAIGNS_TASK_QUEUE,
       workflowsPath: campaignWorkflowSourcePath,
       activities: campaignActivities,
+      interceptors: { activity: activityInterceptors },
       shutdownGraceTime: '30s',
       ...testPollerOptions
     })

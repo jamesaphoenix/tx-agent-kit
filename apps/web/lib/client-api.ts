@@ -191,13 +191,21 @@ export const clientApi = {
     }
   },
 
-  signUp: async (input: SignUpRequest): Promise<AuthResponse> => {
+  signUp: async (
+    input: SignUpRequest,
+    turnstileToken?: string
+  ): Promise<AuthResponse> => {
     try {
-      const { data } = await api.post<AuthResponse>(
-        '/v1/auth/sign-up',
-        input,
-        browserAuthSessionRequestConfig
-      )
+      const config = turnstileToken
+        ? {
+            ...browserAuthSessionRequestConfig,
+            headers: {
+              ...browserAuthSessionRequestConfig.headers,
+              'cf-turnstile-response': turnstileToken
+            }
+          }
+        : browserAuthSessionRequestConfig
+      const { data } = await api.post<AuthResponse>('/v1/auth/sign-up', input, config)
       return persistAuthSession(data)
     } catch (error) {
       return fail(error, 'Sign-up failed')

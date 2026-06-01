@@ -1,8 +1,11 @@
 import { Context, Effect, Layer, Option } from 'effect'
-import { badRequest, conflict, notFound, type CoreError } from '../../../errors.js'
+import { badRequest, conflict, internalError, notFound, type CoreError } from '../../../errors.js'
 import type { ListParams, PaginatedResult } from '../../../pagination.js'
 import type { RoleWithPermissions } from '../domain/role-domain.js'
 import { RoleStorePort } from '../ports/role-ports.js'
+
+const toCoreInternal = (message: string) => (cause: unknown): CoreError =>
+  internalError(message, cause)
 
 export class RoleService extends Context.Tag('RoleService')<
   RoleService,
@@ -35,13 +38,13 @@ export const RoleServiceLive = Layer.effect(
         const store = yield* RoleStorePort
 
         const page = yield* store.list(params).pipe(
-          Effect.mapError((cause) => badRequest('Failed to list roles', cause))
+          Effect.mapError(toCoreInternal('Failed to list roles'))
         )
 
         // Fetch permissions for all roles in the page
         const roleIds = page.data.map((r) => r.id)
         const permMap = yield* store.getPermissionIdsForRoles([...roleIds]).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch role permissions', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch role permissions'))
         )
 
         return {
@@ -63,7 +66,7 @@ export const RoleServiceLive = Layer.effect(
         const store = yield* RoleStorePort
 
         const role = yield* store.getById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch role', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch role')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Role not found')),
             onSome: Effect.succeed
@@ -71,7 +74,7 @@ export const RoleServiceLive = Layer.effect(
         )
 
         const permissionIds = yield* store.getPermissionIdsForRole(role.id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch role permissions', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch role permissions'))
         )
 
         return {
@@ -89,7 +92,7 @@ export const RoleServiceLive = Layer.effect(
 
         // Check for duplicate name
         const existingOpt = yield* store.getByName(input.name).pipe(
-          Effect.mapError((cause) => badRequest('Failed to check role name', cause))
+          Effect.mapError(toCoreInternal('Failed to check role name'))
         )
 
         if (Option.isSome(existingOpt)) {
@@ -99,7 +102,7 @@ export const RoleServiceLive = Layer.effect(
         // Validate permission IDs exist
         if (input.permissions.length > 0) {
           const validIds = yield* store.validatePermissionIds(input.permissions).pipe(
-            Effect.mapError((cause) => badRequest('Failed to validate permission IDs', cause))
+            Effect.mapError(toCoreInternal('Failed to validate permission IDs'))
           )
           if (validIds.length !== input.permissions.length) {
             return yield* Effect.fail(badRequest('One or more permission IDs are invalid'))
@@ -110,7 +113,7 @@ export const RoleServiceLive = Layer.effect(
           name: input.name,
           permissionIds: input.permissions
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to create role', cause)),
+          Effect.mapError(toCoreInternal('Failed to create role')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(badRequest('Role creation failed')),
             onSome: Effect.succeed
@@ -119,7 +122,7 @@ export const RoleServiceLive = Layer.effect(
 
         // Fetch permission IDs to return
         const permissionIds = yield* store.getPermissionIdsForRole(role.id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch role permissions', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch role permissions'))
         )
 
         return {
@@ -136,7 +139,7 @@ export const RoleServiceLive = Layer.effect(
         const store = yield* RoleStorePort
 
         const existing = yield* store.getById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch role', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch role')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Role not found')),
             onSome: Effect.succeed
@@ -155,7 +158,7 @@ export const RoleServiceLive = Layer.effect(
         // Check for duplicate name if name is being changed
         if (input.name !== undefined && input.name !== existing.name) {
           const nameConflictOpt = yield* store.getByName(input.name).pipe(
-            Effect.mapError((cause) => badRequest('Failed to check role name', cause))
+            Effect.mapError(toCoreInternal('Failed to check role name'))
           )
           if (Option.isSome(nameConflictOpt)) {
             return yield* Effect.fail(conflict(`Role with name '${input.name}' already exists`))
@@ -165,7 +168,7 @@ export const RoleServiceLive = Layer.effect(
         // Validate permission IDs exist
         if (input.permissions !== undefined && input.permissions.length > 0) {
           const validIds = yield* store.validatePermissionIds(input.permissions).pipe(
-            Effect.mapError((cause) => badRequest('Failed to validate permission IDs', cause))
+            Effect.mapError(toCoreInternal('Failed to validate permission IDs'))
           )
           if (validIds.length !== input.permissions.length) {
             return yield* Effect.fail(badRequest('One or more permission IDs are invalid'))
@@ -177,7 +180,7 @@ export const RoleServiceLive = Layer.effect(
           name: input.name,
           permissionIds: input.permissions
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to update role', cause)),
+          Effect.mapError(toCoreInternal('Failed to update role')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Role not found')),
             onSome: Effect.succeed
@@ -185,7 +188,7 @@ export const RoleServiceLive = Layer.effect(
         )
 
         const permissionIds = yield* store.getPermissionIdsForRole(updated.id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch role permissions', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch role permissions'))
         )
 
         return {
@@ -202,7 +205,7 @@ export const RoleServiceLive = Layer.effect(
         const store = yield* RoleStorePort
 
         const existing = yield* store.getById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch role', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch role')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Role not found')),
             onSome: Effect.succeed
@@ -215,7 +218,7 @@ export const RoleServiceLive = Layer.effect(
         }
 
         return yield* store.remove(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to delete role', cause))
+          Effect.mapError(toCoreInternal('Failed to delete role'))
         )
       })
   })

@@ -1,9 +1,12 @@
 import { Context, Effect, Layer, Option } from 'effect'
 import type { MemberRole, PermissionAction } from '@tx-agent-kit/contracts'
 import { getPermissionsForTeamRole } from '@tx-agent-kit/contracts'
-import { forbidden, unauthorized, type CoreError } from '../../../errors.js'
+import { forbidden, internalError, type CoreError } from '../../../errors.js'
 import type { TeamMemberRecord } from '../domain/team-domain.js'
 import { TeamStorePort, TeamOrganizationMembershipPort } from '../ports/team-ports.js'
+
+const toCoreInternal = (message: string) => (cause: unknown): CoreError =>
+  internalError(message, cause)
 
 export interface TeamAuthResult {
   readonly member: TeamMemberRecord
@@ -30,7 +33,7 @@ export const TeamAuthMiddlewareLive = Layer.effect(
         const orgMembershipPort = yield* TeamOrganizationMembershipPort
 
         const team = yield* teamStore.getById(teamId).pipe(
-          Effect.mapError((cause) => unauthorized('Failed to resolve team', cause)),
+          Effect.mapError(toCoreInternal('Failed to resolve team')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(forbidden('You are not a member of this team')),
             onSome: Effect.succeed
@@ -38,14 +41,14 @@ export const TeamAuthMiddlewareLive = Layer.effect(
         )
 
         const isMember = yield* orgMembershipPort.isMember(team.organizationId, userId).pipe(
-          Effect.mapError((cause) => unauthorized('Failed to verify organization membership', cause))
+          Effect.mapError(toCoreInternal('Failed to verify organization membership'))
         )
         if (!isMember) {
           return yield* Effect.fail(forbidden('You are not a member of this organization'))
         }
 
         const orgDisabledAt = yield* orgMembershipPort.getOrgMemberDisabledAt(team.organizationId, userId).pipe(
-          Effect.mapError((cause) => unauthorized('Failed to verify organization membership', cause))
+          Effect.mapError(toCoreInternal('Failed to verify organization membership'))
         )
 
         if (orgDisabledAt !== null) {
@@ -53,7 +56,7 @@ export const TeamAuthMiddlewareLive = Layer.effect(
         }
 
         const teamMember = yield* teamStore.getMemberByTeamAndUser(teamId, userId).pipe(
-          Effect.mapError((cause) => unauthorized('Failed to resolve team membership', cause)),
+          Effect.mapError(toCoreInternal('Failed to resolve team membership')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(forbidden('You are not a member of this team')),
             onSome: Effect.succeed

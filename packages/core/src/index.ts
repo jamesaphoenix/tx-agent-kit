@@ -133,7 +133,7 @@ export type {
 } from './domains/assets/domain/assets-domain.js'
 export { principalFromAuthorization } from './utils.js'
 export { CoreError, UsageCapExceeded, paymentRequired } from './errors.js'
-export { requireOwnership, requireRole, withBadRequest, withUnauthorized } from './effect-utils.js'
+export { requireOwnership, requireRole, withInternalError } from './effect-utils.js'
 export {
   AutoRechargeAttemptStorePort,
   BillingEmailPort,

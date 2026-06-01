@@ -13,7 +13,7 @@ import {
   type UsageCategory
 } from '@tx-agent-kit/contracts'
 import { Context, Effect, Layer, Option } from 'effect'
-import { badRequest, notFound, unauthorized, type CoreError } from '../../../errors.js'
+import { badRequest, internalError, notFound, unauthorized, type CoreError } from '../../../errors.js'
 import {
   type AutoRechargeRequiresActionChallenge,
   canAccessFeature,
@@ -216,13 +216,13 @@ const ensureStripeCustomerId = (input: {
     const newCustomer = yield* input.stripe.createCustomer({
       organizationId: input.organizationId,
       email: input.principalEmail
-    }).pipe(Effect.mapError((cause) => badRequest('Failed to create Stripe customer', cause)))
+    }).pipe(Effect.mapError(toCoreInternal('Failed to create Stripe customer')))
 
     if (input.currentCustomerId === null) {
       const claimedOpt = yield* input.billingStore.claimStripeCustomerId({
         organizationId: input.organizationId,
         stripeCustomerId: newCustomer.id
-      }).pipe(Effect.mapError((cause) => badRequest('Failed to update billing customer reference', cause)))
+      }).pipe(Effect.mapError(toCoreInternal('Failed to update billing customer reference')))
 
       return Option.getOrElse(claimedOpt, () => newCustomer.id)
     }
@@ -230,7 +230,7 @@ const ensureStripeCustomerId = (input: {
     const updatedOpt = yield* input.billingStore.updateSubscriptionFields({
       organizationId: input.organizationId,
       stripeCustomerId: newCustomer.id
-    }).pipe(Effect.mapError((cause) => badRequest('Failed to replace local Stripe customer reference', cause)))
+    }).pipe(Effect.mapError(toCoreInternal('Failed to replace local Stripe customer reference')))
 
     return yield* Option.match(updatedOpt, {
       onNone: () => Effect.fail(notFound('Organization not found')),
@@ -286,7 +286,7 @@ const assertBillingAccess = (
   Effect.gen(function* () {
     const billingStore = yield* BillingStorePort
     const role = yield* billingStore.getMemberRole(organizationId, principal.userId).pipe(
-      Effect.mapError((cause) => unauthorized('Failed to verify organization membership', cause)),
+      Effect.mapError(toCoreInternal('Failed to verify organization membership')),
       Effect.flatMap(Option.match({
         onNone: () => Effect.fail(unauthorized('Not allowed to access this organization')),
         onSome: Effect.succeed
@@ -297,6 +297,9 @@ const assertBillingAccess = (
       return yield* Effect.fail(unauthorized('Only owners and admins can manage billing'))
     }
   })
+
+const toCoreInternal = (message: string) => (cause: unknown): CoreError =>
+  internalError(message, cause)
 
 export class BillingService extends Context.Tag('BillingService')<
   BillingService,
@@ -497,7 +500,7 @@ const runRecordUsageEffect = (
     }
 
     const settings = yield* billingStore.getSubscriptionFields(input.organizationId).pipe(
-      Effect.mapError((cause) => badRequest('Failed to fetch billing settings', cause)),
+      Effect.mapError(toCoreInternal('Failed to fetch billing settings')),
       Effect.flatMap(Option.match({
         onNone: () => Effect.fail(notFound('Organization not found')),
         onSome: Effect.succeed
@@ -514,7 +517,7 @@ const runRecordUsageEffect = (
 
     if (input.referenceId) {
       const existingOpt = yield* usageStore.findByReferenceId(input.organizationId, input.referenceId).pipe(
-        Effect.mapError((cause) => badRequest('Failed to look up usage reference', cause))
+        Effect.mapError(toCoreInternal('Failed to look up usage reference'))
       )
 
       if (Option.isSome(existingOpt)) {
@@ -538,9 +541,9 @@ const runRecordUsageEffect = (
       metadata: input.metadata ?? {},
       recordedAt
     }).pipe(
-      Effect.mapError((cause) => badRequest('Failed to record usage', cause)),
+      Effect.mapError(toCoreInternal('Failed to record usage')),
       Effect.flatMap(Option.match({
-        onNone: () => Effect.fail(badRequest('Failed to record usage')),
+        onNone: () => Effect.fail(internalError('Failed to record usage')),
         onSome: Effect.succeed
       }))
     )
@@ -557,7 +560,7 @@ export const BillingServiceLive = Layer.effect(
         const billingStore = yield* BillingStorePort
 
         const settings = yield* billingStore.getSubscriptionFields(organizationId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch billing settings', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch billing settings')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Organization not found')),
             onSome: Effect.succeed
@@ -615,7 +618,7 @@ export const BillingServiceLive = Layer.effect(
           || input.autoRechargeAmountDecimillicents !== undefined
         if (touchesAutoRechargeState) {
           const currentOpt = yield* billingStore.getSubscriptionFields(organizationId).pipe(
-            Effect.mapError((cause) => badRequest('Failed to fetch billing settings', cause))
+            Effect.mapError(toCoreInternal('Failed to fetch billing settings'))
           )
           if (Option.isNone(currentOpt)) {
             return yield* Effect.fail(notFound('Organization not found'))
@@ -644,7 +647,7 @@ export const BillingServiceLive = Layer.effect(
           autoRechargeAmount: input.autoRechargeAmountDecimillicents,
           usageCap: input.usageCapDecimillicents
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to update billing settings', cause)),
+          Effect.mapError(toCoreInternal('Failed to update billing settings')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Organization not found')),
             onSome: Effect.succeed
@@ -662,7 +665,7 @@ export const BillingServiceLive = Layer.effect(
         const dismissed = yield* preferenceStore
           .isNoCapReminderDismissed(principal.userId, organizationId)
           .pipe(
-            Effect.mapError((cause) => badRequest('Failed to fetch no-cap reminder preference', cause))
+            Effect.mapError(toCoreInternal('Failed to fetch no-cap reminder preference'))
           )
 
         return { dismissed }
@@ -676,7 +679,7 @@ export const BillingServiceLive = Layer.effect(
         yield* preferenceStore
           .dismissNoCapReminder(principal.userId, organizationId)
           .pipe(
-            Effect.mapError((cause) => badRequest('Failed to dismiss no-cap reminder', cause))
+            Effect.mapError(toCoreInternal('Failed to dismiss no-cap reminder'))
           )
 
         return { dismissed: true }
@@ -690,7 +693,7 @@ export const BillingServiceLive = Layer.effect(
         return yield* attemptStore
           .findLatestRequiresActionChallenge(organizationId)
           .pipe(
-            Effect.mapError((cause) => badRequest('Failed to fetch auto-recharge 3DS challenge', cause))
+            Effect.mapError(toCoreInternal('Failed to fetch auto-recharge 3DS challenge'))
           )
       }),
 
@@ -701,7 +704,7 @@ export const BillingServiceLive = Layer.effect(
         const stripe = yield* StripePort
 
         const settings = yield* billingStore.getSubscriptionFields(input.organizationId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch billing settings', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch billing settings')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Organization not found')),
             onSome: Effect.succeed
@@ -724,7 +727,7 @@ export const BillingServiceLive = Layer.effect(
         return yield* stripe.createCheckoutSession({
           ...input,
           customerId
-        }).pipe(Effect.mapError((cause) => badRequest('Failed to create checkout session', cause)))
+        }).pipe(Effect.mapError(toCoreInternal('Failed to create checkout session')))
       }),
 
     completeLocalBillingSetup: (principal, organizationId, input) =>
@@ -735,7 +738,7 @@ export const BillingServiceLive = Layer.effect(
         const clock = yield* ClockPort
 
         const current = yield* billingStore.getSubscriptionFields(organizationId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch billing settings', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch billing settings')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Organization not found')),
             onSome: Effect.succeed
@@ -764,7 +767,7 @@ export const BillingServiceLive = Layer.effect(
           subscriptionCurrentPeriodEnd: new Date(now.getTime() + LOCAL_DEV_SUBSCRIPTION_PERIOD_MS),
           paymentGracePeriodEndsAt: null
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to persist local billing bootstrap state', cause)),
+          Effect.mapError(toCoreInternal('Failed to persist local billing bootstrap state')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Organization not found')),
             onSome: Effect.succeed
@@ -780,7 +783,7 @@ export const BillingServiceLive = Layer.effect(
         })
 
         const refreshed = yield* billingStore.getSubscriptionFields(organizationId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to reload billing settings', cause)),
+          Effect.mapError(toCoreInternal('Failed to reload billing settings')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Organization not found')),
             onSome: Effect.succeed
@@ -796,7 +799,7 @@ export const BillingServiceLive = Layer.effect(
         const billingStore = yield* BillingStorePort
         const stripe = yield* StripePort
         const settings = yield* billingStore.getSubscriptionFields(input.organizationId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch billing settings', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch billing settings')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Organization not found')),
             onSome: Effect.succeed
@@ -819,7 +822,7 @@ export const BillingServiceLive = Layer.effect(
         return yield* stripe.createPortalSession({
           ...input,
           customerId
-        }).pipe(Effect.mapError((cause) => badRequest('Failed to create billing portal session', cause)))
+        }).pipe(Effect.mapError(toCoreInternal('Failed to create billing portal session')))
       }),
 
     createTopUpSession: (principal, input) =>
@@ -852,7 +855,7 @@ export const BillingServiceLive = Layer.effect(
         const stripe = yield* StripePort
 
         const settings = yield* billingStore.getSubscriptionFields(input.organizationId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch billing settings', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch billing settings')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Organization not found')),
             onSome: Effect.succeed
@@ -876,7 +879,7 @@ export const BillingServiceLive = Layer.effect(
           amountDecimillicents: input.amountDecimillicents,
           successUrl: input.successUrl,
           cancelUrl: input.cancelUrl
-        }).pipe(Effect.mapError((cause) => badRequest('Failed to create top-up session', cause)))
+        }).pipe(Effect.mapError(toCoreInternal('Failed to create top-up session')))
       }),
 
     processWebhookEvent: (rawBody, signature) =>
@@ -898,7 +901,7 @@ export const BillingServiceLive = Layer.effect(
         // INSERT ... ON CONFLICT DO NOTHING: if the row already exists this
         // returns false and we early-exit before any state-mutating work.
         const inserted = yield* processedStripeEventStore.tryInsert(event.id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to claim processed_stripe_events row', cause))
+          Effect.mapError(toCoreInternal('Failed to claim processed_stripe_events row'))
         )
 
         if (!inserted) {
@@ -922,14 +925,14 @@ export const BillingServiceLive = Layer.effect(
         // human-readable history of processed Stripe events. It is no longer
         // the primary idempotency gate — processed_stripe_events (above) is.
         const existingEventOpt = yield* eventStore.findByStripeEventId(event.id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to check webhook audit log', cause))
+          Effect.mapError(toCoreInternal('Failed to check webhook audit log'))
         )
 
         const resolveBySubscriptionId = (subscriptionId: string): Effect.Effect<string | null, CoreError> =>
           billingStore
             .findByStripeSubscriptionId(subscriptionId)
             .pipe(
-              Effect.mapError((cause) => badRequest('Failed to resolve organization for subscription webhook', cause)),
+              Effect.mapError(toCoreInternal('Failed to resolve organization for subscription webhook')),
               Effect.map((opt) => Option.isSome(opt) ? opt.value.id : null)
             )
 
@@ -937,7 +940,7 @@ export const BillingServiceLive = Layer.effect(
           billingStore
             .findByStripeCustomerId(customerId)
             .pipe(
-              Effect.mapError((cause) => badRequest('Failed to resolve organization for customer webhook', cause)),
+              Effect.mapError(toCoreInternal('Failed to resolve organization for customer webhook')),
               Effect.map((opt) => Option.isSome(opt) ? opt.value.id : null)
             )
 
@@ -984,9 +987,9 @@ export const BillingServiceLive = Layer.effect(
           organizationId,
           payload: event.payload
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to persist webhook event', cause)),
+          Effect.mapError(toCoreInternal('Failed to persist webhook event')),
           Effect.flatMap(Option.match({
-            onNone: () => Effect.fail(badRequest('Failed to persist webhook event')),
+            onNone: () => Effect.fail(internalError('Failed to persist webhook event')),
             onSome: Effect.succeed
           }))
         ))
@@ -1000,7 +1003,7 @@ export const BillingServiceLive = Layer.effect(
         // short-circuit the retry as idempotent. See INV-BILLING-005 and
         // billing-webhook-claim-rollback.e2e.
         yield* eventStore.markProcessed(createdEvent.id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to stamp webhook audit log', cause)),
+          Effect.mapError(toCoreInternal('Failed to stamp webhook audit log')),
           Effect.ignore
         )
 
@@ -1054,7 +1057,7 @@ export const BillingServiceLive = Layer.effect(
                 ? { subscriptionPlan: checkoutPlan }
                 : {}),
               ...(paymentMethodId !== null ? { stripePaymentMethodId: paymentMethodId } : {})
-            }).pipe(Effect.mapError((cause) => badRequest('Failed to persist checkout webhook state', cause)))
+            }).pipe(Effect.mapError(toCoreInternal('Failed to persist checkout webhook state')))
 
             // @spec INV-BILLING-005 — only one-time payment checkouts grant
             // credits. Subscription-mode checkouts are handled by the
@@ -1113,7 +1116,7 @@ export const BillingServiceLive = Layer.effect(
             let staleUpdate = false
             const currentSettingsOpt = yield* billingStore
               .getSubscriptionFields(organizationId)
-              .pipe(Effect.mapError((cause) => badRequest('Failed to read settings for subscription gate', cause)))
+              .pipe(Effect.mapError(toCoreInternal('Failed to read settings for subscription gate')))
             const currentSubscriptionId = Option.match(currentSettingsOpt, {
               onNone: () => null,
               onSome: (s) => s.stripeSubscriptionId
@@ -1171,7 +1174,7 @@ export const BillingServiceLive = Layer.effect(
                 subscriptionEndsAt: endedAt,
                 subscriptionCurrentPeriodEnd: currentPeriodEnd,
                 ...updateOrderingGuard
-              }).pipe(Effect.mapError((cause) => badRequest('Failed to persist subscription webhook state', cause)))
+              }).pipe(Effect.mapError(toCoreInternal('Failed to persist subscription webhook state')))
             }
           } else if (event.type === 'customer.subscription.deleted') {
             // Gate on the event's subscription id matching the org's
@@ -1188,7 +1191,7 @@ export const BillingServiceLive = Layer.effect(
             }
             const currentSettingsOpt = yield* billingStore
               .getSubscriptionFields(organizationId)
-              .pipe(Effect.mapError((cause) => badRequest('Failed to read settings for subscription.deleted gate', cause)))
+              .pipe(Effect.mapError(toCoreInternal('Failed to read settings for subscription.deleted gate')))
             const currentSubscriptionId = Option.match(currentSettingsOpt, {
               onNone: () => null,
               onSome: (s) => s.stripeSubscriptionId
@@ -1215,7 +1218,7 @@ export const BillingServiceLive = Layer.effect(
                 subscriptionEndsAt: endedAt,
                 stripeSubscriptionId: null,
                 stripeMeteredSubscriptionItemId: null
-              }).pipe(Effect.mapError((cause) => badRequest('Failed to persist cancellation webhook state', cause)))
+              }).pipe(Effect.mapError(toCoreInternal('Failed to persist cancellation webhook state')))
             }
           } else if (event.type === 'payment_intent.succeeded' && autoRechargeAttemptId !== null) {
             const stripePaymentIntentId = readStringField(event.data.object, 'id')
@@ -1253,7 +1256,7 @@ export const BillingServiceLive = Layer.effect(
 
             yield* attemptStore
               .markAttemptSucceeded(autoRechargeAttemptId, stripePaymentIntentId)
-              .pipe(Effect.mapError((cause) => badRequest('Failed to persist auto-recharge webhook attempt state', cause)))
+              .pipe(Effect.mapError(toCoreInternal('Failed to persist auto-recharge webhook attempt state')))
           } else if (event.type === 'invoice.payment_failed' || event.type === 'invoice.payment_succeeded') {
             // Gate invoice.* events on the invoice's subscription id
             // matching the org's current stripe_subscription_id. A
@@ -1266,7 +1269,7 @@ export const BillingServiceLive = Layer.effect(
             const invoiceSubscriptionId = readStringField(event.data.object, 'subscription')
             const currentSettingsOpt = yield* billingStore
               .getSubscriptionFields(organizationId)
-              .pipe(Effect.mapError((cause) => badRequest('Failed to read settings for invoice gate', cause)))
+              .pipe(Effect.mapError(toCoreInternal('Failed to read settings for invoice gate')))
             const currentSubscriptionId = Option.match(currentSettingsOpt, {
               onNone: () => null,
               onSome: (s) => s.stripeSubscriptionId
@@ -1315,7 +1318,7 @@ export const BillingServiceLive = Layer.effect(
                 subscriptionStatus: 'past_due',
                 paymentGracePeriodEndsAt: gracePeriodEndsAt,
                 onlyIfStatusIn: ['active', 'trialing', 'past_due']
-              }).pipe(Effect.mapError((cause) => badRequest('Failed to persist failed payment webhook state', cause)))
+              }).pipe(Effect.mapError(toCoreInternal('Failed to persist failed payment webhook state')))
             } else {
               // @spec billing-and-pricing-design §"Failed Payment Lifecycle"
               // Clear the payment grace period on a successful payment —
@@ -1328,7 +1331,7 @@ export const BillingServiceLive = Layer.effect(
                 subscriptionStatus: 'active',
                 paymentGracePeriodEndsAt: null,
                 onlyIfStatusIn: ['active', 'past_due', 'trialing', 'unpaid']
-              }).pipe(Effect.mapError((cause) => badRequest('Failed to persist payment success webhook state', cause)))
+              }).pipe(Effect.mapError(toCoreInternal('Failed to persist payment success webhook state')))
 
               // @spec INV-BILLING-WELCOME-CREDIT-ONCE-PER-ORG
               // @spec INV-BILLING-CREDITS-NEVER-EXPIRE
@@ -1413,7 +1416,7 @@ export const BillingServiceLive = Layer.effect(
                     },
                     stampWelcomeCreditAt: grantedAt
                   })
-                  .pipe(Effect.mapError((cause) => badRequest('Failed to grant welcome credit', cause)))
+                  .pipe(Effect.mapError(toCoreInternal('Failed to grant welcome credit')))
               }
             }
           } else if (event.type === 'charge.dispute.created') {
@@ -1457,7 +1460,7 @@ export const BillingServiceLive = Layer.effect(
                 },
                 correlationId: null
               }
-            }).pipe(Effect.mapError((cause) => badRequest('Failed to persist dispute hold', cause)))
+            }).pipe(Effect.mapError(toCoreInternal('Failed to persist dispute hold')))
           } else if (event.type === 'charge.dispute.closed') {
             // @spec INV-BILLING-009 — emit `billing.dispute_resolved` with
             // the outcome. On 'lost', also append a negative `adjustment`
@@ -1531,7 +1534,7 @@ export const BillingServiceLive = Layer.effect(
                 },
                 correlationId: null
               }
-            }).pipe(Effect.mapError((cause) => badRequest('Failed to persist dispute resolution', cause)))
+            }).pipe(Effect.mapError(toCoreInternal('Failed to persist dispute resolution')))
           } else if (event.type === 'charge.refunded') {
             // @spec INV-BILLING-009 — Stripe-initiated refund (customer
             // portal, operator dashboard, or API). A refund event's
@@ -1627,7 +1630,7 @@ export const BillingServiceLive = Layer.effect(
                   },
                   correlationId: null
                 }
-              }).pipe(Effect.mapError((cause) => badRequest('Failed to persist refund', cause)))
+              }).pipe(Effect.mapError(toCoreInternal('Failed to persist refund')))
             }
           }
         }
@@ -1672,7 +1675,7 @@ export const BillingServiceLive = Layer.effect(
         const attemptStore = yield* AutoRechargeAttemptStorePort
 
         const settingsOpt = yield* billingStore.getSubscriptionFields(input.organizationId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch billing settings', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch billing settings'))
         )
 
         if (Option.isNone(settingsOpt)) {
@@ -1686,7 +1689,7 @@ export const BillingServiceLive = Layer.effect(
         if (!settings.autoRechargeEnabled) {
           yield* attemptStore
             .markAttemptFailed(input.attemptId, 'auto-recharge disabled', null)
-            .pipe(Effect.mapError((cause) => badRequest('Failed to mark auto-recharge attempt failed', cause)))
+            .pipe(Effect.mapError(toCoreInternal('Failed to mark auto-recharge attempt failed')))
           return {
             status: 'failed' as const,
             stripePaymentIntentId: '',
@@ -1697,7 +1700,7 @@ export const BillingServiceLive = Layer.effect(
         if (!customerId || !paymentMethodId) {
           yield* attemptStore
             .markAttemptFailed(input.attemptId, 'no saved payment method', null)
-            .pipe(Effect.mapError((cause) => badRequest('Failed to mark auto-recharge attempt failed', cause)))
+            .pipe(Effect.mapError(toCoreInternal('Failed to mark auto-recharge attempt failed')))
           return {
             status: 'failed' as const,
             stripePaymentIntentId: '',
@@ -1714,7 +1717,7 @@ export const BillingServiceLive = Layer.effect(
             description: `Auto-recharge for organization ${input.organizationId}`,
             idempotencyKey: input.attemptId
           })
-          .pipe(Effect.mapError((cause) => badRequest('Failed to create off-session PaymentIntent', cause)))
+          .pipe(Effect.mapError(toCoreInternal('Failed to create off-session PaymentIntent')))
 
         if (intent.status === 'succeeded') {
           // Atomic ledger append + billing.credits_recharged outbox event
@@ -1734,7 +1737,7 @@ export const BillingServiceLive = Layer.effect(
 
           yield* attemptStore
             .markAttemptSucceeded(input.attemptId, intent.id)
-            .pipe(Effect.mapError((cause) => badRequest('Failed to mark auto-recharge attempt succeeded', cause)))
+            .pipe(Effect.mapError(toCoreInternal('Failed to mark auto-recharge attempt succeeded')))
 
           return {
             status: 'succeeded' as const,
@@ -1765,11 +1768,11 @@ export const BillingServiceLive = Layer.effect(
                 stripePaymentIntentId: intent.id,
                 clientSecret: intent.clientSecret
               })
-              .pipe(Effect.mapError((cause) => badRequest('Failed to mark auto-recharge requires_action', cause)))
+              .pipe(Effect.mapError(toCoreInternal('Failed to mark auto-recharge requires_action')))
           } else {
             yield* attemptStore
               .markAttemptFailed(input.attemptId, 'requires user action', intent.id)
-              .pipe(Effect.mapError((cause) => badRequest('Failed to mark auto-recharge attempt failed', cause)))
+              .pipe(Effect.mapError(toCoreInternal('Failed to mark auto-recharge attempt failed')))
           }
 
           return {
@@ -1782,7 +1785,7 @@ export const BillingServiceLive = Layer.effect(
         // requires_payment_method | canceled → treat as failed card decline.
         yield* attemptStore
           .markAttemptFailed(input.attemptId, 'card declined', intent.id)
-          .pipe(Effect.mapError((cause) => badRequest('Failed to mark auto-recharge attempt failed', cause)))
+          .pipe(Effect.mapError(toCoreInternal('Failed to mark auto-recharge attempt failed')))
         return {
           status: 'failed' as const,
           stripePaymentIntentId: intent.id,
@@ -1826,7 +1829,7 @@ export const BillingServiceLive = Layer.effect(
         const guard = yield* BillingGuardPort
 
         const settings = yield* billingStore.getSubscriptionFields(input.organizationId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch billing settings', cause)),
+          Effect.mapError(toCoreInternal('Failed to fetch billing settings')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(notFound('Organization not found')),
             onSome: Effect.succeed
@@ -1843,7 +1846,7 @@ export const BillingServiceLive = Layer.effect(
           category: input.category,
           periodStart: input.periodStart,
           periodEnd: input.periodEnd
-        }).pipe(Effect.mapError((cause) => badRequest('Failed to summarize usage', cause)))
+        }).pipe(Effect.mapError(toCoreInternal('Failed to summarize usage')))
 
         return {
           organizationId: input.organizationId,

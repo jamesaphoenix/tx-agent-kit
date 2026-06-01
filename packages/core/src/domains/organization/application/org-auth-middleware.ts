@@ -1,6 +1,9 @@
 import { Context, Effect, Layer, Option } from 'effect'
-import { unauthorized, type CoreError } from '../../../errors.js'
+import { internalError, unauthorized, type CoreError } from '../../../errors.js'
 import { OrganizationStorePort } from '../ports/organization-ports.js'
+
+const toCoreInternal = (message: string) => (cause: unknown): CoreError =>
+  internalError(message, cause)
 
 import type { MemberRole } from '@tx-agent-kit/contracts'
 
@@ -28,7 +31,7 @@ export const OrgAuthMiddlewareLive = Layer.effect(
         const orgStore = yield* OrganizationStorePort
 
         const isMember = yield* orgStore.isMember(organizationId, userId).pipe(
-          Effect.mapError((cause) => unauthorized('Failed to verify organization membership', cause))
+          Effect.mapError(toCoreInternal('Failed to verify organization membership'))
         )
 
         if (!isMember) {
@@ -36,7 +39,7 @@ export const OrgAuthMiddlewareLive = Layer.effect(
         }
 
         const role = yield* orgStore.getMemberRole(organizationId, userId).pipe(
-          Effect.mapError((cause) => unauthorized('Failed to resolve organization role', cause)),
+          Effect.mapError(toCoreInternal('Failed to resolve organization role')),
           Effect.flatMap(Option.match({
             onNone: () => Effect.fail(unauthorized('Not a member of this organization')),
             onSome: Effect.succeed

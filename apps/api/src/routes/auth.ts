@@ -13,6 +13,7 @@ import { Effect } from 'effect'
 import { TooManyRequests, TxAgentApi, Unauthorized, mapCoreError } from '../api.js'
 import { getAuthRefreshCookieConfig } from '../config/env.js'
 import { consumeAuthIdentifierRateLimit, toClientIpAddress } from '../middleware/auth-rate-limit.js'
+import { enforceTurnstile } from '../middleware/turnstile.js'
 import { toApiAuthPrincipal, toApiAuthSession } from '../mappers/auth-mapper.js'
 import { requireAuth } from '../utils.js'
 
@@ -184,6 +185,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
           Effect.mapError(mapCoreError)
         )
         yield* enforceIdentifierRateLimit('/v1/auth/sign-up', payload.email)
+        yield* enforceTurnstile(request)
         const authService = yield* AuthService
         const session = yield* authService.signUp(payload, toAuthRequestContext(request))
         const isBrowser = isCookieManagedBrowserSessionRequest(request)

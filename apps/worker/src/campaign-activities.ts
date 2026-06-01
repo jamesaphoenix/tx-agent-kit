@@ -10,7 +10,7 @@ import {
 import { Effect } from 'effect'
 import { getWorkerEnv } from './config/env.js'
 
-const logger = createLogger('tx-agent-kit-campaign-activities')
+const logger = createLogger('tx-agent-kit-worker-campaign-activities')
 const resendEndpoint = 'https://api.resend.com/emails'
 
 const runEffect = <A, E>(effect: Effect.Effect<A, E>): Promise<A> =>

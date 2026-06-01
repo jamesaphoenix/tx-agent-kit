@@ -1,7 +1,11 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, configure } from '@testing-library/react'
 
-configure({ asyncUtilTimeout: 5000 })
+// Web integration tests drive a REAL API + DB behind every waitFor/findBy. Under
+// parallel worker load a single round-trip can exceed the testing-library default
+// (1000ms) or a tight 5s, producing flaky timeouts on redirects/success messages.
+// 15s gives real I/O headroom while staying well under the per-test timeout.
+configure({ asyncUtilTimeout: 15_000 })
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 import { clearAuthToken } from './lib/auth-token'
 import { resetIntegrationRouterLocation } from './integration/support/next-router-context'
@@ -31,6 +35,9 @@ import { configureExternalNavigationHandler } from './lib/url-state'
 
 process.env.NEXT_PUBLIC_API_BASE_URL = integrationBaseUrl
 process.env.API_BASE_URL = integrationBaseUrl
+// Disable Turnstile gating in web tests: AuthForm submits sign-up without a
+// captcha token, and the spawned API runs with TURNSTILE_SECRET_KEY='' too.
+delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 // Reset cached env and update the axios instance to use the test server URL
 resetWebEnvCache()
 api.defaults.baseURL = integrationBaseUrl

@@ -423,3 +423,98 @@ test('no-restricted-imports cascade: infra/db is NOT drizzle-restricted', async 
   const patternGroups = (lastConfig.patterns || []).flatMap((p) => p.group || [])
   assert.ok(!patternGroups.includes('drizzle-orm'), 'drizzle-orm should NOT be banned in infra/db')
 })
+
+// ── effect-consistency: ban Effect.promise (use Effect.tryPromise) ──────
+const effectConsistencyRule = async () => {
+  const { effectConsistencyConfig } = await import('../effect-consistency.js')
+  return {
+    'no-restricted-syntax': effectConsistencyConfig[0].rules['no-restricted-syntax']
+  }
+}
+
+test('bans Effect.promise() (silent defect on rejection)', async () => {
+  await expectError(
+    {
+      code: "const Effect = { promise: (f) => f }\nexport const e = Effect.promise(() => Promise.resolve(1))",
+      rules: await effectConsistencyRule()
+    },
+    'no-restricted-syntax'
+  )
+})
+
+test('allows Effect.tryPromise()', async () => {
+  await expectClean({
+    code: "const Effect = { tryPromise: (o) => o }\nexport const e = Effect.tryPromise({ try: () => Promise.resolve(1), catch: (c) => c })",
+    rules: await effectConsistencyRule()
+  })
+})
+
+// ── effect-consistency: createLogger service-name prefix ────────────────
+test('flags a bare (non-prefixed) createLogger service name', async () => {
+  const rules = await effectConsistencyRule()
+  for (const name of ['db', 'stripe', 'email-webhooks']) {
+    await expectError(
+      {
+        code: `const createLogger = (s) => ({ child: () => ({}) })\nexport const l = createLogger('${name}')`,
+        rules
+      },
+      'no-restricted-syntax'
+    )
+  }
+})
+
+test('allows tx-agent-kit- prefixed names, .child() args, and non-literal service args', async () => {
+  await expectClean({
+    code: [
+      "const createLogger = (s) => ({ child: (x) => ({}) })",
+      "const serviceName = 'tx-agent-kit-worker-dynamic'",
+      "export const a = createLogger('tx-agent-kit-db')",
+      // .child('<subsystem>') args are bare by design — only the first arg is the service name.
+      "export const b = createLogger('tx-agent-kit-api').child('email-webhooks')",
+      // non-literal service args (e.g. the Effect bridge) are untouched.
+      "export const c = createLogger(serviceName)"
+    ].join('\n'),
+    rules: await effectConsistencyRule()
+  })
+})
+
+// ── effect-consistency: infra failure must not be a 4xx client error ────
+// The rule lives in effect-consistency.js as a `no-restricted-syntax` selector.
+// We pull the exact rule options off the published config (via the shared
+// effectConsistencyRule helper) so the test tracks the real selector.
+test("no-infra-failure-as-client-error flags badRequest('Failed to …')", async () => {
+  await expectError(
+    {
+      code: "const badRequest = (m) => m\nexport const e = badRequest('Failed to load widget')",
+      rules: await effectConsistencyRule()
+    },
+    'no-restricted-syntax'
+  )
+})
+
+test('no-infra-failure-as-client-error flags unauthorized/conflict/notFound "Failed to …"', async () => {
+  const rules = await effectConsistencyRule()
+  for (const ctor of ['unauthorized', 'conflict', 'forbidden', 'notFound']) {
+    await expectError(
+      {
+        code: `const ${ctor} = (m) => m\nexport const e = ${ctor}('Failed to read row')`,
+        rules
+      },
+      'no-restricted-syntax'
+    )
+  }
+})
+
+test('no-infra-failure-as-client-error allows genuine client errors + internalError', async () => {
+  await expectClean({
+    code: [
+      "const badRequest = (m) => m",
+      "const conflict = (m) => m",
+      "const internalError = (m) => m",
+      "export const a = badRequest('Invalid widget payload')",
+      "export const b = conflict('Widget already exists')",
+      "export const c = internalError('Failed to load widget')"
+    ].join('\n'),
+    rules: await effectConsistencyRule()
+  })
+})

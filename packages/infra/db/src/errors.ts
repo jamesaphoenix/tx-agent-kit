@@ -1,7 +1,7 @@
 import { createLogger } from '@tx-agent-kit/logging'
 import * as Schema from 'effect/Schema'
 
-const dbLogger = createLogger('db')
+const dbLogger = createLogger('tx-agent-kit-db')
 
 export class DbError extends Schema.TaggedError<DbError>()('DbError', {
   code: Schema.String,
@@ -90,6 +90,26 @@ const extractPostgresError = (
 
 const isPostgresUniqueViolation = (error: unknown): boolean =>
   extractPostgresError(error)?.code === '23505'
+
+// Class-40 (Transaction Rollback) errors that Postgres guarantees have rolled
+// back the transaction — so retrying the operation is safe (no partial commit)
+// and is the documented, intended response to contention:
+//   40001 serialization_failure   (SERIALIZABLE/REPEATABLE READ conflict)
+//   40P01 deadlock_detected
+// We deliberately do NOT include connection-level errors here: a dropped
+// connection after a write has ambiguous commit state, so blind retry could
+// double-apply a non-idempotent write.
+const transientRollbackCodes = new Set(['40001', '40P01'])
+
+/**
+ * True when `error` (anywhere in its cause chain) is a Postgres transient
+ * rollback error that is safe to retry verbatim. Used by the repository seam
+ * (`withDb`) to self-heal contention-induced failures before they surface.
+ */
+export const isTransientPostgresError = (error: unknown): boolean => {
+  const code = extractPostgresError(error)?.code
+  return typeof code === 'string' && transientRollbackCodes.has(code)
+}
 
 const toErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {

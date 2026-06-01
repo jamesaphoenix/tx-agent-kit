@@ -1,95 +1,75 @@
+import {
+  createSentryReporter,
+  SENTRY_SPOTLIGHT_PLACEHOLDER_DSN
+} from '@tx-agent-kit/observability/sentry'
 import type { WorkerEnv } from '../config/env.js'
 
-const spotlightPlaceholderDsn = 'https://spotlight@local/0'
+// Thin worker binding over the shared Sentry reporter (init/race/trace/withScope
+// live in @tx-agent-kit/observability/sentry). Only the DSN resolution is
+// worker-specific.
+const reporter = createSentryReporter()
 
-interface SentryNodeModule {
-  init: (options: {
-    dsn: string
-    environment: string
-    tracesSampleRate: number
-    spotlight?: boolean
-  }) => void
-  captureException: (error: unknown) => unknown
-  flush: (timeout?: number) => PromiseLike<unknown>
-}
-
-let isInitialized = false
-let initializationPromise: Promise<boolean> | null = null
-let sentryModule: SentryNodeModule | null = null
-
-const resolveSentryModule = async (): Promise<SentryNodeModule> => {
-  if (sentryModule) {
-    return sentryModule
-  }
-
-  sentryModule = await import('@sentry/node')
-  return sentryModule
-}
-
-export const initializeWorkerSentry = async (env: WorkerEnv): Promise<boolean> => {
-  if (isInitialized) {
-    return false
-  }
-
-  if (initializationPromise) {
-    return initializationPromise
-  }
-
+export const initializeWorkerSentry = (env: WorkerEnv): Promise<boolean> => {
   const spotlightEnabled = env.SENTRY_SPOTLIGHT
-  const dsn = env.WORKER_SENTRY_DSN ?? (spotlightEnabled ? spotlightPlaceholderDsn : undefined)
+  const dsn =
+    env.WORKER_SENTRY_DSN ?? (spotlightEnabled ? SENTRY_SPOTLIGHT_PLACEHOLDER_DSN : undefined)
 
-  if (!dsn) {
-    return false
-  }
-
-  initializationPromise = (async () => {
-    const Sentry = await resolveSentryModule()
-    Sentry.init({
-      dsn,
-      environment: env.NODE_ENV,
-      tracesSampleRate: spotlightEnabled ? 1.0 : 0,
-      spotlight: spotlightEnabled
-    })
-
-    isInitialized = true
-    return true
-  })()
-
-  const currentInitialization = initializationPromise
-
-  return (async () => {
-    try {
-      return await currentInitialization
-    } catch {
-      isInitialized = false
-      sentryModule = null
-      return false
-    } finally {
-      if (initializationPromise === currentInitialization) {
-        initializationPromise = null
-      }
-    }
-  })()
+  return reporter.initialize({
+    dsn,
+    environment: env.NODE_ENV,
+    spotlightEnabled,
+    component: 'worker'
+  })
 }
 
 export const captureWorkerException = (error: unknown): void => {
-  if (!isInitialized || !sentryModule) {
-    return
-  }
-
-  sentryModule.captureException(error)
+  reporter.captureException(error)
 }
 
-export const flushWorkerSentry = async (): Promise<void> => {
-  if (!isInitialized || !sentryModule) {
-    return
-  }
-
-  await sentryModule.flush(2000)
+/** Context for a worker activity failure, mirroring the API's mapped-error shape. */
+export interface WorkerActivityErrorContext {
+  readonly workflowId?: string
+  readonly runId?: string
+  readonly activityId?: string
+  readonly activityType?: string
+  readonly attempt?: number
+  readonly code?: string
+  readonly rootCauseTag?: string
+  readonly rootCauseMessage?: string
 }
+
+/**
+ * Capture a worker ACTIVITY failure with the same searchable shape as the API's
+ * mapped-error boundary: a stable fingerprint (so the same fault clusters) plus
+ * workflow/activity tags. trace_id/span_id correlation is added by the shared
+ * reporter's captureScoped. Used by the activity error boundary — distinct from
+ * captureWorkerException, which is for process-level crashes.
+ */
+export const captureWorkerActivityError = (
+  error: unknown,
+  context: WorkerActivityErrorContext
+): void => {
+  reporter.captureScoped(error, {
+    boundary: 'worker_activity',
+    tags: {
+      activity_type: context.activityType,
+      workflow_id: context.workflowId,
+      core_error_code: context.code,
+      root_cause_tag: context.rootCauseTag
+    },
+    fingerprint: [
+      'worker-activity-error',
+      context.activityType,
+      context.code,
+      context.rootCauseTag,
+      context.rootCauseMessage
+    ],
+    contexts: { activity: { ...context } }
+  })
+}
+
+export const flushWorkerSentry = (): Promise<void> => reporter.flush(2000)
 
 export const _resetWorkerSentryForTest = (): void => {
-  isInitialized = false
-  initializationPromise = null
-  sentryModule = null
+  reporter.reset()
 }

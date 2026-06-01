@@ -2,8 +2,20 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.146.1
     restart: unless-stopped
+    # The contrib image runs as a non-root user (UID 10001), which gets
+    # "permission denied" on the root-owned Docker socket — the docker_stats
+    # receiver then fails to start and crash-loops the whole collector. Run as
+    # root so docker_stats can read /var/run/docker.sock and hostmetrics can
+    # read /hostfs. All host mounts are read-only; the collector only emits.
+    user: "0:0"
     env_file:
       - ${DEPLOY_ENV_FILE:?DEPLOY_ENV_FILE must point to rendered env}
+    environment:
+      # docker_stats sees every container on the host (Colima VM). The
+      # collector's filter/container_noise keeps only this compose project's
+      # containers so a staging+prod host never double-counts and the dashboard
+      # excludes foreign stacks. Defaults to "octospark" if unset.
+      OTEL_DOCKERSTATS_PROJECT: ${COMPOSE_PROJECT_NAME:-octospark}
     command:
       - --config=/etc/otel-collector/otel-collector.${OTEL_COLLECTOR_BACKEND:-gcp}.yaml
     volumes:
@@ -11,6 +23,13 @@ services:
       - ./monitoring/production/otel-collector.oss.yaml:/etc/otel-collector/otel-collector.oss.yaml:ro
       - "${OTEL_COLLECTOR_GCP_CREDENTIALS_DIR:-./deploy/gcp-empty}:/var/secrets/google:ro"
       - "${OTEL_COLLECTOR_GCLOUD_CONFIG_DIR:-./deploy/gcloud-empty}:/root/.config/gcloud:ro"
+      # Read-only host/docker mounts for the docker_stats + hostmetrics receivers.
+      # docker.sock -> per-container stats; /proc, /sys and / under /hostfs ->
+      # host (Colima VM) CPU/RAM/load/filesystem. All :ro — observability only.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/hostfs/proc:ro
+      - /sys:/hostfs/sys:ro
+      - /:/hostfs:ro
 
   api:
     image: ${API_IMAGE:?API_IMAGE must be set to a pinned image reference}

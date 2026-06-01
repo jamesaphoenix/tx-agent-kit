@@ -15,11 +15,16 @@ if (!baseUrl) {
   process.exit(1)
 }
 
+// Trusted bypass for the auth sign-up rate limiter so repeated deploys from one
+// egress IP don't 429 the smoke test. No-op when the secret is not configured.
+const rateLimitBypassToken = process.env.AUTH_RATE_LIMIT_BYPASS_TOKEN
+
 const requestJson = async (path, init = {}) => {
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       'content-type': 'application/json',
+      ...(rateLimitBypassToken ? { 'x-auth-rate-limit-bypass': rateLimitBypassToken } : {}),
       ...(init.headers ?? {})
     }
   })

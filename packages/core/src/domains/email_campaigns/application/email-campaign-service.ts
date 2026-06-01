@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from 'effect'
-import { badRequest, conflict, notFound, type CoreError } from '../../../errors.js'
+import { badRequest, conflict, internalError, notFound, type CoreError } from '../../../errors.js'
 import type {
   CampaignAnalytics,
   CampaignRecord,
@@ -26,6 +26,9 @@ import {
   EnrollmentStorePort,
   UnsubscribeStorePort
 } from '../ports/email-campaign-ports.js'
+
+const toCoreInternal = (message: string) => (cause: unknown): CoreError =>
+  internalError(message, cause)
 
 export class EmailCampaignService extends Context.Tag('EmailCampaignService')<
   EmailCampaignService,
@@ -120,7 +123,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const campaignStore = yield* CampaignStorePort
 
         const created = yield* campaignStore.create(input).pipe(
-          Effect.mapError((cause) => badRequest('Failed to create campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to create campaign'))
         )
 
         return created
@@ -131,7 +134,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const campaignStore = yield* CampaignStorePort
 
         const existing = yield* campaignStore.findById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign'))
         )
 
         if (!existing) {
@@ -143,7 +146,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const updated = yield* campaignStore.updateById(id, input).pipe(
-          Effect.mapError((cause) => badRequest('Failed to update campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to update campaign'))
         )
 
         if (!updated) {
@@ -159,7 +162,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const stepStore = yield* CampaignStepStorePort
 
         const existing = yield* campaignStore.findById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign'))
         )
 
         if (!existing) {
@@ -173,7 +176,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const steps = yield* stepStore.findByCampaign(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign steps', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign steps'))
         )
 
         if (!canActivateCampaign(steps.length)) {
@@ -183,7 +186,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const updated = yield* campaignStore.updateById(id, { status: 'active' }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to activate campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to activate campaign'))
         )
 
         if (!updated) {
@@ -198,7 +201,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const campaignStore = yield* CampaignStorePort
 
         const existing = yield* campaignStore.findById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign'))
         )
 
         if (!existing) {
@@ -212,7 +215,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const updated = yield* campaignStore.updateById(id, { status: 'paused' }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to pause campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to pause campaign'))
         )
 
         if (!updated) {
@@ -227,7 +230,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const campaignStore = yield* CampaignStorePort
 
         const existing = yield* campaignStore.findById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign'))
         )
 
         if (!existing) {
@@ -241,7 +244,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const updated = yield* campaignStore.updateById(id, { status: 'active' }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to resume campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to resume campaign'))
         )
 
         if (!updated) {
@@ -257,7 +260,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const enrollmentStore = yield* EnrollmentStorePort
 
         const existing = yield* campaignStore.findById(id).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign'))
         )
 
         if (!existing) {
@@ -271,11 +274,11 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         yield* enrollmentStore.cancelAllForCampaign(id, 'campaign_archived').pipe(
-          Effect.mapError((cause) => badRequest('Failed to cancel enrollments', cause))
+          Effect.mapError(toCoreInternal('Failed to cancel enrollments'))
         )
 
         const updated = yield* campaignStore.updateById(id, { status: 'archived' }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to archive campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to archive campaign'))
         )
 
         if (!updated) {
@@ -291,7 +294,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const stepStore = yield* CampaignStepStorePort
 
         const campaign = yield* campaignStore.findById(campaignId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign'))
         )
 
         if (!campaign) {
@@ -305,7 +308,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const existingSteps = yield* stepStore.findByCampaign(campaignId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign steps', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign steps'))
         )
 
         const nextOrder = Math.max(...existingSteps.map((s) => s.stepOrder), 0) + 1
@@ -318,7 +321,7 @@ export const EmailCampaignServiceLive = Layer.effect(
           templateData: input.templateData,
           delaySeconds: input.delaySeconds
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to add step', cause))
+          Effect.mapError(toCoreInternal('Failed to add step'))
         )
 
         return step
@@ -330,7 +333,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const stepStore = yield* CampaignStepStorePort
 
         const campaign = yield* campaignStore.findById(campaignId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign'))
         )
 
         if (!campaign) {
@@ -345,7 +348,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const existingStep = yield* stepStore.findById(stepId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch step', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch step'))
         )
 
         if (existingStep?.campaignId !== campaignId) {
@@ -353,7 +356,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const updated = yield* stepStore.updateById(stepId, input).pipe(
-          Effect.mapError((cause) => badRequest('Failed to update step', cause))
+          Effect.mapError(toCoreInternal('Failed to update step'))
         )
 
         if (!updated) {
@@ -369,7 +372,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const stepStore = yield* CampaignStepStorePort
 
         const campaign = yield* campaignStore.findById(campaignId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign'))
         )
 
         if (!campaign) {
@@ -383,7 +386,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const existingStep = yield* stepStore.findById(stepId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch step', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch step'))
         )
 
         if (existingStep?.campaignId !== campaignId) {
@@ -391,7 +394,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const result = yield* stepStore.deleteById(stepId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to remove step', cause))
+          Effect.mapError(toCoreInternal('Failed to remove step'))
         )
 
         return result
@@ -404,7 +407,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const unsubscribeStore = yield* UnsubscribeStorePort
 
         const campaign = yield* campaignStore.findById(campaignId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch campaign', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch campaign'))
         )
 
         if (!campaign) {
@@ -418,7 +421,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const isUnsubscribed = yield* unsubscribeStore.isUnsubscribed(userId, campaignId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to check unsubscribe status', cause))
+          Effect.mapError(toCoreInternal('Failed to check unsubscribe status'))
         )
 
         if (isUnsubscribed) {
@@ -429,7 +432,7 @@ export const EmailCampaignServiceLive = Layer.effect(
 
         const existingEnrollment = yield* enrollmentStore
           .findByCampaignAndUser(campaignId, userId)
-          .pipe(Effect.mapError((cause) => badRequest('Failed to check existing enrollment', cause)))
+          .pipe(Effect.mapError(toCoreInternal('Failed to check existing enrollment')))
 
         if (existingEnrollment?.status === 'active') {
           return yield* Effect.fail(
@@ -452,7 +455,7 @@ export const EmailCampaignServiceLive = Layer.effect(
             temporalWorkflowId: null,
             enrolledAt: now
           }).pipe(
-            Effect.mapError((cause) => badRequest('Failed to re-enroll user', cause))
+            Effect.mapError(toCoreInternal('Failed to re-enroll user'))
           )
 
           if (!reactivated) {
@@ -466,7 +469,7 @@ export const EmailCampaignServiceLive = Layer.effect(
           campaignId,
           userId
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to enroll user', cause))
+          Effect.mapError(toCoreInternal('Failed to enroll user'))
         )
 
         return enrollment
@@ -478,7 +481,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const clock = yield* ClockPort
 
         const existing = yield* enrollmentStore.findById(enrollmentId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to fetch enrollment', cause))
+          Effect.mapError(toCoreInternal('Failed to fetch enrollment'))
         )
 
         if (!existing) {
@@ -504,7 +507,7 @@ export const EmailCampaignServiceLive = Layer.effect(
           cancelReason,
           cancelledAt: now
         }).pipe(
-          Effect.mapError((cause) => badRequest('Failed to cancel enrollment', cause))
+          Effect.mapError(toCoreInternal('Failed to cancel enrollment'))
         )
 
         if (!updated) {
@@ -519,7 +522,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const sendStore = yield* EmailSendStorePort
 
         const send = yield* sendStore.findByResendMessageId(resendMessageId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to find email send', cause))
+          Effect.mapError(toCoreInternal('Failed to find email send'))
         )
 
         if (!send) {
@@ -531,7 +534,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         }
 
         const updated = yield* sendStore.updateStatus(send.id, eventType, data).pipe(
-          Effect.mapError((cause) => badRequest('Failed to update email send status', cause))
+          Effect.mapError(toCoreInternal('Failed to update email send status'))
         )
 
         return updated
@@ -542,7 +545,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const sendStore = yield* EmailSendStorePort
 
         const analytics = yield* sendStore.aggregateByCampaign(campaignId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to aggregate campaign analytics', cause))
+          Effect.mapError(toCoreInternal('Failed to aggregate campaign analytics'))
         )
 
         return analytics
@@ -553,7 +556,7 @@ export const EmailCampaignServiceLive = Layer.effect(
         const sendStore = yield* EmailSendStorePort
 
         const analytics = yield* sendStore.aggregateByStep(campaignId, stepId).pipe(
-          Effect.mapError((cause) => badRequest('Failed to aggregate step analytics', cause))
+          Effect.mapError(toCoreInternal('Failed to aggregate step analytics'))
         )
 
         return analytics

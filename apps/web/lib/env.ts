@@ -21,6 +21,7 @@ export interface WebEnv {
   SENTRY_DSN: string | undefined
   SENTRY_SPOTLIGHT: boolean
   STRIPE_PUBLISHABLE_KEY: string | undefined
+  TURNSTILE_SITE_KEY: string | undefined
 }
 
 let cachedEnv: WebEnv | null = null
@@ -65,6 +66,7 @@ export const getWebEnv = (): WebEnv => {
       'http://localhost:3000',
     SENTRY_DSN: parseOptionalString(process.env.NEXT_PUBLIC_SENTRY_DSN),
     STRIPE_PUBLISHABLE_KEY: parseOptionalString(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
+    TURNSTILE_SITE_KEY: parseOptionalString(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY),
     SENTRY_SPOTLIGHT:
       (process.env.NEXT_PUBLIC_SENTRY_SPOTLIGHT ?? process.env.SENTRY_SPOTLIGHT ?? '')
         .trim()

@@ -104,7 +104,11 @@ export const GoogleOidcPortLive = Layer.succeed(GoogleOidcPort, {
       const state = `${input.statePrefix ?? ''}${oidc.randomState()}`
       const nonce = oidc.randomNonce()
       const codeVerifier = oidc.randomPKCECodeVerifier()
-      const codeChallenge = yield* Effect.promise(() => oidc.calculatePKCECodeChallenge(codeVerifier))
+      const codeChallenge = yield* Effect.tryPromise({
+        try: () => oidc.calculatePKCECodeChallenge(codeVerifier),
+        catch: (cause) =>
+          new Error(`Failed to calculate PKCE code challenge: ${cause instanceof Error ? cause.message : String(cause)}`)
+      })
       const expiresAt = new Date(Date.now() + oidcStateTtlMs)
 
       yield* authLoginOidcStatesRepository.create({

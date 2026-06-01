@@ -156,7 +156,7 @@ export class InternalError extends Schema.TaggedError<InternalError>()('Internal
   message: Schema.String
 }) {}
 
-const apiLogger = createLogger('api')
+const apiLogger = createLogger('tx-agent-kit-api')
 
 export const mapCoreError = (error: unknown): BadRequest | Unauthorized | Forbidden | PaymentRequired | NotFound | Conflict | InternalError => {
   if (error && typeof error === 'object' && '_tag' in error) {
