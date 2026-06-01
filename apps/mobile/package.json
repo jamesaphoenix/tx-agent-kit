@@ -33,14 +33,14 @@
     "react-native-toast-message": "^2.2.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.27.4",
+    "@babel/core": "^7.29.7",
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
     "@types/react": "^19.1.6",
     "babel-plugin-module-resolver": "^5.0.3",
     "babel-preset-expo": "~13.2.0",
-    "orval": "^8.8.0",
-    "react-test-renderer": "19.2.5",
+    "orval": "^8.14.0",
+    "react-test-renderer": "19.2.6",
     "typescript": "^5.9.3"
   }
 }
