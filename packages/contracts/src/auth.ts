@@ -5,6 +5,7 @@ import { orgMemberRoleSchema } from './permissions.js'
 
 export const browserAuthSessionModeHeaderName = 'x-tx-auth-session-mode'
 export const browserAuthSessionModeHeaderValue = 'browser-cookie'
+export const turnstileResponseHeaderName = 'cf-turnstile-response'
 export const authRefreshTokenKey = 'tx-agent-kit.refresh-token'
 
 export const userSchema = Schema.Struct({

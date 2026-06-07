@@ -29,6 +29,18 @@ export {
   type EffectOtelResourceConfig
 } from './effect.js'
 
+export { METRICS_INSTRUMENTATION_SCOPE, getMetricsMeter } from './metrics-meter.js'
+export {
+  authRateLimitRejectedMetricName,
+  getOrCreateAuthSecurityMetrics,
+  recordAuthRateLimitRejected,
+  recordTurnstileVerification,
+  turnstileVerificationMetricName,
+  _resetAuthSecurityMetricsRegistryForTest,
+  type AuthSecurityMetrics,
+  type TurnstileVerificationResult
+} from './auth-metrics.js'
+
 /**
  * Stable semantic convention for deployment environment.
  * Replaces deprecated SEMRESATTRS_DEPLOYMENT_ENVIRONMENT ('deployment.environment').
