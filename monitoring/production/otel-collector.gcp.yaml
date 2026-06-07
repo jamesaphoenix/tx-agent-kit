@@ -109,7 +109,13 @@ service:
 
     metrics:
       receivers: [otlp, docker_stats, hostmetrics]
-      processors: [memory_limiter, resourcedetection, resource, transform/container_labels, filter/container_noise, batch]
+      # No `batch` here: Google Cloud Monitoring rejects >1 point per series per
+      # request ("Duplicate TimeSeries"), and a batch merges multiple app-export
+      # cycles into one request, dropping ~30% of points. Forwarding each export
+      # untouched gives exactly one point per series per request. Metric volume is
+      # tiny (a few exports/min per service), so un-batched writes are well within
+      # the API limits.
+      processors: [memory_limiter, resourcedetection, resource, transform/container_labels, filter/container_noise]
       exporters: [googlecloud]
 
     logs:
