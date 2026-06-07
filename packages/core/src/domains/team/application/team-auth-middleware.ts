@@ -67,7 +67,14 @@ export const TeamAuthMiddlewareLive = Layer.effect(
           return yield* Effect.fail(forbidden('Your team membership has been disabled'))
         }
 
-        const role = teamMember.role
+        // Org admins manage every team in their org (mirrors requireOrgAdmin in
+        // team-service). Elevate them to team-admin permissions regardless of
+        // their per-team role, so an org admin who joined a workspace as a
+        // viewer/member can still upload assets, delete the team, etc.
+        const orgRole = yield* orgMembershipPort.getMemberRole(team.organizationId, userId).pipe(
+          Effect.mapError(toCoreInternal('Failed to verify organization role'))
+        )
+        const role: MemberRole = orgRole === 'admin' ? 'admin' : teamMember.role
         const permissions = getPermissionsForTeamRole(role)
         return { member: teamMember, role, permissions }
       })

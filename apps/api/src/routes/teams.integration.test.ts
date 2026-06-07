@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { createOrganization, createUser, defaultTestBrandSettings } from '@tx-agent-kit/testkit'
+import { createOrganization, createUser, defaultTestBrandSettings, setTeamMemberRole } from '@tx-agent-kit/testkit'
 import { describe, expect, it } from 'vitest'
 import {
   createTestFixture
@@ -143,6 +143,75 @@ describe('teams integration', () => {
 
     expect(listedAfterDelete.response.status).toBe(200)
     expect(listedAfterDelete.body.total).toBe(0)
+  })
+
+  it('allows an org admin to delete a workspace even when their per-team role is viewer', async () => {
+    // Repro for the staging "missing permissions to delete teams" report: an org
+    // admin whose per-team role is viewer must still be able to perform an
+    // admin-permission team action (org admins manage every team in their org).
+    const factoryContext = getFactoryContext()
+
+    const owner = await createUser(factoryContext, {
+      email: `team-admin-viewer-delete-${uid}@example.com`,
+      password: 'team-admin-viewer-pass-12345',
+      name: 'Team Admin Viewer'
+    })
+
+    const organization = await createOrganization(factoryContext, {
+      token: owner.token,
+      name: 'Team Admin Viewer Organization'
+    })
+
+    // Two workspaces so deleting one is not the protected last workspace.
+    const firstTeam = await request<{ id: string }>(
+      '/v1/teams',
+      'team-admin-viewer-create-a',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${owner.token}` },
+        body: JSON.stringify({
+          organizationId: organization.id,
+          name: 'Viewer Delete A',
+          brandSettings: defaultTestBrandSettings
+        })
+      }
+    )
+    expect(firstTeam.response.status).toBe(201)
+
+    const secondTeam = await request<{ id: string }>(
+      '/v1/teams',
+      'team-admin-viewer-create-b',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${owner.token}` },
+        body: JSON.stringify({
+          organizationId: organization.id,
+          name: 'Viewer Delete B',
+          brandSettings: defaultTestBrandSettings
+        })
+      }
+    )
+    expect(secondTeam.response.status).toBe(201)
+
+    // Demote the org admin to a team viewer (viewer's team-role permissions
+    // exclude delete_teams), but they remain the org admin.
+    await setTeamMemberRole(factoryContext, {
+      teamId: firstTeam.body.id,
+      userId: owner.user.id,
+      role: 'viewer'
+    })
+
+    const deleted = await request<{ deleted: boolean }>(
+      `/v1/teams/${firstTeam.body.id}`,
+      'team-admin-viewer-delete',
+      {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${owner.token}` }
+      }
+    )
+
+    expect(deleted.response.status).toBe(200)
+    expect(deleted.body.deleted).toBe(true)
   })
 
   it('rejects team operations without auth token', async () => {
