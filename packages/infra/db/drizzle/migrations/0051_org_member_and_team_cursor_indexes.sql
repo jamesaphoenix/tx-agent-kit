@@ -1,6 +1,6 @@
 -- Align org_members and teams indexes with cursor access paths that order by a
 -- timestamp/name then tie-break by id, and that filter by organization before
--- ordering. Mirrors the composite/cursor index upgrades shipped in octospark.
+-- ordering. Adds id tie-breakers so keyset pagination stays deterministic.
 
 CREATE INDEX IF NOT EXISTS org_members_user_created_at_id_idx
   ON org_members(user_id, created_at, id);
