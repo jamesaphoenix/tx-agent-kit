@@ -219,7 +219,8 @@ const enforceWebClientOnlyContracts = () => {
     'apps/web/components/ResetPasswordForm.tsx',
     'apps/web/components/ForgotPasswordForm.tsx',
     'apps/web/components/providers/AuthBootstrapProvider.tsx',
-    'apps/web/components/AppSidebar.tsx'
+    'apps/web/components/AppSidebar.tsx',
+    'apps/web/app/auth/google/callback/page.tsx'
   ])
 
   for (const sourceFile of webSourceFiles) {
