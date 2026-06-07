@@ -207,8 +207,87 @@ const enforceComposeRuntimePlacementContracts = () => {
   }
 }
 
+const enforceK3sRuntimeParityContracts = () => {
+  // Chart deployments must wire imagePullSecrets so private-registry pulls work
+  // on self-hosted k3s/k3d nodes.
+  const chartTemplatesWithPullSecrets = [
+    'deploy/k8s/chart/templates/api-deployment.yaml',
+    'deploy/k8s/chart/templates/worker-deployment.yaml',
+    'deploy/k8s/chart/templates/otel-deployment.yaml'
+  ]
+
+  for (const relativePath of chartTemplatesWithPullSecrets) {
+    const templatePath = resolve(repoRoot, relativePath)
+    if (!existsSync(templatePath) || !statSync(templatePath).isFile()) {
+      fail(`Missing chart template: \`${relativePath}\`.`)
+      continue
+    }
+
+    const source = readUtf8(templatePath)
+    for (const fragment of ['{{- with .Values.imagePullSecrets }}', 'imagePullSecrets:']) {
+      if (!source.includes(fragment)) {
+        fail(
+          `Chart template \`${relativePath}\` must wire \`${fragment}\` so private-registry image pulls work.`
+        )
+      }
+    }
+  }
+
+  // render-runtime-values must support private-registry pulls and pin the
+  // in-container API port so pods listen on the chart port, not the external
+  // host/NodePort carried in the deploy env.
+  const renderRuntimePath = resolve(repoRoot, 'scripts/deploy/render-runtime-values.mjs')
+  if (!existsSync(renderRuntimePath) || !statSync(renderRuntimePath).isFile()) {
+    fail('Missing `scripts/deploy/render-runtime-values.mjs`.')
+  } else {
+    const source = readUtf8(renderRuntimePath)
+    for (const fragment of [
+      '--image-pull-secret-name',
+      "runtimeEnv.API_PORT = '4000'",
+      "runtimeEnv.API_HOST = '0.0.0.0'"
+    ]) {
+      if (!source.includes(fragment)) {
+        fail(
+          `\`scripts/deploy/render-runtime-values.mjs\` must include \`${fragment}\` for k3s runtime parity.`
+        )
+      }
+    }
+  }
+
+  // Deployment compose must probe OTEL via the otel-healthcheck sidecar (the
+  // upstream collector image has no shell/wget), and pin the in-container API
+  // port so it matches the chart and rendered Kubernetes values.
+  for (const relativePath of ['docker-compose.staging.yml', 'docker-compose.prod.yml']) {
+    const composePath = resolve(repoRoot, relativePath)
+    if (!existsSync(composePath) || !statSync(composePath).isFile()) {
+      fail(`Missing deployment compose file: \`${relativePath}\`.`)
+      continue
+    }
+
+    const source = readUtf8(composePath)
+    for (const fragment of [
+      'otel-healthcheck:',
+      "test: ['CMD', 'curl', '-fsS', 'http://otel-collector:13133/health/status']",
+      "API_PORT: '4000'"
+    ]) {
+      if (!source.includes(fragment)) {
+        fail(
+          `Deployment compose \`${relativePath}\` must include \`${fragment}\` for k3s/compose runtime parity.`
+        )
+      }
+    }
+
+    if (source.includes("'http://127.0.0.1:13133/health/status'")) {
+      fail(
+        `Deployment compose \`${relativePath}\` must not probe OTEL with wget inside the collector image; use the otel-healthcheck sidecar instead.`
+      )
+    }
+  }
+}
+
 enforceComposeRuntimePlacementContracts()
 enforceRuntimeEnvTemplateParityContracts()
+enforceK3sRuntimeParityContracts()
 
 if (errors.length > 0) {
   console.error('Compose runtime placement check failed:\n')

@@ -31,6 +31,23 @@ services:
       - /sys:/hostfs/sys:ro
       - /:/hostfs:ro
 
+  # The upstream collector image ships no shell or wget, so it cannot self-probe.
+  # This sidecar (a tiny curl image) polls the collector health endpoint over the
+  # compose network and is what api/worker gate on via depends_on service_healthy.
+  otel-healthcheck:
+    image: curlimages/curl:8.12.1
+    restart: unless-stopped
+    command: ['sh', '-c', 'while true; do sleep 3600; done']
+    depends_on:
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://otel-collector:13133/health/status']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   api:
     image: ${API_IMAGE:?API_IMAGE must be set to a pinned image reference}
     restart: unless-stopped
@@ -44,8 +61,8 @@ services:
     ports:
       - '${API_PORT:-4000}:4000'
     depends_on:
-      otel-collector:
-        condition: service_started
+      otel-healthcheck:
+        condition: service_healthy
     healthcheck:
       test:
         - CMD
@@ -68,5 +85,5 @@ services:
     depends_on:
       api:
         condition: service_healthy
-      otel-collector:
-        condition: service_started
+      otel-healthcheck:
+        condition: service_healthy
