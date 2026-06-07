@@ -285,6 +285,9 @@ export const orgMembers = pgTable('org_members', {
   index('org_members_org_id_idx').on(table.organizationId),
   index('org_members_user_id_idx').on(table.userId),
   index('org_members_user_created_at_idx').on(table.userId, table.createdAt),
+  index('org_members_user_created_at_id_idx').on(table.userId, table.createdAt, table.id),
+  index('org_members_org_created_at_id_idx').on(table.organizationId, table.createdAt, table.id),
+  index('org_members_user_org_idx').on(table.userId, table.organizationId),
   index('org_members_role_id_idx').on(table.roleId)
 ])
 
@@ -314,7 +317,9 @@ export const teams = pgTable('teams', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 }, (table) => [
   index('teams_org_id_idx').on(table.organizationId),
-  index('teams_name_id_idx').on(table.name, table.id)
+  index('teams_name_id_idx').on(table.name, table.id),
+  index('teams_org_name_id_idx').on(table.organizationId, table.name, table.id),
+  index('teams_org_created_at_id_idx').on(table.organizationId, table.createdAt, table.id)
 ])
 
 export const teamMembers = pgTable('team_members', {
