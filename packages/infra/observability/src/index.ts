@@ -14,8 +14,10 @@ import {
   type SpanProcessor
 } from '@opentelemetry/sdk-trace-base'
 import {
+  ATTR_SERVICE_INSTANCE_ID,
   ATTR_SERVICE_NAME
 } from '@opentelemetry/semantic-conventions'
+import { randomUUID } from 'node:crypto'
 
 import { getObservabilityEnv } from './env.js'
 import { createLangfuseSpanProcessor } from './langfuse.js'
@@ -194,6 +196,12 @@ const withOtlpHeaders = (
   }
 }
 
+// Unique per-process identity. Google Managed Prometheus keys each `prometheus_target`
+// on (location, cluster, namespace, job, instance); an empty `instance` collapses
+// distinct processes into one series and GMP then rejects the batch with "Duplicate
+// TimeSeries encountered". A stable per-process id keeps each replica's series distinct.
+const serviceInstanceId = randomUUID()
+
 const makeTelemetryResourceFromEnv = (
   serviceName: string,
   env: ReturnType<typeof getObservabilityEnv>
@@ -201,6 +209,7 @@ const makeTelemetryResourceFromEnv = (
   resourceFromAttributes({
     ...env.OTEL_RESOURCE_ATTRIBUTES,
     [ATTR_SERVICE_NAME]: serviceName,
+    [ATTR_SERVICE_INSTANCE_ID]: serviceInstanceId,
     [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: env.NODE_ENV
   })
 
