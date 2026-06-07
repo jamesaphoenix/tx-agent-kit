@@ -42,6 +42,7 @@ import { getLoggingEnv } from './env.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  traceGetActiveSpanMock.mockReturnValue(undefined)
   delete process.env.LOG_LEVEL
 })
 
@@ -101,6 +102,77 @@ describe('createLogger', () => {
     expect(emittedRecord.body).toBe('hello world')
     expect(emittedRecord.attributes['service.name']).toBe('test-service')
     expect(emittedRecord.attributes['context.requestId']).toBe('req-1')
+  })
+
+  it('copies active trace context into stdout entries and OTEL log attributes', () => {
+    const traceId = '0af7651916cd43dd8448eb211c80319c'
+    const spanId = 'b7ad6b7169203331'
+    const stdoutWriteMock = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+    traceGetActiveSpanMock.mockReturnValue({
+      spanContext: () => ({
+        traceId,
+        spanId,
+        traceFlags: 1
+      })
+    })
+
+    const logger = createLogger('test-service')
+    logger.info('correlated event', { requestId: 'req-2' })
+
+    const rawLogLine = String(stdoutWriteMock.mock.calls[0]?.[0] ?? '').trim()
+    stdoutWriteMock.mockRestore()
+
+    const stdoutEntry = JSON.parse(rawLogLine) as Record<string, unknown>
+
+    expect(stdoutEntry.trace_id).toBe(traceId)
+    expect(stdoutEntry.span_id).toBe(spanId)
+    expect(stdoutEntry.trace_flags).toBe(1)
+
+    const emittedRecord = otelEmitMock.mock.calls[0]?.[0]
+    if (!emittedRecord) {
+      throw new Error('Expected OTEL log record to be emitted')
+    }
+
+    expect(emittedRecord.attributes.trace_id).toBe(traceId)
+    expect(emittedRecord.attributes.span_id).toBe(spanId)
+    expect(emittedRecord.attributes.trace_flags).toBe(1)
+  })
+
+  it('serializes BigInt context values without crashing stdout logging', () => {
+    const stdoutWriteMock = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const logger = createLogger('test-service')
+
+    expect(() => logger.info('bigint context', { count: 1n })).not.toThrow()
+
+    const rawLogLine = String(stdoutWriteMock.mock.calls[0]?.[0] ?? '').trim()
+    stdoutWriteMock.mockRestore()
+
+    const stdoutEntry = JSON.parse(rawLogLine) as {
+      context?: Record<string, unknown>
+    }
+    expect(stdoutEntry.context?.count).toBe('1')
+  })
+
+  it('serializes circular context values without crashing stdout logging', () => {
+    const stdoutWriteMock = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const logger = createLogger('test-service')
+    const circularContext: Record<string, unknown> = { requestId: 'req-circular' }
+    circularContext.self = circularContext
+
+    expect(() => logger.info('circular context', circularContext)).not.toThrow()
+
+    const rawLogLine = String(stdoutWriteMock.mock.calls[0]?.[0] ?? '').trim()
+    stdoutWriteMock.mockRestore()
+
+    const stdoutEntry = JSON.parse(rawLogLine) as {
+      context?: Record<string, unknown>
+    }
+    expect(stdoutEntry.context?.requestId).toBe('req-circular')
+    expect(stdoutEntry.context?.self).toEqual({
+      requestId: 'req-circular',
+      self: '[Circular]'
+    })
   })
 
   it('never throws when stdout write fails and degrades to a stderr fallback', () => {
