@@ -1,5 +1,6 @@
 import { authLoginOidcStatesRepository } from '@tx-agent-kit/db'
 import { GoogleOidcPort } from '@tx-agent-kit/core'
+import { describeCauseForLog } from '@tx-agent-kit/observability'
 import { Effect, Layer, Option } from 'effect'
 import * as oidc from 'openid-client'
 import { getGoogleOidcConfig } from '../config/env.js'
@@ -22,6 +23,9 @@ let cachedRuntimeKey = ''
 
 const allowHttpOidcDiscoveryForLocal = (): OidcConfigurationMutator =>
   (oidc as OidcLocalTestingExports)['allowInsecureRequests']
+
+const wrapOidcError = (message: string, cause: unknown): Error =>
+  new Error(`${message}: ${describeCauseForLog(cause)}`, { cause })
 
 const resolveRuntimeKey = (): string => {
   const config = getGoogleOidcConfig()
@@ -56,10 +60,11 @@ const getGoogleOidcRuntime = async (): Promise<GoogleOidcRuntime> => {
           config.clientId,
           {
             client_secret: config.clientSecret,
+            token_endpoint_auth_method: 'client_secret_post',
             redirect_uris: [config.callbackUrl],
             response_types: ['code']
           },
-          oidc.ClientSecretBasic(config.clientSecret),
+          oidc.ClientSecretPost(config.clientSecret),
           discoveryOptions
         )
 
@@ -102,7 +107,7 @@ export const GoogleOidcPortLive = Layer.succeed(GoogleOidcPort, {
       })
 
       const state = `${input.statePrefix ?? ''}${oidc.randomState()}`
-      const nonce = oidc.randomNonce()
+      const nonce = ''
       const codeVerifier = oidc.randomPKCECodeVerifier()
       const codeChallenge = yield* Effect.tryPromise({
         try: () => oidc.calculatePKCECodeChallenge(codeVerifier),
@@ -132,7 +137,6 @@ export const GoogleOidcPortLive = Layer.succeed(GoogleOidcPort, {
         response_type: 'code',
         redirect_uri: runtime.callbackUrl,
         state,
-        nonce,
         code_challenge: codeChallenge,
         code_challenge_method: 'S256'
       })
@@ -144,7 +148,7 @@ export const GoogleOidcPortLive = Layer.succeed(GoogleOidcPort, {
       }
     }),
 
-  completeAuthorization: (input: { code: string; state: string }) =>
+  completeAuthorization: (input: { code: string; state: string; iss?: string }) =>
     Effect.gen(function* () {
       const consumedState = yield* authLoginOidcStatesRepository
         .consumeActiveByProviderAndState('google', input.state)
@@ -161,18 +165,21 @@ export const GoogleOidcPortLive = Layer.succeed(GoogleOidcPort, {
         catch: (cause) => new Error(`Failed to initialize Google OIDC client: ${cause instanceof Error ? cause.message : String(cause)}`)
       })
 
-      const currentUrl = new URL(runtime.callbackUrl)
+      const currentUrl = new URL(consumedState.redirectUri)
       currentUrl.searchParams.set('code', input.code)
       currentUrl.searchParams.set('state', consumedState.state)
+      if (input.iss !== undefined) {
+        currentUrl.searchParams.set('iss', input.iss)
+      }
 
       const tokenSet = yield* Effect.tryPromise({
         try: () =>
           oidc.authorizationCodeGrant(runtime.configuration, currentUrl, {
-            expectedNonce: consumedState.nonce,
             expectedState: consumedState.state,
+            idTokenExpected: true,
             pkceCodeVerifier: consumedState.codeVerifier
           }),
-        catch: (cause) => new Error(`Failed to complete Google OIDC callback: ${cause instanceof Error ? cause.message : String(cause)}`)
+        catch: (cause) => wrapOidcError('Failed to complete Google OIDC callback', cause)
       })
 
       const claims = tokenSet.claims()

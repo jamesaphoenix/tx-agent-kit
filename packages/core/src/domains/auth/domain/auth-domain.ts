@@ -39,6 +39,7 @@ export interface StartGoogleAuthCommand {
 export interface CompleteGoogleAuthCommand {
   code: string
   state: string
+  iss?: string
   ipAddress?: string
   userAgent?: string
 }

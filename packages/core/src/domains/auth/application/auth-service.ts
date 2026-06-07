@@ -641,7 +641,8 @@ export const AuthServiceLive = Layer.effect(
 
         const identity = yield* googleOidcPort.completeAuthorization({
           code: input.code,
-          state: input.state
+          state: input.state,
+          iss: input.iss
         }).pipe(Effect.mapError((cause) => unauthorized('Invalid Google authorization response', cause)))
 
         const normalizedEmail = normalizeEmail(identity.email)

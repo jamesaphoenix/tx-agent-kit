@@ -99,6 +99,7 @@ export class GoogleOidcPort extends Context.Tag('GoogleOidcPort')<
     completeAuthorization: (input: {
       code: string
       state: string
+      iss?: string
     }) => Effect.Effect<{
       provider: 'google'
       providerSubject: string

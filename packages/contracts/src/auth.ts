@@ -85,7 +85,8 @@ export const googleAuthStartResponseSchema = Schema.Struct({
 
 export const googleAuthCallbackRequestSchema = Schema.Struct({
   code: Schema.String.pipe(Schema.minLength(1)),
-  state: Schema.String.pipe(Schema.minLength(1))
+  state: Schema.String.pipe(Schema.minLength(1)),
+  iss: Schema.optional(Schema.String.pipe(Schema.minLength(1)))
 })
 
 export const deleteMeResponseSchema = Schema.Struct({

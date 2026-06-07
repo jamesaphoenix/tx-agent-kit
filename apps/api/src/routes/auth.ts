@@ -293,6 +293,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
         const session = yield* authService.completeGoogleAuth({
           code: urlParams.code,
           state: urlParams.state,
+          iss: urlParams.iss,
           ...toAuthRequestContext(request)
         })
 
@@ -301,7 +302,16 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
           includeRefreshToken: !isBrowserGoogle,
           isBrowserSession: isBrowserGoogle
         })
-      }).pipe(Effect.mapError(mapAuthError))
+      }).pipe(
+        Effect.catchAll((error) => {
+          const mappedError = mapAuthError(error)
+          if (isCookieManagedGoogleAuthState(urlParams.state) && isUnauthorized(mappedError)) {
+            return Effect.succeed(renderUnauthorizedAuthResponse(mappedError.message))
+          }
+
+          return Effect.fail(mappedError)
+        })
+      )
     )
     .handle('forgotPassword', ({ payload }) =>
       Effect.gen(function* () {
