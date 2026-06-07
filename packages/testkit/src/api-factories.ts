@@ -151,11 +151,18 @@ const isLoginSessionCreationFailure = (status: number, body: unknown): boolean =
 }
 
 const isOpaqueSignUpFailure = (status: number, body: unknown): boolean => {
-  if (status !== 400 || !isRecord(body)) {
+  if (!isRecord(body)) {
     return false
   }
 
-  return body.message === 'Sign-up failed'
+  return (
+    (status === 400 && body.message === 'Sign-up failed') ||
+    (status === 500 && (
+      body.message === 'Internal server error' ||
+      body.message === 'Sign-up failed' ||
+      body._tag === 'InternalError'
+    ))
+  )
 }
 
 const signInAfterPartialSignUp = async (
@@ -200,11 +207,13 @@ export const createUser = async (
   context: ApiFactoryContext,
   options: CreateUserOptions = {}
 ): Promise<CreatedUserSession> => {
-  const maxAttempts = options.email ? 1 : 3
+  const maxAttempts = 3
   let lastFailure: { status: number; body: unknown } | null = null
+  let lastPayload: { email: string; password: string; name: string } | null = null
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const payload = buildCreateUserPayload(options)
+    lastPayload = payload
     const response = await fetch(toUrl(context, '/v1/auth/sign-up'), {
       method: 'POST',
       headers: withJsonHeaders(context, 'create-user'),
@@ -230,13 +239,28 @@ export const createUser = async (
     }
 
     lastFailure = { status: response.status, body }
-    if (!isOpaqueSignUpFailure(response.status, body) || attempt === maxAttempts - 1) {
+    const isOpaqueFailure = isOpaqueSignUpFailure(response.status, body)
+
+    if (options.email && isOpaqueFailure) {
+      try {
+        const recovered = await signInAfterPartialSignUp(context, payload)
+        return {
+          ...recovered,
+          credentials: payload
+        }
+      } catch {
+        // The opaque sign-up failure may have happened before the user row existed.
+        // Retry the same explicit email so tests that depend on it stay deterministic.
+      }
+    }
+
+    if (!isOpaqueFailure || attempt === maxAttempts - 1) {
       break
     }
   }
 
   throw new Error(
-    `createUser failed (${lastFailure?.status ?? 'unknown'}): ${JSON.stringify(lastFailure?.body)}`
+    `createUser failed for ${lastPayload?.email ?? 'unknown'} (${lastFailure?.status ?? 'unknown'}): ${JSON.stringify(lastFailure?.body)}`
   )
 }
 

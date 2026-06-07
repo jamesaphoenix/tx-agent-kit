@@ -90,6 +90,87 @@ describe('createUser', () => {
     expect(fetchMock.mock.calls[1]?.[0]).toBe('http://api.test/v1/auth/sign-in')
   })
 
+  it('recovers explicit-email users after an opaque internal sign-up failure', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ message: 'Internal server error', _tag: 'InternalError' }),
+          { status: 500, headers: { 'content-type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(authBody), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const created = await createUser(createFactoryContext(), {
+      email: authBody.user.email,
+      password: 'factory-pass-12345',
+      name: authBody.user.name
+    })
+
+    expect(created.token).toBe(authBody.token)
+    expect(created.credentials.email).toBe(authBody.user.email)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('http://api.test/v1/auth/sign-in')
+  })
+
+  it('retries explicit-email users after an opaque internal sign-up failure when sign-in cannot recover', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ message: 'Internal server error', _tag: 'InternalError' }),
+          { status: 500, headers: { 'content-type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ message: 'Invalid credentials', _tag: 'Unauthorized' }),
+          { status: 401, headers: { 'content-type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ message: 'Invalid credentials', _tag: 'Unauthorized' }),
+          { status: 401, headers: { 'content-type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ message: 'Invalid credentials', _tag: 'Unauthorized' }),
+          { status: 401, headers: { 'content-type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(authBody), {
+          status: 201,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const created = await createUser(createFactoryContext(), {
+      email: authBody.user.email,
+      password: 'factory-pass-12345',
+      name: authBody.user.name
+    })
+
+    const firstBody = readFetchJsonBody(fetchMock.mock.calls[0])
+    const retryBody = readFetchJsonBody(fetchMock.mock.calls[4])
+
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+    expect(firstBody.email).toBe(authBody.user.email)
+    expect(retryBody.email).toBe(authBody.user.email)
+    expect(created.credentials.email).toBe(authBody.user.email)
+  })
+
   it('retries opaque generated sign-up setup failures with a fresh email', async () => {
     const fetchMock = vi.fn<typeof fetch>()
     fetchMock
