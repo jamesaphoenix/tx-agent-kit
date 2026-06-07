@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - Outbox Unprocessed Age > 600s",
+  "documentation": {
+    "content": "## Outbox Unprocessed Age Critical Alert\n\n**Severity:** CRITICAL\n\nThe oldest unprocessed outbox event has been waiting more than 600 seconds (10 minutes). This means at least one event is stuck and the publishing pipeline may have stalled.\n\n### Triage\n1. Check `tx_agent_kit_outbox_unprocessed_count` - is the backlog also growing?\n2. Check `tx_agent_kit_outbox_batch_dispatched_total` - is the dispatcher running at all?\n3. Check Temporal worker health: `temporal_workflow_completed`, `temporal_activity_execution_failed`.\n4. Check Postgres connectivity (outbox table lives in DB).\n5. Check the `outbox-dispatcher-stale` / `outbox-wedged` alerts for a dead or wedged dispatcher.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Outbox Stall section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] Outbox unprocessed age exceeded 600s"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "outbox",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "Outbox oldest unprocessed event age > 600s for 5m",
+      "conditionPrometheusQueryLanguage": {
+        "query": "max(tx_agent_kit_outbox_unprocessed_age_seconds) > 600",
+        "duration": "300s",
+        "evaluationInterval": "60s",
+        "alertRule": "outbox_age_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

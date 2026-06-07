@@ -198,3 +198,54 @@
   - `RUN_LIVE_TUNNEL_NEGATIVE_INTEGRATION=1 LIVE_TUNNEL_MODE=dev pnpm test:integration:live:tunnel:negative`
 - Combined:
   - `pnpm test:integration:live:deploy`
+
+## Outbox dispatcher (event-driven)
+
+Domain events are delivered by an **event-driven outbox dispatcher** in the worker, not a
+Temporal Schedule. The rule: **the `domain_events` table is the durable queue; Postgres
+`LISTEN/NOTIFY` is only the doorbell.**
+
+```
+domain txn -> INSERT domain_events (same txn) -> COMMIT
+          -> AFTER INSERT trigger -> pg_notify('outbox_new_event', '')   (empty payload)
+worker     -> LISTEN outbox_new_event  ->  drain: fetchUnprocessed (FOR UPDATE SKIP LOCKED)
+                                          -> client.workflow.start (REJECT_DUPLICATE)
+                                          -> markPublished
+backstop   -> every OUTBOX_BACKSTOP_INTERVAL_SECONDS (default 10s): drain + measureBacklog
+```
+
+- **A missed NOTIFY is harmless** - the backstop sweep (a lock-free DB read, ~0 Temporal
+  Actions) catches it. NOTIFY is the latency optimisation; polling is the correctness net.
+- **Idempotency**: deterministic workflow IDs embed the event id + `REJECT_DUPLICATE`.
+- **Transient start failures** are left claimed (`processing`) and recovered to `pending` by
+  the `stuck-events-reset-schedule`; only structurally-invalid events are terminal-failed.
+- **Listener connection MUST be session-mode/direct** (`OUTBOX_LISTENER_DATABASE_URL`), never
+  a transaction pooler - pooling breaks `LISTEN`. Falls back to `DATABASE_URL`.
+- The backlog gauge is fed by the lock-free `domainEventsRepository.measureBacklog()` (true
+  pending depth + oldest age), not the per-tick claimed batch, so the depth alert can fire.
+- Follow-up (not yet implemented): attempt-capped exponential backoff + dead-letter columns.
+
+### Alert triage
+
+| Alert | Meaning | First checks |
+|-------|---------|--------------|
+| `outbox-age` / `outbox-depth` | Backlog too old / too deep | Is dispatch progressing? (`rate(tx_agent_kit_outbox_batch_dispatched_total[5m])`) Is the listener connected? |
+| `outbox-dispatcher-stale` | **No** worker reported the backlog gauge for 5m (dead-man's-switch) | Are workers alive? Listener reconnect loop? `OUTBOX_LISTENER_DATABASE_URL` pooler misconfig? |
+| `outbox-wedged` | Backlog > 0 but zero dispatch for 10m (alive but stuck) | Worker logs: 'leaving claimed for retry'; Temporal Cloud reachability; workflow-type mismatch after deploy |
+| `outbox-listener-disconnected` | No worker reported a connected LISTEN session for 10m | Listener reconnect/heartbeat logs; `OUTBOX_LISTENER_DATABASE_URL` pooler/TLS misconfig |
+
+The killer metric is `tx_agent_kit_outbox_unprocessed_age_seconds` - if it climbs, delivery is lagging.
+If drain batches run consistently full, raise `OUTBOX_POLL_BATCH_SIZE` or scale workers.
+
+### Inspect / recover
+
+```bash
+# True pending depth + oldest age (what the gauges report)
+psql "$DATABASE_URL" -c "SELECT count(*) FILTER (WHERE status='pending') AS pending,
+  count(*) FILTER (WHERE status='processing') AS processing,
+  count(*) FILTER (WHERE status='failed') AS failed FROM domain_events;"
+
+# Rows stuck in processing (recovered automatically by stuck-events-reset-schedule)
+psql "$DATABASE_URL" -c "SELECT id, event_type, processing_at FROM domain_events
+  WHERE status='processing' ORDER BY processing_at LIMIT 20;"
+```

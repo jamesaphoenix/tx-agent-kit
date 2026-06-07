@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - Outbox Dispatcher Not Reporting (dead-man's-switch)",
+  "documentation": {
+    "content": "## Outbox Dispatcher Stale Alert\n\n**Severity:** CRITICAL\n\nNo worker has reported the outbox backlog gauge for 5 minutes. The event-driven dispatcher refreshes `tx_agent_kit_outbox_unprocessed_age_seconds` on every backstop sweep (default every 10s). Absence means the dispatcher fleet has stopped running - events may be silently piling up in `domain_events` while the depth/age alerts go blind (they read the very metric that is now missing).\n\n**This is the safety net for the event-driven design:** a missed Postgres NOTIFY is harmless (the backstop sweep catches it), but a dead dispatcher is not - and a dead dispatcher emits no metrics, so the depth/age thresholds cannot fire. This dead-man's-switch fires on the *absence* of the signal instead.\n\n### Triage\n1. Are any workers alive? Check `critical-no-active-workers` and the worker deployment.\n2. Check worker logs for the outbox listener: 'Outbox listener connected' on boot; repeated 'failed to connect; retrying' means the LISTEN connection (direct/session-mode Postgres URL) is broken.\n3. Verify `OUTBOX_LISTENER_DATABASE_URL` targets a direct/session-mode connection, NOT a transaction pooler (pooling breaks LISTEN).\n4. Once a worker is healthy the gauge resumes within one backstop interval; confirm via `tx_agent_kit_outbox_unprocessed_count`.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Outbox Dispatcher section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] Outbox dispatcher stopped reporting metrics"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "outbox",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "Outbox backlog gauge absent for 5m",
+      "conditionPrometheusQueryLanguage": {
+        "query": "absent_over_time(tx_agent_kit_outbox_unprocessed_age_seconds[5m])",
+        "duration": "0s",
+        "evaluationInterval": "60s",
+        "alertRule": "outbox_dispatcher_stale_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}
