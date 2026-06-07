@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - Temporal Workflow Failure Rate Spike",
+  "documentation": {
+    "content": "## Temporal Workflow Failure Rate Critical Alert\n\n**Severity:** CRITICAL\n\nThe Temporal workflow failure rate has spiked above the threshold, or the workflow task schedule-to-start latency is critically high (indicating worker backpressure or starvation).\n\n### Note on Temporal metric names (Prometheus-rendered)\nThe Temporal Node.js SDK emits metrics with the `temporal_` prefix. Counter names end in `_total` (e.g. `temporal_workflow_failed_total`, `temporal_workflow_completed_total`). Histograms use the `_milliseconds_bucket/count/sum` suffix pattern (e.g. `temporal_workflow_task_schedule_to_start_latency_milliseconds_bucket`). These are ingested by GMP via the worker's Prometheus scrape endpoint.\n\n### Triage\n1. Check Temporal UI (or use `tctl`) to inspect failed workflow executions.\n2. Identify which workflow type is failing from the `workflow_type` label on `temporal_workflow_failed_total`.\n3. High schedule-to-start latency: check worker poller count (`temporal_num_pollers` gauge), scale workers if needed.\n4. Check `temporal_activity_task_received_total` vs `temporal_activity_succeed_endtoend_latency_milliseconds_count` - activity completion gap.\n5. Check worker logs for unhandled exceptions.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Temporal Worker section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] Temporal workflow failures or high latency"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "temporal-worker",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "Temporal workflow failure rate > 0.1/min for 10m",
+      "conditionPrometheusQueryLanguage": {
+        "query": "sum(rate(temporal_workflow_failed_total[5m])) * 60 > 0.1",
+        "duration": "600s",
+        "evaluationInterval": "60s",
+        "alertRule": "temporal_workflow_failure_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

@@ -1,0 +1,30 @@
+{
+  "displayName": "[WARNING] tx-agent-kit - Auth Rate Limit / Turnstile Rejection Spike",
+  "documentation": {
+    "content": "## Auth Rate Limit / Turnstile Rejection Spike Warning\n\n**Severity:** WARNING\n\nA sustained spike in auth rate-limit rejections or Turnstile verification failures has been detected. This is an early indicator of credential-stuffing, bot sign-up abuse, or a misconfigured client making excessive requests.\n\n### Threshold note\n`TODO: tune threshold` - The placeholder value of 5 rejections/s (over 10m) is a rough starting point. During staging load testing:\n1. Measure the steady-state `tx_agent_kit_auth_rate_limit_rejected_total` rate under normal user traffic.\n2. Set the threshold to 10x that baseline rate.\n3. Update the `> 5` predicate in this policy and re-apply.\n\n### Metrics\n- `tx_agent_kit_auth_rate_limit_rejected_total{path}` - counter: requests rejected by the Redis-backed per-IP/per-email rate limiter\n- `tx_agent_kit_turnstile_verification_total{result}` - counter: Turnstile verification outcomes; alert on `result=\"failed\"` surge\n\n### Triage\n1. Check which `path` label is spiking - sign-up vs sign-in vs password-reset.\n2. Check `tx_agent_kit_turnstile_verification_total{result=\"failed\"}` - bot sign-up wave?\n3. Check the originating IPs in API logs (Loki: `{service=\"api\"} |= \"rate_limit\"`).\n4. If abuse is confirmed, consider tightening rate limits in `apps/api/src/middleware/auth-rate-limit.ts` or escalating to Cloudflare WAF rules.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Auth & Rate Limiting section.",
+    "mimeType": "text/markdown",
+    "subject": "[WARNING] Auth rate limit or Turnstile rejection spike detected"
+  },
+  "userLabels": {
+    "severity": "warning",
+    "component": "auth",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "Auth rate limit rejections > 5/s sustained 10m (TODO: tune to 10x baseline)",
+      "conditionPrometheusQueryLanguage": {
+        "query": "(sum(rate(tx_agent_kit_auth_rate_limit_rejected_total[5m])) > 5) or (sum(rate(tx_agent_kit_turnstile_verification_total{result=\"failed\"}[5m])) > 2)",
+        "duration": "600s",
+        "evaluationInterval": "60s",
+        "alertRule": "auth_rate_limit_spike_warning",
+        "labels": {
+          "severity": "warning"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

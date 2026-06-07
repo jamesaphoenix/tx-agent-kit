@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - Temporal Schedule-to-Start Latency High",
+  "documentation": {
+    "content": "## Temporal Schedule-to-Start Latency Critical Alert\n\n**Severity:** CRITICAL\n\nThe p95 workflow task schedule-to-start latency has exceeded 30 seconds, indicating that the Temporal workers are overwhelmed or have stopped polling.\n\n### Triage\n1. Check `temporal_num_pollers` gauge - are pollers running?\n2. Check if Temporal server is healthy and reachable.\n3. Scale up the worker deployment (increase replica count).\n4. Check `temporal_worker_task_slots_available` - if 0, the worker is fully saturated.\n5. Look for stuck/long-running activities blocking workflow tasks.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Temporal Worker section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] Temporal schedule-to-start latency p95 > 30s"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "temporal-worker",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "Temporal workflow task schedule-to-start p95 > 30000ms for 5m",
+      "conditionPrometheusQueryLanguage": {
+        "query": "histogram_quantile(0.95, sum(rate(temporal_workflow_task_schedule_to_start_latency_milliseconds_bucket[5m])) by (le)) > 30000",
+        "duration": "300s",
+        "evaluationInterval": "60s",
+        "alertRule": "temporal_schedule_to_start_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

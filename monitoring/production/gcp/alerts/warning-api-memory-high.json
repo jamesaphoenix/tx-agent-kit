@@ -1,0 +1,30 @@
+{
+  "displayName": "[WARNING] tx-agent-kit - API Container Memory High",
+  "documentation": {
+    "content": "## API Container Memory High - Warning Alert\n\n**Severity:** WARNING\n\nThe API container's resident memory has exceeded the threshold. Sustained high memory may precede an OOM kill, which would drop in-flight requests and break the request-serving path.\n\n### Threshold note\n`TODO: tune` - placeholder is 10% of the host VM. Adjust once we have a baseline from the Resource Usage dashboard. The API is request-serving and should sit well below the worker.\n\n### Metric note\nUses `container_memory_percent_ratio` (docker_stats `container.memory.percent`, GMP-rendered with the `_ratio` suffix), in PERCENT of the container's memory limit. No limits are set, so the limit is the VM total and this reads as percent-of-VM. The per-container `container_name` label is added by the collector's transform/container_labels processor. The byte-valued metric (`container_memory_usage_total_bytes`) does not carry a per-container label in GMP, so percent is used.\n\n### Triage\n1. Check `Resource Usage` dashboard - container memory trend by container_name.\n2. Check `API SLO` dashboard - is request volume unusually high?\n3. Check API logs for leaks or large response buffering.\n4. Check for a recent deploy that changed memory behaviour.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> API section.",
+    "mimeType": "text/markdown",
+    "subject": "[WARNING] API container memory above threshold"
+  },
+  "userLabels": {
+    "severity": "warning",
+    "component": "api",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "API container memory > 10% of VM for 10m (TODO: tune)",
+      "conditionPrometheusQueryLanguage": {
+        "query": "max(container_memory_percent_ratio{container_name=~\".*api.*\"}) > 10",
+        "duration": "600s",
+        "evaluationInterval": "60s",
+        "alertRule": "api_memory_high_warning",
+        "labels": {
+          "severity": "warning"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

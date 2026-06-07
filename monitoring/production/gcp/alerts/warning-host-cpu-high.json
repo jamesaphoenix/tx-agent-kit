@@ -1,0 +1,30 @@
+{
+  "displayName": "[WARNING] tx-agent-kit - Host (VM) CPU Utilization High",
+  "documentation": {
+    "content": "## Host CPU Utilization High - Warning Alert\n\n**Severity:** WARNING\n\nThe host's CPU utilization has exceeded the threshold. The host is the VM (the resource envelope the containers run inside), not the physical host; on GCP it is the GCE node. Sustained high host CPU means the containers are starved for compute and latency will suffer.\n\n### Threshold note\n`TODO: tune` - placeholder is 0.9 (90%). Adjust once we have a baseline from the Resource Usage dashboard.\n\n### Metric name note\nThis uses the GMP-rendered name of the `hostmetrics` receiver's `system.cpu.utilization` metric (a ratio, unit `1`, so typically no unit suffix). The exact rendered name is confirmed post-deploy via `gcloud monitoring metrics list` and may need adjustment.\n\n### Triage\n1. Check `Resource Usage` dashboard - host CPU utilization + per-container CPU.\n2. Identify the container(s) consuming the most CPU.\n3. Check `API SLO` dashboard for a load spike.\n4. Right-size services or grow the VM if usage is legitimate.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Infrastructure section.",
+    "mimeType": "text/markdown",
+    "subject": "[WARNING] Host (VM) CPU utilization above threshold"
+  },
+  "userLabels": {
+    "severity": "warning",
+    "component": "host",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "Host CPU utilization > 0.9 for 10m (TODO: tune)",
+      "conditionPrometheusQueryLanguage": {
+        "query": "(1 - avg(system_cpu_utilization_ratio{state=\"idle\"})) > 0.9",
+        "duration": "600s",
+        "evaluationInterval": "60s",
+        "alertRule": "host_cpu_high_warning",
+        "labels": {
+          "severity": "warning"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}
