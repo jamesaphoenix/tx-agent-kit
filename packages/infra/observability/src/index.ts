@@ -41,6 +41,19 @@ export {
   type TurnstileVerificationResult
 } from './auth-metrics.js'
 
+export {
+  describeCauseForLog,
+  summarizeCause,
+  flattenCauseSummary,
+  toFlattenedCauseChain,
+  shouldLogEffectCause,
+  causeLogContext,
+  buildCauseReportError,
+  findRootCauseError,
+  type CauseSummary,
+  type FlattenedCauseSummary
+} from './effect-cause-summary.js'
+
 /**
  * Stable semantic convention for deployment environment.
  * Replaces deprecated SEMRESATTRS_DEPLOYMENT_ENVIRONMENT ('deployment.environment').
