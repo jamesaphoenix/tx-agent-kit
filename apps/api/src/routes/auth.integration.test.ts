@@ -151,6 +151,23 @@ describe('auth integration', () => {
     expect(invalidSignIn.body.message).toContain('Invalid credentials')
   })
 
+  it('rejects a malformed sign-up body with 400, not a reported 500', async () => {
+    // A missing required field is a client error: it must map to 400 BadRequest
+    // (and log at warn, not capture to Sentry), never fall through to a 500
+    // InternalError. Regression for the schemaBodyJson ParseError mapping.
+    const malformed = await request<{ message: string }>(
+      '/v1/auth/sign-up',
+      'auth-sign-up-malformed-body',
+      {
+        method: 'POST',
+        body: JSON.stringify({ password: 'valid-pass-12345', name: 'No Email' })
+      }
+    )
+
+    expect(malformed.response.status).toBe(400)
+    expect(malformed.body.message).toBe('Invalid request body.')
+  })
+
   it('signs in with valid credentials and returns a usable token', async () => {
     const factoryContext = getFactoryContext()
 

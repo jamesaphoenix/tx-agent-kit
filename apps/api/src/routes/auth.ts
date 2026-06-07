@@ -10,7 +10,7 @@ import {
   type RefreshSessionRequest
 } from '@tx-agent-kit/contracts'
 import { Effect } from 'effect'
-import { TooManyRequests, TxAgentApi, Unauthorized, mapCoreError } from '../api.js'
+import { TooManyRequests, TxAgentApi, Unauthorized, mapCoreError, mapRequestBodyError } from '../api.js'
 import { getAuthRefreshCookieConfig } from '../config/env.js'
 import { consumeAuthIdentifierRateLimit, toClientIpAddress } from '../middleware/auth-rate-limit.js'
 import { enforceTurnstile } from '../middleware/turnstile.js'
@@ -182,7 +182,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const payload = yield* HttpServerRequest.schemaBodyJson(signUpRequestSchema).pipe(
-          Effect.mapError(mapCoreError)
+          Effect.mapError(mapRequestBodyError)
         )
         yield* enforceIdentifierRateLimit('/v1/auth/sign-up', payload.email)
         yield* enforceTurnstile(request)
@@ -200,7 +200,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const payload = yield* HttpServerRequest.schemaBodyJson(signInRequestSchema).pipe(
-          Effect.mapError(mapCoreError)
+          Effect.mapError(mapRequestBodyError)
         )
         yield* enforceIdentifierRateLimit('/v1/auth/sign-in', payload.email)
         const authService = yield* AuthService
@@ -216,7 +216,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const payload = yield* HttpServerRequest.schemaBodyJson(refreshSessionRequestSchema).pipe(
-          Effect.mapError(mapCoreError)
+          Effect.mapError(mapRequestBodyError)
         )
         const authService = yield* AuthService
         const refreshToken = resolveRefreshToken(request, payload)

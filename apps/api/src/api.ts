@@ -170,6 +170,11 @@ const apiLogger = createLogger('tx-agent-kit-api')
 
 type MappedCoreError = BadRequest | Unauthorized | Forbidden | PaymentRequired | NotFound | Conflict | InternalError
 
+const isTaggedErrorLike = (
+  error: unknown
+): error is { _tag: string; code?: string; message?: string; cause?: unknown } =>
+  typeof error === 'object' && error !== null && '_tag' in error
+
 // UNAUTHORIZED failures whose root cause is an expected JWT/JWS condition
 // (expired/invalid token) are ordinary client noise, not a server fault — they
 // are logged at warn and never sent to Sentry.
@@ -302,6 +307,31 @@ export const mapCoreError = (error: unknown): MappedCoreError => {
   captureApiMappedError(new Error('Non-CoreError fell through to 500'), context)
   markApiErrorReported()
   return new InternalError({ message: 'Internal server error' })
+}
+
+// Request-BODY decode failures are client errors, not server faults. Effect Schema
+// raises a `ParseError` (and `schemaBodyJson` a `RequestError` for malformed JSON);
+// both must become a 400 BadRequest and be logged at `warn` - NOT routed through
+// `mapCoreError`'s default branch, which would mislabel them as a reportworthy 500
+// InternalError and flood Sentry with useless Effect-internals stacks. Use this for
+// manual `HttpServerRequest.schemaBodyJson(...)` decodes in handlers; the framework's
+// `.handle({ payload })` path already returns a 400 automatically. Non-body errors
+// still defer to `mapCoreError` so genuine faults are reported.
+export const mapRequestBodyError = (error: unknown): MappedCoreError => {
+  if (isTaggedErrorLike(error) && (error._tag === 'ParseError' || error._tag === 'RequestError')) {
+    const detail = typeof (error as { message?: unknown }).message === 'string'
+      ? (error as { message: string }).message
+      : 'request body validation failed'
+    apiLogger.warn('Rejected malformed request body', {
+      ...getApiRequestContext(),
+      tag: error._tag,
+      httpErrorTag: 'BadRequest',
+      message: detail
+    })
+    markApiErrorReported()
+    return new BadRequest({ message: 'Invalid request body.' })
+  }
+  return mapCoreError(error)
 }
 
 // --- Aliases referencing contract schemas ---
