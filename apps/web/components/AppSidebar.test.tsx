@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -68,6 +69,7 @@ const teamsMocks = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   usePathname: pathnameMock,
+  useParams: () => ({ orgId: 'org_1', teamId: 'team_1' }),
   useRouter: () => ({
     push: routerPushMock,
     replace: routerReplaceMock
@@ -82,7 +84,18 @@ vi.mock('../hooks/use-permissions', () => ({
 
 vi.mock('../lib/api/generated/organizations/organizations', () => ({
   useOrganizationsListOrganizations: organizationsMocks.listOrganizations,
-  useOrganizationsGetOrganization: organizationsMocks.getOrganization
+  useOrganizationsGetOrganization: organizationsMocks.getOrganization,
+  getOrganizationsListOrgMembersQueryOptions: (organizationId: string) => ({
+    queryKey: ['/v1/organizations', organizationId, 'members'],
+    queryFn: vi.fn()
+  })
+}))
+
+vi.mock('../lib/api/generated/assets/assets', () => ({
+  getAssetsListAssetsQueryOptions: (teamId: string) => ({
+    queryKey: ['/v1/teams', teamId, 'assets'],
+    queryFn: vi.fn()
+  })
 }))
 
 vi.mock('../lib/api/generated/teams/teams', () => ({
@@ -91,10 +104,17 @@ vi.mock('../lib/api/generated/teams/teams', () => ({
 }))
 
 const renderSidebar = (): void => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false }
+    }
+  })
   render(
-    <SidebarProvider>
-      <AppSidebar orgId="org_1" teamId="team_1" principalEmail="owner@example.com" />
-    </SidebarProvider>
+    <QueryClientProvider client={queryClient}>
+      <SidebarProvider>
+        <AppSidebar orgId="org_1" teamId="team_1" principalEmail="owner@example.com" />
+      </SidebarProvider>
+    </QueryClientProvider>
   )
 }
 
@@ -190,5 +210,22 @@ describe('AppSidebar', () => {
     expect(settingsButton.getAttribute('aria-expanded')).toBe('false')
     expect(settingsSection.getAttribute('aria-hidden')).toBe('true')
     expect(settingsSection.className).toContain('grid-rows-[0fr]')
+  })
+
+  it('prefetches the assets list query when hovering the Media nav link', async () => {
+    const user = userEvent.setup()
+    const prefetchSpy = vi
+      .spyOn(QueryClient.prototype, 'prefetchQuery')
+      .mockResolvedValue(undefined)
+
+    renderSidebar()
+
+    await user.hover(screen.getByRole('link', { name: /^media$/i }))
+
+    expect(prefetchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['/v1/teams', 'team_1', 'assets'] })
+    )
+
+    prefetchSpy.mockRestore()
   })
 })

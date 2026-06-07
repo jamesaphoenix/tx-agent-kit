@@ -1,14 +1,22 @@
 'use client'
 
 import type { PermissionAction } from '@tx-agent-kit/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { useParams, usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { GroupBase, MenuListProps, SelectInstance } from 'react-select'
 import CreatableSelect from 'react-select/creatable'
+import { useRouteTransition } from './RouteTransition'
 import { useMyPermissions } from '../hooks/use-permissions'
+import { useCurrentPrincipal } from '../hooks/use-session-store'
 import { clientApi } from '../lib/client-api'
-import { useOrganizationsGetOrganization, useOrganizationsListOrganizations } from '../lib/api/generated/organizations/organizations'
+import { getAssetsListAssetsQueryOptions } from '../lib/api/generated/assets/assets'
+import {
+  getOrganizationsListOrgMembersQueryOptions,
+  useOrganizationsGetOrganization,
+  useOrganizationsListOrganizations
+} from '../lib/api/generated/organizations/organizations'
 import { useTeamsListTeams, teamsCreateTeam } from '../lib/api/generated/teams/teams'
 import { notify } from '../lib/notify'
 // clientApi kept for signOut (auth side effects)
@@ -92,8 +100,11 @@ const IconPlus = () => (
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
 interface AppSidebarProps {
+  /** Optional override; defaults to the `orgId` route param. */
   orgId?: string
+  /** Optional override; defaults to the `teamId` route param. */
   teamId?: string
+  /** Optional override; defaults to the principal email from the session store. */
   principalEmail?: string | null
 }
 
@@ -223,9 +234,20 @@ const settingsItems: NavItem[] = [
 
 /* ── Component ───────────────────────────────────────────────────── */
 
-export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
+export function AppSidebar({
+  orgId: orgIdProp,
+  teamId: teamIdProp,
+  principalEmail: principalEmailProp
+}: AppSidebarProps = {}) {
   const router = useRouter()
   const pathname = usePathname()
+  const params = useParams()
+  const principal = useCurrentPrincipal()
+  const orgId = orgIdProp ?? (typeof params.orgId === 'string' ? params.orgId : undefined)
+  const teamId = teamIdProp ?? (typeof params.teamId === 'string' ? params.teamId : undefined)
+  const principalEmail = principalEmailProp ?? principal?.email ?? null
+  const queryClient = useQueryClient()
+  const routeTransition = useRouteTransition()
   const { state: sidebarState } = useSidebar()
   const isCollapsed = sidebarState === 'collapsed'
   const myPermissionsQuery = useMyPermissions()
@@ -353,6 +375,18 @@ export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
     router.push(`/org/${selectedOrgId}/${nextTeamId}`)
   }, [router, selectedOrgId])
 
+  // Navigate through the route transition when one is available (inside the
+  // AppShell) so the current page stays visible while the next renders; fall
+  // back to a plain push when rendered standalone (e.g. in tests).
+  const navigate = useCallback((href: string) => {
+    if (routeTransition) {
+      routeTransition.navigate(href)
+      return
+    }
+
+    router.push(href)
+  }, [routeTransition, router])
+
   const handleSidebarLinkClick = useCallback((
     event: ReactMouseEvent<HTMLAnchorElement>,
     href: string,
@@ -371,8 +405,8 @@ export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
     }
 
     event.preventDefault()
-    router.push(href)
-  }, [router])
+    navigate(href)
+  }, [navigate])
 
   const handleCreateWorkspace = useCallback(async (
     rawName: string,
@@ -501,6 +535,28 @@ export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
   }, [router])
 
   const resolvedTeamId = teamSelection || teamId || ''
+
+  // Warm the destination's primary list query on hover/focus so the page is
+  // already populated by the time the user clicks. Keyed off the href so we
+  // only prefetch the data-heavy workspace/org pages.
+  const prefetchForHref = useCallback((href: string) => {
+    if (!href || href === '#') {
+      return
+    }
+
+    if (href.endsWith('/media') && resolvedTeamId) {
+      void queryClient.prefetchQuery({
+        ...getAssetsListAssetsQueryOptions(resolvedTeamId),
+        staleTime: 30_000
+      })
+    } else if (href.endsWith('/members') && selectedOrgId) {
+      void queryClient.prefetchQuery({
+        ...getOrganizationsListOrgMembersQueryOptions(selectedOrgId),
+        staleTime: 30_000
+      })
+    }
+  }, [queryClient, resolvedTeamId, selectedOrgId])
+
   const availableCredits = selectedOrganization
     ? selectedOrganization.creditsBalance - selectedOrganization.reservedCredits
     : null
@@ -650,6 +706,8 @@ export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
                         title={item.label}
                         tabIndex={needsTeam || !selectedOrgId ? -1 : undefined}
                         onClick={(event) => handleSidebarLinkClick(event, href, needsTeam || !selectedOrgId)}
+                        onMouseEnter={() => prefetchForHref(href)}
+                        onFocus={() => prefetchForHref(href)}
                       >
                         <Icon />
                         {!isCollapsed && <span className="overflow-hidden whitespace-nowrap text-ellipsis">{item.label}</span>}
@@ -689,6 +747,8 @@ export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
                   title={item.label}
                   tabIndex={disabled ? -1 : undefined}
                   onClick={(event) => handleSidebarLinkClick(event, href, disabled)}
+                  onMouseEnter={() => prefetchForHref(href)}
+                  onFocus={() => prefetchForHref(href)}
                 >
                   <Icon />
                 </Link>
@@ -713,6 +773,8 @@ export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
               title={workspacesItem.label}
               tabIndex={!selectedOrgId ? -1 : undefined}
               onClick={(event) => handleSidebarLinkClick(event, wsHref, !selectedOrgId)}
+              onMouseEnter={() => prefetchForHref(wsHref)}
+              onFocus={() => prefetchForHref(wsHref)}
             >
               <WsIcon />
               <span>{workspacesItem.label}</span>
@@ -784,6 +846,8 @@ export function AppSidebar({ orgId, teamId, principalEmail }: AppSidebarProps) {
                         title={item.label}
                         tabIndex={!settingsOpen || needsTeam || !selectedOrgId ? -1 : undefined}
                         onClick={(event) => handleSidebarLinkClick(event, href, needsTeam || !selectedOrgId)}
+                        onMouseEnter={() => prefetchForHref(href)}
+                        onFocus={() => prefetchForHref(href)}
                       >
                         <Icon />
                         <span>{item.label}</span>
