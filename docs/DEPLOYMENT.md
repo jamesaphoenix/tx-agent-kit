@@ -189,6 +189,36 @@ Suggested host mapping for `<domain>`:
 - `api-staging.<domain>` -> staging upstream
 - `api.<domain>` -> prod upstream
 
+## R2 Bucket CORS
+The media library uploads files directly from the browser to a presigned R2 URL
+(`<account>.r2.cloudflarestorage.com`). R2 rejects cross-origin browser requests
+unless the bucket has a CORS policy listing the app origin, without it uploads
+fail with "Failed to fetch". This is bucket configuration, not app code, so it
+must be (re)asserted out of band whenever a bucket is created or an origin
+changes.
+
+Apply/verify with the idempotent script (reads creds from `op://api-keys/Cloudflare`):
+
+```bash
+scripts/cloudflare/set-r2-cors.sh all        # dev + staging + prod
+scripts/cloudflare/set-r2-cors.sh staging    # one environment
+```
+
+Origin policy (one rule per bucket, methods `GET,PUT,HEAD`, header `content-type`):
+
+| Bucket | Allowed origins |
+|--------|-----------------|
+| `tx-agent-kit-dev` | `*` (worktrees run web on many localhost ports; local-only) |
+| `tx-agent-kit-staging` | `https://staging.<domain>` (TODO: set real domain) |
+| `tx-agent-kit-prod` | `https://<domain>`, `https://www.<domain>` (TODO: set real domain) |
+
+R2 only accepts exact origins or a full `*` - partial wildcards like
+`http://localhost:*` are rejected. Dev uses `*` so every worktree port works;
+**never** use `*` for staging/prod. A `PUT` replaces the whole CORS config, so
+re-running is safe. The staging/prod origins are not committed (the web domain
+lives in 1Password as `API_CORS_ORIGIN`/`WEB_BASE_URL`); when adding a new web
+origin, update `origins_for()` in the script and re-run.
+
 ## GitHub Actions Release Workflow
 - Workflow: `.github/workflows/release-k8s.yml`
 - Build jobs:
