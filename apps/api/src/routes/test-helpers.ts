@@ -187,10 +187,13 @@ export const createOidcTestProvider = async (input: {
             nonce
           })
 
+          // Real Google appends the `iss` (issuer) response parameter so the
+          // client can validate the authorization response origin. Mirror that
+          // here so issuer-validation paths are exercised.
           response.statusCode = 302
           response.setHeader(
             'location',
-            `${redirectUri}?code=${encodeURIComponent(authorizationCode)}&state=${encodeURIComponent(state)}`
+            `${redirectUri}?code=${encodeURIComponent(authorizationCode)}&state=${encodeURIComponent(state)}&iss=${encodeURIComponent(issuerUrl)}`
           )
           response.end()
           return

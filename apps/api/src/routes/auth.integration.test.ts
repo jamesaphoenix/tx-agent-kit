@@ -597,7 +597,7 @@ describe('auth integration', () => {
 
     expect(persistedState).not.toBeNull()
     expect(persistedState?.provider).toBe('google')
-    expect((persistedState?.nonce ?? '').length).toBeGreaterThan(0)
+    expect(persistedState?.nonce).toBe('')
     expect((persistedState?.codeVerifier ?? '').length).toBeGreaterThan(0)
     expect(persistedState?.consumedAt).toBeNull()
 
@@ -742,6 +742,66 @@ describe('auth integration', () => {
 
     expect(callback.response.status).toBe(401)
     expect(callback.body.message).toContain('Invalid Google authorization response')
+  })
+
+  it('expires the browser refresh cookie when a cookie-managed Google callback fails', async () => {
+    const callback = await request<{ message: string }>(
+      '/v1/auth/google/callback?code=unused-code&state=bc_invalid-state',
+      'google-auth-browser-cookie-invalid-state',
+      {
+        method: 'GET',
+        headers: {
+          cookie: 'tx-agent-kit.refresh-token=stale-refresh-token',
+          ...browserCookieAuthHeaders
+        }
+      }
+    )
+
+    expect(callback.response.status).toBe(401)
+    expect(callback.body.message).toContain('Invalid Google authorization response')
+    expect(readCookieHeader(callback.response)).toBe('tx-agent-kit.refresh-token=')
+  })
+
+  it.skipIf(process.env.RUN_OIDC_TESTS !== '1')('rejects Google OIDC callback when issuer response parameter is not forwarded', async () => {
+    const issuerUrl = oidcTestProvider?.issuerUrl
+    if (!issuerUrl) {
+      throw new Error('OIDC test provider was not initialized')
+    }
+
+    const googleStart = await request<{ authorizationUrl: string; state: string }>(
+      '/v1/auth/google/start',
+      'google-auth-missing-issuer-start',
+      {
+        method: 'GET',
+        headers: {
+          'x-forwarded-for': '203.0.113.77'
+        }
+      }
+    )
+
+    expect(googleStart.response.status).toBe(200)
+
+    const providerAuthorization = await fetch(googleStart.body.authorizationUrl, {
+      redirect: 'manual'
+    })
+    expect(providerAuthorization.status).toBe(302)
+
+    const callbackUrl = providerAuthorization.headers.get('location')
+    if (!callbackUrl) {
+      throw new Error('Google test provider did not return a callback redirect URL')
+    }
+
+    const callbackUrlWithoutIssuer = new URL(callbackUrl)
+    expect(callbackUrlWithoutIssuer.searchParams.get('iss')).toBe(issuerUrl)
+    callbackUrlWithoutIssuer.searchParams.delete('iss')
+
+    const callback = await fetch(callbackUrlWithoutIssuer, {
+      headers: dbAuthContext.testContext.headersForCase('google-auth-missing-issuer-callback')
+    })
+    const callbackBody = await callback.json() as { message: string }
+
+    expect(callback.status).toBe(401)
+    expect(callbackBody.message).toContain('Invalid Google authorization response')
   })
 
   it.skipIf(process.env.RUN_OIDC_TESTS !== '1')('rejects Google OIDC callback when state is expired', async () => {
