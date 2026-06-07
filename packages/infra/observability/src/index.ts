@@ -42,6 +42,21 @@ export {
 } from './auth-metrics.js'
 
 export {
+  outboxUnprocessedCountMetricName,
+  outboxUnprocessedAgeMetricName,
+  outboxBatchDispatchedMetricName,
+  outboxBatchFillRatioMetricName,
+  outboxListenerConnectedMetricName,
+  getOrCreateOutboxMetrics,
+  recordOutboxBatchDispatched,
+  recordOutboxBacklog,
+  recordOutboxBatchFill,
+  recordOutboxListenerConnected,
+  _resetOutboxMetricsRegistryForTest,
+  type OutboxMetrics
+} from './outbox-metrics.js'
+
+export {
   describeCauseForLog,
   summarizeCause,
   flattenCauseSummary,

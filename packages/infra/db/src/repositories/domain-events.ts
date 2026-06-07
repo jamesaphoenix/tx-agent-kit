@@ -237,5 +237,38 @@ export const domainEventsRepository = {
 
         return { deleted: rows.length }
       })
+    ),
+
+  /**
+   * Lock-free snapshot of the pending backlog for the outbox metrics.
+   *
+   * Deliberately does NOT use `FOR UPDATE`/`SKIP LOCKED` so the gauge reflects
+   * true queue depth (and the true oldest pending event) regardless of rows
+   * in-flight under another dispatcher replica's claim lock. `depth` is the
+   * full count of `pending` rows (uncapped, unlike the per-tick claimed batch)
+   * so the `critical-outbox-depth` alert can actually fire.
+   */
+  measureBacklog: () =>
+    withDb('Failed to measure outbox backlog', (db) =>
+      Effect.gen(function* () {
+        const rows = yield* db.execute<{
+          depth: number | string
+          oldest_age_seconds: number | string | null
+        }>(sql`
+          SELECT
+            count(*) FILTER (WHERE status = 'pending') AS depth,
+            COALESCE(
+              EXTRACT(EPOCH FROM now() - min(occurred_at) FILTER (WHERE status = 'pending')),
+              0
+            ) AS oldest_age_seconds
+          FROM domain_events
+        `)
+
+        const row = rows[0]
+        return {
+          depth: row ? Number(row.depth) : 0,
+          oldestAgeSeconds: row ? Number(row.oldest_age_seconds) : 0
+        }
+      })
     )
 }
