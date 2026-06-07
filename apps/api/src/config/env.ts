@@ -1,4 +1,9 @@
-import { authRefreshTokenKey } from '@tx-agent-kit/contracts'
+import {
+  authRefreshTokenKey,
+  getDefaultAuthRateLimitPolicy,
+  type AuthRateLimitedPath,
+  type AuthRateLimitPolicy
+} from '@tx-agent-kit/contracts'
 import * as Schema from 'effect/Schema'
 
 const requiredApiEnvShape = {
@@ -6,6 +11,7 @@ const requiredApiEnvShape = {
   API_PORT: Schema.String,
   API_HOST: Schema.String,
   DATABASE_URL: Schema.String,
+  REDIS_URL: Schema.optional(Schema.String),
   AUTH_SECRET: Schema.String,
   API_CORS_ORIGIN: Schema.String,
   AUTH_RATE_LIMIT_WINDOW_MS: Schema.optional(Schema.String),
@@ -50,14 +56,14 @@ export type ApiEnv = Schema.Schema.Type<typeof ApiEnvSchema>
 
 export const decodeApiEnv = Schema.decodeUnknownSync(ApiEnvSchema)
 
-const parsePositiveInt = (rawValue: string | undefined, fallback: number): number => {
+const parseOptionalPositiveInt = (rawValue: string | undefined): number | undefined => {
   if (!rawValue) {
-    return fallback
+    return undefined
   }
 
   const parsed = Number.parseInt(rawValue, 10)
   if (!Number.isInteger(parsed) || parsed < 1) {
-    return fallback
+    return undefined
   }
 
   return parsed
@@ -158,24 +164,63 @@ export const resetApiEnvCache = (): void => {
   _cachedApiEnv = null
 }
 
-export interface AuthRateLimitConfig {
-  windowMs: number
-  maxIpRequests: number
-  maxIdentifierRequests: number
+// Redis backs the auth rate limiter so caps hold across process restarts
+// and any horizontal scale. In production/staging the URL must be
+// configured explicitly; locally we fall back to the dev container.
+const resolveConfiguredRedisUrl = (): string | null => {
+  const env = getApiEnv()
+  if (env.REDIS_URL && env.REDIS_URL.trim().length > 0) {
+    return env.REDIS_URL
+  }
+  if (env.NODE_ENV !== 'production' && env.NODE_ENV !== 'staging') {
+    return `redis://127.0.0.1:${process.env.REDIS_PORT ?? '6379'}`
+  }
+  return null
 }
 
-export const getAuthRateLimitConfig = (): AuthRateLimitConfig => {
+export const getAuthRateLimitRedisUrl = (): string | null =>
+  resolveConfiguredRedisUrl()
+
+/**
+ * Auth rate limiting is disabled entirely in local development so iterating on
+ * sign-in/sign-up pages never locks you out (the limiter is Redis-backed and
+ * would otherwise persist across dev-server restarts). Staging/production keep
+ * the tight per-path policy.
+ */
+export const isAuthRateLimitingEnabled = (): boolean =>
+  getApiEnv().NODE_ENV !== 'development'
+
+/**
+ * Resolves the effective rate-limit policy for a given auth path.
+ *
+ * Precedence (highest first):
+ *   1. explicit `AUTH_RATE_LIMIT_*` env override (when set)
+ *   2. the per-path contract policy ({@link getDefaultAuthRateLimitPolicy})
+ *   3. the contract default
+ *
+ * Env overrides are global (one value across all paths). This is what
+ * lets the integration harness disable limits suite-wide by setting
+ * `AUTH_RATE_LIMIT_MAX_REQUESTS` to a very large number, while real
+ * deployments, which set nothing, get the tight per-path defaults.
+ */
+export const getAuthRateLimitPolicy = (path: AuthRateLimitedPath): AuthRateLimitPolicy => {
   const env = getApiEnv()
-  const maxIpRequests = parsePositiveInt(env.AUTH_RATE_LIMIT_MAX_REQUESTS, 15)
-  const maxIdentifierRequests = parsePositiveInt(
-    env.AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS,
-    maxIpRequests
-  )
+  const base = getDefaultAuthRateLimitPolicy(path)
+
+  const windowMsOverride = parseOptionalPositiveInt(env.AUTH_RATE_LIMIT_WINDOW_MS)
+  const maxIpOverride = parseOptionalPositiveInt(env.AUTH_RATE_LIMIT_MAX_REQUESTS)
+  const maxIdentifierOverride = parseOptionalPositiveInt(env.AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS)
 
   return {
-    windowMs: parsePositiveInt(env.AUTH_RATE_LIMIT_WINDOW_MS, 60_000),
-    maxIpRequests,
-    maxIdentifierRequests
+    windowSeconds:
+      windowMsOverride !== undefined
+        ? Math.max(1, Math.ceil(windowMsOverride / 1000))
+        : base.windowSeconds,
+    maxPerIp: maxIpOverride ?? base.maxPerIp,
+    // Mirror legacy behaviour: an explicit IP override with no identifier
+    // override applies to both buckets.
+    maxPerIdentifier: maxIdentifierOverride ?? maxIpOverride ?? base.maxPerIdentifier,
+    blockSeconds: base.blockSeconds
   }
 }
 

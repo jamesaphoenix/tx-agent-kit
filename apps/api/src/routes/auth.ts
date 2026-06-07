@@ -164,17 +164,30 @@ const catchUnauthorizedWithExpiredCookie = (
 const enforceIdentifierRateLimit = (
   path: AuthRateLimitedPath,
   identifier: string
-): Effect.Effect<void, TooManyRequests> => {
-  const decision = consumeAuthIdentifierRateLimit(path, identifier)
-
-  if (!decision.limited) {
-    return Effect.void
-  }
-
-  return Effect.fail(
-    new TooManyRequests({ message: 'Too many authentication attempts. Please try again later.' })
+): Effect.Effect<void, TooManyRequests> =>
+  // tryPromise (not promise): a rejection from the limiter must be a logged,
+  // typed error, never a silent Effect defect that bypasses the boundary's
+  // log+Sentry mapping. On an unexpected failure we fail OPEN (allow the
+  // request) so a limiter hiccup can't lock legitimate users out.
+  Effect.tryPromise({
+    try: () => consumeAuthIdentifierRateLimit(path, identifier),
+    catch: (cause) => cause
+  }).pipe(
+    Effect.catchAll((cause) =>
+      Effect.logError('Auth identifier rate-limit check failed; failing open', { path, cause }).pipe(
+        Effect.as({ limited: false as const })
+      )
+    ),
+    Effect.flatMap((decision) =>
+      decision.limited
+        ? Effect.fail(
+            new TooManyRequests({
+              message: 'Too many authentication attempts. Please try again later.'
+            })
+          )
+        : Effect.void
+    )
   )
-}
 
 export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
   return handlers
