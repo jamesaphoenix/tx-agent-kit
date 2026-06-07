@@ -7,8 +7,13 @@ images:
   otelCollector: otel/opentelemetry-collector-contrib:0.146.1
   pullPolicy: IfNotPresent
 
+imagePullSecrets: []
+
 runtimeEnv: {}
 runtimeEnvSecretName: ''
+
+networkPolicy:
+  enabled: true
 
 api:
   replicas: 1

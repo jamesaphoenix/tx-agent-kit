@@ -19,6 +19,10 @@ spec:
         {{- include "tx-agent-kit.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
