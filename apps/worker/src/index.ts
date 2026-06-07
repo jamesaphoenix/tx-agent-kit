@@ -4,7 +4,8 @@ import { ActivityErrorBoundaryInterceptor } from './activity-error-boundary.js'
 import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
 import { closeRedisClients } from '@tx-agent-kit/redis'
-import { existsSync } from 'node:fs'
+import { existsSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { combinedActivities } from './activities.js'
@@ -62,6 +63,32 @@ const shutdownWorkerIfRunning = (worker: Worker, taskQueue: string): void => {
   }
 }
 
+// Queue-scoped pidfile so a fresh worker boot (or `kill-stale-service.sh worker`)
+// can reap a previous worker that is still polling the SAME Temporal task queue.
+// This prevents worker version skew when multiple checkouts share a queue: only
+// the prior holder of this exact queue is killed, never workers on a different
+// queue (isolated worktrees or unrelated projects). Dev-only convenience.
+const workerPidfilePath = (taskQueue: string): string =>
+  path.join(tmpdir(), `tx-agent-worker.${taskQueue.replaceAll(/[^A-Za-z0-9_.-]/g, '_')}.pid`)
+
+const writeWorkerPidfile = (taskQueue: string): string => {
+  const file = workerPidfilePath(taskQueue)
+  try {
+    writeFileSync(file, String(process.pid))
+  } catch {
+    // Best-effort: the pidfile is only a local stale-killer convenience.
+  }
+  return file
+}
+
+const removeWorkerPidfile = (file: string): void => {
+  try {
+    rmSync(file, { force: true })
+  } catch {
+    // Best-effort cleanup; a stale pidfile is guarded against on the read side.
+  }
+}
+
 async function run(env: WorkerEnv): Promise<void> {
   const sourceDir = path.dirname(fileURLToPath(import.meta.url))
   const workflowJsPath = path.join(sourceDir, 'workflows.js')
@@ -73,6 +100,12 @@ async function run(env: WorkerEnv): Promise<void> {
   const campaignWorkflowSourcePath = existsSync(campaignWorkflowJsPath)
     ? campaignWorkflowJsPath
     : path.join(sourceDir, 'campaign-workflows.ts')
+
+  // Register this worker in a queue-scoped pidfile so the next boot (via
+  // kill-stale-service.sh) reaps a stale worker still polling the same task
+  // queue, preventing Temporal worker version skew across checkouts.
+  const workerPidfile = writeWorkerPidfile(env.TEMPORAL_TASK_QUEUE)
+  process.once('exit', () => { removeWorkerPidfile(workerPidfile) })
 
   startTelemetry('tx-agent-kit-worker')
 
