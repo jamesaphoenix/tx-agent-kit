@@ -24,6 +24,30 @@ context_reachable() {
   kubectl --context "$1" get nodes >/dev/null 2>&1
 }
 
+normalize_k3d_context_server() {
+  local context="$1"
+  local cluster_name=""
+  local server=""
+
+  if [[ "$context" != k3d-* ]]; then
+    return 0
+  fi
+
+  cluster_name="$(kubectl config view --raw --minify --context "$context" -o jsonpath='{.contexts[0].context.cluster}' 2>/dev/null || true)"
+  server="$(kubectl config view --raw --minify --context "$context" -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)"
+  if [[ -z "$cluster_name" || -z "$server" ]]; then
+    return 0
+  fi
+
+  case "$server" in
+    https://0.0.0.0:*)
+      port="${server##*:}"
+      kubectl config set-cluster "$cluster_name" --server="https://127.0.0.1:${port}" >/dev/null
+      ;;
+  esac
+}
+
+normalize_k3d_context_server "$target_context"
 if context_exists "$target_context" && context_reachable "$target_context"; then
   kubectl --context "$target_context" wait node --all --for=condition=Ready --timeout="${K3S_NODE_READY_TIMEOUT:-180s}" >/dev/null
   echo "K8S_BOOTSTRAP_CONTEXT=$target_context"
@@ -39,11 +63,14 @@ fi
 if [[ "$allow_k3d_fallback" == "1" ]] && command -v k3d >/dev/null 2>&1; then
   if ! k3d cluster list 2>/dev/null | awk 'NR>1 { print $1 }' | grep -Fxq "$cluster_name"; then
     echo "Creating k3d cluster '$cluster_name' for staging verification."
-    k3d cluster create "$cluster_name" --wait
+    k3d cluster create "$cluster_name" \
+      --wait \
+      --port "${K3D_API_NODEPORT_STAGING:-32080}:32080@server:0"
   fi
 
   k3d_context="k3d-${cluster_name}"
   kubectl config use-context "$k3d_context" >/dev/null
+  normalize_k3d_context_server "$k3d_context"
   kubectl --context "$k3d_context" wait node --all --for=condition=Ready --timeout="${K3S_NODE_READY_TIMEOUT:-180s}" >/dev/null
   echo "K8S_BOOTSTRAP_CONTEXT=$k3d_context"
   exit 0
