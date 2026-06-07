@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildCauseReportError,
   causeLogContext,
+  describeCauseForLog,
   shouldLogEffectCause,
   toFlattenedCauseChain
 } from './effect-cause-summary.js'
@@ -123,5 +124,102 @@ describe('effect cause summary', () => {
       expect(reported.name).toBe('Whatever')
       expect(reported.message).toBe('Whatever')
     })
+  })
+
+  it('does not let opaque Error.cause metadata hide the real error frame', () => {
+    const jwtExpired = new Error('"exp" claim timestamp check failed') as Error & {
+      cause?: unknown
+    }
+    jwtExpired.name = 'JWTExpired'
+    jwtExpired.cause = {
+      claim: 'exp',
+      reason: 'check_failed',
+      payload: {
+        sub: 'user-1',
+        exp: 1
+      }
+    }
+
+    const authError = new Error('Invalid session token') as Error & { cause?: unknown }
+    authError.name = 'AuthError'
+    authError.cause = jwtExpired
+
+    const context = causeLogContext(authError)
+    expect(context).toMatchObject({
+      rootCauseType: 'JWTExpired',
+      rootCauseTag: 'JWTExpired',
+      rootCauseMessage: '"exp" claim timestamp check failed'
+    })
+    expect(context.causeChain).toEqual([
+      { type: 'AuthError', tag: 'AuthError', code: undefined, message: 'Invalid session token' },
+      {
+        type: 'JWTExpired',
+        tag: 'JWTExpired',
+        code: undefined,
+        message: '"exp" claim timestamp check failed'
+      },
+      {
+        type: 'object',
+        tag: undefined,
+        code: undefined,
+        message: '{"claim":"exp","reason":"check_failed","payload":{"sub":"user-1","exp":1}}'
+      }
+    ])
+    expect(shouldLogEffectCause(authError, new Set(['AuthError', 'JWTExpired']))).toBe(false)
+  })
+
+  it('serializes OAuth response body errors without collapsing objects', () => {
+    const responseBodyError = new Error('server responded with an error in the response body') as Error & {
+      cause?: unknown
+      code?: string
+    }
+    responseBodyError.name = 'ResponseBodyError'
+    responseBodyError.code = 'OAUTH_RESPONSE_BODY_ERROR'
+    responseBodyError.cause = {
+      error: 'invalid_client',
+      error_description: 'The OAuth client was not found.',
+      client_secret: 'super-secret-value'
+    }
+
+    const callbackError = new Error(
+      `Failed to complete Google OIDC callback: ${describeCauseForLog(responseBodyError)}`,
+      { cause: responseBodyError }
+    )
+
+    const context = causeLogContext(callbackError)
+    expect(context.causeMessage).not.toContain('[object Object]')
+    expect(context.causeMessage).toContain('"error":"invalid_client"')
+    expect(context.causeMessage).toContain('"client_secret":"[REDACTED]"')
+    expect(context.rootCauseMessage).toBe('invalid_client')
+    expect(context.causeChain).toContainEqual({
+      type: 'object',
+      tag: undefined,
+      code: undefined,
+      message: '{"error":"invalid_client","error_description":"The OAuth client was not found.","client_secret":"[REDACTED]"}'
+    })
+  })
+
+  it('serializes generic object causes without making metadata the root cause', () => {
+    const providerError = new Error('provider failed') as Error & { cause?: unknown }
+    providerError.name = 'ProviderError'
+    providerError.cause = {
+      requestId: 'req-1',
+      status: 400,
+      access_token: 'secret-token'
+    }
+
+    const context = causeLogContext(providerError)
+    expect(context).toMatchObject({
+      rootCauseType: 'ProviderError',
+      rootCauseTag: 'ProviderError',
+      rootCauseMessage: 'provider failed'
+    })
+    expect(context.causeChain).toContainEqual({
+      type: 'object',
+      tag: undefined,
+      code: undefined,
+      message: '{"requestId":"req-1","status":400,"access_token":"[REDACTED]"}'
+    })
+    expect(shouldLogEffectCause(providerError, new Set())).toBe(true)
   })
 })

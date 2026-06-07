@@ -1,13 +1,14 @@
 import type { LogContext } from '@tx-agent-kit/logging'
 
 // Shared Effect-cause summarization used by BOTH the API request boundary and
-// the worker activity boundary, so error→log→Sentry context is identical across
+// the worker activity boundary, so error->log->Sentry context is identical across
 // services. The only app-specific input is the set of "expected" error tags
-// (4xx/business failures that should NOT be reported as faults) — passed into
+// (4xx/business failures that should NOT be reported as faults) passed into
 // shouldLogEffectCause by each app.
 
 const MAX_LOG_FIELD_LENGTH = 2000
 const MAX_CAUSE_DEPTH = 8
+const MAX_SERIALIZED_OBJECT_DEPTH = 4
 
 export interface CauseSummary {
   readonly type: string
@@ -38,6 +39,68 @@ const getStringField = (record: Record<string, unknown>, key: string): string | 
   return typeof value === 'string' && value.length > 0 ? truncateLogField(value) : undefined
 }
 
+const sensitiveKeyPattern = /(?:authorization|client_secret|cookie|password|refresh_token|access_token|id_token|token|secret|code_verifier)/iu
+
+const sanitizeValueForLog = (
+  value: unknown,
+  seen: WeakSet<object>,
+  depth: number
+): unknown => {
+  if (depth > MAX_SERIALIZED_OBJECT_DEPTH) {
+    return '[MaxDepth]'
+  }
+
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValueForLog(item, seen, depth + 1))
+  }
+
+  if (!isRecord(value)) {
+    return typeof value === 'bigint' ? value.toString() : value
+  }
+
+  if (seen.has(value)) {
+    return '[Circular]'
+  }
+  seen.add(value)
+
+  const entries = Object.entries(value).map(([key, entryValue]) => [
+    key,
+    sensitiveKeyPattern.test(key)
+      ? '[REDACTED]'
+      : sanitizeValueForLog(entryValue, seen, depth + 1)
+  ])
+  return Object.fromEntries(entries)
+}
+
+export const describeCauseForLog = (cause: unknown): string => {
+  if (cause instanceof Error) {
+    const codedCause = cause as Error & { code?: unknown; cause?: unknown }
+    const code = typeof codedCause.code === 'string'
+      ? ` (${codedCause.code})`
+      : ''
+    const nestedCause = codedCause.cause
+    const nested = nestedCause === undefined ? '' : `; cause=${describeCauseForLog(nestedCause)}`
+    return truncateLogField(`${cause.message}${code}${nested}`)
+  }
+
+  if (isRecord(cause) || Array.isArray(cause)) {
+    try {
+      return truncateLogField(JSON.stringify(sanitizeValueForLog(cause, new WeakSet(), 0)))
+    } catch {
+      return '[Unserializable object]'
+    }
+  }
+
+  return truncateLogField(String(cause))
+}
+
 const inferCauseType = (cause: unknown): string => {
   if (cause instanceof Error) {
     return cause.name
@@ -64,6 +127,22 @@ const nestedCauseCandidateKeys = [
   'right'
 ] as const
 
+const getStructuredObjectMessage = (record: Record<string, unknown>): string | undefined => {
+  const hasSemanticCauseFields = [
+    '_tag',
+    '_id',
+    'name',
+    'code',
+    'message'
+  ].some((key) => record[key] !== undefined && record[key] !== null)
+
+  if (hasSemanticCauseFields || Object.keys(record).length === 0) {
+    return undefined
+  }
+
+  return describeCauseForLog(record)
+}
+
 const getNestedCauseCandidates = (record: Record<string, unknown>): ReadonlyArray<unknown> => {
   const candidates: unknown[] = []
 
@@ -86,6 +165,22 @@ const getNestedCauseCandidates = (record: Record<string, unknown>): ReadonlyArra
   return candidates
 }
 
+const hasActionableSummaryDetail = (summary: CauseSummary): boolean =>
+  summary.tag !== undefined ||
+  summary.code !== undefined ||
+  summary.message !== undefined ||
+  (summary.nested?.length ?? 0) > 0 ||
+  summary.type !== 'object'
+
+const summarizeNestedCause = (
+  cause: unknown,
+  seen: WeakSet<object>,
+  depth: number
+): CauseSummary | undefined => {
+  const summary = summarizeCause(cause, seen, depth)
+  return summary && hasActionableSummaryDetail(summary) ? summary : undefined
+}
+
 export const summarizeCause = (
   cause: unknown,
   seen: WeakSet<object> = new WeakSet(),
@@ -102,7 +197,7 @@ export const summarizeCause = (
     seen.add(cause)
 
     const errorWithCause = cause as Error & { cause?: unknown }
-    const nested = [summarizeCause(errorWithCause.cause, seen, depth + 1)]
+    const nested = [summarizeNestedCause(errorWithCause.cause, seen, depth + 1)]
       .filter((summary): summary is CauseSummary => summary !== undefined)
 
     return {
@@ -121,7 +216,7 @@ export const summarizeCause = (
     seen.add(cause)
 
     const nested = getNestedCauseCandidates(cause)
-      .map((candidate) => summarizeCause(candidate, seen, depth + 1))
+      .map((candidate) => summarizeNestedCause(candidate, seen, depth + 1))
       .filter((summary): summary is CauseSummary => summary !== undefined)
     const tag = getStringField(cause, '_tag') ?? getStringField(cause, '_id') ?? getStringField(cause, 'name')
     const code = getStringField(cause, 'code')
@@ -130,7 +225,7 @@ export const summarizeCause = (
       type: tag ?? inferCauseType(cause),
       tag,
       code,
-      message: getStringField(cause, 'message'),
+      message: getStringField(cause, 'message') ?? getStructuredObjectMessage(cause),
       nested
     }
   }
@@ -180,6 +275,20 @@ const expectedPlatformCauseTags = new Set([
   'RouteNotFound'
 ])
 
+const isPlainObjectMetadataSummary = (item: FlattenedCauseSummary): boolean => {
+  if (
+    item.tag !== undefined ||
+    item.code !== undefined ||
+    item.message === undefined ||
+    (item.type !== 'object' && item.type !== 'Array')
+  ) {
+    return false
+  }
+
+  const trimmedMessage = item.message.trimStart()
+  return trimmedMessage.startsWith('{') || trimmedMessage.startsWith('[')
+}
+
 export const toFlattenedCauseChain = (cause: unknown): ReadonlyArray<FlattenedCauseSummary> =>
   flattenCauseSummary(summarizeCause(cause)).map((item) => ({
     type: item.type,
@@ -194,8 +303,8 @@ export const toFlattenedCauseChain = (cause: unknown): ReadonlyArray<FlattenedCa
  *
  * `expectedErrorTags` is the app-specific set of error tags that are NOT faults
  * (API: its HTTP error tags; worker: e.g. retryable publish failures). Anything
- * else — a `Die`, an `INTERNAL_ERROR`, an untagged error with a message, or a
- * tag outside the expected/structural/platform sets — is reportable.
+ * else, a `Die`, an `INTERNAL_ERROR`, an untagged error with a message, or a
+ * tag outside the expected/structural/platform sets, is reportable.
  */
 export const shouldLogEffectCause = (
   cause: unknown,
@@ -212,6 +321,10 @@ export const shouldLogEffectCause = (
       return true
     }
 
+    if (chain.length > 1 && isPlainObjectMetadataSummary(item)) {
+      return false
+    }
+
     if (item.tag === undefined) {
       return item.message !== undefined
     }
@@ -225,7 +338,9 @@ export const shouldLogEffectCause = (
 export const causeLogContext = (cause: unknown): LogContext => {
   const chain = toFlattenedCauseChain(cause)
   const first = chain[0]
-  const root = chain.at(-1)
+  const root = chain.length > 1
+    ? [...chain].reverse().find((item) => !isPlainObjectMetadataSummary(item)) ?? chain.at(-1)
+    : chain.at(-1)
 
   return {
     causeType: first?.type,
@@ -244,12 +359,12 @@ export const causeLogContext = (cause: unknown): LogContext => {
  * Produce the `Error` to hand to Sentry for an Effect cause.
  *
  * Prefers the deepest real JS `Error` in the cause tree (e.g. a pg
- * `DatabaseError`, a `ParseError`, an `HttpApiDecodeError` — all of which carry
+ * `DatabaseError`, a `ParseError`, an `HttpApiDecodeError`, all of which carry
  * a meaningful message and stack), so the reported issue points at the actual
  * code path instead of a freshly-allocated boundary `Error`. When the cause is
  * pure Effect data (a `Cause.fail` of a plain object with no JS `Error`), it
  * synthesizes an `Error` whose `name`/`message` come from the root of the cause
- * chain and whose `stack` is the supplied `Cause.pretty` rendering — i.e. the
+ * chain and whose `stack` is the supplied `Cause.pretty` rendering, i.e. the
  * logical Effect span trace rather than fiber internals.
  */
 export const buildCauseReportError = (
