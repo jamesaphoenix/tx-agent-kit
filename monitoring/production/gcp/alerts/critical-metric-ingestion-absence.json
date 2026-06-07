@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - Metric Ingestion Absent",
+  "documentation": {
+    "content": "## Metric Ingestion Absence Critical Alert\n\n**Severity:** CRITICAL\n\nNo datapoints have been received for the core API request counter for 10+ minutes. This indicates the OTEL collector has stopped scraping, GMP ingestion has failed, or the API itself is down.\n\n### How this works\nThe alert fires when `absent(tx_agent_kit_api_request_total)` is true - i.e. the metric has no active series. In Cloud Monitoring PromQL alerting, `absent()` returns 1 when the series is absent.\n\n### Triage\n1. Check if the API container is running and healthy.\n2. Check OTEL Collector logs for scrape errors or GMP export failures.\n3. Verify GMP is ingesting: `gcloud monitoring metrics list --filter='metric.type=~prometheus.googleapis.com.*tx_agent_kit.*'`.\n4. Check if `OTEL_EXPORTER_OTLP_ENDPOINT` is correctly configured in the deployed service.\n5. Check GMP API quotas for the project.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Observability section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] Core metrics have stopped ingesting"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "observability",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "No tx_agent_kit_api_request_total datapoints for 10m",
+      "conditionPrometheusQueryLanguage": {
+        "query": "absent(rate(tx_agent_kit_api_request_total[5m])) == 1",
+        "duration": "600s",
+        "evaluationInterval": "60s",
+        "alertRule": "metric_ingestion_absent_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

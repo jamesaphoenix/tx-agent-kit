@@ -1376,8 +1376,130 @@ const createEnforceTenantScopeRule = (context) => {
 //   .pipe(Effect.mapError(() => unauthorized('opaque')))
 // Where the catch/mapError arrow function ignores its error parameter.
 
+// The worker uses flat Temporal entrypoints (apps/worker/src/activities.ts and
+// apps/worker/src/workflows.ts), so the matcher targets those exact files. A
+// directory layout (activities/, workflows/) would need its own glob; the flat
+// files are what this checkout ships.
+const TEMPORAL_WORKER_FILE_RE = /(?:^|\/)apps\/worker\/src\/(?:activities|workflows)\.tsx?$/
+const TEMPORAL_ALLOW_SWALLOW_MARKER = 'temporal-observability:allow-swallow'
+const AST_TRAVERSAL_SKIP_KEYS = new Set(['parent', 'loc', 'range', 'tokens', 'comments', 'leadingComments', 'trailingComments'])
+
+const propertyName = (property) => {
+  if (!property) {
+    return null
+  }
+  if (property.type === 'Identifier' || property.type === 'PrivateIdentifier') {
+    return property.name
+  }
+  if (property.type === 'Literal' && typeof property.value === 'string') {
+    return property.value
+  }
+  return null
+}
+
+const nodeContains = (node, predicate) => {
+  if (!node || typeof node !== 'object') {
+    return false
+  }
+  if (Array.isArray(node)) {
+    return node.some((child) => nodeContains(child, predicate))
+  }
+  if (typeof node.type !== 'string') {
+    return false
+  }
+  if (predicate(node)) {
+    return true
+  }
+  return Object.entries(node).some(([key, value]) => {
+    if (AST_TRAVERSAL_SKIP_KEYS.has(key)) {
+      return false
+    }
+    return nodeContains(value, predicate)
+  })
+}
+
+const isEffectMember = (node, names) =>
+  node.type === 'MemberExpression' &&
+  node.object.type === 'Identifier' &&
+  node.object.name === 'Effect' &&
+  names.has(propertyName(node.property))
+
+const isLoggerErrorCall = (node) =>
+  node.type === 'CallExpression' &&
+  node.callee.type === 'MemberExpression' &&
+  node.callee.object.type === 'Identifier' &&
+  (node.callee.object.name === 'logger' || node.callee.object.name === 'log') &&
+  propertyName(node.callee.property) === 'error'
+
+const FAILURE_MARKER_FUNCTION_NAMES = new Set([
+  'failScheduledSocialPost',
+  'markEnrichmentFailed',
+  'markEventFailed'
+])
+
+const isFailureMarkerCall = (node) =>
+  node.type === 'CallExpression' &&
+  ((node.callee.type === 'Identifier' && FAILURE_MARKER_FUNCTION_NAMES.has(node.callee.name)) ||
+    (node.callee.type === 'MemberExpression' && FAILURE_MARKER_FUNCTION_NAMES.has(propertyName(node.callee.property))))
+
+const hasTemporalSwallowAllowComment = (sourceCode, node) => {
+  const comments = [
+    ...sourceCode.getCommentsBefore(node),
+    ...sourceCode.getCommentsInside(node)
+  ]
+  return comments.some((comment) => comment.value.includes(TEMPORAL_ALLOW_SWALLOW_MARKER))
+}
+
+const catchBlockPreservesFailure = (catchClause) =>
+  nodeContains(catchClause.body, (node) =>
+    node.type === 'ThrowStatement' ||
+    isLoggerErrorCall(node) ||
+    isFailureMarkerCall(node)
+  )
+
 const createNoSwallowedErrorsRule = (context) => {
+  const sourceCode = context.sourceCode ?? context.getSourceCode()
+  const filename = toPosix(context.filename ?? context.getFilename())
+  const isTemporalWorkerFile = TEMPORAL_WORKER_FILE_RE.test(filename)
+
   return {
+    CatchClause(node) {
+      if (!isTemporalWorkerFile || hasTemporalSwallowAllowComment(sourceCode, node)) {
+        return
+      }
+
+      if (!node.param) {
+        context.report({
+          node,
+          message:
+            'Temporal activity/workflow catch blocks must bind the caught error, then rethrow, log at error level, or mark the operation failed. ' +
+            `For deliberate parse/timezone fallbacks, add a short ${TEMPORAL_ALLOW_SWALLOW_MARKER} comment explaining why the error is safe to ignore.`
+        })
+        return
+      }
+
+      if (!catchBlockPreservesFailure(node)) {
+        context.report({
+          node,
+          message:
+            'Temporal activity/workflow catch blocks must not quietly continue after failure. ' +
+            'Rethrow, call logger.error/log.error, or call a failure marker such as markEventFailed, markEnrichmentFailed, or failScheduledSocialPost.'
+        })
+      }
+    },
+    MemberExpression(node) {
+      if (!isTemporalWorkerFile || hasTemporalSwallowAllowComment(sourceCode, node)) {
+        return
+      }
+      if (isEffectMember(node, new Set(['either', 'ignore']))) {
+        context.report({
+          node,
+          message:
+            `Temporal activities/workflows must not use Effect.${propertyName(node.property)} without an explicit observability decision. ` +
+            `Add ${TEMPORAL_ALLOW_SWALLOW_MARKER} only when the error is converted into an explicit failed/skipped result nearby.`
+        })
+      }
+    },
     CallExpression(node) {
       // Check Effect.tryPromise({ catch: () => ... })
       if (

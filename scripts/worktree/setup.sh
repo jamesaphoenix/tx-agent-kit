@@ -192,6 +192,9 @@ upsert_env_value "$WORKTREE_ENV" "WEB_PORT" "$WEB_PORT"
 upsert_env_value "$WORKTREE_ENV" "MOBILE_PORT" "$MOBILE_PORT"
 upsert_env_value "$WORKTREE_ENV" "WORKER_INSPECT_PORT" "$WORKER_INSPECT_PORT"
 upsert_env_value "$WORKTREE_ENV" "TEMPORAL_TASK_QUEUE" "$WORKTREE_TASK_QUEUE"
+# Isolate the email-campaigns task queue per worktree too, so a worktree's
+# campaign worker never collides with another checkout's (Temporal version skew).
+upsert_env_value "$WORKTREE_ENV" "EMAIL_CAMPAIGNS_TASK_QUEUE" "email-campaigns-${WORKTREE_NAME}"
 upsert_env_value "$WORKTREE_ENV" "API_BASE_URL" "http://localhost:${API_PORT}"
 upsert_env_value "$WORKTREE_ENV" "NEXT_PUBLIC_API_BASE_URL" "http://localhost:${API_PORT}"
 upsert_env_value "$WORKTREE_ENV" "EXPO_PUBLIC_API_BASE_URL" "http://localhost:${API_PORT}"

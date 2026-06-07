@@ -5,6 +5,7 @@ import { orgMemberRoleSchema } from './permissions.js'
 
 export const browserAuthSessionModeHeaderName = 'x-tx-auth-session-mode'
 export const browserAuthSessionModeHeaderValue = 'browser-cookie'
+export const turnstileResponseHeaderName = 'cf-turnstile-response'
 export const authRefreshTokenKey = 'tx-agent-kit.refresh-token'
 
 export const userSchema = Schema.Struct({
@@ -84,7 +85,8 @@ export const googleAuthStartResponseSchema = Schema.Struct({
 
 export const googleAuthCallbackRequestSchema = Schema.Struct({
   code: Schema.String.pipe(Schema.minLength(1)),
-  state: Schema.String.pipe(Schema.minLength(1))
+  state: Schema.String.pipe(Schema.minLength(1)),
+  iss: Schema.optional(Schema.String.pipe(Schema.minLength(1)))
 })
 
 export const deleteMeResponseSchema = Schema.Struct({

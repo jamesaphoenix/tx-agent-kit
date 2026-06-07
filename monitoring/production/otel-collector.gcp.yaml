@@ -70,6 +70,21 @@ processors:
       - key: deployment.environment.name
         value: ${NODE_ENV}
         action: upsert
+      # Google Managed Prometheus requires a valid `prometheus_target` (location,
+      # cluster, namespace). Off-GCP (Colima/Mac Studio) resourcedetection leaves
+      # these empty, so GMP rejects every write with "Unrecognized region or
+      # location" and descriptors get created but no samples are queryable. The GMP
+      # exporter maps cloud.region -> location, k8s.cluster.name -> cluster,
+      # k8s.namespace.name -> namespace. Set them so writes are accepted.
+      - key: cloud.region
+        value: us-central1
+        action: upsert
+      - key: k8s.cluster.name
+        value: ${OTEL_SERVICE_NAMESPACE}
+        action: upsert
+      - key: k8s.namespace.name
+        value: ${OTEL_SERVICE_NAMESPACE}
+        action: upsert
   # Promote docker_stats' `container.name` resource attribute to a datapoint
   # attribute so per-container breakdowns get a real `container_name` label.
   # The `where` guard makes it a no-op for hostmetrics/app metrics.
@@ -94,10 +109,10 @@ processors:
 exporters:
   googlecloud:
     project: ${GOOGLE_CLOUD_PROJECT}
-    metric:
-      prefix: workload.googleapis.com
     log:
       default_log_name: tx-agent-kit
+  googlemanagedprometheus:
+    project: ${GOOGLE_CLOUD_PROJECT}
 
 service:
   extensions: [health_check]
@@ -109,8 +124,13 @@ service:
 
     metrics:
       receivers: [otlp, docker_stats, hostmetrics]
-      processors: [memory_limiter, resourcedetection, resource, transform/container_labels, filter/container_noise, batch]
-      exporters: [googlecloud]
+      # No `batch` here: GMP rejects >1 point per series per request ("Duplicate
+      # TimeSeries"), and a 10s batch merges two 5s app-export cycles into one
+      # request so ~30% of points get dropped. Forwarding each export untouched
+      # gives exactly one point per series per request. Metric volume is tiny (a
+      # few exports/min per service), so un-batched writes are well within GMP limits.
+      processors: [memory_limiter, resourcedetection, resource, transform/container_labels, filter/container_noise]
+      exporters: [googlemanagedprometheus]
 
     logs:
       receivers: [otlp]

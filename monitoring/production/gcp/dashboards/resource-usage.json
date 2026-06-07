@@ -1,0 +1,259 @@
+{
+  "displayName": "tx-agent-kit - Resource Usage",
+  "description": "Per-container and host (VM) CPU/RAM usage from the docker_stats + hostmetrics receivers. Container series are grouped by container_name; host series describe the VM the containers run inside. Filter by deployment_environment_name to scope to staging or prod. NOTE: GMP-rendered metric names are confirmed post-deploy via `gcloud monitoring metrics list` and PromQL here may need a unit-suffix tweak.",
+  "labels": {
+    "component": "resource-usage"
+  },
+  "mosaicLayout": {
+    "columns": 48,
+    "tiles": [
+      {
+        "xPos": 0,
+        "yPos": 0,
+        "width": 48,
+        "height": 4,
+        "widget": {
+          "text": {
+            "content": "## Resource Usage Dashboard\n\nPer-container CPU/RAM (from the `docker_stats` receiver) and host CPU/RAM/load/filesystem (from the `hostmetrics` receiver).\n\n**Host metrics reflect the host VM**, i.e. the resource envelope the containers run inside - NOT the physical host. On GCP the same series describe the GCE node.\n\nUsage-only: there are no memory limits enforced; this is observability to size and right-size services.\n\nSet the `deployment_environment_name` filter above to the staging or prod environment. PromQL metric names below assume the standard GMP rendering (OTel dots -> underscores, `By` unit -> `_bytes` suffix); confirm exact names post-deploy with `gcloud monitoring metrics list`.",
+            "format": "MARKDOWN"
+          },
+          "title": "Dashboard Info"
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 4,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "collapsibleGroup": {
+            "collapsed": false
+          },
+          "title": "Containers"
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 6,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Container CPU Utilization (%) by container_name",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "max(container_cpu_utilization_ratio) by (container_name)"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "CPU %",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 6,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Container Memory Utilization (% of VM) by container_name",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "max(container_memory_percent_ratio) by (container_name)"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "memory %",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 22,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "collapsibleGroup": {
+            "collapsed": false
+          },
+          "title": "Host (VM)"
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 24,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Host CPU Utilization (ratio 0-1)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "1 - avg(system_cpu_utilization_ratio{state=\"idle\"})"
+                }
+              }
+            ],
+            "thresholds": [
+              {
+                "label": "warn 0.9",
+                "value": 0.9,
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "ratio",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 24,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Host Memory Utilization (ratio 0-1)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "max(system_memory_utilization_ratio{state=\"used\"})"
+                }
+              }
+            ],
+            "thresholds": [
+              {
+                "label": "warn 0.85",
+                "value": 0.85,
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "ratio",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 32,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Host Memory Usage (bytes) by state",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "STACKED_AREA",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum(system_memory_usage_bytes) by (state)"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "bytes",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 32,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Host Load Average (1m)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "avg(system_cpu_load_average_1m)"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "load",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 40,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Host Filesystem Utilization (ratio 0-1) by mountpoint",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "max(system_filesystem_utilization_ratio) by (mountpoint)"
+                }
+              }
+            ],
+            "thresholds": [
+              {
+                "label": "warn 0.85",
+                "value": 0.85,
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "ratio",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

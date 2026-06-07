@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - Outbox Unprocessed Count High",
+  "documentation": {
+    "content": "## Outbox Depth Critical Alert\n\n**Severity:** CRITICAL\n\nThe number of unprocessed (`pending`) outbox events has exceeded the threshold for a sustained period, suggesting the event-driven dispatcher cannot keep up with the write rate (or has stopped draining).\n\n### Threshold note\n`tx_agent_kit_outbox_unprocessed_count` is now a lock-free count of true `pending` depth (uncapped - it is no longer bounded by the dispatcher batch size, so this alert can actually fire). `TODO: tune threshold` - 500 is a starting estimate; during staging load testing observe the steady-state depth and set 2-3x that value.\n\n### Triage\n1. Compare `tx_agent_kit_outbox_batch_dispatched_total` rate vs the event write rate - is dispatch falling behind?\n2. Is the dispatcher draining at all? Check `rate(tx_agent_kit_outbox_batch_dispatched_total[5m])` and the `outbox-dispatcher-stale` / `outbox-wedged` alerts.\n3. Verify the worker's Postgres LISTEN connection is healthy (look for 'Outbox listener connected' / reconnect logs).\n4. Check if a single event type is failing to start and looping via stuck-events-reset (workflow type mismatch after a deploy).\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Outbox Backlog section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] Outbox backlog too deep"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "outbox",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "Outbox unprocessed count > 500 for 10m",
+      "conditionPrometheusQueryLanguage": {
+        "query": "max(tx_agent_kit_outbox_unprocessed_count) > 500",
+        "duration": "600s",
+        "evaluationInterval": "60s",
+        "alertRule": "outbox_depth_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

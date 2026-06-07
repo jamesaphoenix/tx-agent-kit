@@ -10,7 +10,7 @@ import {
   type RefreshSessionRequest
 } from '@tx-agent-kit/contracts'
 import { Effect } from 'effect'
-import { TooManyRequests, TxAgentApi, Unauthorized, mapCoreError } from '../api.js'
+import { TooManyRequests, TxAgentApi, Unauthorized, mapCoreError, mapRequestBodyError } from '../api.js'
 import { getAuthRefreshCookieConfig } from '../config/env.js'
 import { consumeAuthIdentifierRateLimit, toClientIpAddress } from '../middleware/auth-rate-limit.js'
 import { enforceTurnstile } from '../middleware/turnstile.js'
@@ -164,17 +164,30 @@ const catchUnauthorizedWithExpiredCookie = (
 const enforceIdentifierRateLimit = (
   path: AuthRateLimitedPath,
   identifier: string
-): Effect.Effect<void, TooManyRequests> => {
-  const decision = consumeAuthIdentifierRateLimit(path, identifier)
-
-  if (!decision.limited) {
-    return Effect.void
-  }
-
-  return Effect.fail(
-    new TooManyRequests({ message: 'Too many authentication attempts. Please try again later.' })
+): Effect.Effect<void, TooManyRequests> =>
+  // tryPromise (not promise): a rejection from the limiter must be a logged,
+  // typed error, never a silent Effect defect that bypasses the boundary's
+  // log+Sentry mapping. On an unexpected failure we fail OPEN (allow the
+  // request) so a limiter hiccup can't lock legitimate users out.
+  Effect.tryPromise({
+    try: () => consumeAuthIdentifierRateLimit(path, identifier),
+    catch: (cause) => cause
+  }).pipe(
+    Effect.catchAll((cause) =>
+      Effect.logError('Auth identifier rate-limit check failed; failing open', { path, cause }).pipe(
+        Effect.as({ limited: false as const })
+      )
+    ),
+    Effect.flatMap((decision) =>
+      decision.limited
+        ? Effect.fail(
+            new TooManyRequests({
+              message: 'Too many authentication attempts. Please try again later.'
+            })
+          )
+        : Effect.void
+    )
   )
-}
 
 export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
   return handlers
@@ -182,7 +195,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const payload = yield* HttpServerRequest.schemaBodyJson(signUpRequestSchema).pipe(
-          Effect.mapError(mapCoreError)
+          Effect.mapError(mapRequestBodyError)
         )
         yield* enforceIdentifierRateLimit('/v1/auth/sign-up', payload.email)
         yield* enforceTurnstile(request)
@@ -200,7 +213,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const payload = yield* HttpServerRequest.schemaBodyJson(signInRequestSchema).pipe(
-          Effect.mapError(mapCoreError)
+          Effect.mapError(mapRequestBodyError)
         )
         yield* enforceIdentifierRateLimit('/v1/auth/sign-in', payload.email)
         const authService = yield* AuthService
@@ -216,7 +229,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const payload = yield* HttpServerRequest.schemaBodyJson(refreshSessionRequestSchema).pipe(
-          Effect.mapError(mapCoreError)
+          Effect.mapError(mapRequestBodyError)
         )
         const authService = yield* AuthService
         const refreshToken = resolveRefreshToken(request, payload)
@@ -280,6 +293,7 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
         const session = yield* authService.completeGoogleAuth({
           code: urlParams.code,
           state: urlParams.state,
+          iss: urlParams.iss,
           ...toAuthRequestContext(request)
         })
 
@@ -288,7 +302,16 @@ export const AuthLive = HttpApiBuilder.group(TxAgentApi, 'auth', (handlers) => {
           includeRefreshToken: !isBrowserGoogle,
           isBrowserSession: isBrowserGoogle
         })
-      }).pipe(Effect.mapError(mapAuthError))
+      }).pipe(
+        Effect.catchAll((error) => {
+          const mappedError = mapAuthError(error)
+          if (isCookieManagedGoogleAuthState(urlParams.state) && isUnauthorized(mappedError)) {
+            return Effect.succeed(renderUnauthorizedAuthResponse(mappedError.message))
+          }
+
+          return Effect.fail(mappedError)
+        })
+      )
     )
     .handle('forgotPassword', ({ payload }) =>
       Effect.gen(function* () {

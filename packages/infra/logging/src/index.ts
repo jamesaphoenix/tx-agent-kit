@@ -15,6 +15,9 @@ export interface StructuredLogEntry {
   level: LogLevel
   service: string
   message: string
+  trace_id?: string
+  span_id?: string
+  trace_flags?: number
   context?: LogContext
   error?: {
     name: string
@@ -53,6 +56,25 @@ const safeJsonStringify = (value: unknown): string => {
   }
 }
 
+const stringifyLogEntry = (entry: StructuredLogEntry): string => {
+  const seen = new WeakSet()
+
+  return JSON.stringify(entry, (_key, value: unknown) => {
+    if (typeof value === 'bigint') {
+      return value.toString()
+    }
+
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) {
+        return '[Circular]'
+      }
+      seen.add(value)
+    }
+
+    return value
+  })
+}
+
 const normalizeAttributeValue = (value: unknown): AnyValue | undefined => {
   if (value === undefined) {
     return undefined
@@ -77,6 +99,18 @@ const toLogRecordAttributes = (entry: StructuredLogEntry): AnyValueMap => {
   const attributes: AnyValueMap = {
     'service.name': entry.service,
     'log.level': entry.level
+  }
+
+  if (entry.trace_id) {
+    attributes.trace_id = entry.trace_id
+  }
+
+  if (entry.span_id) {
+    attributes.span_id = entry.span_id
+  }
+
+  if (entry.trace_flags !== undefined) {
+    attributes.trace_flags = entry.trace_flags
   }
 
   if (entry.context) {
@@ -118,7 +152,7 @@ const emitOtelLogRecord = (entry: StructuredLogEntry): void => {
 }
 
 const writeLog = (entry: StructuredLogEntry): void => {
-  process.stdout.write(`${JSON.stringify(entry)}\n`)
+  process.stdout.write(`${stringifyLogEntry(entry)}\n`)
   emitOtelLogRecord(entry)
 }
 
@@ -136,14 +170,32 @@ const withScope = (service: string, scope: string): string => `${service}:${scop
 export const getActiveSpanContext = ():
   | { traceId: string; spanId: string; traceFlags: number }
   | undefined => {
-  const spanContext = trace.getActiveSpan()?.spanContext()
-  if (!spanContext?.traceId) {
+  try {
+    const spanContext = trace.getActiveSpan()?.spanContext()
+    if (!spanContext?.traceId) {
+      return undefined
+    }
+    return {
+      traceId: spanContext.traceId,
+      spanId: spanContext.spanId,
+      traceFlags: spanContext.traceFlags
+    }
+  } catch {
     return undefined
   }
+}
+
+const getActiveTraceFields = (): Pick<StructuredLogEntry, 'trace_id' | 'span_id' | 'trace_flags'> => {
+  const spanContext = getActiveSpanContext()
+
+  if (!spanContext) {
+    return {}
+  }
+
   return {
-    traceId: spanContext.traceId,
-    spanId: spanContext.spanId,
-    traceFlags: spanContext.traceFlags
+    trace_id: spanContext.traceId,
+    span_id: spanContext.spanId,
+    trace_flags: spanContext.traceFlags
   }
 }
 
@@ -159,6 +211,7 @@ const createEntry = (
     level,
     service,
     message,
+    ...getActiveTraceFields(),
     context,
     error: error
       ? {

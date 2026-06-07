@@ -13,7 +13,9 @@ const usage = () => {
       '  --api-image <ref>',
       '  --worker-image <ref>',
       '  --output <path>',
-      '  [--otel-endpoint <url>]'
+      '  [--otel-endpoint <url>]',
+      '  [--otel-config-file <path>]',
+      '  [--image-pull-secret-name <name>]'
     ].join('\\n')
   )
 }
@@ -36,6 +38,8 @@ const apiImage = readArg('--api-image')
 const workerImage = readArg('--worker-image')
 const outputPath = readArg('--output')
 const otelEndpoint = readArg('--otel-endpoint')
+const otelConfigFile = readArg('--otel-config-file')
+const imagePullSecretName = readArg('--image-pull-secret-name')
 
 if (!envFile || !apiImage || !workerImage || !outputPath) {
   usage()
@@ -106,6 +110,12 @@ if (otelEndpoint) {
   runtimeEnv.OTEL_EXPORTER_OTLP_ENDPOINT = otelEndpoint
 }
 
+// The deploy env's API_PORT is the externally mapped host/NodePort for staging/prod.
+// Kubernetes pods must listen on the chart's in-container API port, matching the
+// explicit Compose service override.
+runtimeEnv.API_PORT = '4000'
+runtimeEnv.API_HOST = '0.0.0.0'
+
 const yamlQuote = (value) => `'${String(value).replace(/'/g, "''")}'`
 
 const yamlLines = [
@@ -117,6 +127,22 @@ const yamlLines = [
 
 for (const key of Object.keys(runtimeEnv).sort((left, right) => left.localeCompare(right))) {
   yamlLines.push(`  ${key}: ${yamlQuote(runtimeEnv[key])}`)
+}
+
+if (imagePullSecretName) {
+  yamlLines.push('imagePullSecrets:', `  - name: ${yamlQuote(imagePullSecretName)}`)
+}
+
+if (otelConfigFile) {
+  const otelConfig = readFileSync(otelConfigFile, 'utf8').replace(/\r\n/gu, '\n')
+  if (otelConfig.trim().length === 0) {
+    throw new Error(`OTEL config file is empty: ${otelConfigFile}`)
+  }
+
+  yamlLines.push('otelCollector:', '  config: |')
+  for (const line of otelConfig.replace(/\n$/u, '').split('\n')) {
+    yamlLines.push(`    ${line}`)
+  }
 }
 
 yamlLines.push('')

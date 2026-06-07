@@ -2,6 +2,11 @@ import type { Client as TemporalClient } from '@temporalio/client'
 import { WorkflowExecutionAlreadyStartedError } from '@temporalio/common'
 import { Client as PgClient } from 'pg'
 import { createLogger } from '@tx-agent-kit/logging'
+import {
+  recordOutboxBatchDispatched,
+  recordOutboxBatchFill,
+  recordOutboxListenerConnected
+} from '@tx-agent-kit/observability'
 import type { SerializedDomainEvent } from '../activities.js'
 import { activities } from '../activities.js'
 import { resolveDispatch } from './resolve-dispatch.js'
@@ -9,7 +14,12 @@ import { resolveDispatch } from './resolve-dispatch.js'
 // The dispatcher runs in plain Node (no Temporal determinism sandbox), so it
 // invokes these outbox I/O functions directly rather than through activity
 // proxies. They do plain DB IO — no activity context.
-const { fetchUnprocessedEvents, markEventFailed, markEventsPublished } = activities
+const {
+  fetchUnprocessedEvents,
+  markEventFailed,
+  markEventsPublished,
+  measureOutboxBacklog
+} = activities
 
 const logger = createLogger('tx-agent-kit-worker-outbox-dispatcher')
 
@@ -105,6 +115,8 @@ export const drainOutboxOnce = async (
 
     if (dispatched.length > 0) {
       await markEventsPublished(dispatched.map((event) => event.id))
+      recordOutboxBatchDispatched(dispatched.length)
+      recordOutboxBatchFill(dispatched.length, batchSize)
     }
 
     if (events.length < batchSize) {
@@ -169,6 +181,12 @@ export function startOutboxDispatcher(
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let heartbeat: ReturnType<typeof setInterval> | null = null
   let reconnectAttempts = 0
+  let listenerConnected = false
+
+  const setListenerConnected = (connected: boolean): void => {
+    listenerConnected = connected
+    recordOutboxListenerConnected(connected)
+  }
 
   // Capped exponential backoff with full jitter, so a fleet of workers doesn't
   // reconnect in lockstep and stampede the pooler while it's recovering.
@@ -203,6 +221,7 @@ export function startOutboxDispatcher(
     if (stopped || reconnectTimer) {
       return
     }
+    setListenerConnected(false)
     void teardownListener()
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null
@@ -230,6 +249,7 @@ export function startOutboxDispatcher(
       await pg.connect()
       await pg.query(`LISTEN ${NOTIFY_CHANNEL}`)
       reconnectAttempts = 0
+      setListenerConnected(true)
       logger.info('Outbox listener connected.', { channel: NOTIFY_CHANNEL })
 
       // Liveness probe: a query on the listener detects a half-open connection
@@ -250,6 +270,7 @@ export function startOutboxDispatcher(
       void trigger()
     } catch (error: unknown) {
       logger.error('Outbox listener failed to connect; retrying.', { error: errorMessage(error) })
+      setListenerConnected(false)
       scheduleReconnect()
     }
   }
@@ -257,7 +278,18 @@ export function startOutboxDispatcher(
   void connect()
 
   const backstop = setInterval(() => {
+    // Re-emit the listener health gauge each tick so a flatlined series (no
+    // recent samples) is itself an alertable signal, then catch any missed
+    // NOTIFY and refresh the lock-free backlog gauges from true pending depth.
+    recordOutboxListenerConnected(listenerConnected)
     void trigger()
+    void (async () => {
+      try {
+        await measureOutboxBacklog()
+      } catch (error: unknown) {
+        logger.error('Outbox backlog measurement failed.', { error: errorMessage(error) })
+      }
+    })()
   }, backstopIntervalSeconds * 1000)
   backstop.unref()
 

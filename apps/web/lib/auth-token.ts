@@ -1,4 +1,5 @@
 let authToken: string | null = null
+let authSessionVersion = 0
 
 const authRefreshLockStorageKey = 'tx-agent-kit.auth-refresh-lock'
 const authRefreshLockTtlMs = 10_000
@@ -185,10 +186,36 @@ export const withSerializedAuthRefresh = async <T>(
 
 export const readAuthToken = (): string | null => authToken
 
+/**
+ * Monotonic session version. Each fresh login or sign-out bumps it. Callers can
+ * snapshot the version before an async refresh and only act on a stale 401/403
+ * if the version still matches, so a slow failing refresh cannot stomp a session
+ * that a concurrent fresh login has already established.
+ */
+export const readAuthSessionVersion = (): number => authSessionVersion
+
+export const isAuthSessionVersionCurrent = (version: number): boolean =>
+  authSessionVersion === version
+
 export const writeAuthToken = (token: string): void => {
   authToken = token
 }
 
+/**
+ * Persist a token for a brand-new session: bump the version and drop any
+ * in-flight refresh lock so a previous session's pending refresh cannot clobber
+ * this one.
+ */
+export const writeNewAuthSessionToken = (token: string): void => {
+  authSessionVersion += 1
+  serializedAuthRefreshPromise = null
+  releaseRefreshLock()
+  authToken = token
+}
+
 export const clearAuthToken = (): void => {
+  authSessionVersion += 1
+  serializedAuthRefreshPromise = null
+  releaseRefreshLock()
   authToken = null
 }

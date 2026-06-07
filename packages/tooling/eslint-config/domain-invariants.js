@@ -314,12 +314,14 @@ export const domainInvariantConfig = [
     }
   },
   // ── No swallowed errors: catch handlers must preserve the original error ──
-  // Applies to all Effect-using code in core, infra, and API layers.
+  // Applies to all Effect-using code in core, infra, API, and Temporal worker layers.
   {
     files: [
       'packages/core/src/**/*.{ts,tsx}',
       'packages/infra/*/src/**/*.{ts,tsx}',
-      'apps/api/src/**/*.{ts,tsx}'
+      'apps/api/src/**/*.{ts,tsx}',
+      'apps/worker/src/activities.{ts,tsx}',
+      'apps/worker/src/workflows.{ts,tsx}'
     ],
     ignores: ['**/*.test.ts', '**/*.test.tsx'],
     plugins: {

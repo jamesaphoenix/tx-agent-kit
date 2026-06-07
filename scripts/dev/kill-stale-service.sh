@@ -105,6 +105,31 @@ collect_command_contains() {
   )
 }
 
+# Reap a stale worker that is already polling THIS checkout's Temporal task queue,
+# even if it lives in a different checkout/clone (the cause of worker version skew:
+# a stale worker on the same queue fails any task it picks up). Workers register
+# themselves in a queue-scoped pidfile on boot (see apps/worker/src/index.ts), so
+# we only ever kill the previous holder of the SAME queue. Workers on a different
+# queue (isolated worktrees, or unrelated projects) are never touched.
+collect_worker_pidfile() {
+  local queue="${TEMPORAL_TASK_QUEUE:-tx-agent-kit}"
+  local sanitized
+  sanitized="$(printf '%s' "$queue" | tr -c 'A-Za-z0-9_.-' '_')"
+  local pidfile="${TMPDIR:-/tmp}/tx-agent-worker.${sanitized}.pid"
+
+  [[ -f "$pidfile" ]] || return 0
+
+  local old
+  old="$(cat "$pidfile" 2>/dev/null || true)"
+  [[ "$old" =~ ^[0-9]+$ ]] || return 0
+
+  # Guard against a stale pidfile whose PID was recycled to an unrelated process:
+  # only reap it if it is genuinely a worker.
+  if ps -p "$old" -o command= 2>/dev/null | grep -q "apps/worker/src/index.ts"; then
+    add_pid "$old"
+  fi
+}
+
 case "$SERVICE" in
   api)
     collect_listeners "${API_PORT:-4000}"
@@ -118,6 +143,7 @@ case "$SERVICE" in
     collect_listeners "${WORKER_INSPECT_PORT:-9229}"
     collect_command_contains "$REPO_ROOT/apps/worker/src/index.ts"
     collect_command_contains "$REPO_ROOT/node_modules/.bin/../tsx/dist/cli.mjs" "watch src/index.ts"
+    collect_worker_pidfile
     ;;
   docs)
     collect_listeners "${DOCS_PORT:-3002}"

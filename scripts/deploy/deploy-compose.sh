@@ -103,25 +103,32 @@ if [[ "${RUN_TUNNEL_RECONCILE:-0}" == "1" ]]; then
 fi
 
 if [[ "${RUN_SMOKE:-1}" == "1" ]]; then
-  API_EXTERNAL_BASE_URL=""
-  # Trusted bypass for the API's own auth rate-limit middleware: the smoke check
-  # does real sign-ups, and several deploys per hour from one egress IP would
-  # otherwise exhaust the per-IP sign-up budget and 429. The smoke test forwards
-  # this token via the x-auth-rate-limit-bypass header (no-op when unconfigured).
+  # Smoke against the LOCAL API port, NOT the external Cloudflare URL. The smoke
+  # check does real sign-ups, which are rate-limited in TWO places: a Cloudflare
+  # rule on the sign-up path (avoided by hitting :API_PORT directly) AND the API's
+  # own auth rate-limit middleware (which the local port can't dodge). For the
+  # latter, the smoke test forwards the AUTH_RATE_LIMIT_BYPASS_TOKEN header so
+  # several deploys per hour from one egress IP don't 429 (a self-inflicted block
+  # on active deploy days). The external tunnel path is validated separately by the
+  # tunnel-health check above; this validates app behaviour. Override with
+  # SMOKE_API_BASE_URL to force a specific target.
+  SMOKE_API_PORT=""
   SMOKE_RATE_LIMIT_BYPASS_TOKEN=""
   while IFS='=' read -r key value; do
-    if [[ "$key" == "API_EXTERNAL_BASE_URL" ]]; then
-      API_EXTERNAL_BASE_URL="$value"
+    if [[ "$key" == "API_PORT" ]]; then
+      SMOKE_API_PORT="$value"
     elif [[ "$key" == "AUTH_RATE_LIMIT_BYPASS_TOKEN" ]]; then
       SMOKE_RATE_LIMIT_BYPASS_TOKEN="$value"
     fi
   done < "$RENDERED_ENV_FILE"
 
-  if [[ -z "$API_EXTERNAL_BASE_URL" ]]; then
-    echo "Skipping smoke checks: API_EXTERNAL_BASE_URL is not configured"
+  SMOKE_BASE_URL="${SMOKE_API_BASE_URL:-http://127.0.0.1:${SMOKE_API_PORT}}"
+
+  if [[ -z "$SMOKE_API_PORT" && -z "${SMOKE_API_BASE_URL:-}" ]]; then
+    echo "Skipping smoke checks: API_PORT is not configured"
     exit 0
   fi
 
-  echo "Running smoke checks against ${API_EXTERNAL_BASE_URL}"
-  API_BASE_URL="$API_EXTERNAL_BASE_URL" AUTH_RATE_LIMIT_BYPASS_TOKEN="$SMOKE_RATE_LIMIT_BYPASS_TOKEN" "$SCRIPT_DIR/smoke-api.sh"
+  echo "Running smoke checks against ${SMOKE_BASE_URL} (local; CF tunnel verified separately)"
+  API_BASE_URL="$SMOKE_BASE_URL" AUTH_RATE_LIMIT_BYPASS_TOKEN="$SMOKE_RATE_LIMIT_BYPASS_TOKEN" "$SCRIPT_DIR/smoke-api.sh"
 fi

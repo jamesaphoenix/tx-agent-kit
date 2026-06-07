@@ -1,0 +1,14 @@
+{
+  "breakpoints": [390, 768, 1280, 1536],
+  "out": "./lib/boneyard/bones",
+  "wait": 1000,
+  "routes": ["/boneyard-skeletons"],
+  "color": "#e2e8f0",
+  "darkColor": "#334155",
+  "animate": "shimmer",
+  "shimmerColor": "#f8fafc",
+  "darkShimmerColor": "#475569",
+  "speed": "1.8s",
+  "shimmerAngle": 110,
+  "transition": 160
+}

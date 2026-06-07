@@ -4,6 +4,7 @@ import { codeQualityConfig } from './packages/tooling/eslint-config/code-quality
 import { domainInvariantConfig } from './packages/tooling/eslint-config/domain-invariants.js'
 import { effectConsistencyConfig } from './packages/tooling/eslint-config/effect-consistency.js'
 import { promiseConfig } from './packages/tooling/eslint-config/promise.js'
+import { reactQueryConfig } from './packages/tooling/eslint-config/react-query.js'
 import { testingConfig } from './packages/tooling/eslint-config/testing.js'
 import { typeSafetyConfig } from './packages/tooling/eslint-config/type-safety.js'
 import { unicornConfig } from './packages/tooling/eslint-config/unicorn.js'
@@ -35,6 +36,7 @@ export default [
   ...promiseConfig,
   ...testingConfig,
   ...webUiConfig,
+  ...reactQueryConfig,
   ...boundariesConfig,
   ...typeSafetyConfig,
   ...unicornConfig,

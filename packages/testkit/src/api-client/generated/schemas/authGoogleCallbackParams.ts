@@ -17,4 +17,9 @@ code: string;
  * @minLength 1
  */
 state: string;
+/**
+ * a string at least 1 character(s) long
+ * @minLength 1
+ */
+iss?: string;
 };

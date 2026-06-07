@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: integration-tests-${{ github.ref }}
+  group: integration-tests-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: true
 
 env:

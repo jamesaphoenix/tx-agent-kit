@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - DB Pool Exhausted (connections queued or pool >=90%)",
+  "documentation": {
+    "content": "## DB Pool Exhaustion Critical Alert\n\n**Severity:** CRITICAL\n\nThe Postgres connection pool is at or near capacity. Either requests are actively queued waiting for a free connection (`tx_agent_kit_db_pool_connections_waiting > 0` sustained 5m) or the pool utilisation ratio has exceeded 90% (`connections_total / db_pool_max > 0.9` sustained 5m).\n\nThis policy fires on OR of either condition (combiner=OR), so it triggers as soon as the first signal breaches threshold.\n\n### Triage\n1. Check `tx_agent_kit_db_pool_connections_waiting` - how many requests are blocked?\n2. Check `tx_agent_kit_db_pool_connections_total` vs `tx_agent_kit_db_pool_max` - how close to the limit?\n3. Check `tx_agent_kit_db_pool_connections_idle` - are connections leaking (idle=0 and total=max)?\n4. Look for long-running queries in `pg_stat_activity` holding connections.\n5. If load is legitimate, consider raising `DB_POOL_MAX` in the deployment config.\n\n### Metrics\n- `tx_agent_kit_db_pool_connections_waiting` - gauge: requests queued waiting for a connection\n- `tx_agent_kit_db_pool_connections_total` - gauge: current total open connections\n- `tx_agent_kit_db_pool_connections_idle` - gauge: currently idle connections\n- `tx_agent_kit_db_pool_max` - gauge: configured pool ceiling (from `DB_POOL_MAX`)\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Database section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] DB pool near exhaustion - connections queued or pool at capacity"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "database",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "DB pool: connections waiting > 0 sustained 5m",
+      "conditionPrometheusQueryLanguage": {
+        "query": "(tx_agent_kit_db_pool_connections_waiting > 0) or (tx_agent_kit_db_pool_connections_total / tx_agent_kit_db_pool_max > 0.9)",
+        "duration": "300s",
+        "evaluationInterval": "60s",
+        "alertRule": "db_pool_connections_waiting_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

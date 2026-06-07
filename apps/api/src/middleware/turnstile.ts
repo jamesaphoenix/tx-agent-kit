@@ -1,11 +1,13 @@
 import type { HttpServerRequest } from '@effect/platform'
+import { turnstileResponseHeaderName } from '@tx-agent-kit/contracts'
+import { recordTurnstileVerification } from '@tx-agent-kit/observability'
 import { Effect } from 'effect'
 import { BadRequest, Forbidden } from '../api.js'
 import { getTurnstileConfig } from '../config/env.js'
-import { toClientIpAddress } from './auth-rate-limit.js'
+import { hasValidRateLimitBypass, toClientIpAddress } from './auth-rate-limit.js'
 
 // Standard Cloudflare form-field / header name carrying the widget token.
-export const TURNSTILE_RESPONSE_HEADER = 'cf-turnstile-response'
+export const TURNSTILE_RESPONSE_HEADER = turnstileResponseHeaderName
 
 export interface TurnstileVerifyParams {
   readonly secretKey: string
@@ -65,10 +67,11 @@ export const verifyTurnstileToken = async (
 /**
  * Gates an auth request behind Cloudflare Turnstile.
  *
- * - No secret configured → no-op (dev without a key, and the test suite).
- * - Missing token → 400 BadRequest.
- * - Explicit verification failure → 403 Forbidden.
- * - siteverify transport error → fail OPEN (allow) and log, so a Cloudflare
+ * - No secret configured: no-op (dev without a key, and the test suite).
+ * - Trusted deploy bypass: no-op.
+ * - Missing token: 400 BadRequest.
+ * - Explicit verification failure: 403 Forbidden.
+ * - siteverify transport error: fail OPEN (allow) and log, so a Cloudflare
  *   hiccup can't take sign-up offline. The rate limiter remains the backstop.
  */
 export const enforceTurnstile = (
@@ -80,6 +83,10 @@ export const enforceTurnstile = (
       return
     }
 
+    if (hasValidRateLimitBypass(request)) {
+      return
+    }
+
     const token = request.headers[TURNSTILE_RESPONSE_HEADER]
     if (typeof token !== 'string' || token.trim().length === 0) {
       return yield* Effect.fail(
@@ -87,7 +94,9 @@ export const enforceTurnstile = (
       )
     }
 
-    const result = yield* Effect.tryPromise({
+    // `reachable: false` marks the fail-open branch so it is recorded as
+    // `unreachable` rather than being mistaken for a genuine `success`.
+    const outcome = yield* Effect.tryPromise({
       try: () =>
         verifyTurnstileToken({
           secretKey: config.secretKey,
@@ -97,18 +106,33 @@ export const enforceTurnstile = (
         }),
       catch: (cause) => cause
     }).pipe(
+      Effect.map((result): { readonly reachable: boolean; readonly result: TurnstileVerifyResult } => ({
+        reachable: true,
+        result
+      })),
       Effect.catchAll((cause) =>
         // Fail open: an infra error must not take sign-up offline.
-        Effect.logWarning('turnstile siteverify unreachable — failing open').pipe(
+        Effect.logWarning('turnstile siteverify unreachable, failing open').pipe(
           Effect.annotateLogs('error', String(cause)),
-          Effect.as<TurnstileVerifyResult>({ success: true, errorCodes: [] })
+          Effect.as({ reachable: false, result: { success: true, errorCodes: [] } })
         )
       )
     )
 
-    if (!result.success) {
+    if (!outcome.reachable) {
+      // siteverify transport error / unreachable: fail OPEN but record it.
+      yield* Effect.sync(() => recordTurnstileVerification('unreachable'))
+      return
+    }
+
+    if (!outcome.result.success) {
+      // Explicit siteverify verification failure: 403 Forbidden.
+      yield* Effect.sync(() => recordTurnstileVerification('failed'))
       return yield* Effect.fail(
         new Forbidden({ message: 'Captcha verification failed. Please try again.' })
       )
     }
+
+    // Explicit siteverify success.
+    yield* Effect.sync(() => recordTurnstileVerification('success'))
   })

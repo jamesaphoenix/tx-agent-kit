@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - API 5xx Error Rate > 2%",
+  "documentation": {
+    "content": "## API 5xx Error Rate Critical Alert\n\n**Severity:** CRITICAL\n\nThe ratio of 5xx HTTP responses to total API requests has exceeded 2% over a 5-minute window.\n\n### Triage\n1. Check `api-slo` dashboard - 5xx rate by route to identify the offending endpoint.\n2. Check Sentry/Spotlight for recent error events.\n3. Check database connectivity: high 5xx on write endpoints often indicate DB pool exhaustion or Postgres outage.\n4. Check Effect service layer for unhandled exceptions - look at Jaeger traces for failed requests.\n5. Verify Temporal worker is healthy if the 5xx is on job-submission endpoints.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> API Errors section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] API 5xx error rate above 2%"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "api",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "API 5xx rate > 2% of total requests for 5m",
+      "conditionPrometheusQueryLanguage": {
+        "query": "(\n  sum(rate(tx_agent_kit_api_request_total{status_class=\"5xx\"}[5m]))\n  /\n  sum(rate(tx_agent_kit_api_request_total[5m]))\n) * 100 > 2",
+        "duration": "300s",
+        "evaluationInterval": "60s",
+        "alertRule": "api_5xx_rate_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

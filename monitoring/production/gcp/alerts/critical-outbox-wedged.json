@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - Outbox Backlog Present But No Dispatch (wedged)",
+  "documentation": {
+    "content": "## Outbox Wedged Alert\n\n**Severity:** CRITICAL\n\nThere is a pending outbox backlog but the dispatcher has dispatched nothing for 10 minutes. The dispatcher process is alive and still reporting the backlog gauge (so `outbox-dispatcher-stale` is NOT firing), yet `tx_agent_kit_outbox_batch_dispatched_total` is flat. This catches a live-but-wedged dispatcher: a stuck drain loop, a Temporal connectivity failure where every start throws (events left claimed and retried forever), or a poison event type that never starts.\n\nDistinct from `outbox-depth`/`outbox-age` (which fire on *how much* is backed up) - this fires on *zero forward progress while work exists*, which surfaces faster for a hard stall.\n\n### Triage\n1. Check worker logs for 'Failed to start workflow for outbox event; leaving claimed for retry' - repeated entries point at a Temporal connectivity issue or a workflow-type mismatch after a deploy.\n2. Check Temporal Cloud reachability from the worker (namespace, API key, address).\n3. Check `tx_agent_kit_outbox_unprocessed_age_seconds` - climbing age + zero dispatch confirms the stall.\n4. Inspect rows stuck in `processing` (`SELECT count(*) FROM domain_events WHERE status='processing'`); the stuck-events-reset schedule should be cycling them back to pending.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Outbox Dispatcher section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] Outbox backlog present but dispatcher making no progress"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "outbox",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "Backlog > 0 and dispatch rate == 0 for 10m",
+      "conditionPrometheusQueryLanguage": {
+        "query": "(max(tx_agent_kit_outbox_unprocessed_count) > 0) and (sum(rate(tx_agent_kit_outbox_batch_dispatched_total[10m])) == 0)",
+        "duration": "600s",
+        "evaluationInterval": "60s",
+        "alertRule": "outbox_wedged_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

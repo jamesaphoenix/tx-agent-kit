@@ -1,0 +1,30 @@
+{
+  "displayName": "[WARNING] tx-agent-kit - Host (VM) Memory Utilization High",
+  "documentation": {
+    "content": "## Host Memory Utilization High - Warning Alert\n\n**Severity:** WARNING\n\nThe host's memory utilization has exceeded the threshold. The host is the VM (the resource envelope the containers run inside), not the physical host; on GCP it is the GCE node. High host memory means the containers are close to exhausting the VM's RAM and may start to swap or get OOM-killed.\n\n### Threshold note\n`TODO: tune` - placeholder is 0.85 (85%). Adjust once we have a baseline from the Resource Usage dashboard.\n\n### Metric name note\nThis uses the GMP-rendered name of the `hostmetrics` receiver's `system.memory.utilization` metric (a ratio, unit `1`, so typically no unit suffix). The exact rendered name is confirmed post-deploy via `gcloud monitoring metrics list` and may need adjustment.\n\n### Triage\n1. Check `Resource Usage` dashboard - host memory utilization + per-container memory.\n2. Identify the container(s) consuming the most memory.\n3. Right-size services or grow the VM if usage is legitimate.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Infrastructure section.",
+    "mimeType": "text/markdown",
+    "subject": "[WARNING] Host (VM) memory utilization above threshold"
+  },
+  "userLabels": {
+    "severity": "warning",
+    "component": "host",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "Host memory utilization > 0.85 for 10m (TODO: tune)",
+      "conditionPrometheusQueryLanguage": {
+        "query": "max(system_memory_utilization_ratio{state=\"used\"}) > 0.85",
+        "duration": "600s",
+        "evaluationInterval": "60s",
+        "alertRule": "host_memory_high_warning",
+        "labels": {
+          "severity": "warning"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

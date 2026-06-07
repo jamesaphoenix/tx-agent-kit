@@ -1,0 +1,379 @@
+{
+  "displayName": "tx-agent-kit - API SLO",
+  "description": "API request rate, latency SLOs (p50/p95/p99 by route), and 5xx error rate. Filter by deployment_environment_name to scope to staging or prod.",
+  "labels": {
+    "component": "api-slo"
+  },
+  "mosaicLayout": {
+    "columns": 48,
+    "tiles": [
+      {
+        "xPos": 0,
+        "yPos": 0,
+        "width": 48,
+        "height": 3,
+        "widget": {
+          "text": {
+            "content": "## API SLO Dashboard\n\nMeasures the three golden signals for the API: **request rate**, **latency** (p50/p95/p99 by route), and **error rate** (5xx %). Set the `deployment_environment_name` filter above to the staging or prod environment.",
+            "format": "MARKDOWN"
+          },
+          "title": "Dashboard Info"
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 3,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "collapsibleGroup": {
+            "collapsed": false
+          },
+          "title": "Traffic"
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 5,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Total Request Rate (req/min) by route",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum(rate(tx_agent_kit_api_request_total[5m])) by (route) * 60"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "req/min",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 5,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Total Request Rate (req/min) by method",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "STACKED_AREA",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum(rate(tx_agent_kit_api_request_total[5m])) by (method) * 60"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "req/min",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 13,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "collapsibleGroup": {
+            "collapsed": false
+          },
+          "title": "Errors"
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 15,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "5xx Error Rate (%) - overall",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "100 * sum(rate(tx_agent_kit_api_request_total{status_class=\"5xx\"}[5m])) / sum(rate(tx_agent_kit_api_request_total[5m]))"
+                }
+              }
+            ],
+            "thresholds": [
+              {
+                "label": "SLO 2%",
+                "value": 2,
+                "targetAxis": "Y1"
+              },
+              {
+                "label": "Warning 1%",
+                "value": 1,
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "5xx %",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 15,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "5xx Error Rate (%) by route",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "100 * sum(rate(tx_agent_kit_api_request_total{status_class=\"5xx\"}[5m])) by (route) / sum(rate(tx_agent_kit_api_request_total[5m])) by (route)"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "5xx %",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 23,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "4xx Rate (%) - client errors by route",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "100 * sum(rate(tx_agent_kit_api_request_total{status_class=\"4xx\"}[5m])) by (route) / sum(rate(tx_agent_kit_api_request_total[5m])) by (route)"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "4xx %",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 23,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "Request Volume by status_class (stacked)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "STACKED_BAR",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum(rate(tx_agent_kit_api_request_total[5m])) by (status_class) * 60"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "req/min",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 31,
+        "width": 48,
+        "height": 2,
+        "widget": {
+          "collapsibleGroup": {
+            "collapsed": false
+          },
+          "title": "Latency"
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 33,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "API Request Duration p50/p95/p99 - all routes (ms)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "legendTemplate": "p50",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "histogram_quantile(0.50, sum(rate(tx_agent_kit_api_request_duration_milliseconds_bucket[5m])) by (le))"
+                }
+              },
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "legendTemplate": "p95",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "histogram_quantile(0.95, sum(rate(tx_agent_kit_api_request_duration_milliseconds_bucket[5m])) by (le))"
+                }
+              },
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "legendTemplate": "p99",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "histogram_quantile(0.99, sum(rate(tx_agent_kit_api_request_duration_milliseconds_bucket[5m])) by (le))"
+                }
+              }
+            ],
+            "thresholds": [
+              {
+                "label": "p95 SLO 500ms",
+                "value": 500,
+                "targetAxis": "Y1"
+              },
+              {
+                "label": "p99 SLO 1000ms",
+                "value": 1000,
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "ms",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 33,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "API Request Duration p95 by route (ms)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "histogram_quantile(0.95, sum(rate(tx_agent_kit_api_request_duration_milliseconds_bucket[5m])) by (le, route))"
+                }
+              }
+            ],
+            "thresholds": [
+              {
+                "label": "500ms",
+                "value": 500,
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "ms",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 41,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "API Request Duration p50 by route (ms)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "histogram_quantile(0.50, sum(rate(tx_agent_kit_api_request_duration_milliseconds_bucket[5m])) by (le, route))"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "ms",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 41,
+        "width": 24,
+        "height": 8,
+        "widget": {
+          "title": "API Request Duration p99 by route (ms)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "prometheusQuery": "histogram_quantile(0.99, sum(rate(tx_agent_kit_api_request_duration_milliseconds_bucket[5m])) by (le, route))"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "ms",
+              "scale": "LINEAR"
+            },
+            "chartOptions": {
+              "mode": "COLOR"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

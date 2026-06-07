@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - Outbox Listener Disconnected",
+  "documentation": {
+    "content": "## Outbox Listener Disconnected Alert\n\n**Severity:** CRITICAL\n\nNo worker has reported a connected Postgres LISTEN session for 10 minutes. The outbox backstop sweep still drains periodically, but a sustained listener disconnect means event delivery is degraded and backlog latency can become customer-visible.\n\nThis alert is intentionally fleet-level: it stays quiet during a single worker restart as long as at least one worker keeps reporting `tx_agent_kit_outbox_listener_connected = 1`.\n\n### Threshold\n`max(max_over_time(tx_agent_kit_outbox_listener_connected[10m])) < 1`\n\n### Triage\n1. Check worker logs for `Outbox listener failed to connect; retrying.`, `Outbox listener connection error; reconnecting.`, or `Outbox listener heartbeat failed; reconnecting.`\n2. Confirm `OUTBOX_LISTENER_DATABASE_URL` points at a direct or session-mode Postgres endpoint, not a transaction pooler.\n3. Check for TLS or certificate errors, especially `self-signed certificate in certificate chain`.\n4. Confirm `tx_agent_kit_outbox_unprocessed_age_seconds` and `tx_agent_kit_outbox_unprocessed_count` are not climbing.\n5. Restart the worker only after the listener database URL and SSL mode are confirmed.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Outbox Dispatcher section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] Outbox listener disconnected for 10 minutes"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "outbox",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "No connected outbox listener reported for 10m",
+      "conditionPrometheusQueryLanguage": {
+        "query": "max(max_over_time(tx_agent_kit_outbox_listener_connected[10m])) < 1",
+        "duration": "0s",
+        "evaluationInterval": "60s",
+        "alertRule": "outbox_listener_disconnected_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

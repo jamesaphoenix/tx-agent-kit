@@ -1,0 +1,30 @@
+{
+  "displayName": "[CRITICAL] tx-agent-kit - No Active Temporal Workers (primary task queue)",
+  "documentation": {
+    "content": "## No Active Temporal Workers - Critical Alert\n\n**Severity:** CRITICAL\n\nNo Temporal workers are active on the primary task queue. This is catastrophic: no workflows will execute and the outbox will grow unbounded until workers return.\n\n### Detection\nThe Temporal Node.js SDK emits `temporal_worker_task_slots_available` - a gauge reporting the number of available task slots per worker. When no workers are running, this series goes absent. The alert fires when the metric has been absent for 5 minutes.\n\nThe PromQL condition uses `absent(temporal_worker_task_slots_available)` - Cloud Monitoring / GMP will evaluate this as \"the series does not exist\".\n\n**Confirmed metric name:** `temporal_worker_task_slots_available` - verified present in local Prometheus when the worker is running. Labels include `namespace`, `task_queue`, and `worker_type`.\n\n### Triage\n1. Check the Temporal UI (`pnpm dev:open` -> Temporal) - are any workers connected?\n2. Check the worker container/pod logs for the deployed environment.\n3. Check for OOM kills or crash-loop restarts in GCP Cloud Logging.\n4. Check GCP deployment status - was a bad deploy recently applied?\n5. Restart the worker service if it is crashed.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> Temporal Worker section.",
+    "mimeType": "text/markdown",
+    "subject": "[CRITICAL] No Temporal workers active - workflow execution is completely stopped"
+  },
+  "userLabels": {
+    "severity": "critical",
+    "component": "temporal-worker",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "temporal_worker_task_slots_available absent for 5m (no workers running)",
+      "conditionPrometheusQueryLanguage": {
+        "query": "absent(temporal_worker_task_slots_available)",
+        "duration": "300s",
+        "evaluationInterval": "60s",
+        "alertRule": "no_active_workers_critical",
+        "labels": {
+          "severity": "critical"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

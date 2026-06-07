@@ -10,6 +10,7 @@ import {
   StorageAdapterPortLive
 } from '@tx-agent-kit/core'
 import { domainEventsRepository } from '@tx-agent-kit/db'
+import { recordOutboxBacklog } from '@tx-agent-kit/observability'
 import { Storage, StorageLive } from '@tx-agent-kit/storage'
 import { Effect, Layer } from 'effect'
 import { SharpThumbnailGeneratorPortLive } from './asset-thumbnail-generator.js'
@@ -66,6 +67,10 @@ export const activities = {
       domainEventsRepository.fetchUnprocessed(batchSize)
     )
 
+    // NB: the backlog gauge is NOT emitted here. The claimed batch is capped at
+    // `batchSize` and only reflects rows this caller locked, a misleading depth
+    // signal. `measureOutboxBacklog` owns the gauge via a lock-free count of the
+    // true pending depth + oldest age (see the dispatcher backstop sweep).
     return events.map((event) => ({
       id: event.id,
       eventType: event.eventType,
@@ -82,6 +87,19 @@ export const activities = {
       failureReason: event.failureReason,
       createdAt: event.createdAt.toISOString()
     }))
+  },
+
+  /**
+   * Refresh the backlog gauges from the true pending depth (lock-free), so the
+   * `critical-outbox-depth` / `critical-outbox-age` alerts observe ground truth
+   * regardless of in-flight claim locks or which replica reports. Driven by the
+   * dispatcher's backstop sweep. Emitted with no ids to keep cardinality low.
+   */
+  measureOutboxBacklog: async (): Promise<void> => {
+    const { depth, oldestAgeSeconds } = await runEffect(
+      domainEventsRepository.measureBacklog()
+    )
+    recordOutboxBacklog({ unprocessedCount: depth, oldestAgeSeconds })
   },
 
   markEventsPublished: async (eventIds: ReadonlyArray<string>): Promise<void> => {

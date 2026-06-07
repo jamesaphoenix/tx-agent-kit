@@ -83,6 +83,90 @@ wait_release_running_pods() {
   done
 }
 
+run_k8s_post_rollout_stability_check() {
+  if [[ "${RUN_K8S_STABILITY_CHECK:-1}" != "1" ]]; then
+    return 0
+  fi
+
+  local stability_seconds="${K8S_POST_ROLLOUT_STABILITY_SECONDS:-60}"
+  if [[ "$stability_seconds" -gt 0 ]]; then
+    echo "Waiting ${stability_seconds}s to verify pods remain stable after rollout..."
+    sleep "$stability_seconds"
+  fi
+
+  wait_release_running_pods
+
+  kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get pods \
+    -l "app.kubernetes.io/instance=${RELEASE}" \
+    -o json | node -e '
+const fs = require("node:fs");
+const data = JSON.parse(fs.readFileSync(0, "utf8"));
+const problems = [];
+
+for (const pod of data.items ?? []) {
+  const name = pod.metadata?.name ?? "<unknown>";
+  const phase = pod.status?.phase;
+  if (phase !== "Running") {
+    problems.push(`${name} phase=${phase ?? "unknown"}`);
+  }
+
+  const ready = (pod.status?.conditions ?? []).find((condition) => condition.type === "Ready");
+  if (ready?.status !== "True") {
+    problems.push(`${name} Ready=${ready?.status ?? "unknown"}`);
+  }
+
+  for (const status of pod.status?.containerStatuses ?? []) {
+    const containerName = status.name ?? "container";
+    if ((status.restartCount ?? 0) > 0) {
+      problems.push(`${name}/${containerName} restartCount=${status.restartCount}`);
+    }
+
+    const waitingReason = status.state?.waiting?.reason;
+    if (waitingReason) {
+      problems.push(`${name}/${containerName} waiting=${waitingReason}`);
+    }
+
+    const lastTermination = status.lastState?.terminated;
+    if (lastTermination?.reason) {
+      problems.push(`${name}/${containerName} lastTerminated=${lastTermination.reason}`);
+    }
+  }
+}
+
+if (problems.length > 0) {
+  console.error("Kubernetes post-rollout stability check failed:");
+  for (const problem of problems) {
+    console.error(`- ${problem}`);
+  }
+  process.exit(1);
+}
+'
+}
+
+normalize_mac_k3d_context_server() {
+  if [[ "$TARGET" != "mac" || "$KUBE_CONTEXT" != k3d-* ]]; then
+    return 0
+  fi
+
+  local cluster_name=""
+  local server=""
+  cluster_name="$(kubectl config view --raw --minify --context "$KUBE_CONTEXT" -o jsonpath='{.contexts[0].context.cluster}' 2>/dev/null || true)"
+  server="$(kubectl config view --raw --minify --context "$KUBE_CONTEXT" -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)"
+
+  if [[ -z "$cluster_name" || -z "$server" ]]; then
+    return 0
+  fi
+
+  case "$server" in
+    https://0.0.0.0:*)
+      local port="${server##*:}"
+      local normalized_server="https://127.0.0.1:${port}"
+      kubectl config set-cluster "$cluster_name" --server="$normalized_server" >/dev/null
+      echo "Normalized k3d context '$KUBE_CONTEXT' API server to $normalized_server for launchd/self-hosted runner reachability."
+      ;;
+  esac
+}
+
 emit_k8s_diagnostics() {
   if [[ -z "$KUBE_CONTEXT" || -z "$NAMESPACE" ]]; then
     return
@@ -180,6 +264,8 @@ if [[ ! -f "$VALUES_FILE" ]]; then
   exit 1
 fi
 
+normalize_mac_k3d_context_server
+
 rendered_env_base_dir="${DEPLOY_RENDERED_ENV_DIR:-${RUNNER_TEMP:-/tmp}}"
 mkdir -p "$rendered_env_base_dir"
 RENDERED_ENV_FILE="$(mktemp "$rendered_env_base_dir/tx-agent-kit-k8s-${TARGET}-${DEPLOY_ENV}.env.XXXXXX")"
@@ -230,6 +316,7 @@ if kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get deployment "${RELEASE}-
   kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" rollout status "deployment/${RELEASE}-otel-collector" --timeout="${K8S_ROLLOUT_TIMEOUT:-300s}"
 fi
 wait_release_running_pods
+run_k8s_post_rollout_stability_check
 
 if [[ "$TARGET" == "mac" && "${RUN_TUNNEL_RECONCILE:-1}" == "1" ]]; then
   reconcile_mode="${TUNNEL_RECONCILE_MODE:-both}"

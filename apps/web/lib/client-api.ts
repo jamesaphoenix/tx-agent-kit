@@ -6,6 +6,7 @@ import type {
   CreateOrganizationRequest,
   CreateTeamRequest,
   ForgotPasswordRequest,
+  GoogleAuthStartResponse,
   InvitationAssignableRole,
   Invitation,
   Organization,
@@ -15,11 +16,14 @@ import type {
   Team
 } from '@tx-agent-kit/contracts'
 import {
-  clearAuthToken,
+  isAuthSessionVersionCurrent,
+  readAuthSessionVersion,
   readAuthToken,
   withSerializedAuthRefresh,
-  writeAuthToken
+  writeAuthToken,
+  writeNewAuthSessionToken
 } from './auth-token'
+import { clearClientSessionState } from './client-session'
 import { browserAuthSessionRequestConfig } from './auth-session-mode'
 import { api, getApiErrorMessage, getApiErrorStatus } from './axios'
 
@@ -113,26 +117,51 @@ const fail = (error: unknown, fallback: string): never => {
   throw new ApiClientError(getApiErrorMessage(error, fallback), getApiErrorStatus(error))
 }
 
-const persistAuthSession = (response: AuthResponse): AuthResponse => {
-  writeAuthToken(response.token)
+const getClientApiErrorStatus = (error: unknown): number | undefined =>
+  error instanceof ApiClientError ? error.status : getApiErrorStatus(error)
+
+const persistAuthSession = (
+  response: AuthResponse,
+  options: { readonly newSession?: boolean } = {}
+): AuthResponse => {
+  if (options.newSession) {
+    writeNewAuthSessionToken(response.token)
+  } else {
+    writeAuthToken(response.token)
+  }
   return response
 }
 
 const refreshSession = async (): Promise<AuthResponse> => {
+  const refreshSessionVersion = readAuthSessionVersion()
+  let refreshedSession: AuthResponse
+
   try {
     const { data } = await api.post<AuthResponse>(
       '/v1/auth/refresh',
       {},
       browserAuthSessionRequestConfig
     )
-    return persistAuthSession(data)
+    refreshedSession = data
   } catch (error) {
-    if (getApiErrorStatus(error) === 401 || getApiErrorStatus(error) === 403) {
-      clearAuthToken()
+    // Only clear when the failure belongs to the session we started with. A
+    // concurrent fresh login (e.g. Google callback) bumps the version, so a slow
+    // 401/403 from the prior session must not stomp the new one.
+    if (
+      (getApiErrorStatus(error) === 401 || getApiErrorStatus(error) === 403) &&
+      isAuthSessionVersionCurrent(refreshSessionVersion)
+    ) {
+      clearClientSessionState()
     }
 
     return fail(error, 'Failed to refresh session')
   }
+
+  if (!isAuthSessionVersionCurrent(refreshSessionVersion)) {
+    throw new ApiClientError('Session was cleared', 401)
+  }
+
+  return persistAuthSession(refreshedSession)
 }
 
 const restoreSession = createSessionRestorer({
@@ -185,7 +214,7 @@ export const clientApi = {
         input,
         browserAuthSessionRequestConfig
       )
-      return persistAuthSession(data)
+      return persistAuthSession(data, { newSession: true })
     } catch (error) {
       return fail(error, 'Authentication failed')
     }
@@ -206,9 +235,33 @@ export const clientApi = {
           }
         : browserAuthSessionRequestConfig
       const { data } = await api.post<AuthResponse>('/v1/auth/sign-up', input, config)
-      return persistAuthSession(data)
+      return persistAuthSession(data, { newSession: true })
     } catch (error) {
       return fail(error, 'Sign-up failed')
+    }
+  },
+
+  googleStart: async (): Promise<GoogleAuthStartResponse> => {
+    try {
+      const { data } = await api.get<GoogleAuthStartResponse>(
+        '/v1/auth/google/start',
+        browserAuthSessionRequestConfig
+      )
+      return data
+    } catch (error) {
+      return fail(error, 'Failed to start Google sign-in')
+    }
+  },
+
+  googleCallback: async (code: string, state: string, iss?: string): Promise<AuthResponse> => {
+    try {
+      const { data } = await api.get<AuthResponse>('/v1/auth/google/callback', {
+        ...browserAuthSessionRequestConfig,
+        params: iss === undefined ? { code, state } : { code, state, iss }
+      })
+      return persistAuthSession(data, { newSession: true })
+    } catch (error) {
+      return fail(error, 'Google sign-in failed')
     }
   },
 
@@ -218,7 +271,7 @@ export const clientApi = {
     } catch {
       // Sign-out is best-effort — intentionally swallowed
     } finally {
-      clearAuthToken()
+      clearClientSessionState()
     }
   },
 
@@ -403,15 +456,23 @@ export const clientApi = {
 }
 
 export const restoreCurrentPrincipal = async (): Promise<AuthPrincipal | null> => {
+  const restoreSessionVersion = readAuthSessionVersion()
+
   if (readAuthToken() === null) {
     try {
       const restoredSession = await withSerializedAuthRefresh(() => clientApi.refreshSession())
+      if (!isAuthSessionVersionCurrent(restoreSessionVersion)) {
+        return null
+      }
       if (restoredSession.principal) {
         return restoredSession.principal
       }
     } catch (error) {
-      if (getApiErrorStatus(error) === 401 || getApiErrorStatus(error) === 403) {
-        clearAuthToken()
+      const status = getClientApiErrorStatus(error)
+      if (status === 401 || status === 403) {
+        if (isAuthSessionVersionCurrent(restoreSessionVersion)) {
+          clearClientSessionState()
+        }
         return null
       }
 
@@ -420,10 +481,14 @@ export const restoreCurrentPrincipal = async (): Promise<AuthPrincipal | null> =
   }
 
   try {
-    return await clientApi.me()
+    const principal = await clientApi.me()
+    return isAuthSessionVersionCurrent(restoreSessionVersion) ? principal : null
   } catch (error) {
-    if (getApiErrorStatus(error) === 401 || getApiErrorStatus(error) === 403) {
-      clearAuthToken()
+    const status = getClientApiErrorStatus(error)
+    if (status === 401 || status === 403) {
+      if (isAuthSessionVersionCurrent(restoreSessionVersion)) {
+        clearClientSessionState()
+      }
       return null
     }
 

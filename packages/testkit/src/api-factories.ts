@@ -151,11 +151,18 @@ const isLoginSessionCreationFailure = (status: number, body: unknown): boolean =
 }
 
 const isOpaqueSignUpFailure = (status: number, body: unknown): boolean => {
-  if (status !== 400 || !isRecord(body)) {
+  if (!isRecord(body)) {
     return false
   }
 
-  return body.message === 'Sign-up failed'
+  return (
+    (status === 400 && body.message === 'Sign-up failed') ||
+    (status === 500 && (
+      body.message === 'Internal server error' ||
+      body.message === 'Sign-up failed' ||
+      body._tag === 'InternalError'
+    ))
+  )
 }
 
 const signInAfterPartialSignUp = async (
@@ -200,11 +207,13 @@ export const createUser = async (
   context: ApiFactoryContext,
   options: CreateUserOptions = {}
 ): Promise<CreatedUserSession> => {
-  const maxAttempts = options.email ? 1 : 3
+  const maxAttempts = 3
   let lastFailure: { status: number; body: unknown } | null = null
+  let lastPayload: { email: string; password: string; name: string } | null = null
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const payload = buildCreateUserPayload(options)
+    lastPayload = payload
     const response = await fetch(toUrl(context, '/v1/auth/sign-up'), {
       method: 'POST',
       headers: withJsonHeaders(context, 'create-user'),
@@ -230,13 +239,28 @@ export const createUser = async (
     }
 
     lastFailure = { status: response.status, body }
-    if (!isOpaqueSignUpFailure(response.status, body) || attempt === maxAttempts - 1) {
+    const isOpaqueFailure = isOpaqueSignUpFailure(response.status, body)
+
+    if (options.email && isOpaqueFailure) {
+      try {
+        const recovered = await signInAfterPartialSignUp(context, payload)
+        return {
+          ...recovered,
+          credentials: payload
+        }
+      } catch {
+        // The opaque sign-up failure may have happened before the user row existed.
+        // Retry the same explicit email so tests that depend on it stay deterministic.
+      }
+    }
+
+    if (!isOpaqueFailure || attempt === maxAttempts - 1) {
       break
     }
   }
 
   throw new Error(
-    `createUser failed (${lastFailure?.status ?? 'unknown'}): ${JSON.stringify(lastFailure?.body)}`
+    `createUser failed for ${lastPayload?.email ?? 'unknown'} (${lastFailure?.status ?? 'unknown'}): ${JSON.stringify(lastFailure?.body)}`
   )
 }
 
@@ -552,6 +576,26 @@ export const createTeamWithMembers = async (
   }
 
   return { team, members: addedMembers }
+}
+
+/**
+ * Forces a member's per-team role directly in the database.
+ *
+ * There is no public API to demote yourself below admin on a team, so tests that
+ * need a non-admin team role (e.g. verifying that an org admin who is only a team
+ * viewer can still act on the team) set it here. Mirrors the SQL-fallback style
+ * the team/member factories already use.
+ */
+export const setTeamMemberRole = async (
+  context: ApiFactoryContext,
+  options: { teamId: string; userId: string; role: 'admin' | 'member' | 'viewer' }
+): Promise<void> => {
+  await context.testContext.withSchemaClient(async (client) => {
+    await client.query(
+      'UPDATE team_members SET role = $1 WHERE team_id = $2 AND user_id = $3',
+      [options.role, options.teamId, options.userId]
+    )
+  })
 }
 
 export interface CreateUserWithOrgAndTeamOptions {
