@@ -45,18 +45,18 @@
     "@opentelemetry/api": "^1.9.1"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.2",
+    "@tailwindcss/postcss": "^4.3.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.61.0",
     "@testing-library/user-event": "^14.6.1",
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
-    "jsdom": "^29.0.2",
-    "orval": "^8.8.0",
-    "postcss": "8.5.10",
-    "tailwindcss": "^4.2.2"
+    "jsdom": "^29.1.1",
+    "orval": "^8.17.0",
+    "postcss": "8.5.15",
+    "tailwindcss": "^4.3.1"
   }
 }
