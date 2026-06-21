@@ -41,6 +41,7 @@ export { pendingUploadsRepository } from './repositories/pending-uploads.js'
 export { storageMeteringRepository } from './repositories/storage-metering.js'
 export { storageUsageRepository } from './repositories/storage-usage.js'
 export { mediaCollectionsRepository } from './repositories/media-collections.js'
+export { autoFixRunsRepository } from './repositories/auto-fix-runs.js'
 export { systemSettingsRepository, type RetentionSettings, type RetentionTableConfig } from './repositories/system-settings.js'
 export {
   defaultRetentionSettings,

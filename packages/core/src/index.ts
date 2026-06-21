@@ -238,3 +238,16 @@ export type {
   EmailSendTimestamps
 } from './domains/email_campaigns/domain/email-campaign-domain.js'
 export * from './pagination.js'
+
+// ── Auto-fix (operational infra; neutral cross-cutting ports) ────────
+export { AutoFixTriggerPort } from './ports/auto-fix-trigger-port.js'
+export type { AutoFixTriggerError } from './ports/auto-fix-trigger-port.js'
+export {
+  AutoFixRunStorePort,
+  AutoFixRunStoreTestPort
+} from './ports/auto-fix-run-store-port.js'
+export type { InsertAutoFixRunInput } from './ports/auto-fix-run-store-port.js'
+export {
+  AutoFixRunStoreLive,
+  AutoFixRunStoreTestLive
+} from './adapters/auto-fix-run-store-adapter.js'
