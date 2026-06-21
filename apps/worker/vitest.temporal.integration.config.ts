@@ -6,6 +6,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: 'worker-temporal-integration',
+      setupFiles: ['./vitest.integration.setup.ts'],
       include: [
         'src/activities.integration.test.ts',
         'src/billing-end-to-end.e2e.integration.test.ts',
