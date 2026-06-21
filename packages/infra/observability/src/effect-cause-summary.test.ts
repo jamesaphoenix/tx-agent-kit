@@ -135,7 +135,9 @@ describe('effect cause summary', () => {
       claim: 'exp',
       reason: 'check_failed',
       payload: {
-        sub: 'user-1',
+        sub: '11111111-2222-4333-8444-555555555555',
+        email: 'user@example.com',
+        sid: '99999999-8888-4777-8666-555555555555',
         exp: 1
       }
     }
@@ -162,9 +164,11 @@ describe('effect cause summary', () => {
         type: 'object',
         tag: undefined,
         code: undefined,
-        message: '{"claim":"exp","reason":"check_failed","payload":{"sub":"user-1","exp":1}}'
+        message: '{"claim":"exp","reason":"check_failed","payload":"[REDACTED]"}'
       }
     ])
+    // The claim payload carries PII (email/sub/sid); it must never leak into logs.
+    expect(JSON.stringify(context.causeChain)).not.toContain('user@example.com')
     expect(shouldLogEffectCause(authError, new Set(['AuthError', 'JWTExpired']))).toBe(false)
   })
 

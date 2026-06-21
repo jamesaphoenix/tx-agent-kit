@@ -52,6 +52,14 @@ const unwrapFiberFailureCause = (cause: unknown): unknown => {
   return cause
 }
 
+// A JWT-claim verification failure carries a `payload` object with the decoded
+// claims (email/sub/sid PII). Detect that shape so the `payload` key can be
+// redacted while still surfacing the rest of the metadata in logs.
+const isJwtClaimMetadataRecord = (record: Record<string, unknown>): boolean =>
+  typeof record.claim === 'string' &&
+  typeof record.reason === 'string' &&
+  isRecord(record.payload)
+
 const getStringField = (record: Record<string, unknown>, key: string): string | undefined => {
   const value = record[key]
   return typeof value === 'string' && value.length > 0 ? truncateLogField(value) : undefined
@@ -88,9 +96,10 @@ const sanitizeValueForLog = (
   }
   seen.add(value)
 
+  const isJwtClaimMetadata = isJwtClaimMetadataRecord(value)
   const entries = Object.entries(value).map(([key, entryValue]) => [
     key,
-    sensitiveKeyPattern.test(key)
+    sensitiveKeyPattern.test(key) || (isJwtClaimMetadata && key === 'payload')
       ? '[REDACTED]'
       : sanitizeValueForLog(entryValue, seen, depth + 1)
   ])
