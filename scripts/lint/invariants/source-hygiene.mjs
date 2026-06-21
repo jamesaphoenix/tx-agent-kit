@@ -226,7 +226,7 @@ export const enforceNoDirectProcessEnvInSource = (errors) => {
 }
 
 export const enforceSingleRootEnvFilePolicy = (errors) => {
-  const allowedRootEnvFiles = new Set(['.env', '.env.example'])
+  const allowedRootEnvFiles = new Set(['.env', '.env.example', '.env.tunnel'])
 
   const rootEnvFiles = readdirSync(repoRoot, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.startsWith('.env'))
