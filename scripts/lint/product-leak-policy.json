@@ -1,5 +1,6 @@
 {
   "allowedProductLeakPathPrefixes": [
+    "docs/goals/octospark-infra-portability",
     "scripts/lint/product-leak-policy.json",
     "scripts/lint/enforce-product-leak-and-secret-policy.test.ts"
   ],
