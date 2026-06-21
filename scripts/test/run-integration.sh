@@ -9,6 +9,10 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
+# Affected-decision helpers (shared with scripts/test-integration-affected.sh).
+# shellcheck source=scripts/lib/affected-base-ref.sh
+source "$PROJECT_ROOT/scripts/lib/affected-base-ref.sh"
+
 source_local_env() {
   if [[ ! -f "$PROJECT_ROOT/.env" ]]; then
     return 0
@@ -100,6 +104,7 @@ PASSTHROUGH_ARGS=()
 REQUESTED_PROJECT_IDS="${INTEGRATION_PROJECTS:-}"
 REQUEST_SKIP_PGTAP="${INTEGRATION_SKIP_PGTAP:-}"
 REQUEST_DRY_RUN="${INTEGRATION_DRY_RUN:-}"
+REQUEST_PLAN="${INTEGRATION_AFFECTED_PLAN_ONLY:-}"
 REQUESTED_BY_FILTER=0
 
 i=0
@@ -163,9 +168,84 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
     continue
   fi
 
+  if [[ "$arg" == "--plan" ]]; then
+    REQUEST_PLAN="1"
+    i=$((i + 1))
+    continue
+  fi
+
   PASSTHROUGH_ARGS+=("$arg")
   i=$((i + 1))
 done
+
+# ── Affected-by-default routing (LOCAL ONLY) ─────────────────────────
+# `pnpm test:integration` (this non-quiet runner) runs ONLY the affected
+# projects locally, exactly like the quiet runner. CI is ALWAYS full and the
+# affected path is UNREACHABLE when CI=true. We do NOT narrow when the caller
+# already scoped (filter / passthrough file / INTEGRATION_PROJECTS), forced full
+# (TX_INTEGRATION_FULL=1), or this is a delegated invocation
+# (TX_INTEGRATION_AFFECTED_ACTIVE=1, the recursion guard).
+should_route_to_affected_full_runner() {
+  if [[ "${CI:-}" == "true" ]]; then
+    return 1
+  fi
+  if [[ "${TX_INTEGRATION_FULL:-0}" == "1" ]]; then
+    return 1
+  fi
+  if [[ "${TX_INTEGRATION_AFFECTED_ACTIVE:-0}" == "1" ]]; then
+    return 1
+  fi
+  if [[ -n "$REQUESTED_PROJECT_IDS" ]]; then
+    return 1
+  fi
+  if [[ ${#PASSTHROUGH_ARGS[@]} -gt 0 ]]; then
+    return 1
+  fi
+  return 0
+}
+
+if [[ -n "$REQUEST_PLAN" ]]; then
+  if [[ "${CI:-}" == "true" ]]; then
+    echo "PLAN: FULL integration suite (CI; affected selection is never used in CI)"
+  elif [[ "${TX_INTEGRATION_FULL:-0}" == "1" ]]; then
+    echo "PLAN: FULL integration suite (TX_INTEGRATION_FULL=1 local opt-out)"
+  elif [[ -n "$REQUESTED_PROJECT_IDS" ]]; then
+    echo "PLAN: scoped integration suite (INTEGRATION_PROJECTS=$(dedupe_csv "$REQUESTED_PROJECT_IDS"))"
+  elif [[ ${#PASSTHROUGH_ARGS[@]} -gt 0 ]]; then
+    echo "PLAN: scoped integration suite (passthrough ${PASSTHROUGH_ARGS[*]})"
+  else
+    plan_reason_file="$(mktemp)"
+    plan_decision="$(resolve_affected_integration_decision "" "$PROJECT_ROOT/scripts/lib" 2>"$plan_reason_file")"
+    plan_reason="$(cat "$plan_reason_file")"
+    rm -f "$plan_reason_file"
+    if [[ "$plan_decision" == "$FULL_INTEGRATION_SENTINEL" ]]; then
+      echo "PLAN: FULL integration suite ($plan_reason)"
+    else
+      echo "PLAN: AFFECTED integration projects ($plan_reason): $plan_decision"
+    fi
+  fi
+  exit 0
+fi
+
+if should_route_to_affected_full_runner; then
+  affected_reason_file="$(mktemp)"
+  affected_decision="$(resolve_affected_integration_decision "" "$PROJECT_ROOT/scripts/lib" 2>"$affected_reason_file")"
+  affected_reason="$(cat "$affected_reason_file")"
+  rm -f "$affected_reason_file"
+  if [[ "$affected_decision" == "$FULL_INTEGRATION_SENTINEL" ]]; then
+    echo "FULL: $affected_reason"
+  else
+    echo "AFFECTED: $affected_decision ($affected_reason)"
+    echo "(CI always runs the full integration suite; this is a local convenience.)"
+    REQUESTED_PROJECT_IDS="$affected_decision"
+  fi
+else
+  if [[ "${CI:-}" == "true" ]]; then
+    echo "FULL: CI (affected selection is never used in CI)"
+  elif [[ "${TX_INTEGRATION_FULL:-0}" == "1" ]]; then
+    echo "FULL: TX_INTEGRATION_FULL=1 (local opt-out)"
+  fi
+fi
 
 if [[ -n "$REQUESTED_PROJECT_IDS" ]]; then
   export INTEGRATION_PROJECTS

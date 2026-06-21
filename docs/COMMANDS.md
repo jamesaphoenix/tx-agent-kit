@@ -30,6 +30,12 @@
 - `INTEGRATION_SKIP_INFRA_ENSURE=1 pnpm test:integration`: skip infra bootstrap when stack is already healthy (observability health check still runs).
 - `INTEGRATION_SKIP_OBSERVABILITY=1 pnpm test:integration`: skip observability health preflight when debugging unrelated integration failures.
 - `INTEGRATION_DRY_RUN=1 pnpm test:integration -- --filter api --dry-run`: print resolved runner config without executing tests.
+- Affected-by-default locally: `pnpm test:integration` / `pnpm test:integration:quiet` run only the projects affected since the base ref (changed packages + dependents, `api` always included, base ref defaults to `origin/main`). CI always runs the full suite (affected path unreachable when `CI=true`).
+- `pnpm test:integration --plan`: print the FULL-vs-affected decision without running.
+- `TX_INTEGRATION_FULL=1 pnpm test:integration`: force the full suite locally (stable opt-out; no `:affected`/`:full` suffix).
+- `pnpm test:affected`: affected-only unit lane (`turbo run test --filter=...[<ref>]`); falls back to full on ambiguity/sentinel change.
+- `pnpm test:integration:repeat <project> <file-or-pattern> [count=20]`: per-file flake-repro; ensures infra once, loops one file in one project, stops on first failure.
+- `pnpm ci:check [--watch]`: post-push full-suite CI gate; refuses green until the `Integration Tests` workflow is present + passed for the pushed commit.
 - `pnpm test:boilerplate`: run the parallel-worktree boilerplate meta-test lane (shared integration harness preflight + dedicated boilerplate suite).
 - `BOILERPLATE_DRY_RUN=1 pnpm test:boilerplate -- --dry-run`: print resolved boilerplate runner wiring without executing tests.
 - `pnpm test:temporal:integration`: opt-in Temporal integration lane (real Temporal backend, excluded from default integration suite).

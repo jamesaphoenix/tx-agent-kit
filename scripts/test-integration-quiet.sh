@@ -50,6 +50,7 @@ source_generated_local_infra_env() {
 FILTER=""
 REQUEST_SKIP_PGTAP="${INTEGRATION_SKIP_PGTAP:-}"
 REQUEST_DRY_RUN="${INTEGRATION_DRY_RUN:-}"
+REQUEST_PLAN="${INTEGRATION_AFFECTED_PLAN_ONLY:-}"
 
 discover_integration_project_map() {
   node "$PROJECT_ROOT/scripts/lib/discover-integration-projects.mjs"
@@ -162,6 +163,15 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
     continue
   fi
 
+  # `--plan` prints the affected-mode decision (FULL vs the affected project
+  # CSV) and exits without running anything. It is only meaningful on the
+  # default (affected) path; see the routing block below.
+  if [[ "$arg" == "--plan" ]]; then
+    REQUEST_PLAN="1"
+    i=$((i + 1))
+    continue
+  fi
+
   if [[ -z "$FILTER" ]]; then
     FILTER="$arg"
     i=$((i + 1))
@@ -171,6 +181,85 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
   echo "Unknown argument: $arg"
   exit 1
 done
+
+# ── Affected-by-default routing (LOCAL ONLY) ─────────────────────────
+# The default local integration command runs ONLY the projects affected since
+# the base ref. CI always runs the full suite, and the affected path is
+# UNREACHABLE when CI=true. The affected runner falls back to FULL on any
+# ambiguity or sentinel change, always includes the core `api` project, and
+# execs back into THIS runner with INTEGRATION_PROJECTS +
+# TX_INTEGRATION_AFFECTED_ACTIVE set (so infra preflight, the observability
+# marker, the wall-clock budget, slow-test reporting, and orphan/exit handling
+# all run exactly once on the delegated invocation).
+#
+# We do NOT route (the caller already chose, or full is mandated) when:
+#   - CI=true                          -> CI is always full (hard guard).
+#   - TX_INTEGRATION_FULL=1            -> local opt-out to force full.
+#   - TX_INTEGRATION_AFFECTED_ACTIVE=1 -> recursion guard: the affected runner
+#                                          is delegating back into this runner.
+#   - INTEGRATION_PROJECTS already set -> caller scoped projects explicitly.
+#   - a --filter scope                 -> caller scoped a file/pattern.
+#   - a dry-run was requested          -> the dry-run summary path handles it.
+should_route_to_affected() {
+  if [[ "${CI:-}" == "true" ]]; then
+    return 1
+  fi
+  if [[ "${TX_INTEGRATION_FULL:-0}" == "1" ]]; then
+    return 1
+  fi
+  if [[ "${TX_INTEGRATION_AFFECTED_ACTIVE:-0}" == "1" ]]; then
+    return 1
+  fi
+  if [[ -n "${INTEGRATION_PROJECTS:-}" ]]; then
+    return 1
+  fi
+  if [[ -n "$FILTER" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+# `--plan` only describes the affected decision; resolve it before any run.
+# When full is mandated (CI / opt-out / already-scoped) print why and exit; the
+# affected runner itself prints the FULL-vs-affected plan on the affected path.
+if [[ -n "$REQUEST_PLAN" ]]; then
+  if [[ "${CI:-}" == "true" ]]; then
+    echo "PLAN: FULL integration suite (CI; affected selection is never used in CI)"
+    exit 0
+  fi
+  if [[ "${TX_INTEGRATION_FULL:-0}" == "1" ]]; then
+    echo "PLAN: FULL integration suite (TX_INTEGRATION_FULL=1 local opt-out)"
+    exit 0
+  fi
+  if [[ -n "${INTEGRATION_PROJECTS:-}" ]]; then
+    echo "PLAN: scoped integration suite (INTEGRATION_PROJECTS=${INTEGRATION_PROJECTS})"
+    exit 0
+  fi
+  if [[ -n "$FILTER" ]]; then
+    echo "PLAN: scoped integration suite (--filter=${FILTER})"
+    exit 0
+  fi
+  exec env INTEGRATION_AFFECTED_PLAN_ONLY=1 "$SCRIPT_DIR/test-integration-affected.sh"
+fi
+
+if should_route_to_affected; then
+  exec "$SCRIPT_DIR/test-integration-affected.sh"
+fi
+
+# Banner: state the mode + why before any infra work begins. When the affected
+# helper delegated here (TX_INTEGRATION_AFFECTED_ACTIVE=1) it already printed the
+# AFFECTED/FULL reason, so we do not double-print.
+if [[ "${TX_INTEGRATION_AFFECTED_ACTIVE:-0}" != "1" ]]; then
+  if [[ "${CI:-}" == "true" ]]; then
+    echo "FULL: CI (affected selection is never used in CI)"
+  elif [[ "${TX_INTEGRATION_FULL:-0}" == "1" ]]; then
+    echo "FULL: TX_INTEGRATION_FULL=1 (local opt-out)"
+  elif [[ -n "${INTEGRATION_PROJECTS:-}" ]]; then
+    echo "SCOPED: INTEGRATION_PROJECTS=${INTEGRATION_PROJECTS}"
+  elif [[ -n "$FILTER" ]]; then
+    echo "SCOPED: --filter=${FILTER}"
+  fi
+fi
 
 if [[ -n "$REQUEST_DRY_RUN" ]]; then
   if [[ -n "$FILTER" ]]; then

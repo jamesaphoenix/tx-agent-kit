@@ -134,6 +134,22 @@ Full skill: `.claude/skills/golden-path-crud/SKILL.md`
 - `pnpm test:quiet` / `pnpm test`
 - Local integration verification: use `pnpm test:integration:quiet` by default.
 - `pnpm test:integration` is available for non-quiet debugging when you need full output.
+- **Affected-by-default locally**: `pnpm test:integration` and `pnpm test:integration:quiet` run
+  ONLY the projects affected since the base ref (changed packages + dependents, `api` always
+  included, base ref defaults to `origin/main`). **Agents test only their changes locally; the full
+  suite runs on push to CI/CD.** Add `--plan` to see the decision without running. Force full locally
+  with `TX_INTEGRATION_FULL=1` (the stable opt-out - there is no `:affected` or `:full` local
+  suffix). FALLS BACK to full on ambiguity (no base ref, detached HEAD, turbo failure) or a sentinel
+  change.
+- **CI always runs the full suite**: when `CI=true` the affected path is unreachable (hard guard).
+- Flake-repro: `pnpm test:integration:repeat <project> <file-or-pattern> [count=20]` ensures infra
+  once, then loops one file/pattern in one project, stopping on the first failure with its iteration.
+- **After pushing a branch, you MUST check the full-suite CI on that branch before considering the
+  work done.** Local runs are affected-only, so cross-package or CI-only breakage (shared DB schema,
+  per-worktree API server, things turbo's static graph cannot see) will NOT have shown locally. Run
+  `pnpm ci:check --watch` (backgrounded - it polls until the runs for your pushed commit conclude),
+  then resolve any failing job before handing off. `pnpm ci:check` alone prints a snapshot. This is
+  the soundness net that makes the affected-only local default safe.
 - CI-only integration verification: `pnpm test:integration:full` and `pnpm test:integration:ci-only`.
   Do not run these locally unless the user explicitly asks; they include slow command-entrypoint/start-dev-services suites.
 - `pnpm test:db:pgtap` for database trigger contracts.
@@ -153,9 +169,10 @@ kills vitest and reports slow tests (>10s). Individual test timeout is **30s loc
 up (`"Infrastructure already healthy (shared across worktrees)"`). Never tear down infra
 during dev — it costs 20s to restart.
 
-**Local target:** the default `pnpm test:integration:quiet` suite should stay around
-30-40s on a warm machine. If it drifts materially above that, profile/split the slow
-test before adding more coverage.
+**Local target:** locally the default runs affected-only, so wall-clock scales with the change
+(a single-package edit is api + that package). A forced-full local run (`TX_INTEGRATION_FULL=1`)
+and CI both run the whole suite; keep that under the budget and profile/split the slow test before
+adding more coverage if it drifts.
 
 **Slow test suites** (command-entrypoints, start-dev-services) are excluded from the
 default integration run. They run only in CI via `INTEGRATION_INCLUDE_CI_ONLY=1`,
