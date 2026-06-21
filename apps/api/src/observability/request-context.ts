@@ -10,12 +10,20 @@ export interface ApiRequestContext {
   // effectCauseLoggingMiddleware can skip re-logging the same fault. Created
   // fresh per request in enter/run below.
   readonly errorReported?: { value: boolean }
+  // Mutable per-request cell holding the caller's user id once their session
+  // token has been verified. The auth-principal-stamp middleware fills it
+  // (BEFORE the route handler decodes params) so the error boundary can tell an
+  // authenticated caller's request-validation failure (a real contract
+  // violation) from anonymous noise. Holds only the id, not a full principal:
+  // the verification is stateless (no DB), so this stays a cheap pre-decode hook.
+  readonly authUserId?: { value: string | null }
 }
 
 const requestContextStorage = new AsyncLocalStorage<ApiRequestContext>()
 
-const withErrorReportedCell = (context: ApiRequestContext): ApiRequestContext => ({
+const withRequestCells = (context: ApiRequestContext): ApiRequestContext => ({
   errorReported: { value: false },
+  authUserId: { value: null },
   ...context
 })
 
@@ -28,7 +36,7 @@ export const parseRequestPathname = (rawUrl: string): string => {
 }
 
 export const enterApiRequestContext = (context: ApiRequestContext): void => {
-  requestContextStorage.enterWith(withErrorReportedCell(context))
+  requestContextStorage.enterWith(withRequestCells(context))
 }
 
 export const getApiRequestContext = (): ApiRequestContext =>
@@ -37,7 +45,7 @@ export const getApiRequestContext = (): ApiRequestContext =>
 export const runWithApiRequestContext = <A>(
   context: ApiRequestContext,
   fn: () => A
-): A => requestContextStorage.run(withErrorReportedCell(context), fn)
+): A => requestContextStorage.run(withRequestCells(context), fn)
 
 /**
  * Mark that this request's fault has already been logged at the error boundary
@@ -57,3 +65,21 @@ export const markApiErrorReported = (): void => {
  */
 export const wasApiErrorReported = (): boolean =>
   requestContextStorage.getStore()?.errorReported?.value === true
+
+/**
+ * Record the verified caller's user id for this request. No-ops if no request
+ * context is active (so it never throws outside a request scope).
+ */
+export const setApiRequestAuthUserId = (userId: string): void => {
+  const cell = requestContextStorage.getStore()?.authUserId
+  if (cell) {
+    cell.value = userId
+  }
+}
+
+/**
+ * The caller's user id when their session token was verified for this request
+ * (by the auth-principal-stamp middleware), else null (anonymous / unverified).
+ */
+export const getApiRequestAuthUserId = (): string | null =>
+  requestContextStorage.getStore()?.authUserId?.value ?? null

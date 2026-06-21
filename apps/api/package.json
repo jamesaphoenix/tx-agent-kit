@@ -17,6 +17,7 @@
   "dependencies": {
     "@effect/platform": "^0.96.0",
     "@effect/platform-node": "^0.106.0",
+    "@tx-agent-kit/auth": "workspace:*",
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/core": "workspace:*",
     "@tx-agent-kit/db": "workspace:*",
@@ -32,7 +33,6 @@
   },
   "devDependencies": {
     "@opentelemetry/sdk-metrics": "^2.6.1",
-    "@tx-agent-kit/auth": "workspace:*",
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
     "jose": "^6.2.2"

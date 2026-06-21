@@ -326,6 +326,26 @@ export const toFlattenedCauseChain = (cause: unknown): ReadonlyArray<FlattenedCa
   }))
 
 /**
+ * `HttpApiDecodeError` is @effect/platform's REQUEST-decoding failure (a bad
+ * path/query/body shape) — a client 4xx, NOT a server fault. Returns the first
+ * offending field name when the cause is such a decode error (or `'unknown'` when
+ * the field can't be parsed from the rendered issue tree), else `null` when the
+ * cause is not a request-decode error. The field is parsed from the issue path
+ * marker (e.g. `["organizationId"]`) the decoder renders into the message.
+ */
+export const extractRequestDecodeField = (cause: unknown): string | null => {
+  const decodeItem = toFlattenedCauseChain(cause).find(
+    (item) => item.tag === 'HttpApiDecodeError'
+  )
+  if (decodeItem === undefined) {
+    return null
+  }
+
+  const matchedField = decodeItem.message?.match(/\["([^"]+)"\]/u)?.[1]
+  return matchedField ?? 'unknown'
+}
+
+/**
  * True when a cause chain represents a genuine server fault worth logging at
  * error level + capturing to Sentry (vs an expected client/business failure).
  *

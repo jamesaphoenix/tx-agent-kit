@@ -70,6 +70,7 @@ import { Effect, Layer } from 'effect'
 import { createServer } from 'node:http'
 import { TxAgentApi } from './api.js'
 import { getApiEnv, getSubscriptionGuardEnabled } from './config/env.js'
+import { authPrincipalStampMiddleware } from './middleware/auth-principal-stamp.js'
 import { authRateLimitMiddleware } from './middleware/auth-rate-limit.js'
 import { bodyLimitMiddleware } from './middleware/body-limit.js'
 import { getCorsConfig } from './middleware/cors.js'
@@ -122,6 +123,9 @@ const MiddlewareLive = Layer.mergeAll(
   // Last-resort boundary: logs+captures causes that bypass mapCoreError, and
   // skips any request mapCoreError already reported (log-once dedup).
   HttpApiBuilder.middleware(effectCauseLoggingMiddleware),
+  // Resolve + stamp the caller's principal BEFORE route handlers decode params,
+  // so the boundary can attribute a request-validation rejection to a real client.
+  HttpApiBuilder.middleware(authPrincipalStampMiddleware),
   HttpApiBuilder.middleware(traceContextMiddleware),
   HttpApiBuilder.middleware(authRateLimitMiddleware),
   HttpApiBuilder.middleware(bodyLimitMiddleware),

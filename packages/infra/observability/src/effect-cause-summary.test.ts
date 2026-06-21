@@ -4,6 +4,7 @@ import {
   buildCauseReportError,
   causeLogContext,
   describeCauseForLog,
+  extractRequestDecodeField,
   shouldLogEffectCause,
   toFlattenedCauseChain
 } from './effect-cause-summary.js'
@@ -267,5 +268,33 @@ describe('effect cause summary', () => {
     // Sentry gets the real underlying Error, not a synthetic FiberFailure frame.
     const reported = buildCauseReportError(fiberFailure, { fallbackMessage: 'fallback' })
     expect(reported.message).toBe('asset rows decode failed')
+  })
+})
+
+describe('extractRequestDecodeField', () => {
+  const makeDecodeError = (message: string): Error => {
+    const error = new Error(message) as Error & { _tag?: string }
+    error.name = 'HttpApiDecodeError'
+    error._tag = 'HttpApiDecodeError'
+    return error
+  }
+
+  it('returns the first offending field from an HttpApiDecodeError issue tree', () => {
+    const cause = makeDecodeError(
+      '{ readonly organizationId: UUID }\n└─ ["organizationId"]\n   └─ Expected a Universally Unique Identifier, actual ""'
+    )
+    expect(extractRequestDecodeField(cause)).toBe('organizationId')
+  })
+
+  it('returns "unknown" for an HttpApiDecodeError whose field cannot be parsed', () => {
+    expect(extractRequestDecodeField(makeDecodeError('request did not match the schema'))).toBe('unknown')
+  })
+
+  it('returns null when the cause is not a request-decode error', () => {
+    const notDecode = new Error('boom ["organizationId"]') as Error & { _tag?: string }
+    notDecode.name = 'InternalError'
+    notDecode._tag = 'InternalError'
+    expect(extractRequestDecodeField(notDecode)).toBeNull()
+    expect(extractRequestDecodeField(new Error('plain'))).toBeNull()
   })
 })

@@ -1,17 +1,21 @@
 import { HttpMiddleware, HttpServerRequest } from '@effect/platform'
 import { createLogger } from '@tx-agent-kit/logging'
+import { recordValidationRejection } from '@tx-agent-kit/observability'
 import {
   buildCauseReportError,
   causeLogContext,
+  extractRequestDecodeField,
   shouldLogEffectCause
 } from '@tx-agent-kit/observability/effect-cause-summary'
 import { Cause, Effect, Option } from 'effect'
 import {
+  getApiRequestAuthUserId,
   getApiRequestContext,
+  markApiErrorReported,
   parseRequestPathname,
   wasApiErrorReported
 } from '../observability/request-context.js'
-import { captureApiMappedError } from '../observability/sentry.js'
+import { captureApiClientContractViolation, captureApiMappedError } from '../observability/sentry.js'
 
 const BOUNDARY_FALLBACK_MESSAGE = 'Unhandled Effect API cause reached route boundary'
 
@@ -31,7 +35,7 @@ export const effectCauseLoggingMiddleware = HttpMiddleware.make((httpApp) =>
   httpApp.pipe(
     Effect.tapErrorCause((cause) =>
       Effect.gen(function* () {
-        if (wasApiErrorReported() || !shouldLogEffectCause(cause)) {
+        if (wasApiErrorReported()) {
           return
         }
 
@@ -47,6 +51,50 @@ export const effectCauseLoggingMiddleware = HttpMiddleware.make((httpApp) =>
         // (request-context AsyncLocalStorage); merge them so the boundary report
         // names the offending endpoint instead of just method + path.
         const { operationId, routePattern } = getApiRequestContext()
+
+        // Request-validation rejections (an `HttpApiDecodeError` from a bad
+        // path/query/body shape) are client 4xx, not server faults — the framework
+        // already returned the 4xx; here we only decide telemetry. Attribute it by
+        // caller: the auth-principal-stamp middleware resolved the principal BEFORE
+        // decode, so a stamped principal means one of OUR clients sent malformed
+        // input (a real contract violation worth a non-paging Sentry signal), while
+        // no principal means anonymous noise (metered + warn-logged, never paged).
+        const decodeField = extractRequestDecodeField(cause)
+        if (decodeField !== null) {
+          const userId = getApiRequestAuthUserId()
+          const authenticated = userId !== null
+          recordValidationRejection({ operationId, field: decodeField, authenticated })
+          logger.warn('Rejected malformed request', {
+            ...requestContext,
+            ...(operationId ? { operationId } : {}),
+            ...(routePattern ? { routePattern } : {}),
+            field: decodeField,
+            authenticated,
+            ...(userId ? { userId } : {})
+          })
+          if (userId !== null) {
+            captureApiClientContractViolation(
+              buildCauseReportError(cause, {
+                fallbackMessage: 'Request contract violation',
+                prettyStack: Cause.pretty(cause)
+              }),
+              {
+                ...requestContext,
+                ...(operationId ? { operationId } : {}),
+                ...(routePattern ? { routePattern } : {}),
+                field: decodeField,
+                userId
+              }
+            )
+          }
+          markApiErrorReported()
+          return
+        }
+
+        if (!shouldLogEffectCause(cause)) {
+          return
+        }
+
         const causePretty = Cause.pretty(cause)
         const causeContext = causeLogContext(cause)
 

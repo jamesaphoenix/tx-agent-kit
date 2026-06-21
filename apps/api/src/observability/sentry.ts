@@ -88,6 +88,53 @@ export const captureApiMappedError = (
   })
 }
 
+/**
+ * Capture an authenticated client's request-contract violation: an
+ * `HttpApiDecodeError` 4xx on a request that carried a resolved principal. That is
+ * a real bug in one of OUR clients (web/SDK/MCP) sending malformed input, so it is
+ * worth surfacing — but it is NOT a server fault, so it gets its own stable,
+ * low-cardinality fingerprint and a `client_contract_violation` tag. Route an alert
+ * rule off these to keep them visible WITHOUT paging. Anonymous request-validation
+ * noise never reaches here: the boundary only calls this when a principal was
+ * stamped (the request authenticated before decode rejected it).
+ */
+export const captureApiClientContractViolation = (
+  error: Error,
+  context: {
+    readonly operationId?: string
+    readonly routePattern?: string
+    readonly method?: string
+    readonly path?: string
+    readonly field: string
+    readonly userId?: string
+  }
+): void => {
+  reporter.captureScoped(error, {
+    boundary: 'api_client_contract_violation',
+    tags: {
+      client_contract_violation: 'true',
+      operation_id: context.operationId,
+      route: context.routePattern,
+      http_method: context.method,
+      field: context.field
+    },
+    fingerprint: [
+      'api-client-contract-violation',
+      context.operationId ?? context.routePattern,
+      context.field
+    ],
+    contexts: {
+      api_request: {
+        method: context.method,
+        path: context.path,
+        routePattern: context.routePattern,
+        operationId: context.operationId,
+        userId: context.userId
+      }
+    }
+  })
+}
+
 export const flushApiSentry = (): Promise<void> => reporter.flush(2000)
 
 export const _resetApiSentryForTest = (): void => {
