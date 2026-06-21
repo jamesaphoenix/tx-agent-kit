@@ -309,7 +309,8 @@ const synthesiseAlertScenario = (alert) => {
   // Covers `sum(rate(m[5m])) * 60 > N` (events/min) and `sum(rate(m[5m])) > N`.
   if (
     alertName === 'temporal_workflow_failure_critical' ||
-    alertName === 'auth_rate_limit_spike_warning'
+    alertName === 'auth_rate_limit_spike_warning' ||
+    alertName === 'request_validation_rejection_spike_warning'
   ) {
     const m = metrics[0]
     if (!m) {

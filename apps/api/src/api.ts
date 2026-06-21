@@ -204,8 +204,11 @@ const isExpectedUnauthorizedAuthFailure = (error: { code?: string; cause?: unkno
 // A mapping is report-worthy (error level + Sentry) when it is a 500, an
 // unmapped/unknown code, or its Effect cause is itself reportable. Everything
 // else is an expected client error → warn, no Sentry.
-const shouldCaptureCoreErrorMapping = (error: { code?: string; cause?: unknown }): boolean => {
-  if (isExpectedUnauthorizedAuthFailure(error)) {
+const shouldCaptureCoreErrorMapping = (
+  error: { code?: string; cause?: unknown },
+  expectedUnauthorizedAuthFailure = isExpectedUnauthorizedAuthFailure(error)
+): boolean => {
+  if (expectedUnauthorizedAuthFailure) {
     return false
   }
 
@@ -229,7 +232,8 @@ const logCoreErrorMapping = (
     message: error.message,
     ...causeContext
   }
-  const reportWorthy = shouldCaptureCoreErrorMapping(error)
+  const expectedUnauthorizedAuthFailure = isExpectedUnauthorizedAuthFailure(error)
+  const reportWorthy = shouldCaptureCoreErrorMapping(error, expectedUnauthorizedAuthFailure)
   const logMessage = typeof causeContext.rootCauseMessage === 'string'
     ? causeContext.rootCauseMessage
     : error.message ?? 'CoreError mapped to HTTP error'
@@ -237,6 +241,11 @@ const logCoreErrorMapping = (
   if (reportWorthy) {
     apiLogger.error(logMessage, context)
     captureApiMappedError(findRootCauseError(error.cause) ?? new Error(logMessage), context)
+  } else if (expectedUnauthorizedAuthFailure) {
+    // An expected token/session expiry is informational, not a warning. The
+    // redacted cause chain still appears in the info log for diagnosis, but it
+    // is not warn/error-level noise and is never sent to Sentry.
+    apiLogger.info(logMessage, context)
   } else {
     apiLogger.warn(logMessage, context)
   }

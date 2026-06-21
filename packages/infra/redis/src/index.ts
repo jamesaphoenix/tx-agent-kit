@@ -4,6 +4,7 @@ export {
   createRedisClient,
   getOrCreateRedisClient,
   runWithRedisCommandSpan,
+  setRedisErrorReporter,
   type RedisClient,
   type RedisClientOptions
 } from './redis-client.js'

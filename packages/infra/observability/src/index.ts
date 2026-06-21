@@ -59,6 +59,14 @@ export {
 } from './outbox-metrics.js'
 
 export {
+  apiRequestValidationRejectedMetricName,
+  getOrCreateValidationMetrics,
+  recordValidationRejection,
+  _resetValidationMetricsRegistryForTest,
+  type ValidationMetrics
+} from './validation-metrics.js'
+
+export {
   describeCauseForLog,
   summarizeCause,
   flattenCauseSummary,
@@ -67,6 +75,7 @@ export {
   causeLogContext,
   buildCauseReportError,
   findRootCauseError,
+  extractRequestDecodeField,
   type CauseSummary,
   type FlattenedCauseSummary
 } from './effect-cause-summary.js'

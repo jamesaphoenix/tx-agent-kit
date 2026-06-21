@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": ["TX_DEV_ENV_OVERLAY"],
   "globalDependencies": [
     "eslint.config.js",
     "packages/tooling/eslint-config/**",
@@ -27,6 +28,7 @@
       "outputs": ["dist/**/*.d.ts", "dist/**/*.d.ts.map"]
     },
     "lint": {
+      "dependsOn": ["^build"],
       "outputs": []
     },
     "test": {

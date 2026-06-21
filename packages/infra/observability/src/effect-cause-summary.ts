@@ -1,4 +1,5 @@
 import type { LogContext } from '@tx-agent-kit/logging'
+import { FiberFailureCauseId } from 'effect/Runtime'
 
 // Shared Effect-cause summarization used by BOTH the API request boundary and
 // the worker activity boundary, so error->log->Sentry context is identical across
@@ -33,6 +34,31 @@ const truncateLogField = (value: string): string =>
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
+
+// `Effect.runPromise` (used by every worker activity's `runEffect`) rejects with
+// a `(FiberFailure) Error` whose standard `.message`/`.name` are the squashed
+// boundary text and whose REAL cause chain is stashed under the
+// `FiberFailureCauseId` symbol, NOT the JS-standard `.cause`. Without unwrapping,
+// the chain flattens to that useless wrapper and telemetry loses the actual root
+// (e.g. a DbError -> ParseError). Peel the symbol so the existing cause
+// traversal reaches the underlying Effect Cause.
+const unwrapFiberFailureCause = (cause: unknown): unknown => {
+  if (
+    (isRecord(cause) || cause instanceof Error) &&
+    FiberFailureCauseId in (cause as object)
+  ) {
+    return (cause as Record<symbol, unknown>)[FiberFailureCauseId]
+  }
+  return cause
+}
+
+// A JWT-claim verification failure carries a `payload` object with the decoded
+// claims (email/sub/sid PII). Detect that shape so the `payload` key can be
+// redacted while still surfacing the rest of the metadata in logs.
+const isJwtClaimMetadataRecord = (record: Record<string, unknown>): boolean =>
+  typeof record.claim === 'string' &&
+  typeof record.reason === 'string' &&
+  isRecord(record.payload)
 
 const getStringField = (record: Record<string, unknown>, key: string): string | undefined => {
   const value = record[key]
@@ -70,9 +96,10 @@ const sanitizeValueForLog = (
   }
   seen.add(value)
 
+  const isJwtClaimMetadata = isJwtClaimMetadataRecord(value)
   const entries = Object.entries(value).map(([key, entryValue]) => [
     key,
-    sensitiveKeyPattern.test(key)
+    sensitiveKeyPattern.test(key) || (isJwtClaimMetadata && key === 'payload')
       ? '[REDACTED]'
       : sanitizeValueForLog(entryValue, seen, depth + 1)
   ])
@@ -182,10 +209,11 @@ const summarizeNestedCause = (
 }
 
 export const summarizeCause = (
-  cause: unknown,
+  rawCause: unknown,
   seen: WeakSet<object> = new WeakSet(),
   depth = 0
 ): CauseSummary | undefined => {
+  const cause = unwrapFiberFailureCause(rawCause)
   if (cause === undefined || depth > MAX_CAUSE_DEPTH) {
     return undefined
   }
@@ -298,6 +326,26 @@ export const toFlattenedCauseChain = (cause: unknown): ReadonlyArray<FlattenedCa
   }))
 
 /**
+ * `HttpApiDecodeError` is @effect/platform's REQUEST-decoding failure (a bad
+ * path/query/body shape) — a client 4xx, NOT a server fault. Returns the first
+ * offending field name when the cause is such a decode error (or `'unknown'` when
+ * the field can't be parsed from the rendered issue tree), else `null` when the
+ * cause is not a request-decode error. The field is parsed from the issue path
+ * marker (e.g. `["organizationId"]`) the decoder renders into the message.
+ */
+export const extractRequestDecodeField = (cause: unknown): string | null => {
+  const decodeItem = toFlattenedCauseChain(cause).find(
+    (item) => item.tag === 'HttpApiDecodeError'
+  )
+  if (decodeItem === undefined) {
+    return null
+  }
+
+  const matchedField = decodeItem.message?.match(/\["([^"]+)"\]/u)?.[1]
+  return matchedField ?? 'unknown'
+}
+
+/**
  * True when a cause chain represents a genuine server fault worth logging at
  * error level + capturing to Sentry (vs an expected client/business failure).
  *
@@ -389,10 +437,11 @@ export const buildCauseReportError = (
 }
 
 export const findRootCauseError = (
-  cause: unknown,
+  rawCause: unknown,
   seen: WeakSet<object> = new WeakSet(),
   depth = 0
 ): Error | null => {
+  const cause = unwrapFiberFailureCause(rawCause)
   if (cause === undefined || cause === null || depth > MAX_CAUSE_DEPTH) {
     return null
   }

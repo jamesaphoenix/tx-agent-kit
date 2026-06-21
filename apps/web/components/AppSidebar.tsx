@@ -18,6 +18,7 @@ import {
   useOrganizationsListOrganizations
 } from '../lib/api/generated/organizations/organizations'
 import { useTeamsListTeams, teamsCreateTeam } from '../lib/api/generated/teams/teams'
+import { isUuid, NIL_UUID } from '../lib/id-validation'
 import { notify } from '../lib/notify'
 // clientApi kept for signOut (auth side effects)
 import { cn } from '../lib/utils'
@@ -308,7 +309,7 @@ export function AppSidebar({
 
   const selectedOrganizationQuery = useOrganizationsGetOrganization(selectedOrgId, {
     query: {
-      enabled: !!selectedOrgId
+      enabled: isUuid(selectedOrgId)
     }
   })
 
@@ -327,9 +328,10 @@ export function AppSidebar({
     return onboardingData.status !== 'completed'
   }, [currentOrganization])
 
+  const hasValidSelectedOrgId = isUuid(selectedOrgId)
   const teamsQuery = useTeamsListTeams(
-    { organizationId: selectedOrgId, limit: '100', sortBy: 'name', sortOrder: 'asc' },
-    { query: { enabled: !!selectedOrgId } }
+    { organizationId: hasValidSelectedOrgId ? selectedOrgId : NIL_UUID, limit: '100', sortBy: 'name', sortOrder: 'asc' },
+    { query: { enabled: hasValidSelectedOrgId } }
   )
   const teams = teamsQuery.data?.data ?? []
   const teamLoading = teamsQuery.isLoading

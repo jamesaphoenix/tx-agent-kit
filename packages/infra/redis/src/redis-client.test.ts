@@ -4,7 +4,8 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor
 } from '@opentelemetry/sdk-trace-base'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { EventEmitter } from 'node:events'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { runWithRedisCommandSpan as runWithRedisCommandSpanType } from './redis-client.js'
 
 let runWithRedisCommandSpan: typeof runWithRedisCommandSpanType
@@ -68,5 +69,43 @@ describe('runWithRedisCommandSpan', () => {
       message: 'redis command failed'
     })
     expect(span?.events.some((event) => event.name === 'exception')).toBe(true)
+  })
+})
+
+describe('createRedisClient error handling', () => {
+  afterEach(() => {
+    vi.doUnmock('ioredis')
+    vi.resetModules()
+  })
+
+  it('consumes ioredis error events and forwards them to the injected reporter', async () => {
+    vi.doMock('ioredis', () => ({
+      Redis: class MockRedis extends EventEmitter {
+        readonly url: string
+        readonly options: unknown
+        sendCommand = vi.fn()
+
+        constructor(url: string, options: unknown) {
+          super()
+          this.url = url
+          this.options = options
+        }
+      }
+    }))
+
+    const { createRedisClient, setRedisErrorReporter } = await import('./redis-client.js')
+    const reporter = vi.fn()
+    setRedisErrorReporter(reporter)
+
+    const client = createRedisClient({ url: 'redis://localhost:6379' }) as unknown as EventEmitter
+    expect(client.listenerCount('error')).toBe(1)
+
+    const dropError = new Error('Connection is closed.')
+    // Consumed (no uncaught exception) AND forwarded to the injected reporter so
+    // the connection drop is still sent to Sentry instead of silently swallowed.
+    expect(() => client.emit('error', dropError)).not.toThrow()
+    expect(reporter).toHaveBeenCalledWith(dropError)
+
+    setRedisErrorReporter(() => {})
   })
 })

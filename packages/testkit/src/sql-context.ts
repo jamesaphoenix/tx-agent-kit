@@ -278,24 +278,74 @@ export const createSqlTestContext = (
     await reset()
   }
 
-  const performReset = async (): Promise<void> => {
-    await withSchemaClient(async (client) => {
+  // Reset runs before EVERY test in per-test contexts, so its cost multiplies
+  // across the whole suite. Two optimizations over the naive path:
+  //  1. A persistent connection (instead of connect + ensureSchema +
+  //     setSearchPath + disconnect per reset).
+  //  2. The timeouts, TRUNCATE, and seed files batched into ONE simple-protocol
+  //     query - a single round trip that Postgres also runs as one implicit
+  //     transaction, making truncate + reseed atomic.
+  let resetClient: Client | null = null
+
+  const getResetClient = async (): Promise<Client> => {
+    if (resetClient !== null) {
+      return resetClient
+    }
+    const client = createBaseClient(baseDatabaseUrl)
+    await client.connect()
+    try {
+      await ensureSchema(client, schemaName)
+      await setSearchPath(client, schemaName)
+    } catch (error) {
+      await client.end().catch(() => undefined)
+      throw error
+    }
+    resetClient = client
+    return client
+  }
+
+  const closeResetClient = async (): Promise<void> => {
+    if (resetClient === null) {
+      return
+    }
+    const client = resetClient
+    resetClient = null
+    await client.end().catch(() => undefined)
+  }
+
+  const buildResetScript = (tableNames: ReadonlyArray<string>): string => {
+    const statements = [
       // Fail fast on lock contention instead of hanging integration suites.
-      await client.query(`SET lock_timeout TO '5s'`)
-      await client.query(`SET statement_timeout TO '30s'`)
+      `SET lock_timeout TO '5s'`,
+      `SET statement_timeout TO '30s'`
+    ]
 
+    if (tableNames.length > 0) {
+      const qualified = tableNames
+        .map((tableName) => `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}`)
+        .join(', ')
+      statements.push(`TRUNCATE TABLE ${qualified} RESTART IDENTITY CASCADE`)
+    }
+
+    for (const schemaFile of schemaFiles) {
+      statements.push(schemaFile.sql)
+    }
+
+    return statements.join(';\n')
+  }
+
+  const performReset = async (): Promise<void> => {
+    const client = await getResetClient()
+
+    try {
       const tableNames = await resolveMutableTableNames(client)
-
-      if (tableNames.length > 0) {
-        const qualified = tableNames
-          .map((tableName) => `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}`)
-          .join(', ')
-
-        await client.query(`TRUNCATE TABLE ${qualified} RESTART IDENTITY CASCADE`)
-      }
-
-      await applySqlFiles(client, schemaFiles)
-    })
+      await client.query(buildResetScript(tableNames))
+    } catch (error) {
+      // A connection-level failure leaves the session unusable; drop the
+      // cached client so the next reset reconnects cleanly.
+      await closeResetClient()
+      throw error
+    }
   }
 
   const performResetWithRetry = async (): Promise<void> => {
@@ -324,6 +374,7 @@ export const createSqlTestContext = (
   }
 
   const teardown = async (): Promise<void> => {
+    await closeResetClient()
     await withBaseClient(async (client) => {
       await client.query(`DROP SCHEMA IF EXISTS ${quoteIdentifier(schemaName)} CASCADE`)
     })

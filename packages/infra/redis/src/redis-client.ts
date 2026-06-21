@@ -19,6 +19,24 @@ const redisClients = new Map<string, RedisClient>()
 const instrumentedRedisClients = new WeakSet<RedisClient>()
 const redisTracer = trace.getTracer('tx-agent-kit.redis')
 
+type RedisErrorReporter = (error: unknown) => void
+let redisErrorReporter: RedisErrorReporter = () => {}
+
+/**
+ * Register a handler for ioredis `'error'` events (connection drops/timeouts on
+ * the long-lived, cached sockets). Backend processes inject their Sentry capture
+ * at boot (e.g. `setRedisErrorReporter(captureWorkerException)`), so these are
+ * reported instead of silently swallowed.
+ *
+ * Kept as an injected hook so this package stays free of any Sentry/logging
+ * dependency. The default no-op still guarantees the no-crash invariant: ioredis
+ * is an EventEmitter, and an `'error'` with no listener is escalated by Node to
+ * an uncaught exception that crashes the process.
+ */
+export const setRedisErrorReporter = (reporter: RedisErrorReporter): void => {
+  redisErrorReporter = reporter
+}
+
 type RedisSendCommand = RedisClient['sendCommand']
 type RedisCommand = Parameters<RedisSendCommand>[0]
 type RedisCommandStream = Parameters<RedisSendCommand>[1]
@@ -135,6 +153,15 @@ const instrumentRedisClient = (
   }
 
   instrumentedRedisClients.add(client)
+
+  // ioredis sockets are long-lived and cached (getOrCreateRedisClient). They
+  // emit 'error' on connection drops/timeouts; without a listener Node escalates
+  // it to an uncaught exception and crashes the process. Consume it here (ioredis
+  // reconnects on its own) AND forward to the injected reporter so it still
+  // reaches Sentry instead of being silently swallowed.
+  client.on('error', (error: unknown) => {
+    redisErrorReporter(error)
+  })
 
   const originalSendCommand = client.sendCommand.bind(client)
   const connectionAttributes = getRedisConnectionAttributes(options)

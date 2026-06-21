@@ -131,7 +131,7 @@ export type {
   ValidatedUploadResult,
   UploadValidationError
 } from './domains/assets/domain/assets-domain.js'
-export { principalFromAuthorization } from './utils.js'
+export { parseBearerToken, principalFromAuthorization } from './utils.js'
 export { CoreError, UsageCapExceeded, paymentRequired } from './errors.js'
 export { requireOwnership, requireRole, withInternalError } from './effect-utils.js'
 export {

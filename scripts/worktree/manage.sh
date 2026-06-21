@@ -21,6 +21,47 @@ if ! require_local_postgres_url "$DB_URL"; then
   exit 1
 fi
 
+# Kill any dev/integration server (api/worker/web) running INSIDE a worktree
+# before it is removed. Without this, `git worktree remove` orphans those node
+# processes: they keep holding ports and polling the shared Postgres/Temporal,
+# which loads the Docker VM and spins the fans. Matched by cwd-under-worktree so
+# it catches every runtime spawned there; a runtime filter keeps shells/editors
+# safe.
+reap_worktree_processes() {
+  local wt="$1"
+  local pids="" current_pid="" cwd cmd line
+
+  while IFS= read -r line; do
+    case "$line" in
+      p*) current_pid="${line#p}" ;;
+      n*)
+        cwd="${line#n}"
+        case "$cwd" in
+          "$wt"|"$wt"/*) ;;
+          *) continue ;;
+        esac
+        cmd="$(ps -p "$current_pid" -o command= 2>/dev/null || true)"
+        case "$cmd" in
+          *node*|*tsx*|*next*|*esbuild*) pids="$pids $current_pid" ;;
+        esac
+        ;;
+    esac
+  done < <(lsof -d cwd -Fpn 2>/dev/null || true)
+
+  pids="$(printf '%s\n' $pids | sed '/^$/d' | sort -u | tr '\n' ' ')"
+  [[ -z "${pids// /}" ]] && return 0
+
+  log_info "Stopping dev/integration servers running inside the worktree..."
+  # shellcheck disable=SC2086 # intentional word-splitting of the pid list
+  kill $pids 2>/dev/null || true
+  sleep 1
+  for pid in $pids; do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+  done
+}
+
 show_help() {
   cat <<HELP
 Usage: $0 <command> [options]
@@ -196,6 +237,7 @@ remove_worktree() {
   fi
 
   cd "$ROOT_DIR"
+  reap_worktree_processes "$path"
   git worktree remove "$path" --force || true
   rm -rf "$path"
 

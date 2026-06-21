@@ -161,7 +161,7 @@ env_line_has_value() {
 # Never overwrites a non-empty worktree value — preserves local overrides.
 # Skips worktree-scoped keys (ports, schema, DB_URL) — those are upserted below.
 if [[ -n "$PRIMARY_ENV" ]]; then
-  WORKTREE_SCOPED_KEYS="^(DATABASE_URL|DATABASE_SCHEMA|WORKTREE_PORT_OFFSET|API_PORT|PORT|WEB_PORT|MOBILE_PORT|WORKER_INSPECT_PORT|TEMPORAL_TASK_QUEUE|API_BASE_URL|NEXT_PUBLIC_API_BASE_URL|EXPO_PUBLIC_API_BASE_URL|API_CORS_ORIGIN)$"
+  WORKTREE_SCOPED_KEYS="^(DATABASE_URL|DATABASE_SCHEMA|WORKTREE_PORT_OFFSET|API_PORT|PORT|WEB_PORT|MOBILE_PORT|WORKER_INSPECT_PORT|TEMPORAL_TASK_QUEUE|API_BASE_URL|NEXT_PUBLIC_API_BASE_URL|EXPO_PUBLIC_API_BASE_URL|API_CORS_ORIGIN|WATCHPACK_POLLING)$"
 
   while IFS= read -r primary_line || [[ -n "$primary_line" ]]; do
     [[ -z "$primary_line" ]] && continue
@@ -208,6 +208,10 @@ upsert_env_value "$WORKTREE_ENV" "API_CORS_ORIGIN" "http://localhost:${WEB_PORT}
 upsert_env_value "$WORKTREE_ENV" "SENTRY_SPOTLIGHT" "true"
 upsert_env_value "$WORKTREE_ENV" "LOG_LEVEL" "debug"
 upsert_env_value "$WORKTREE_ENV" "NODE_ENV" "development"
+# Worktree dev stacks run alongside the primary checkout's dev stack; two sets
+# of fs watchers exhaust file descriptors (Watchpack EMFILE) and next dev then
+# 404s every route. Polling sidesteps the watcher limit entirely.
+upsert_env_value "$WORKTREE_ENV" "WATCHPACK_POLLING" "true"
 
 cat > "$WORKTREE_PATH/run-migrations.sh" <<MIGRATE
 #!/usr/bin/env bash

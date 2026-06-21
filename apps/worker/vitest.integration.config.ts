@@ -6,6 +6,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: 'worker-integration',
+      setupFiles: ['./vitest.integration.setup.ts'],
       include: ['src/**/*.integration.test.ts'],
       exclude: [
         'src/activities.integration.test.ts',

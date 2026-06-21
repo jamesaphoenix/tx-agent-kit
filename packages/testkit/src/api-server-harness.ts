@@ -185,8 +185,25 @@ export const createApiServerHarness = (
         AUTH_SECRET: authSecret,
         DATABASE_URL: options.testContext.schemaDatabaseUrl,
         API_CORS_ORIGIN: corsOrigin,
-        AUTH_RATE_LIMIT_MAX_REQUESTS: '200',
-        AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '200',
+        // Honour the test-injected x-forwarded-for so the per-IP auth rate limiter keys
+        // off each factory request's unique synthetic client IP (see nextTestClientIp in
+        // api-factories) instead of collapsing every request onto the shared 127.0.0.1
+        // socket address. Tests that assert throttling set their own fixed x-forwarded-for
+        // and still isolate correctly.
+        TRUST_PROXY: 'true',
+        // Disable the auth rate limit suite-wide (see getAuthRateLimitPolicy in
+        // apps/api config/env.ts — a large override "disables limits suite-wide").
+        // The factory x-forwarded-for trick only isolates testkit-originated calls;
+        // browser-driven auth requests (the web/mobile React components' own axios/fetch
+        // sign-up/sign-in, the dev-utils seed flows, and the deploy-smoke CLI) carry no
+        // x-forwarded-for, so under TRUST_PROXY they all collapse onto the single shared
+        // 127.0.0.1 socket bucket. That bucket lives in the worktree-shared Redis, so a
+        // full suite (or repeated runs within the block window) blows past a small cap and
+        // block-lists 127.0.0.1 for ~30 min, 429-ing every later browser sign-up. A large
+        // ceiling keeps that shared bucket from ever blocking while the dedicated
+        // throttle-assertion tests still drive their own limits via in-process env.
+        AUTH_RATE_LIMIT_MAX_REQUESTS: '1000000',
+        AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '1000000',
         TX_STORAGE_MODE: testkitProcessEnv.TX_STORAGE_MODE ?? 'memory',
         DB_POOL_MAX: '5'
       },

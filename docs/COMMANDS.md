@@ -8,6 +8,8 @@
 - `pnpm temporal:dev:down`: stop local Temporal CLI server managed by repo scripts.
 - `pnpm temporal:dev:status`: inspect Temporal runtime mode + local CLI health.
 - `pnpm dev`: run web + api + worker locally with hot reload (auto-runs infra ensure + local Temporal CLI in `cli` mode). When `DEV_CLOUDFLARE_TUNNEL_ENABLED=true`, starts a Cloudflare tunnel for local API exposure and stops it on shutdown.
+- `scripts/dev/reap-orphan-servers.sh [--dry-run]`: reap api/worker/web servers orphaned by a removed/pruned worktree or a `kill -9`/crash that skipped the EXIT trap (a process whose worktree directory is gone is safe to kill; live-worktree servers are never touched). Runs automatically as a `pnpm dev` preflight and by `scripts/worktree/manage.sh remove`.
+- `pnpm dev --tunnel` (alias `pnpm dev:tunnel`): overlay the committed `.env.tunnel` (op:// refs only) on top of `.env` to enable the Cloudflare tunnel for local API exposure. The overlay survives per-app dev scripts re-sourcing `.env` via a `.data/dev-env-overlay` marker plus `turbo` `globalPassThroughEnv=TX_DEV_ENV_OVERLAY`; plain `pnpm dev` clears the marker.
 - `DEV_CLOUDFLARE_TUNNEL_ENABLED=true pnpm dev`: enable local API tunnel during dev. Tunnel ownership is lock-guarded across worktrees; if another worktree owns the tunnel lock, dev continues and tunnel startup is skipped.
 - `pnpm dev:tunnel:status`: inspect local dev tunnel lock ownership (`active|stale|unlocked`) and owner metadata.
 - Optional tunnel overrides: `DEV_CLOUDFLARE_TUNNEL_URL`, `DEV_CLOUDFLARE_TUNNEL_TOKEN`, `DEV_CLOUDFLARE_TUNNEL_LOG_FILE`, `DEV_CLOUDFLARE_TUNNEL_LOCK_DIR`, `DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS`, `DEV_CLOUDFLARE_TUNNEL_MISSING_PID_GRACE_SECONDS`.
@@ -30,6 +32,12 @@
 - `INTEGRATION_SKIP_INFRA_ENSURE=1 pnpm test:integration`: skip infra bootstrap when stack is already healthy (observability health check still runs).
 - `INTEGRATION_SKIP_OBSERVABILITY=1 pnpm test:integration`: skip observability health preflight when debugging unrelated integration failures.
 - `INTEGRATION_DRY_RUN=1 pnpm test:integration -- --filter api --dry-run`: print resolved runner config without executing tests.
+- Affected-by-default locally: `pnpm test:integration` / `pnpm test:integration:quiet` run only the projects affected since the base ref (changed packages + dependents, `api` always included, base ref defaults to `origin/main`). CI always runs the full suite (affected path unreachable when `CI=true`).
+- `pnpm test:integration --plan`: print the FULL-vs-affected decision without running.
+- `TX_INTEGRATION_FULL=1 pnpm test:integration`: force the full suite locally (stable opt-out; no `:affected`/`:full` suffix).
+- `pnpm test:affected`: affected-only unit lane (`turbo run test --filter=...[<ref>]`); falls back to full on ambiguity/sentinel change.
+- `pnpm test:integration:repeat <project> <file-or-pattern> [count=20]`: per-file flake-repro; ensures infra once, loops one file in one project, stops on first failure.
+- `pnpm ci:check [--watch]`: post-push full-suite CI gate; refuses green until the `Integration Tests` workflow is present + passed for the pushed commit.
 - `pnpm test:boilerplate`: run the parallel-worktree boilerplate meta-test lane (shared integration harness preflight + dedicated boilerplate suite).
 - `BOILERPLATE_DRY_RUN=1 pnpm test:boilerplate -- --dry-run`: print resolved boilerplate runner wiring without executing tests.
 - `pnpm test:temporal:integration`: opt-in Temporal integration lane (real Temporal backend, excluded from default integration suite).

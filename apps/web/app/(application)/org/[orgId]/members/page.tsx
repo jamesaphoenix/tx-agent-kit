@@ -14,6 +14,7 @@ import ReactSelect, {
 import { DashboardShell } from '../../../../../components/DashboardShell'
 import { useCurrentPrincipal } from '../../../../../hooks/use-session-store'
 import { notify } from '../../../../../lib/notify'
+import { isUuid, NIL_UUID } from '../../../../../lib/id-validation'
 import {
   useOrganizationsListOrgMembers,
   useOrganizationsListOrgInvitations,
@@ -315,6 +316,7 @@ const TrashIcon = () => (
 export default function MembersPage() {
   const params = useParams<{ orgId: string }>()
   const orgId = params.orgId
+  const hasValidOrgId = isUuid(orgId)
   const principal = useCurrentPrincipal()
   const queryClient = useQueryClient()
 
@@ -328,8 +330,8 @@ export default function MembersPage() {
     { query: { enabled: !!principal } }
   )
   const teamsQuery = useTeamsListTeams(
-    { organizationId: orgId, limit: '100', sortBy: 'name', sortOrder: 'asc' },
-    { query: { enabled: !!principal } }
+    { organizationId: hasValidOrgId ? orgId : NIL_UUID, limit: '100', sortBy: 'name', sortOrder: 'asc' },
+    { query: { enabled: hasValidOrgId && !!principal } }
   )
 
   const members = membersQuery.data?.data ?? []

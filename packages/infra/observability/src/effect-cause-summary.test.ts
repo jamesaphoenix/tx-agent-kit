@@ -1,9 +1,10 @@
-import { Cause } from 'effect'
+import { Cause, Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 import {
   buildCauseReportError,
   causeLogContext,
   describeCauseForLog,
+  extractRequestDecodeField,
   shouldLogEffectCause,
   toFlattenedCauseChain
 } from './effect-cause-summary.js'
@@ -135,7 +136,9 @@ describe('effect cause summary', () => {
       claim: 'exp',
       reason: 'check_failed',
       payload: {
-        sub: 'user-1',
+        sub: '11111111-2222-4333-8444-555555555555',
+        email: 'user@example.com',
+        sid: '99999999-8888-4777-8666-555555555555',
         exp: 1
       }
     }
@@ -162,9 +165,11 @@ describe('effect cause summary', () => {
         type: 'object',
         tag: undefined,
         code: undefined,
-        message: '{"claim":"exp","reason":"check_failed","payload":{"sub":"user-1","exp":1}}'
+        message: '{"claim":"exp","reason":"check_failed","payload":"[REDACTED]"}'
       }
     ])
+    // The claim payload carries PII (email/sub/sid); it must never leak into logs.
+    expect(JSON.stringify(context.causeChain)).not.toContain('user@example.com')
     expect(shouldLogEffectCause(authError, new Set(['AuthError', 'JWTExpired']))).toBe(false)
   })
 
@@ -221,5 +226,75 @@ describe('effect cause summary', () => {
       message: '{"requestId":"req-1","status":400,"access_token":"[REDACTED]"}'
     })
     expect(shouldLogEffectCause(providerError, new Set())).toBe(true)
+  })
+
+  it('unwraps a FiberFailure to the real cause chain instead of the (FiberFailure) wrapper', async () => {
+    // Reproduces the worker activity boundary scenario: the real failure is a
+    // DbError -> ParseError chain, but Effect.runPromise (every activity's
+    // runEffect) rejects with a `(FiberFailure) Error` whose `.message`/`.name`
+    // are the generic boundary text. The real Cause is stashed under the
+    // FiberFailureCauseId symbol, so without unwrapping the chain collapses to
+    // that wrapper and telemetry loses the actual root.
+    const parseError = new Error('asset rows decode failed') as Error & { _tag?: string }
+    parseError.name = 'ParseError'
+    parseError._tag = 'ParseError'
+    const coreError = new Error('Failed to mark enrichment failed') as Error & {
+      _tag?: string
+      code?: string
+      cause?: unknown
+    }
+    coreError.name = 'CoreError'
+    coreError._tag = 'CoreError'
+    coreError.code = 'INTERNAL_ERROR'
+    coreError.cause = parseError
+
+    const fiberFailure = await Effect.runPromise(Effect.fail(coreError)).then(
+      () => {
+        throw new Error('expected the effect to fail')
+      },
+      (error: unknown) => error
+    )
+
+    // Sanity: the raw rejection really is the opaque FiberFailure wrapper.
+    expect((fiberFailure as Error).name).toContain('FiberFailure')
+
+    const context = causeLogContext(fiberFailure)
+    expect(context.rootCauseMessage).toBe('asset rows decode failed')
+    expect(context.rootCauseTag).toBe('ParseError')
+    expect(
+      (context.causeChain as ReadonlyArray<{ tag?: string }>).map((item) => item.tag)
+    ).toContain('CoreError')
+
+    // Sentry gets the real underlying Error, not a synthetic FiberFailure frame.
+    const reported = buildCauseReportError(fiberFailure, { fallbackMessage: 'fallback' })
+    expect(reported.message).toBe('asset rows decode failed')
+  })
+})
+
+describe('extractRequestDecodeField', () => {
+  const makeDecodeError = (message: string): Error => {
+    const error = new Error(message) as Error & { _tag?: string }
+    error.name = 'HttpApiDecodeError'
+    error._tag = 'HttpApiDecodeError'
+    return error
+  }
+
+  it('returns the first offending field from an HttpApiDecodeError issue tree', () => {
+    const cause = makeDecodeError(
+      '{ readonly organizationId: UUID }\n└─ ["organizationId"]\n   └─ Expected a Universally Unique Identifier, actual ""'
+    )
+    expect(extractRequestDecodeField(cause)).toBe('organizationId')
+  })
+
+  it('returns "unknown" for an HttpApiDecodeError whose field cannot be parsed', () => {
+    expect(extractRequestDecodeField(makeDecodeError('request did not match the schema'))).toBe('unknown')
+  })
+
+  it('returns null when the cause is not a request-decode error', () => {
+    const notDecode = new Error('boom ["organizationId"]') as Error & { _tag?: string }
+    notDecode.name = 'InternalError'
+    notDecode._tag = 'InternalError'
+    expect(extractRequestDecodeField(notDecode)).toBeNull()
+    expect(extractRequestDecodeField(new Error('plain'))).toBeNull()
   })
 })

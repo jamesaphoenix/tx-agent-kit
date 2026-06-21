@@ -11,7 +11,37 @@ source "$SCRIPT_DIR/lib/lock.sh"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/source-env.sh"
+
+# Two-mode dev: plain `pnpm dev` (gitignored .env, localhost, the per-worktree
+# override point) vs `pnpm dev --tunnel`, which overlays the committed .env.tunnel
+# (op:// refs only) on top of .env to expose the local API over a Cloudflare
+# tunnel for real provider OAuth callbacks.
+DEV_TUNNEL_MODE=0
+for arg in "$@"; do
+  case "$arg" in
+    --tunnel) DEV_TUNNEL_MODE=1 ;;
+    *) echo "Unknown argument: $arg" >&2; exit 1 ;;
+  esac
+done
+
 source_env "$PROJECT_ROOT/.env"
+
+# The overlay survives per-app dev scripts re-sourcing .env inside turbo task
+# shells (turbo strict env mode strips ad-hoc vars) via a .data/dev-env-overlay
+# marker that source_env re-applies plus the turbo globalPassThroughEnv entry.
+if [[ "$DEV_TUNNEL_MODE" == "0" ]]; then
+  rm -f "$PROJECT_ROOT/.data/dev-env-overlay" >/dev/null 2>&1 || true
+else
+  if [[ ! -f "$PROJECT_ROOT/.env.tunnel" ]]; then
+    echo "Tunnel mode requested but .env.tunnel is missing at the repo root." >&2
+    exit 1
+  fi
+  echo "Tunnel mode: overlaying .env.tunnel on top of .env."
+  export TX_DEV_ENV_OVERLAY="$PROJECT_ROOT/.env.tunnel"
+  mkdir -p "$PROJECT_ROOT/.data"
+  printf '%s\n' "$PROJECT_ROOT/.env.tunnel" > "$PROJECT_ROOT/.data/dev-env-overlay"
+  source_env "$PROJECT_ROOT/.env.tunnel"
+fi
 
 DEV_CLOUDFLARE_TUNNEL_LOCK_DIR="${DEV_CLOUDFLARE_TUNNEL_LOCK_DIR:-/tmp/tx-agent-kit-dev-tunnel.lock}"
 DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS="${DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS:-120}"
@@ -136,6 +166,7 @@ release_tunnel_lock_if_owned() {
 cleanup() {
   stop_cloudflare_tunnel
   release_tunnel_lock_if_owned
+  rm -f "$PROJECT_ROOT/.data/dev-env-overlay" >/dev/null 2>&1 || true
 }
 
 trap cleanup EXIT INT TERM
@@ -210,6 +241,11 @@ start_cloudflare_tunnel_if_enabled() {
     echo "Cloudflare named tunnel started."
   fi
 }
+
+# Sweep dev/integration servers orphaned by a removed/pruned worktree or a
+# kill -9 / crash that skipped the EXIT trap. Safe (their worktree is gone) and
+# keeps the shared Postgres/Temporal + Docker VM from being loaded by zombies.
+"$SCRIPT_DIR/dev/reap-orphan-servers.sh" || true
 
 pnpm infra:ensure
 pnpm temporal:dev:up

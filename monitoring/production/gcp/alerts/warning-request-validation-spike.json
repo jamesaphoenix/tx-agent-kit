@@ -1,0 +1,30 @@
+{
+  "displayName": "[WARNING] tx-agent-kit - Request Validation Rejection Spike",
+  "documentation": {
+    "content": "## Request Validation Rejection Spike Warning\n\n**Severity:** WARNING (collect, do not page)\n\nA sustained spike in request-validation rejections (`HttpApiDecodeError` 4xx - a bad path/query/body shape) has been detected. These are client errors the framework already answers with a 400, so this alert exists to surface a *regression*, not to page on every malformed request.\n\nWhat a spike usually means:\n- A frontend / SDK / MCP client started sending malformed requests (a real contract regression worth investigating).\n- A new deploy changed a request shape without regenerating the typed client.\n\n### Why this alert (and not just Sentry)\nThe API boundary reports an *authenticated* caller's decode rejection to Sentry as a `client-contract-violation` (see `apps/api/src/observability/sentry.ts`). But agent-surface MCP / OAuth-resource tokens are verified via a DB-backed path the pre-decode stamp middleware deliberately does NOT run, so an MCP client's decode rejection is classified `authenticated=\"false\"` and never reaches Sentry. This metric counter is incremented for EVERY decode rejection regardless of classification, so alerting on its rate is what covers that gap - the documented replacement for the deferred 'cover MCP tokens' follow-up. Slice by `operation_id` at triage time to see whether an agent-surface operation is the one spiking.\n\n### Threshold note\n`TODO: tune threshold` - The catch-all predicate of 2 rejections/s (over 10m) and the authenticated-only predicate of 0.2/s are rough starting points. During staging load testing:\n1. Measure the steady-state `tx_agent_kit_api_request_validation_rejected_total` rate under normal traffic (anonymous bot noise sets a non-zero floor).\n2. Set the catch-all threshold to ~10x that baseline.\n3. The `authenticated=\"true\"` predicate should stay low: our own typed clients should almost never send malformed input, so any sustained authenticated rate is suspicious.\n4. Update the predicates in this policy and re-apply.\n\n### Metrics\n- `tx_agent_kit_api_request_validation_rejected_total{operation_id, field, authenticated}` - counter: one per request-validation rejection. Low-cardinality labels only; the offending value is NOT a label (it goes to the structured warn log).\n\n### Triage\n1. Break the counter down by `operation_id` - which endpoint(s) are rejecting? `sum by (operation_id) (rate(tx_agent_kit_api_request_validation_rejected_total[5m]))`.\n2. Break down by `authenticated` - `true` means one of our session clients (web/SDK) regressed; `false` is anonymous noise OR an agent-surface MCP client (cross-check the `operation_id` against the agent surface).\n3. Break down by `field` - which schema field is failing? Points straight at the offending request shape.\n4. Check the API warn logs for the offending value (Loki: `{service=\"api\"} |= \"Rejected malformed request\"`).\n5. If an authenticated client regressed, also check Sentry for the matching `client-contract-violation` fingerprint.\n\n### Runbook\nSee `docs/RUNBOOKS.md` -> API & Request Validation section.",
+    "mimeType": "text/markdown",
+    "subject": "[WARNING] Request-validation rejection spike detected"
+  },
+  "userLabels": {
+    "severity": "warning",
+    "component": "api",
+    "team": "tx-agent-kit"
+  },
+  "conditions": [
+    {
+      "displayName": "Request-validation rejections > 2/s sustained 10m, or authenticated > 0.2/s (TODO: tune to staging baseline)",
+      "conditionPrometheusQueryLanguage": {
+        "query": "(sum(rate(tx_agent_kit_api_request_validation_rejected_total[5m])) > 2) or (sum(rate(tx_agent_kit_api_request_validation_rejected_total{authenticated=\"true\"}[5m])) > 0.2)",
+        "duration": "600s",
+        "evaluationInterval": "60s",
+        "alertRule": "request_validation_rejection_spike_warning",
+        "labels": {
+          "severity": "warning"
+        }
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": []
+}

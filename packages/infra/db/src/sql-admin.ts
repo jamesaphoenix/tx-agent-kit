@@ -59,6 +59,65 @@ export const resolveRepoRoot = (start = process.cwd()): string => {
   }
 }
 
+export type DuplicateMigrationPrefix = {
+  readonly prefix: string
+  readonly files: ReadonlyArray<string>
+}
+
+// Extract the leading numeric prefix that orders a migration (e.g. "0050" from
+// "0050_foo.sql"). Files without a numeric prefix fall back to their full name so
+// they are still compared against one another rather than silently grouped.
+const migrationPrefix = (fileName: string): string => /^(\d+)/u.exec(fileName)?.[1] ?? fileName
+
+// Pure, side-effect-free detector: group migration file names by their numeric
+// prefix and return only the groups that collide. Exported so the guard can be
+// unit-tested without touching the filesystem.
+export const findDuplicateMigrationPrefixes = (
+  fileNames: ReadonlyArray<string>
+): ReadonlyArray<DuplicateMigrationPrefix> => {
+  const byPrefix = new Map<string, string[]>()
+  for (const fileName of fileNames) {
+    const prefix = migrationPrefix(fileName)
+    const existing = byPrefix.get(prefix)
+    if (existing) {
+      existing.push(fileName)
+    } else {
+      byPrefix.set(prefix, [fileName])
+    }
+  }
+
+  return [...byPrefix.entries()]
+    .filter(([, files]) => files.length > 1)
+    .map(([prefix, files]) => ({
+      prefix,
+      files: [...files].sort((left, right) => left.localeCompare(right))
+    }))
+    .sort((left, right) => left.prefix.localeCompare(right.prefix))
+}
+
+// Fail fast when two migrations share a number. Without this, two branches that
+// each took the same prefix (e.g. both `0050_*.sql`) merge cleanly into staging
+// and BOTH get applied in alphabetical order - an order that can differ from the
+// order they applied elsewhere, silently diverging schemas across environments.
+// Raising here turns that into a hard error at the point migrations are loaded
+// (migrator, deploy, `pnpm dev`, and every integration test) instead of a no-op.
+export const assertUniqueMigrationPrefixes = (fileNames: ReadonlyArray<string>): void => {
+  const duplicates = findDuplicateMigrationPrefixes(fileNames)
+  if (duplicates.length === 0) {
+    return
+  }
+
+  const details = duplicates
+    .map(({ prefix, files }) => `migration number ${prefix} is used by ${files.join(', ')}`)
+    .join('; ')
+
+  throw new Error(
+    `Duplicate migration numbers detected: ${details}. ` +
+      'Renumber one migration so every file has a unique sequential prefix ' +
+      '(this usually means two git branches both took the same number before merging).'
+  )
+}
+
 export const getMigrationFiles = (
   repoRoot: string,
   relativePath = migrationsRelativePath
@@ -68,13 +127,16 @@ export const getMigrationFiles = (
     return []
   }
 
-  return readdirSync(migrationDir)
+  const fileNames = readdirSync(migrationDir)
     .filter((fileName) => fileName.endsWith('.sql'))
     .sort((left, right) => left.localeCompare(right))
-    .map((name) => ({
-      name,
-      sql: readFileSync(resolve(migrationDir, name), 'utf8')
-    }))
+
+  assertUniqueMigrationPrefixes(fileNames)
+
+  return fileNames.map((name) => ({
+    name,
+    sql: readFileSync(resolve(migrationDir, name), 'utf8')
+  }))
 }
 
 export const getSchemaFiles = (

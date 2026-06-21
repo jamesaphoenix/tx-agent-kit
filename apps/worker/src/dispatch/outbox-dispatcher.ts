@@ -9,6 +9,7 @@ import {
 } from '@tx-agent-kit/observability'
 import type { SerializedDomainEvent } from '../activities.js'
 import { activities } from '../activities.js'
+import { captureWorkerException } from '../observability/sentry.js'
 import { resolveDispatch } from './resolve-dispatch.js'
 
 // The dispatcher runs in plain Node (no Temporal determinism sandbox), so it
@@ -239,6 +240,9 @@ export function startOutboxDispatcher(
     listener = pg
     pg.on('error', (error: Error) => {
       logger.error('Outbox listener connection error; reconnecting.', { error: error.message })
+      // The dispatcher self-heals via scheduleReconnect, but the failure must still
+      // surface in Sentry rather than only in logs.
+      captureWorkerException(error)
       scheduleReconnect()
     })
     pg.on('notification', () => {

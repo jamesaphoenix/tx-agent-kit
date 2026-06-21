@@ -4,7 +4,41 @@ set -euo pipefail
 # Source a .env file into the current shell with set -a semantics, resolving
 # 1Password op:// references on the fly when the op CLI is available.
 
+# Tunnel-mode support: every source_env call re-applies the overlay env file
+# AFTER the requested file. Without this, per-app dev scripts that re-source
+# .env (apps/api, apps/web, ...) would clobber the overlay values - turbo's
+# strict env mode strips ad-hoc vars from task environments, so the overlay must
+# be rediscovered on each source. The overlay is discovered from (in order):
+#   1. TX_DEV_ENV_OVERLAY - explicit, for ad-hoc shells
+#   2. .data/dev-env-overlay next to the sourced env file - written by
+#      `scripts/dev.sh --tunnel`, survives turbo strict env mode.
 source_env() {
+  local env_file="${1:-}"
+
+  __source_env_one "$env_file"
+
+  local overlay="${TX_DEV_ENV_OVERLAY:-}"
+  if [[ -z "$overlay" && -n "$env_file" && -f "$env_file" ]]; then
+    # Resolve to an absolute path first: per-app dev scripts pass relative
+    # paths like ../../.env, and the marker must be found regardless of the
+    # caller's working directory (and never found in worktrees, which have
+    # their own checkout root without a marker).
+    local env_dir marker
+    env_dir="$(cd "$(dirname "$env_file")" 2>/dev/null && pwd)"
+    if [[ -n "$env_dir" ]]; then
+      marker="${env_dir}/.data/dev-env-overlay"
+      if [[ -f "$marker" ]]; then
+        overlay="$(head -n 1 "$marker")"
+      fi
+    fi
+  fi
+
+  if [[ -n "$overlay" && -f "$overlay" && "$overlay" != "$env_file" ]]; then
+    __source_env_one "$overlay"
+  fi
+}
+
+__source_env_one() {
   local env_file="${1:-}"
 
   if [[ -z "$env_file" || ! -f "$env_file" ]]; then

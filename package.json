@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "./scripts/dev.sh",
+    "dev:tunnel": "./scripts/dev.sh --tunnel",
     "dev:web": "turbo run dev --filter=@tx-agent-kit/web",
     "dev:api": "turbo run dev --filter=@tx-agent-kit/api",
     "dev:worker": "turbo run dev --filter=@tx-agent-kit/worker",
@@ -38,13 +39,17 @@
     "lint:product-leaks": "node ./scripts/lint/enforce-product-leak-and-secret-policy.mjs",
     "lint:knip:strict": "knip --no-progress --reporter compact",
     "lint:jscpd": "jscpd --config .jscpd.json apps/api/src packages/core/src scripts",
-    "lint:invariants": "node ./scripts/lint/enforce-domain-invariants.mjs && node ./scripts/lint/enforce-web-client-contracts.mjs && node ./scripts/lint/enforce-route-kind-contracts.mjs && node ./scripts/lint/enforce-source-type-safety.mjs && node ./scripts/lint/enforce-compose-runtime-contracts.mjs && node ./scripts/lint/enforce-tsconfig-alignment.mjs && node ./scripts/lint/enforce-domain-event-contracts.mjs && node ./scripts/lint/enforce-enum-sync.mjs && node ./scripts/lint/enforce-no-hardcoded-test-emails.mjs && pnpm lint:product-leaks && pnpm agent-surfaces:check && node ./scripts/lint/enforce-agent-client-surface-sync.mjs && pnpm permissions:check && node ./scripts/lint/enforce-e2e-budget.mjs",
+    "lint:invariants": "node ./scripts/lint/run-invariants.mjs",
+    "lint:invariants:serial": "node ./scripts/lint/enforce-domain-invariants.mjs && node ./scripts/lint/enforce-web-client-contracts.mjs && node ./scripts/lint/enforce-route-kind-contracts.mjs && node ./scripts/lint/enforce-source-type-safety.mjs && node ./scripts/lint/enforce-compose-runtime-contracts.mjs && node ./scripts/lint/enforce-tsconfig-alignment.mjs && node ./scripts/lint/enforce-domain-event-contracts.mjs && node ./scripts/lint/enforce-enum-sync.mjs && node ./scripts/lint/enforce-no-hardcoded-test-emails.mjs && pnpm lint:product-leaks && pnpm agent-surfaces:check && node ./scripts/lint/enforce-agent-client-surface-sync.mjs && pnpm permissions:check && node ./scripts/lint/enforce-e2e-budget.mjs",
     "lint:ci-env": "node ./scripts/validate-ci-env.mjs",
     "lint:shell": "./scripts/check-shell-invariants.sh",
     "test": "turbo run test",
     "test:quiet": "./scripts/test-quiet.sh",
+    "test:affected": "./scripts/test-affected.sh",
     "test:integration": "./scripts/test/run-integration.sh",
     "test:integration:quiet": "./scripts/test-integration-quiet.sh",
+    "test:integration:repeat": "./scripts/test-integration-repeat.sh",
+    "ci:check": "./scripts/ci/check-branch-ci.sh",
     "test:integration:live:k3s": "TESTKIT_INCLUDE_LIVE_INTEGRATION=1 RUN_LIVE_K3S_STAGING_INTEGRATION=1 pnpm test:integration --filter testkit -- packages/testkit/src/deploy-k3s-live.integration.test.ts",
     "test:integration:live:tunnel": "TESTKIT_INCLUDE_LIVE_INTEGRATION=1 RUN_LIVE_TUNNEL_INTEGRATION=1 pnpm test:integration --filter testkit -- packages/testkit/src/deploy-tunnel-live.integration.test.ts",
     "test:integration:live:tunnel:negative": "TESTKIT_INCLUDE_LIVE_INTEGRATION=1 RUN_LIVE_TUNNEL_NEGATIVE_INTEGRATION=1 LIVE_TUNNEL_MODE=dev pnpm test:integration --filter testkit -- packages/testkit/src/deploy-tunnel-live.integration.test.ts",
@@ -125,6 +130,7 @@
     "eslint-plugin-boundaries": "^6.0.2",
     "eslint-plugin-no-only-tests": "^3.3.0",
     "eslint-plugin-promise": "^7.2.1",
+    "eslint-plugin-testing-library": "^7.16.2",
     "eslint-plugin-unicorn": "^63.0.0",
     "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^17.5.0",
@@ -138,6 +144,12 @@
     "vitest": "^4.1.4"
   },
   "pnpm": {
+    "overrides": {
+      "@grpc/grpc-js@<1.14.4": "1.14.4",
+      "esbuild@>=0.17.0 <0.28.1": "0.28.1",
+      "hono@<4.12.25": "4.12.25",
+      "undici@>=6.0.0 <6.27.0": "6.27.0"
+    },
     "patchedDependencies": {
       "@openrouter/sdk@0.9.11": "patches/@openrouter__sdk@0.9.11.patch"
     }

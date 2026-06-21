@@ -11,21 +11,10 @@ import { readIntegrationRouterLocation } from '../integration/support/next-route
 import { renderWithProviders, screen, userEvent, waitFor } from '../integration/test-utils'
 import { createWebFactoryContext } from '../integration/support/web-integration-context'
 
-/** Retry an async factory call to tolerate transient server availability gaps. */
-const withRetry = async <T,>(fn: () => Promise<T>, retries = 3, delayMs = 500): Promise<T> => {
-  for (let attempt = 0; attempt < retries; attempt++) {
-    try {
-      return await fn()
-    } catch (error) {
-      const isFetchError = error instanceof TypeError && /fetch failed/i.test(error.message)
-      if (!isFetchError || attempt === retries - 1) {
-        throw error
-      }
-      await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)))
-    }
-  }
-  throw new Error('withRetry exhausted')
-}
+// NOTE: createUser already retries transient sign-up/login failures internally
+// (see testkitRetryDelaysMs + signInAfterPartialSignUp in api-factories.ts), so
+// it is called directly here. A bespoke fixed-sleep withRetry wrapper would
+// duplicate that backoff and trips the no-fixed-sleep flake guardrail.
 
 describe('AuthForm integration', () => {
   beforeEach(() => { clearAuthToken() })
@@ -54,11 +43,11 @@ describe('AuthForm integration', () => {
 
   it('shows an error when sign-up email is already in use', async () => {
     const factoryContext = createWebFactoryContext()
-    const existing = await withRetry(() => createUser(factoryContext, {
+    const existing = await createUser(factoryContext, {
       email: `web-sign-up-dup-${uid}@example.com`,
       password: 'existing-pass-12345',
       name: 'Existing Sign Up User'
-    }))
+    })
 
     // Clear any token from previous tests or createUser
     clearAuthToken()
@@ -84,11 +73,11 @@ describe('AuthForm integration', () => {
 
   it('signs in an existing user', async () => {
     const factoryContext = createWebFactoryContext()
-    const created = await withRetry(() => createUser(factoryContext, {
+    const created = await createUser(factoryContext, {
       email: `web-sign-in-${uid}@example.com`,
       password: 'sign-in-pass-12345',
       name: 'Sign In User'
-    }))
+    })
 
     const user = userEvent.setup()
 
@@ -109,11 +98,11 @@ describe('AuthForm integration', () => {
 
   it('surfaces an error when sign-in credentials are invalid', async () => {
     const factoryContext = createWebFactoryContext()
-    const created = await withRetry(() => createUser(factoryContext, {
+    const created = await createUser(factoryContext, {
       email: `web-sign-in-invalid-${uid}@example.com`,
       password: 'valid-pass-12345',
       name: 'Invalid Sign In User'
-    }))
+    })
 
     // Clear any token — capture state before form submission
     clearAuthToken()
