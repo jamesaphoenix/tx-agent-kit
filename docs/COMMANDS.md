@@ -8,6 +8,7 @@
 - `pnpm temporal:dev:down`: stop local Temporal CLI server managed by repo scripts.
 - `pnpm temporal:dev:status`: inspect Temporal runtime mode + local CLI health.
 - `pnpm dev`: run web + api + worker locally with hot reload (auto-runs infra ensure + local Temporal CLI in `cli` mode). When `DEV_CLOUDFLARE_TUNNEL_ENABLED=true`, starts a Cloudflare tunnel for local API exposure and stops it on shutdown.
+- `scripts/dev/reap-orphan-servers.sh [--dry-run]`: reap api/worker/web servers orphaned by a removed/pruned worktree or a `kill -9`/crash that skipped the EXIT trap (a process whose worktree directory is gone is safe to kill; live-worktree servers are never touched). Runs automatically as a `pnpm dev` preflight and by `scripts/worktree/manage.sh remove`.
 - `DEV_CLOUDFLARE_TUNNEL_ENABLED=true pnpm dev`: enable local API tunnel during dev. Tunnel ownership is lock-guarded across worktrees; if another worktree owns the tunnel lock, dev continues and tunnel startup is skipped.
 - `pnpm dev:tunnel:status`: inspect local dev tunnel lock ownership (`active|stale|unlocked`) and owner metadata.
 - Optional tunnel overrides: `DEV_CLOUDFLARE_TUNNEL_URL`, `DEV_CLOUDFLARE_TUNNEL_TOKEN`, `DEV_CLOUDFLARE_TUNNEL_LOG_FILE`, `DEV_CLOUDFLARE_TUNNEL_LOCK_DIR`, `DEV_CLOUDFLARE_TUNNEL_STALE_TIMEOUT_SECONDS`, `DEV_CLOUDFLARE_TUNNEL_MISSING_PID_GRACE_SECONDS`.

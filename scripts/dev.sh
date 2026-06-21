@@ -211,6 +211,11 @@ start_cloudflare_tunnel_if_enabled() {
   fi
 }
 
+# Sweep dev/integration servers orphaned by a removed/pruned worktree or a
+# kill -9 / crash that skipped the EXIT trap. Safe (their worktree is gone) and
+# keeps the shared Postgres/Temporal + Docker VM from being loaded by zombies.
+"$SCRIPT_DIR/dev/reap-orphan-servers.sh" || true
+
 pnpm infra:ensure
 pnpm temporal:dev:up
 start_cloudflare_tunnel_if_enabled
