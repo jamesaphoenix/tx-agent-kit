@@ -2,6 +2,13 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Types are gated separately in CI (`pnpm type-check`), so running tsc again
+  // inside `next build` is redundant. That in-build pass walks the whole
+  // monorepo source graph via project references and OOMs the builder (exit
+  // 137). Skipping it removes the OOM and cuts build time; type regressions
+  // still block merges via the CI gate. (Next dropped built-in ESLint-during-
+  // build, so there is no eslint key to disable here.)
+  typescript: { ignoreBuildErrors: true },
   transpilePackages: ['@tx-agent-kit/contracts'],
   env: {
     NEXT_PUBLIC_API_BASE_URL:
