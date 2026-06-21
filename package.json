@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "./scripts/dev.sh",
+    "dev:tunnel": "./scripts/dev.sh --tunnel",
     "dev:web": "turbo run dev --filter=@tx-agent-kit/web",
     "dev:api": "turbo run dev --filter=@tx-agent-kit/api",
     "dev:worker": "turbo run dev --filter=@tx-agent-kit/worker",
