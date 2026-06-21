@@ -100,6 +100,10 @@ per-webhook), and the E2E job sets `AUTO_FIX_TRIGGER_MODE=stub`. The integration
 (testkit api-server-harness) does NOT hit this hang, which is why the core suite is green.
 
 **Follow-up (out of scope for this infra port):** investigate the api `tsx watch` startup hang
-under the E2E env (likely a telemetry/OTEL or layer-construction block the harness path avoids),
-or align the E2E api-start with the upstream source. The job is now strictly closer to green than
-before this work, with diagnostics captured.
+under the E2E env. RULED OUT so far: the auto-fix trigger (`AutoFixTriggerLive` is `Layer.succeed`,
+lazy + stub-gated) and eager OIDC discovery (`getGoogleOidcRuntime` is lazy/cached, byte-identical to
+upstream whose E2E is green). The hang is SILENT (no error logged after "Starting API server"),
+pointing at telemetry/OTEL init or server-runtime layer construction that the testkit api-server-harness
+startup path does not exercise. Next step: add startup tracing or reproduce with the exact E2E env
+(closed-port `GOOGLE_OIDC_ISSUER_URL`, full deploy-style env). The job is strictly closer to green than
+before this work, with service logs now captured on failure.
