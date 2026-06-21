@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { sentryInitMock } = vi.hoisted(() => ({
-  sentryInitMock: vi.fn()
+const { sentryInitMock, sentryCaptureExceptionMock } = vi.hoisted(() => ({
+  sentryInitMock: vi.fn(),
+  sentryCaptureExceptionMock: vi.fn()
 }))
 
 const mutableProcessEnv = process.env as Record<string, string | undefined>
 
 vi.mock('@sentry/browser', () => ({
-  init: sentryInitMock
+  init: sentryInitMock,
+  captureException: sentryCaptureExceptionMock
 }))
 
 describe('initializeWebSentry', () => {
@@ -100,5 +102,57 @@ describe('initializeWebSentry', () => {
 
     await expect(initializeWebSentry()).resolves.toBe(false)
     expect(sentryInitMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('reportWebError', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    delete mutableProcessEnv.NEXT_PUBLIC_SENTRY_DSN
+    delete mutableProcessEnv.NEXT_PUBLIC_NODE_ENV
+    delete mutableProcessEnv.NEXT_PUBLIC_SENTRY_SPOTLIGHT
+    delete mutableProcessEnv.SENTRY_SPOTLIGHT
+    delete mutableProcessEnv.NODE_ENV
+  })
+
+  it('initializes Sentry on demand and captures the error when a DSN is configured', async () => {
+    mutableProcessEnv.NEXT_PUBLIC_SENTRY_DSN = 'https://public@sentry.example.com/1'
+
+    const { reportWebError } = await import('./sentry')
+    const error = new Error('boundary failure')
+
+    await expect(reportWebError(error)).resolves.toBe(true)
+    expect(sentryInitMock).toHaveBeenCalledTimes(1)
+    expect(sentryCaptureExceptionMock).toHaveBeenCalledWith(error)
+  })
+
+  it('captures the error without re-initializing when Sentry is already initialized', async () => {
+    mutableProcessEnv.NEXT_PUBLIC_SENTRY_DSN = 'https://public@sentry.example.com/1'
+
+    const { initializeWebSentry, reportWebError } = await import('./sentry')
+    await initializeWebSentry()
+
+    await expect(reportWebError(new Error('late failure'))).resolves.toBe(true)
+    expect(sentryInitMock).toHaveBeenCalledTimes(1)
+    expect(sentryCaptureExceptionMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns false and captures nothing when no DSN is configured', async () => {
+    const { reportWebError } = await import('./sentry')
+
+    await expect(reportWebError(new Error('unreported'))).resolves.toBe(false)
+    expect(sentryCaptureExceptionMock).not.toHaveBeenCalled()
+  })
+
+  it('never throws when capture itself fails', async () => {
+    mutableProcessEnv.NEXT_PUBLIC_SENTRY_DSN = 'https://public@sentry.example.com/1'
+    sentryCaptureExceptionMock.mockImplementation(() => {
+      throw new Error('sentry exploded')
+    })
+
+    const { reportWebError } = await import('./sentry')
+
+    await expect(reportWebError(new Error('original'))).resolves.toBe(false)
   })
 })

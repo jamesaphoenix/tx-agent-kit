@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
+
 /**
  * Self-contained global error boundary.
  *
@@ -17,6 +19,20 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    // React swallows errors caught by this boundary, so Sentry's global
+    // handlers never see them, so report explicitly. Dynamic import keeps the
+    // prerendered boundary chunk free of the shared SPA bundle (see above).
+    void (async () => {
+      try {
+        const { reportWebError } = await import('@/lib/sentry')
+        await reportWebError(error)
+      } catch {
+        // Reporting must never break the error screen.
+      }
+    })()
+  }, [error])
+
   return (
     <html lang="en">
       <body

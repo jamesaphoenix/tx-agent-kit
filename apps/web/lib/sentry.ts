@@ -51,6 +51,28 @@ export const initializeWebSentry = (): Promise<boolean> => {
   })()
 }
 
+/**
+ * Explicitly report an error to Sentry. Needed by error boundaries:
+ * React swallows render errors it catches, so `window.onerror` never fires
+ * and the SDK's global handlers never see them.
+ *
+ * Returns true when the error was handed to Sentry, false when reporting is
+ * unavailable (no DSN) or fails. Never throws.
+ */
+export const reportWebError = async (error: unknown): Promise<boolean> => {
+  try {
+    await initializeWebSentry()
+    if (!isInitialized) {
+      return false
+    }
+    const Sentry = await import('@sentry/browser')
+    Sentry.captureException(error)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const _resetWebSentryForTest = (): void => {
   isInitialized = false
   initializationPromise = null
