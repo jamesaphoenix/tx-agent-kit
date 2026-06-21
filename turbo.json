@@ -27,6 +27,7 @@
       "outputs": ["dist/**/*.d.ts", "dist/**/*.d.ts.map"]
     },
     "lint": {
+      "dependsOn": ["^build"],
       "outputs": []
     },
     "test": {
