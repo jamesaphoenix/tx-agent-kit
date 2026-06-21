@@ -165,13 +165,34 @@ jobs:
       # before the bounded test step. Playwright's webServer block also reuses
       # this already-running prod web server.
       - name: Start api
-        run: pnpm dev:api &
+        run: |
+          log_file="${RUNNER_TEMP}/e2e-api.log"
+          echo "API log: ${log_file}"
+          pnpm --filter @tx-agent-kit/api dev >"${log_file}" 2>&1 &
+          echo "$!" >"${RUNNER_TEMP}/e2e-api.pid"
       - name: Start web (production server)
-        run: pnpm --filter @tx-agent-kit/web run e2e:serve &
+        run: |
+          log_file="${RUNNER_TEMP}/e2e-web.log"
+          echo "Web log: ${log_file}"
+          ./scripts/dev/kill-stale-service.sh web
+          pnpm --filter @tx-agent-kit/web run e2e:serve >"${log_file}" 2>&1 &
+          echo "$!" >"${RUNNER_TEMP}/e2e-web.pid"
       - name: Wait for api + web readiness
         run: |
           api_port="${API_PORT:-4000}"
           web_port="${WEB_PORT:-3000}"
+          dump_service_logs() {
+            echo "::group::E2E API log"
+            tail -n 200 "${RUNNER_TEMP}/e2e-api.log" || true
+            echo "::endgroup::"
+            echo "::group::E2E web log"
+            tail -n 200 "${RUNNER_TEMP}/e2e-web.log" || true
+            echo "::endgroup::"
+            echo "::group::E2E port listeners"
+            lsof -nP -iTCP:"${api_port}" -sTCP:LISTEN || true
+            lsof -nP -iTCP:"${web_port}" -sTCP:LISTEN || true
+            echo "::endgroup::"
+          }
           poll() {
             local name="$1" url="$2"
             for i in $(seq 1 120); do
@@ -182,6 +203,7 @@ jobs:
               sleep 1
             done
             echo "$name did NOT become ready at $url within 120s" >&2
+            dump_service_logs
             return 1
           }
           poll api "http://localhost:${api_port}/health"
