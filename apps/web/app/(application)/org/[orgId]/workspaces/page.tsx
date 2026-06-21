@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { DashboardShell } from '../../../../../components/DashboardShell'
 import { useCurrentPrincipal } from '../../../../../hooks/use-session-store'
 import { notify } from '../../../../../lib/notify'
+import { isUuid, NIL_UUID } from '../../../../../lib/id-validation'
 import {
   useTeamsListTeams,
   useTeamsCreateTeam,
@@ -29,6 +30,7 @@ export default function WorkspacesPage() {
   const router = useRouter()
   const params = useParams<{ orgId: string }>()
   const orgId = params.orgId
+  const hasValidOrgId = isUuid(orgId)
   const principal = useCurrentPrincipal()
   const queryClient = useQueryClient()
 
@@ -37,8 +39,8 @@ export default function WorkspacesPage() {
   const [deleteTeamId, setDeleteTeamId] = useState<string | null>(null)
 
   const teamsQuery = useTeamsListTeams(
-    { organizationId: orgId },
-    { query: {} }
+    { organizationId: hasValidOrgId ? orgId : NIL_UUID },
+    { query: { enabled: hasValidOrgId } }
   )
 
   const teams = teamsQuery.data?.data ?? []
