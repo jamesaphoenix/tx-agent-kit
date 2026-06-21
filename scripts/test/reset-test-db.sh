@@ -96,14 +96,46 @@ lock_acquire \
   "${DB_RESET_LOCK_MISSING_PID_GRACE_SECONDS:-15}"
 trap 'lock_release "$LOCK_DIR"' EXIT
 
-echo "Applying migrations..."
-pnpm db:migrate
-
 POSTGRES_CONTAINER_ID="$(docker compose -p "$COMPOSE_PROJECT_NAME" ps -q postgres)"
 if [[ -z "$POSTGRES_CONTAINER_ID" ]]; then
   echo "Postgres container is not running for compose project '$COMPOSE_PROJECT_NAME'."
   exit 1
 fi
+
+# Garbage-collect leaked per-run test schemas (killed runs skip teardown and
+# leave their schema behind; the CI database accumulated 12,240 of them by
+# 2026-06-12). Best-effort hygiene: a GC failure must not fail the reset.
+echo "Garbage-collecting leaked test schemas..."
+if ! sed "s/__MAX_AGE_HOURS__/${TEST_SCHEMA_GC_MAX_AGE_HOURS:-24}/g" ./scripts/test/gc-test-schemas.sql |
+  docker exec -i "$POSTGRES_CONTAINER_ID" psql -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME"; then
+  echo "Schema GC failed (non-fatal); continuing."
+fi
+
+# Ensure the shared updated_at trigger function exists in `public` BEFORE
+# migrating. Migration 0034 guards its creation with an unqualified
+# `pg_proc WHERE proname = 'set_updated_at'` check that matches the function in
+# ANY schema. On a long-lived DB the runner keeps other schemas that already
+# define it (protected `wt_*` worktree schemas, `public` itself, recent per-run
+# schemas the age-based GC does not drop), so on a freshly migrated `public`
+# the guard finds a stray copy, skips creation, and the follow-up CREATE TRIGGER
+# fails with "function set_updated_at() does not exist". Pre-creating it in
+# `public` (idempotent) makes the trigger resolve regardless of stray copies.
+# This is a test-harness concern only (many schemas share one Postgres
+# instance); single-schema prod/staging DBs are unaffected, so migration 0034
+# is deliberately left untouched (editing an applied migration would risk a
+# drizzle hash mismatch on databases that already ran it).
+echo "Ensuring set_updated_at() exists in public before migrate..."
+docker exec -i "$POSTGRES_CONTAINER_ID" psql -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" <<'SQL'
+CREATE OR REPLACE FUNCTION public.set_updated_at() RETURNS trigger AS $fn$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$fn$ LANGUAGE plpgsql;
+SQL
+
+echo "Applying migrations..."
+pnpm db:migrate
 
 echo "Resetting test database state in '$DB_NAME'..."
 pnpm --silent exec tsx ./scripts/test/render-reset-public-sql.ts |
