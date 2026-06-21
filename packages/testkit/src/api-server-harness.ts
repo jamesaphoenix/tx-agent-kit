@@ -185,6 +185,12 @@ export const createApiServerHarness = (
         AUTH_SECRET: authSecret,
         DATABASE_URL: options.testContext.schemaDatabaseUrl,
         API_CORS_ORIGIN: corsOrigin,
+        // Honour the test-injected x-forwarded-for so the per-IP auth rate limiter keys
+        // off each factory request's unique synthetic client IP (see nextTestClientIp in
+        // api-factories) instead of collapsing every request onto the shared 127.0.0.1
+        // socket address. Without this a full suite exhausts the per-IP bucket; tests that
+        // assert throttling set their own fixed x-forwarded-for and still isolate correctly.
+        TRUST_PROXY: 'true',
         AUTH_RATE_LIMIT_MAX_REQUESTS: '200',
         AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '200',
         TX_STORAGE_MODE: testkitProcessEnv.TX_STORAGE_MODE ?? 'memory',

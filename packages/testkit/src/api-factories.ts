@@ -120,6 +120,19 @@ const deleteUserResponseSchema = Schema.Struct({
   deleted: Schema.Boolean
 })
 
+// Give every factory request a unique synthetic source IP so the per-IP auth rate
+// limit never accumulates across a full suite run against the one shared test API
+// server (each createUser/loginUser is one sign-up/sign-in from the client's IP, and
+// hundreds of them from a single 127.0.0.1 would otherwise exhaust the limit). Tests
+// that deliberately exercise the limiter pass their own `x-forwarded-for`, which still
+// wins because the caller's headers are spread last.
+let testClientIpCounter = 0
+const nextTestClientIp = (): string => {
+  testClientIpCounter += 1
+  const n = testClientIpCounter
+  return `10.${(n >>> 16) & 0xff}.${(n >>> 8) & 0xff}.${n & 0xff}`
+}
+
 const withJsonHeaders = (
   context: ApiFactoryContext,
   caseName: string,
@@ -128,6 +141,7 @@ const withJsonHeaders = (
   const testHeaders = context.testContext.headersForCase(caseName, headers)
   return {
     'content-type': 'application/json',
+    'x-forwarded-for': nextTestClientIp(),
     ...testHeaders
   }
 }
