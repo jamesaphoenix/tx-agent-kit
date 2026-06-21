@@ -10,26 +10,48 @@
 -- codex or claude: agent (which runtime ran), agent_output (structured result),
 -- agent_jsonl_output (raw JSONL/stream output for audit).
 --
--- Plain CREATE TYPE / CREATE TABLE so the objects land in the running schema
--- (current_schema), NOT public.* -- the integration suites run one isolated
--- schema per worker, and CREATE OR REPLACE public.* would contend on the shared
--- catalog tuple and deadlock the parallel-per-schema runs.
+-- Objects are created per-schema (current_schema), NOT public.*, so CI's
+-- parallel-per-schema integration suites never contend on the shared catalog
+-- tuple. The enum creation is guarded with an IF-NOT-EXISTS check scoped to the
+-- running schema so a re-apply (or a shared local DB already carrying the type
+-- under a different migration filename) is idempotent rather than a hard error;
+-- the table + indexes use plain IF NOT EXISTS.
 
 -- Enums (mirrors @tx-agent-kit/contracts autoFixAgentKinds + autoFixRunStatuses)
-CREATE TYPE auto_fix_agent_kind AS ENUM ('codex', 'claude');
-CREATE TYPE auto_fix_run_status AS ENUM (
-  'pending',
-  'dispatched',
-  'running',
-  'pr_opened',
-  'pushed_no_pr',
-  'blocked',
-  'failed',
-  'rate_limited',
-  'skipped'
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_type t
+      JOIN pg_namespace n ON n.oid = t.typnamespace
+     WHERE t.typname = 'auto_fix_agent_kind'
+       AND n.nspname = current_schema()
+  ) THEN
+    CREATE TYPE auto_fix_agent_kind AS ENUM ('codex', 'claude');
+  END IF;
 
-CREATE TABLE auto_fix_runs (
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_type t
+      JOIN pg_namespace n ON n.oid = t.typnamespace
+     WHERE t.typname = 'auto_fix_run_status'
+       AND n.nspname = current_schema()
+  ) THEN
+    CREATE TYPE auto_fix_run_status AS ENUM (
+      'pending',
+      'dispatched',
+      'running',
+      'pr_opened',
+      'pushed_no_pr',
+      'blocked',
+      'failed',
+      'rate_limited',
+      'skipped'
+    );
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS auto_fix_runs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sentry_issue_id TEXT NOT NULL,
   environment TEXT NOT NULL,              -- 'staging' | 'production'
@@ -49,13 +71,13 @@ CREATE TABLE auto_fix_runs (
 );
 
 -- Once-per-issue dedupe key AND webhook dedupe detection.
-CREATE UNIQUE INDEX auto_fix_runs_sentry_issue_unique
+CREATE UNIQUE INDEX IF NOT EXISTS auto_fix_runs_sentry_issue_unique
   ON auto_fix_runs (sentry_issue_id);
 
 -- Query pending / recently-completed runs by status + creation time.
-CREATE INDEX auto_fix_runs_status_idx
+CREATE INDEX IF NOT EXISTS auto_fix_runs_status_idx
   ON auto_fix_runs (status, created_at);
 
 -- Separate staging vs production runs operationally.
-CREATE INDEX auto_fix_runs_environment_idx
+CREATE INDEX IF NOT EXISTS auto_fix_runs_environment_idx
   ON auto_fix_runs (environment);
