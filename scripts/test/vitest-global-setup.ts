@@ -308,6 +308,7 @@ const worktreePortOffset = Number.parseInt(process.env.WORKTREE_PORT_OFFSET ?? '
 const integrationApiPort = 4100 + worktreePortOffset
 const integrationApiBaseUrl = `http://127.0.0.1:${integrationApiPort}`
 const sharedApiAuthSecret = 'integration-shared-auth-secret-32ch'
+const fakeSentryWebhookSecret = 'test-sentry-webhook-secret-for-integration'
 const fakeOpenRouterPort = 4300 + worktreePortOffset
 const fakeOpenRouterBaseUrl = `http://127.0.0.1:${fakeOpenRouterPort}`
 
@@ -580,6 +581,7 @@ const tryReuseSharedApiServer = async (): Promise<ChildProcess | null> => {
   process.env.INTEGRATION_API_PORT = String(integrationApiPort)
   process.env.INTEGRATION_API_BASE_URL = integrationApiBaseUrl
   process.env.INTEGRATION_AUTH_SECRET = sharedApiAuthSecret
+  process.env.INTEGRATION_TEST_SENTRY_WEBHOOK_SECRET_RAW = fakeSentryWebhookSecret
   process.env.TX_INTEGRATION_SHARED_API_READY = '1'
 
   // Return a dummy ChildProcess-like stub so the caller's type signature
@@ -632,6 +634,12 @@ const startSharedApiServer = async (): Promise<ChildProcess> => {
         // posts to /v1/auth/sign-up without a captcha token. An empty secret
         // makes getTurnstileConfig() return null, skipping enforcement.
         TURNSTILE_SECRET_KEY: '',
+        // Auto-fix new-issue webhook receiver: a fixed HMAC secret + a 'staging'
+        // deployment env, with the Temporal trigger swapped for the recording
+        // stub so the webhook integration test never needs a live Temporal.
+        SENTRY_WEBHOOK_SECRET: fakeSentryWebhookSecret,
+        SENTRY_DEPLOYMENT_ENVIRONMENT: 'staging',
+        AUTO_FIX_TRIGGER_MODE: 'stub',
         TX_STORAGE_MODE: process.env.TX_STORAGE_MODE ?? 'memory',
         ...stripeIntegrationTestEnvOverrides(process.env),
         // Sized for CONCURRENT stress integration tests overlapping within
@@ -682,6 +690,7 @@ const startSharedApiServer = async (): Promise<ChildProcess> => {
   process.env.INTEGRATION_API_PORT = String(integrationApiPort)
   process.env.INTEGRATION_API_BASE_URL = integrationApiBaseUrl
   process.env.INTEGRATION_AUTH_SECRET = sharedApiAuthSecret
+  process.env.INTEGRATION_TEST_SENTRY_WEBHOOK_SECRET_RAW = fakeSentryWebhookSecret
   process.env.TX_INTEGRATION_SHARED_API_READY = '1'
 
   if (apiProcess.pid !== undefined) {

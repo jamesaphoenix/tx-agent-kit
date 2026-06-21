@@ -60,7 +60,9 @@ import {
   StorageUsageReaderPortLive,
   UsageCapServicePort,
   UsageCapStorePortLive,
-  makeUsageCapService
+  makeUsageCapService,
+  AutoFixRunStoreLive,
+  AutoFixRunStoreTestLive
 } from '@tx-agent-kit/core'
 import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
@@ -69,7 +71,7 @@ import { flushApiSentry, initializeApiSentry } from './observability/sentry.js'
 import { Effect, Layer } from 'effect'
 import { createServer } from 'node:http'
 import { TxAgentApi } from './api.js'
-import { getApiEnv, getSubscriptionGuardEnabled } from './config/env.js'
+import { getApiEnv, getSubscriptionGuardEnabled, isAutoFixTriggerStubMode } from './config/env.js'
 import { authPrincipalStampMiddleware } from './middleware/auth-principal-stamp.js'
 import { authRateLimitMiddleware } from './middleware/auth-rate-limit.js'
 import { bodyLimitMiddleware } from './middleware/body-limit.js'
@@ -94,6 +96,9 @@ import { StorageLive as StorageRouteLive } from './routes/storage.js'
 import { EmailCampaignsLive } from './routes/email-campaigns.js'
 import { EmailWebhooksLive } from './routes/email-webhooks.js'
 import { EmailUnsubscribeLive } from './routes/email-unsubscribe.js'
+import { SentryWebhooksLive } from './routes/sentry-webhooks.js'
+import { AutoFixTriggerLive } from './adapters/temporal-control.js'
+import { AutoFixTriggerStubLive } from './adapters/auto-fix-trigger-stub.js'
 import { StorageLive as StorageServiceLive } from '@tx-agent-kit/storage'
 import { AssetsLive } from './routes/assets.js'
 import { StorageMeteringLive } from './routes/storage-metering.js'
@@ -113,6 +118,7 @@ const ApiLive = HttpApiBuilder.api(TxAgentApi).pipe(
   Layer.provide(StorageMeteringLive),
   Layer.provide(EmailCampaignsLive),
   Layer.provide(EmailWebhooksLive),
+  Layer.provide(SentryWebhooksLive),
   Layer.provide(EmailUnsubscribeLive)
 )
 
@@ -220,9 +226,22 @@ const ServiceDependenciesLive = Layer.mergeAll(
   EmailCampaignServiceLive
 )
 
+// Auto-fix trigger seam: the live Temporal-backed adapter, OR (test-only, when
+// AUTO_FIX_TRIGGER_MODE=stub) an in-process recording stub that needs the
+// AutoFixRunStoreTestPort audit hook, so it is provided that layer here.
+const autoFixTriggerLayer = isAutoFixTriggerStubMode()
+  ? AutoFixTriggerStubLive.pipe(Layer.provide(AutoFixRunStoreTestLive))
+  : AutoFixTriggerLive
+
+const AutoFixDependenciesLive = Layer.mergeAll(
+  AutoFixRunStoreLive,
+  autoFixTriggerLayer
+)
+
 const ApiWithDependenciesLive = ApiLive.pipe(
   Layer.provide(ServiceDependenciesLive),
-  Layer.provide(PortDependenciesLive)
+  Layer.provide(PortDependenciesLive),
+  Layer.provide(AutoFixDependenciesLive)
 )
 
 export const makeServerLive = (options?: { port?: number; host?: string }) => {

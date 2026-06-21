@@ -93,3 +93,31 @@ __source_env_one() {
 
   rm -f "$resolved" >/dev/null 2>&1 || true
 }
+
+# Decide whether a local .env should be sourced. In CI the environment is
+# provided by the workflow directly, and a committed/op:// .env would fail the
+# strict resolver (op is not on PATH on the runner), so skip it unless explicitly
+# opted in via TX_SOURCE_ENV_IN_CI=1.
+should_source_env_file() {
+  local env_file="${1:-}"
+
+  if [[ -z "$env_file" || ! -f "$env_file" ]]; then
+    return 1
+  fi
+
+  if [[ "${CI:-}" == "true" && "${TX_SOURCE_ENV_IN_CI:-0}" != "1" ]]; then
+    echo "source-env: skipping local .env sourcing in CI (set TX_SOURCE_ENV_IN_CI=1 to opt in)." >&2
+    return 1
+  fi
+
+  return 0
+}
+
+# CI-safe wrapper: source the env file locally, no-op in CI.
+source_env_if_allowed() {
+  local env_file="${1:-}"
+
+  if should_source_env_file "$env_file"; then
+    source_env "$env_file"
+  fi
+}

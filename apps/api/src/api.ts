@@ -51,6 +51,7 @@ import {
   enrollUsersBodySchema,
   enrollUsersResponseSchema,
   resendWebhookResponseSchema,
+  sentryWebhookResponseSchema,
   stepAnalyticsResponseSchema,
   stepListResponseSchema,
   unsubscribeBodySchema,
@@ -911,6 +912,7 @@ const UpdateStepBody = updateStepBodySchema
 const EnrollUsersBody = enrollUsersBodySchema
 const CampaignListParams = campaignListParamsSchema
 const ResendWebhookResponseSchema = resendWebhookResponseSchema
+const SentryWebhookResponseSchema = sentryWebhookResponseSchema
 const UnsubscribeTokenParams = unsubscribeTokenParamsSchema
 const UnsubscribeVerifyResponseSchema = unsubscribeVerifyResponseSchema
 const UnsubscribeBody = unsubscribeBodySchema
@@ -1003,6 +1005,12 @@ export const EmailWebhooksGroup = HttpApiGroup.make('emailWebhooks')
       .addSuccess(ResendWebhookResponseSchema)
   )
 
+export const SentryWebhooksGroup = HttpApiGroup.make('sentryWebhooks')
+  .add(
+    HttpApiEndpoint.post('sentryNewIssueWebhook', '/internal/sentry/new-issue')
+      .addSuccess(SentryWebhookResponseSchema)
+  )
+
 export const EmailUnsubscribeGroup = HttpApiGroup.make('emailUnsubscribe')
   .add(
     HttpApiEndpoint.get('getUnsubscribe', '/v1/email/unsubscribe')
@@ -1036,4 +1044,5 @@ export class TxAgentApi extends HttpApi.make('tx-agent-kit')
   .add(StorageMeteringGroup)
   .add(EmailCampaignsGroup)
   .add(EmailWebhooksGroup)
+  .add(SentryWebhooksGroup)
   .add(EmailUnsubscribeGroup) {}

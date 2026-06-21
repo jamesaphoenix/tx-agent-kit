@@ -35,6 +35,24 @@ env:
   RESEND_API_KEY: ''
   RESEND_FROM_EMAIL: ''
   RESEND_WEBHOOK_SECRET: ''
+  # Auto-fix new-issue webhook: the spawned API actually receives these from the
+  # vitest global setup (stub trigger + fixed HMAC secret); declared here too so
+  # the contract is explicit in CI.
+  SENTRY_WEBHOOK_SECRET: 'test-sentry-webhook-secret-for-integration'
+  SENTRY_DEPLOYMENT_ENVIRONMENT: staging
+  AUTO_FIX_TRIGGER_MODE: stub
+  # API-side Temporal client config. The auto-fix webhook integration test runs
+  # the trigger in stub mode (above), so the API never connects to Temporal in
+  # CI; these are declared (empty/default) to satisfy the CI env contract.
+  TEMPORAL_RUNTIME_MODE: cli
+  TEMPORAL_ADDRESS: localhost:7233
+  TEMPORAL_NAMESPACE: default
+  TEMPORAL_API_KEY: ''
+  TEMPORAL_TLS_ENABLED: 'false'
+  TEMPORAL_TLS_SERVER_NAME: ''
+  TEMPORAL_TLS_CA_CERT_PEM: ''
+  TEMPORAL_TLS_CLIENT_CERT_PEM: ''
+  TEMPORAL_TLS_CLIENT_KEY_PEM: ''
   WEB_BASE_URL: http://localhost:3000
   GOOGLE_OIDC_ISSUER_URL: http://localhost:65535
   GOOGLE_OIDC_CLIENT_ID: ci-google-client-id

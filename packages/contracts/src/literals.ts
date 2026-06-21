@@ -225,3 +225,33 @@ export const permissionActions = [
   'delete_assets'
 ] as const
 export type PermissionAction = (typeof permissionActions)[number]
+
+// ── Auto-Fix Infrastructure literals ────────────────────────────────
+//
+// The pluggable headless coding-agent runtime, the deployment environments an
+// incident can target, the auto_fix_runs row lifecycle, and the agent's
+// structured outcome. Used by the API webhook handler, the sanctioned Temporal
+// adapter, and the host worker (apps/auto-fix-runner) so the routing keys and
+// row shape can't drift.
+
+export const autoFixAgentKinds = ['codex', 'claude'] as const
+export type AutoFixAgentKind = (typeof autoFixAgentKinds)[number]
+
+export const autoFixEnvironments = ['staging', 'production'] as const
+export type AutoFixEnvironment = (typeof autoFixEnvironments)[number]
+
+export const autoFixRunStatuses = [
+  'pending',
+  'dispatched',
+  'running',
+  'pr_opened',
+  'pushed_no_pr',
+  'blocked',
+  'failed',
+  'rate_limited',
+  'skipped'
+] as const
+export type AutoFixRunStatus = (typeof autoFixRunStatuses)[number]
+
+export const autoFixOutcomes = ['fixed', 'blocked', 'no_change'] as const
+export type AutoFixOutcome = (typeof autoFixOutcomes)[number]

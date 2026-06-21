@@ -5,6 +5,8 @@ import {
   authLoginAuditEventTypes,
   authLoginAuditStatuses,
   authLoginProviders,
+  autoFixAgentKinds,
+  autoFixRunStatuses,
   domainEventStatuses,
   emailCampaignStatuses,
   emailCampaignTypes,
@@ -77,6 +79,8 @@ export const emailSendStatusEnum = pgEnum('email_send_status', emailSendStatuses
 export const emailSuppressionReasonEnum = pgEnum('email_suppression_reason', emailSuppressionReasons)
 export const emailCancelReasonEnum = pgEnum('email_cancel_reason', emailCancelReasons)
 export const emailSourceSystemEnum = pgEnum('email_source_system', emailSourceSystems)
+export const autoFixAgentKindEnum = pgEnum('auto_fix_agent_kind', autoFixAgentKinds)
+export const autoFixRunStatusEnum = pgEnum('auto_fix_run_status', autoFixRunStatuses)
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -848,3 +852,35 @@ export type EmailCampaignEnrollmentRow = typeof emailCampaignEnrollments.$inferS
 export type EmailSendRow = typeof emailSends.$inferSelect
 export type EmailSuppressionListRow = typeof emailSuppressionList.$inferSelect
 export type EmailUnsubscribeRow = typeof emailUnsubscribes.$inferSelect
+
+// ── Auto-fix runs (operational infra, NOT a domain event) ────────────
+//
+// The API new-issue webhook inserts a row on a genuinely new issue and starts a
+// Temporal workflow directly via the sanctioned adapter. The unique index on
+// `sentry_issue_id` is both the once-per-issue guarantee and the webhook dedupe
+// key (INSERT ... ON CONFLICT (sentry_issue_id) DO NOTHING). Agent-generic
+// columns (no 'codex' in names) so the pluggable runner can be codex or claude.
+export const autoFixRuns = pgTable('auto_fix_runs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  sentryIssueId: text('sentry_issue_id').notNull(),
+  environment: text('environment').notNull(), // 'staging' | 'production'
+  fingerprint: text('fingerprint'),
+  title: text('title').notNull(),
+  permalink: text('permalink'),
+  status: autoFixRunStatusEnum('status').notNull().default('pending'),
+  branch: text('branch'), // autofix/<sentry_issue_id>
+  agent: autoFixAgentKindEnum('agent'), // 'codex' | 'claude' (null until the activity runs)
+  agentOutput: jsonb('agent_output').$type<JsonObject | null>(), // structured AutoFixResult
+  agentJsonlOutput: text('agent_jsonl_output'), // raw JSONL/stream output for audit
+  prUrl: text('pr_url'),
+  agentError: text('agent_error'),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  uniqueIndex('auto_fix_runs_sentry_issue_unique').on(table.sentryIssueId),
+  index('auto_fix_runs_status_idx').on(table.status, table.createdAt),
+  index('auto_fix_runs_environment_idx').on(table.environment)
+])
+
+export type AutoFixRunRow = typeof autoFixRuns.$inferSelect

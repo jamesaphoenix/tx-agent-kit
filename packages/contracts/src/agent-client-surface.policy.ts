@@ -31,6 +31,11 @@ export const agentClientSurfaceExclusionPolicy = [
     pathPattern: '^/v1/webhooks/'
   },
   {
+    category: 'internal-webhook',
+    rationale: 'Internal infra webhooks (e.g. the auto-fix new-issue receiver under /internal/) are server-to-server callbacks, not CLI or MCP tools.',
+    pathPattern: '^/internal/'
+  },
+  {
     category: 'local-dev',
     rationale: 'Local development helpers should not be exposed by generated agent clients.',
     pathPattern: '^/v1/.*/dev(/|$)|^/v1/dev(/|$)'

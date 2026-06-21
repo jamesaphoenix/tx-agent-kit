@@ -77,3 +77,43 @@ export const AUTH_RATE_LIMIT_POLICIES: Partial<Record<AuthRateLimitedPath, AuthR
 /** Resolves the baseline (pre-env-override) policy for an auth path. */
 export const getDefaultAuthRateLimitPolicy = (path: AuthRateLimitedPath): AuthRateLimitPolicy =>
   AUTH_RATE_LIMIT_POLICIES[path] ?? DEFAULT_AUTH_RATE_LIMIT
+
+// ── Auto-Fix Infrastructure constants ───────────────────────────────
+
+/**
+ * Temporal workflow type for auto-fix issue runs.
+ * Single source of truth; imported by the API adapter + host worker.
+ */
+export const AUTO_FIX_WORKFLOW_TYPE = 'autoFixRequestedWorkflow' as const
+
+/**
+ * Temporal task queue for auto-fix agent activities.
+ * The host worker registers this queue; the API starts workflows onto it
+ * directly (no outbox, no resolveDispatch). A dedicated queue, never the
+ * primary worker's TEMPORAL_TASK_QUEUE — the host runner is single-flight.
+ */
+export const AUTO_FIX_TASK_QUEUE = 'auto-fix' as const
+
+/**
+ * Default agent runtime; selected by the AUTO_FIX_AGENT env var.
+ * If the env var is unset, 'codex' is the fallback.
+ */
+export const DEFAULT_AUTO_FIX_AGENT = 'codex' as const
+
+/**
+ * Daily quota for auto-fix runs (Redis key: 'auto-fix-daily').
+ * Once exhausted, surplus issues are marked rate_limited and NOT retried.
+ */
+export const AUTO_FIX_DAILY_QUOTA = 5 as const
+
+/**
+ * Timeout for a single auto-fix agent activity (worktree setup + env
+ * rendering + the agent run). Temporal activity startToCloseTimeout in ms.
+ *
+ * Deliberately HIGH: a coding agent fixing a real bug can run for a long time
+ * (explore, reproduce, edit, run the test gate). This is the hard ceiling; the
+ * agent's own wall-clock budget is set below it (minus a finalize buffer) so the
+ * agent's timer fires + the run finalizes BEFORE Temporal abandons the activity.
+ * Past ~4h an agent is almost certainly stuck/looping, so we cap there.
+ */
+export const AUTO_FIX_ACTIVITY_TIMEOUT_MS = 4 * 60 * 60 * 1000 // 4 hours

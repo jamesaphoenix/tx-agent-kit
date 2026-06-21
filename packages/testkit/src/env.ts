@@ -26,6 +26,8 @@ export interface TestkitEnv {
   INTEGRATION_API_BASE_URL: string | undefined
   TX_INTEGRATION_SHARED_API_READY: string | undefined
   INTEGRATION_AUTH_SECRET: string | undefined
+  /** Raw HMAC secret the shared API was spawned with for the auto-fix webhook. */
+  INTEGRATION_TEST_SENTRY_WEBHOOK_SECRET_RAW: string | undefined
   /**
    * Opt-in gate for tests that hit REAL external third-party services (live,
    * non-deterministic, credentialed, billable). Covers multiple providers —
@@ -64,6 +66,8 @@ export const getTestkitEnv = (): TestkitEnv => {
     INTEGRATION_API_BASE_URL: process.env.INTEGRATION_API_BASE_URL,
     TX_INTEGRATION_SHARED_API_READY: process.env.TX_INTEGRATION_SHARED_API_READY,
     INTEGRATION_AUTH_SECRET: process.env.INTEGRATION_AUTH_SECRET,
+    INTEGRATION_TEST_SENTRY_WEBHOOK_SECRET_RAW:
+      process.env.INTEGRATION_TEST_SENTRY_WEBHOOK_SECRET_RAW,
     RUN_LIVE_INTEGRATION: process.env.RUN_LIVE_INTEGRATION
   }
 }

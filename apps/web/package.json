@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env ../../.env; port=${WEB_PORT:-${PORT:-3000}}; ../../scripts/dev/kill-stale-service.sh web; exec next dev --webpack -p \"${port}\"'",
+    "dev": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env_if_allowed ../../.env; port=${WEB_PORT:-${PORT:-3000}}; ../../scripts/dev/kill-stale-service.sh web; exec next dev --webpack -p \"${port}\"'",
     "build": "next build",
     "start": "next start -p ${WEB_PORT:-${PORT:-3000}}",
     "generate:api": "orval --config ./orval.config.ts",
@@ -12,9 +12,9 @@
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run -c vitest.config.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts",
-    "e2e:build": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env ../../.env; export NODE_ENV=production; export NEXT_PUBLIC_API_BASE_URL=\"${NEXT_PUBLIC_API_BASE_URL:-http://localhost:${API_PORT:-4000}}\"; exec next build --webpack'",
-    "e2e:serve": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env ../../.env; export NODE_ENV=production; export NEXT_PUBLIC_API_BASE_URL=\"${NEXT_PUBLIC_API_BASE_URL:-http://localhost:${API_PORT:-4000}}\"; exec next start -p \"${WEB_PORT:-${PORT:-3000}}\"'",
-    "test:e2e": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env ../../.env; E2E_WALL_CLOCK_BUDGET_SECONDS=120; if command -v timeout >/dev/null 2>&1; then exec timeout --kill-after=10 \"${E2E_WALL_CLOCK_BUDGET_SECONDS}\" pnpm exec playwright test --config e2e/playwright.config.ts; elif command -v gtimeout >/dev/null 2>&1; then exec gtimeout --kill-after=10 \"${E2E_WALL_CLOCK_BUDGET_SECONDS}\" pnpm exec playwright test --config e2e/playwright.config.ts; else exec node ../../scripts/e2e/wall-clock-watchdog.mjs \"${E2E_WALL_CLOCK_BUDGET_SECONDS}\" pnpm exec playwright test --config e2e/playwright.config.ts; fi'"
+    "e2e:build": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env_if_allowed ../../.env; export NODE_ENV=production; export NEXT_PUBLIC_API_BASE_URL=\"${NEXT_PUBLIC_API_BASE_URL:-http://localhost:${API_PORT:-4000}}\"; exec next build --webpack'",
+    "e2e:serve": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env_if_allowed ../../.env; export NODE_ENV=production; export NEXT_PUBLIC_API_BASE_URL=\"${NEXT_PUBLIC_API_BASE_URL:-http://localhost:${API_PORT:-4000}}\"; exec next start -p \"${WEB_PORT:-${PORT:-3000}}\"'",
+    "test:e2e": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env_if_allowed ../../.env; E2E_WALL_CLOCK_BUDGET_SECONDS=120; if command -v timeout >/dev/null 2>&1; then exec timeout --kill-after=10 \"${E2E_WALL_CLOCK_BUDGET_SECONDS}\" pnpm exec playwright test --config e2e/playwright.config.ts; elif command -v gtimeout >/dev/null 2>&1; then exec gtimeout --kill-after=10 \"${E2E_WALL_CLOCK_BUDGET_SECONDS}\" pnpm exec playwright test --config e2e/playwright.config.ts; else exec node ../../scripts/e2e/wall-clock-watchdog.mjs \"${E2E_WALL_CLOCK_BUDGET_SECONDS}\" pnpm exec playwright test --config e2e/playwright.config.ts; fi'"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",

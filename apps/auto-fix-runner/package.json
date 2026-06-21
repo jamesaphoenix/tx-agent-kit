@@ -1,0 +1,27 @@
+{
+  "name": "@tx-agent-kit/auto-fix-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "type-check": "tsc -b --pretty false",
+    "lint": "eslint src --max-warnings=0",
+    "test": "vitest run -c vitest.config.ts"
+  },
+  "dependencies": {
+    "@temporalio/activity": "^1.16.0",
+    "@temporalio/worker": "^1.16.0",
+    "@temporalio/workflow": "^1.16.0",
+    "@tx-agent-kit/contracts": "workspace:*",
+    "@tx-agent-kit/db": "workspace:*",
+    "@tx-agent-kit/logging": "workspace:*",
+    "@tx-agent-kit/redis": "workspace:*",
+    "effect": "^3.21.2"
+  },
+  "devDependencies": {
+    "@tx-agent-kit/vitest-config": "workspace:*"
+  }
+}
