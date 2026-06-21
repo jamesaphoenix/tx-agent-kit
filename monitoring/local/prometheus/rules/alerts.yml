@@ -5,6 +5,9 @@
 #   tx_agent_kit_client_http_request_total      — HTTP client request counter
 #   tx_agent_kit_client_http_request_duration    — HTTP client request duration histogram
 #   tx_agent_kit_node_service_startup_total      — service startup counter
+#   tx_agent_kit_api_request_validation_rejected_total
+#     — request-validation (HttpApiDecodeError 4xx) rejection counter,
+#       labelled {operation_id, field, authenticated}
 #
 # Scrape targets (from prometheus.yml):
 #   prometheus, node, otel-collector

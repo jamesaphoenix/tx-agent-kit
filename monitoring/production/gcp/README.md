@@ -27,6 +27,7 @@ monitoring/production/gcp/
 |   |-- warning-host-memory-high.json
 |   |-- warning-outbox-poller-saturation.json
 |   |-- warning-rate-limit-spike.json
+|   |-- warning-request-validation-spike.json
 |   `-- warning-worker-memory-high.json
 |-- apply.sh
 `-- README.md
