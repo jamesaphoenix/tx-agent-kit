@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "dev": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env ../../.env; ../../scripts/dev/kill-stale-service.sh api; exec tsx watch src/server.ts'",
+    "dev": "bash -lc 'source ../../scripts/lib/source-env.sh; source_env_if_allowed ../../.env; ../../scripts/dev/kill-stale-service.sh api; exec tsx watch src/server.ts'",
     "build": "tsc -b",
     "openapi:generate": "tsx src/openapi.ts",
     "type-check": "tsc -b --pretty false",
