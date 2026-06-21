@@ -81,6 +81,10 @@ const makePgClientLive = (databaseUrl?: string) =>
   PgClient.layer({
     url: Redacted.make(normalizeDatabaseUrlForPgDriver(databaseUrl ?? getDatabaseUrl())),
     ssl: getPgSslConfigForDatabaseUrl(databaseUrl ?? getDatabaseUrl()),
+    // Without maxConnections the underlying node-postgres pg.Pool silently caps
+    // its max at 10, so every Effect repository request serializes behind only 10
+    // connections regardless of DB_POOL_MAX. Size it from the configured pool max.
+    maxConnections: getDbEnv().DB_POOL_MAX,
     types: {
       getTypeParser: (typeId, format) => {
         if (rawTimestampTypeIds.includes(typeId)) {

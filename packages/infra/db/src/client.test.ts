@@ -110,4 +110,50 @@ describe('provideDB', () => {
     await resetPool()
     expect(pgLayerReleases).toBe(1)
   })
+
+  it('sizes the request pool via maxConnections sourced from DB_POOL_MAX', async () => {
+    // Regression guard: PgClient.layer previously omitted maxConnections, so the
+    // underlying pg.Pool silently capped max at 10. The documented DB_POOL_MAX knob
+    // must flow into the Effect request pool, not only the separate admin pool.
+    let capturedOptions: { readonly maxConnections?: number } | undefined
+
+    vi.stubEnv('DATABASE_URL', databaseUrl)
+    vi.stubEnv('NODE_ENV', 'staging')
+    vi.stubEnv('DB_POOL_MAX', '150')
+
+    vi.doMock('@effect/sql-pg/PgClient', async () => {
+      const effect = await import('effect')
+      const PgClient = effect.Context.GenericTag<Readonly<{ connectionId: number }>>(
+        '@effect/sql-pg/PgClient'
+      )
+
+      return {
+        PgClient,
+        layer: (options: { readonly maxConnections?: number }) => {
+          capturedOptions = options
+          return effect.Layer.scoped(PgClient, effect.Effect.succeed({ connectionId: 1 }))
+        }
+      }
+    })
+
+    vi.doMock('drizzle-orm/effect-postgres', async () => {
+      const effect = await import('effect')
+      return {
+        makeWithDefaults: () => effect.Effect.sync(() => ({ dbBuildId: 1 }))
+      }
+    })
+
+    const { DB, provideDB } = await import('./client.js')
+
+    await Effect.runPromise(
+      provideDB(
+        Effect.gen(function* () {
+          yield* DB
+          return null
+        })
+      )
+    )
+
+    expect(capturedOptions?.maxConnections).toBe(150)
+  })
 })
