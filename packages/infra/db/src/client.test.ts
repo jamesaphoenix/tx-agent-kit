@@ -1,4 +1,5 @@
 import { Effect } from 'effect'
+import { EventEmitter } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const databaseUrl = 'postgres://test:test@db.example.com:5432/tx_agent_kit'
@@ -7,6 +8,7 @@ afterEach(() => {
   vi.unstubAllEnvs()
   vi.doUnmock('@effect/sql-pg/PgClient')
   vi.doUnmock('drizzle-orm/effect-postgres')
+  vi.doUnmock('pg')
   vi.resetModules()
 })
 
@@ -155,5 +157,55 @@ describe('provideDB', () => {
     )
 
     expect(capturedOptions?.maxConnections).toBe(150)
+  })
+})
+
+describe('getPool', () => {
+  it('handles idle pool connection errors without raising an uncaught exception', async () => {
+    const pools: EventEmitter[] = []
+
+    vi.stubEnv('DATABASE_URL', databaseUrl)
+    vi.stubEnv('NODE_ENV', 'staging')
+
+    vi.doMock('pg', () => ({
+      Pool: class MockPool extends EventEmitter {
+        readonly totalCount = 0
+        readonly idleCount = 0
+        readonly waitingCount = 0
+        readonly options: unknown
+
+        constructor(options: unknown) {
+          super()
+          this.options = options
+          pools.push(this)
+        }
+
+        end = vi.fn(() => Promise.resolve())
+      },
+      types: {
+        getTypeParser: vi.fn(() => (value: unknown) => value)
+      }
+    }))
+
+    const { getPool, resetPool, setPoolErrorReporter } = await import('./client.js')
+
+    const reporter = vi.fn()
+    setPoolErrorReporter(reporter)
+
+    getPool()
+    const pool = pools[0]
+    if (!pool) {
+      throw new Error('Expected getPool to create a pool')
+    }
+    expect(pool.listenerCount('error')).toBe(1)
+
+    const idleError = new Error('connection to database closed')
+    // Consumed (no uncaught exception) AND forwarded to the injected reporter
+    // so the failure is still sent to Sentry instead of silently swallowed.
+    expect(() => pool.emit('error', idleError)).not.toThrow()
+    expect(reporter).toHaveBeenCalledWith(idleError)
+
+    setPoolErrorReporter(() => {})
+    await resetPool()
   })
 })

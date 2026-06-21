@@ -1,9 +1,10 @@
 import { Client, Connection } from '@temporalio/client'
 import { NativeConnection, Worker } from '@temporalio/worker'
 import { ActivityErrorBoundaryInterceptor } from './activity-error-boundary.js'
+import { setPoolErrorReporter } from '@tx-agent-kit/db'
 import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
-import { closeRedisClients } from '@tx-agent-kit/redis'
+import { closeRedisClients, setRedisErrorReporter } from '@tx-agent-kit/redis'
 import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -330,23 +331,64 @@ async function run(env: WorkerEnv): Promise<void> {
   }
 }
 
+// Last-resort handler for genuinely unexpected process-level faults. We do NOT
+// swallow these: after an arbitrary uncaught error the process state is undefined,
+// so limping on risks corrupt work. Instead we capture to Sentry, flush, and exit
+// cleanly so Docker `restart: unless-stopped` brings the worker back in a
+// known-good state. Benign, recoverable infra errors (idle pg pool / ioredis
+// socket drops) are consumed at their source via
+// setPoolErrorReporter/setRedisErrorReporter and never reach here.
+const FATAL_FLUSH_BACKSTOP_MS = 5000
+let fatalShutdownInitiated = false
+
+const handleFatalError = (error: unknown, message: string): void => {
+  captureWorkerException(error)
+  logger.error(message, {
+    error:
+      error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { message: String(error) }
+  })
+
+  if (fatalShutdownInitiated) {
+    return
+  }
+  fatalShutdownInitiated = true
+  process.exitCode = 1
+
+  // Force-exit on a backstop timer in case the flush ever hangs.
+  const backstop = setTimeout(() => {
+    process.exit(1)
+  }, FATAL_FLUSH_BACKSTOP_MS)
+  backstop.unref()
+
+  // Flush Sentry BEFORE exiting so the crash event is not lost, then exit so
+  // Docker `restart: unless-stopped` brings the worker back in a known-good state.
+  void (async () => {
+    try {
+      await flushWorkerSentry()
+    } finally {
+      process.exit(1)
+    }
+  })()
+}
+
 const runWorker = async (): Promise<void> => {
   const env = getWorkerEnv()
   await initializeWorkerSentry(env)
 
+  // Route long-lived background EventEmitter 'error' events (raw pg pool, cached
+  // ioredis sockets) to Sentry. Without these listeners a benign idle-connection
+  // drop escalates to an uncaughtException and crashes the worker.
+  setPoolErrorReporter(captureWorkerException)
+  setRedisErrorReporter(captureWorkerException)
+
   process.on('unhandledRejection', (reason) => {
-    captureWorkerException(reason)
-    logger.error('Unhandled promise rejection in worker', {
-      error: reason instanceof Error ? { name: reason.name, message: reason.message, stack: reason.stack } : { message: String(reason) }
-    })
-    process.exitCode = 1
+    handleFatalError(reason, 'Unhandled promise rejection in worker')
   })
 
   process.on('uncaughtException', (error) => {
-    captureWorkerException(error)
-    logger.error('Uncaught exception in worker', { error: { name: error.name, message: error.message, stack: error.stack } })
-    process.exitCode = 1
-    setTimeout(() => { process.exit(1) }, 5000)
+    handleFatalError(error, 'Uncaught exception in worker')
   })
 
   try {

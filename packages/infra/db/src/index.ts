@@ -1,4 +1,4 @@
-export { DB, DBLive, db, getPool, provideDB, resetPool } from './client.js'
+export { DB, DBLive, db, getPool, provideDB, resetPool, setPoolErrorReporter } from './client.js'
 export { DbError, dbDecodeFailed, dbQueryFailed, toDbError } from './errors.js'
 export { buildCursorPage } from './pagination.js'
 export * from './schema.js'

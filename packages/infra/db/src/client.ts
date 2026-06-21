@@ -12,6 +12,23 @@ let poolSingleton: Pool | undefined
 const dbRuntimeSingletons = new Map<string, ManagedRuntime.ManagedRuntime<DB, unknown>>()
 const rawTimestampTypeIds = [1184, 1114, 1082, 1186, 1231, 1115, 1185, 1187, 1182]
 
+type PoolErrorReporter = (error: unknown) => void
+let poolErrorReporter: PoolErrorReporter = () => {}
+
+/**
+ * Register a handler for raw `pg.Pool` `'error'` events (idle client failures
+ * when the backend/pooler drops a connection). Backend processes inject their
+ * Sentry capture at boot (e.g. `setPoolErrorReporter(captureWorkerException)`),
+ * so these transient errors are reported instead of silently swallowed.
+ *
+ * Kept as an injected hook so this package stays free of any Sentry/logging
+ * dependency. The default no-op still guarantees the no-crash invariant even
+ * when no reporter is wired (scripts, tests, API before init).
+ */
+export const setPoolErrorReporter = (reporter: PoolErrorReporter): void => {
+  poolErrorReporter = reporter
+}
+
 const getDatabaseUrl = (): string => {
   const env = getDbEnv()
   return env.DATABASE_URL
@@ -58,6 +75,13 @@ export const getPool = (): Pool => {
       max: getDbEnv().DB_POOL_MAX,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 5000
+    })
+    // node-postgres emits pool errors for idle clients. Without a listener, Node
+    // treats that EventEmitter error as uncaught and terminates the worker. We
+    // consume it here (no crash) AND forward to the injected reporter so it is
+    // still sent to Sentry rather than silently swallowed.
+    poolSingleton.on('error', (error) => {
+      poolErrorReporter(error)
     })
   }
   return poolSingleton
