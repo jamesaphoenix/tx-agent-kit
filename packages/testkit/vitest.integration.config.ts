@@ -8,7 +8,10 @@ const ciOnlyExcludes = includeCiOnlySuites
   ? []
   : [
       'src/command-entrypoints.integration.test.ts',
-      'src/start-dev-services.integration.test.ts'
+      'src/start-dev-services.integration.test.ts',
+      // Dev-tooling meta-test: actually runs worktree schema setup (~13s for 2
+      // tests). Same class as the suites above - CI still covers it.
+      'src/worktree-setup.integration.test.ts'
     ]
 
 const liveExcludes = includeLiveSuites
