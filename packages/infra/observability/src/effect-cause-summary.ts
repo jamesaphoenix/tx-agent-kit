@@ -1,4 +1,5 @@
 import type { LogContext } from '@tx-agent-kit/logging'
+import { FiberFailureCauseId } from 'effect/Runtime'
 
 // Shared Effect-cause summarization used by BOTH the API request boundary and
 // the worker activity boundary, so error->log->Sentry context is identical across
@@ -33,6 +34,23 @@ const truncateLogField = (value: string): string =>
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
+
+// `Effect.runPromise` (used by every worker activity's `runEffect`) rejects with
+// a `(FiberFailure) Error` whose standard `.message`/`.name` are the squashed
+// boundary text and whose REAL cause chain is stashed under the
+// `FiberFailureCauseId` symbol, NOT the JS-standard `.cause`. Without unwrapping,
+// the chain flattens to that useless wrapper and telemetry loses the actual root
+// (e.g. a DbError -> ParseError). Peel the symbol so the existing cause
+// traversal reaches the underlying Effect Cause.
+const unwrapFiberFailureCause = (cause: unknown): unknown => {
+  if (
+    (isRecord(cause) || cause instanceof Error) &&
+    FiberFailureCauseId in (cause as object)
+  ) {
+    return (cause as Record<symbol, unknown>)[FiberFailureCauseId]
+  }
+  return cause
+}
 
 const getStringField = (record: Record<string, unknown>, key: string): string | undefined => {
   const value = record[key]
@@ -182,10 +200,11 @@ const summarizeNestedCause = (
 }
 
 export const summarizeCause = (
-  cause: unknown,
+  rawCause: unknown,
   seen: WeakSet<object> = new WeakSet(),
   depth = 0
 ): CauseSummary | undefined => {
+  const cause = unwrapFiberFailureCause(rawCause)
   if (cause === undefined || depth > MAX_CAUSE_DEPTH) {
     return undefined
   }
@@ -389,10 +408,11 @@ export const buildCauseReportError = (
 }
 
 export const findRootCauseError = (
-  cause: unknown,
+  rawCause: unknown,
   seen: WeakSet<object> = new WeakSet(),
   depth = 0
 ): Error | null => {
+  const cause = unwrapFiberFailureCause(rawCause)
   if (cause === undefined || cause === null || depth > MAX_CAUSE_DEPTH) {
     return null
   }

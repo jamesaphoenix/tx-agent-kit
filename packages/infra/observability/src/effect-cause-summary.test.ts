@@ -1,4 +1,4 @@
-import { Cause } from 'effect'
+import { Cause, Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 import {
   buildCauseReportError,
@@ -221,5 +221,47 @@ describe('effect cause summary', () => {
       message: '{"requestId":"req-1","status":400,"access_token":"[REDACTED]"}'
     })
     expect(shouldLogEffectCause(providerError, new Set())).toBe(true)
+  })
+
+  it('unwraps a FiberFailure to the real cause chain instead of the (FiberFailure) wrapper', async () => {
+    // Reproduces the worker activity boundary scenario: the real failure is a
+    // DbError -> ParseError chain, but Effect.runPromise (every activity's
+    // runEffect) rejects with a `(FiberFailure) Error` whose `.message`/`.name`
+    // are the generic boundary text. The real Cause is stashed under the
+    // FiberFailureCauseId symbol, so without unwrapping the chain collapses to
+    // that wrapper and telemetry loses the actual root.
+    const parseError = new Error('asset rows decode failed') as Error & { _tag?: string }
+    parseError.name = 'ParseError'
+    parseError._tag = 'ParseError'
+    const coreError = new Error('Failed to mark enrichment failed') as Error & {
+      _tag?: string
+      code?: string
+      cause?: unknown
+    }
+    coreError.name = 'CoreError'
+    coreError._tag = 'CoreError'
+    coreError.code = 'INTERNAL_ERROR'
+    coreError.cause = parseError
+
+    const fiberFailure = await Effect.runPromise(Effect.fail(coreError)).then(
+      () => {
+        throw new Error('expected the effect to fail')
+      },
+      (error: unknown) => error
+    )
+
+    // Sanity: the raw rejection really is the opaque FiberFailure wrapper.
+    expect((fiberFailure as Error).name).toContain('FiberFailure')
+
+    const context = causeLogContext(fiberFailure)
+    expect(context.rootCauseMessage).toBe('asset rows decode failed')
+    expect(context.rootCauseTag).toBe('ParseError')
+    expect(
+      (context.causeChain as ReadonlyArray<{ tag?: string }>).map((item) => item.tag)
+    ).toContain('CoreError')
+
+    // Sentry gets the real underlying Error, not a synthetic FiberFailure frame.
+    const reported = buildCauseReportError(fiberFailure, { fallbackMessage: 'fallback' })
+    expect(reported.message).toBe('asset rows decode failed')
   })
 })
