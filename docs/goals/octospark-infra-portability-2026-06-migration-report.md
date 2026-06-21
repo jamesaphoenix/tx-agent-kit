@@ -77,3 +77,29 @@ Verified green: type-check + lint + unit (incl. 70 runner tests) + stub-mode web
 Deferred (operator/host): real end-to-end needs a live Temporal cluster, authed codex|claude + gh,
 pre-rendered env, and a real alert rule + `SENTRY_WEBHOOK_SECRET`; launchd install is documented in
 `docs/auto-fix-infra.md`.
+## Web E2E (browser) CI status — pre-existing-broken, substantially repaired
+
+The Web E2E browser job has been red on `main` since 2026-05-26, long before this work (the
+pre-merge commit failed the identical job). It is independent of the core gate: **"Run All
+Integration Suites" is GREEN in CI** for both PR-A and PR-B (the ported code, incl. the auto-fix
+subsystem's new Temporal client + migration in CI's parallel schemas, is verified).
+
+This work fixed three layers of the E2E pipeline (all clean upstream ports):
+1. `e2e:build` op-env failure -> `source_env_if_allowed` CI-skip (build now passes).
+2. `apps/api` + `apps/worker` `dev` op-env failure -> `source_env_if_allowed` (start path no longer
+   dies on op:// refs in CI).
+3. E2E `Start api` step: `pnpm dev:api &` (turbo wrapper, no log capture) -> direct
+   `pnpm --filter @tx-agent-kit/api dev` with stdout/stderr to a log file + `dump_service_logs` on
+   readiness timeout.
+
+**Remaining (deeper, pre-existing, NOT this work):** with the above fixed, the api now logs
+`Starting API server (host 127.0.0.1 port 4100)` but never binds :4100 in the E2E `tsx watch`
+start path -> it hangs during server-runtime launch and the readiness wait times out at 120s.
+Confirmed NOT the auto-fix subsystem: `AutoFixTriggerLive` is `Layer.succeed` (lazy; connects
+per-webhook), and the E2E job sets `AUTO_FIX_TRIGGER_MODE=stub`. The integration-test startup path
+(testkit api-server-harness) does NOT hit this hang, which is why the core suite is green.
+
+**Follow-up (out of scope for this infra port):** investigate the api `tsx watch` startup hang
+under the E2E env (likely a telemetry/OTEL or layer-construction block the harness path avoids),
+or align the E2E api-start with the upstream source. The job is now strictly closer to green than
+before this work, with diagnostics captured.
