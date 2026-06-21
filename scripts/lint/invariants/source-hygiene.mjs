@@ -169,6 +169,7 @@ export const enforceNoDirectProcessEnvInSource = (errors) => {
     'apps/api/src/config/env.ts',
     'apps/api/src/config/openapi-env.ts',
     'apps/worker/src/config/env.ts',
+    'apps/auto-fix-runner/src/config/env.ts',
     'apps/web/lib/env.ts',
     'apps/mobile/lib/env.ts',
     'packages/infra/auth/src/env.ts',

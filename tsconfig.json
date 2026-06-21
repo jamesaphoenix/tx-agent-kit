@@ -35,6 +35,7 @@
     { "path": "./packages/temporal-client" },
     { "path": "./apps/api" },
     { "path": "./apps/worker" },
+    { "path": "./apps/auto-fix-runner" },
     { "path": "./apps/web" }
   ]
 }

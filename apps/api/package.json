@@ -17,6 +17,7 @@
   "dependencies": {
     "@effect/platform": "^0.96.0",
     "@effect/platform-node": "^0.106.0",
+    "@temporalio/client": "^1.16.0",
     "@tx-agent-kit/auth": "workspace:*",
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/core": "workspace:*",

@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/infra/db" },
+    { "path": "../../packages/infra/logging" },
+    { "path": "../../packages/infra/redis" }
+  ]
+}

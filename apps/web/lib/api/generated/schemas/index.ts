@@ -309,6 +309,7 @@ export * from './rolesListRolesSortOrder';
 export * from './rolesRemoveRole200';
 export * from './rolesUpdateRole200';
 export * from './rolesUpdateRoleBody';
+export * from './sentryWebhooksSentryNewIssueWebhook200';
 export * from './storageDeleteObject200';
 export * from './storageDeleteObjectBody';
 export * from './storageGenerateDownloadUrl200';

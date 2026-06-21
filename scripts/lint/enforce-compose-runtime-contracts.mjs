@@ -54,6 +54,10 @@ const unionSets = (...sets) => new Set(sets.flatMap((set) => Array.from(set)))
 // with a safe code default, an optional feature surface, or a value supplied at
 // runtime (workflow secret / vault field) rather than the rendered env file.
 const deployRuntimeEnvExemptions = new Set([
+  // Test-only: swaps the live Temporal-backed AutoFixTriggerPort for an
+  // in-process recording stub (see isAutoFixTriggerStubMode). Never set in a
+  // real deployment, so it must not appear in the deploy env templates.
+  'AUTO_FIX_TRIGGER_MODE',
   // Auth rate-limit tuning knobs (code defaults apply when unset).
   'AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS',
   'AUTH_RATE_LIMIT_MAX_REQUESTS',
@@ -92,6 +96,13 @@ const deployRuntimeEnvExemptions = new Set([
 // Runtime keys that are intentionally absent from the local template
 // (.env.example). Same classification as above, scoped to local dev defaults.
 const localRuntimeEnvExemptions = new Set([
+  // Test-only stub toggle for the auto-fix Temporal trigger; never wired in a
+  // normal local .env (see isAutoFixTriggerStubMode).
+  'AUTO_FIX_TRIGGER_MODE',
+  // Auto-fix webhook controls are deployment-only and presence-gated; local dev
+  // does not wire the alert rule (see getSentryWebhookConfig).
+  'SENTRY_DEPLOYMENT_ENVIRONMENT',
+  'SENTRY_WEBHOOK_SECRET',
   // Auth rate-limit tuning knobs (code defaults apply when unset).
   'AUTH_RATE_LIMIT_BYPASS_TOKEN',
   'AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS',

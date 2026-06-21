@@ -35,6 +35,12 @@ env:
   RESEND_API_KEY: ''
   RESEND_FROM_EMAIL: ''
   RESEND_WEBHOOK_SECRET: ''
+  # Auto-fix new-issue webhook: the spawned API actually receives these from the
+  # vitest global setup (stub trigger + fixed HMAC secret); declared here too so
+  # the contract is explicit in CI.
+  SENTRY_WEBHOOK_SECRET: 'test-sentry-webhook-secret-for-integration'
+  SENTRY_DEPLOYMENT_ENVIRONMENT: staging
+  AUTO_FIX_TRIGGER_MODE: stub
   WEB_BASE_URL: http://localhost:3000
   GOOGLE_OIDC_ISSUER_URL: http://localhost:65535
   GOOGLE_OIDC_CLIENT_ID: ci-google-client-id

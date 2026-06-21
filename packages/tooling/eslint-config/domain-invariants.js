@@ -1068,19 +1068,40 @@ export const domainInvariantConfig = [
   },
   // ── Rule: API must not import Temporal ──────────────────────────────
   // IMPORTANT: Must come BEFORE the API routes block so that route-specific
-  // restrictions override this broader apps/api/** block.
+  // restrictions override this broader apps/api/** block. The auto-fix trigger
+  // adapter is the SOLE exception (it starts the host-served `auto-fix`
+  // workflow directly — a neutral seam, no domain coupling); it is exempted
+  // below and may import ONLY the client.
   {
     files: ['apps/api/**/*.{ts,tsx}'],
+    ignores: ['apps/api/src/adapters/temporal-control.ts'],
     rules: {
       'no-restricted-imports': ['error', withGlobalRestrictions({
         paths: [
-          { name: '@temporalio/client', message: 'API must not import Temporal client. Write to the outbox table; the worker processes events.' },
+          { name: '@temporalio/client', message: 'Only apps/api/src/adapters/temporal-control.ts may import the Temporal client (the auto-fix trigger seam). Everything else writes to the outbox; the worker processes events.' },
           { name: '@temporalio/workflow', message: 'API must not import Temporal workflows.' },
           { name: '@temporalio/worker', message: 'API must not import Temporal worker.' }
         ],
         patterns: [{
           group: ['@temporalio/*'],
-          message: 'API must not depend on Temporal. Events flow through the outbox pattern: API → domain_events table → worker.'
+          message: 'API must not depend on Temporal outside the temporal-control adapter. Events flow through the outbox pattern: API → domain_events table → worker.'
+        }]
+      })]
+    }
+  },
+  // The auto-fix trigger adapter may use the Temporal CLIENT only; workflow +
+  // worker remain banned even here so it never pulls the sandbox/runtime in.
+  {
+    files: ['apps/api/src/adapters/temporal-control.ts'],
+    rules: {
+      'no-restricted-imports': ['error', withGlobalRestrictions({
+        paths: [
+          { name: '@temporalio/workflow', message: 'API must not import Temporal workflows.' },
+          { name: '@temporalio/worker', message: 'API must not import Temporal worker.' }
+        ],
+        patterns: [{
+          group: ['@temporalio/workflow', '@temporalio/worker'],
+          message: 'The API Temporal adapter may use the client only.'
         }]
       })]
     }
