@@ -59,7 +59,21 @@ Verified against a clean `main` baseline. 262 × 429 → 0.
 - After push, confirm full-suite CI on `main` (`pnpm ci:check --watch`); worktree-shared Redis means a
   pre-fix poisoned `127.0.0.1` bucket could linger ~30 min — the high ceiling prevents re-poisoning.
 
-## Follow-up
+## PR-B: Auto-fix subsystem (MERGED to main, e050cbb)
 
-- Auto-fix subsystem as a separate branch/PR-B (plan ready: `apps/auto-fix-runner`, migration 0053,
-  Sentry payload generalized to a product-agnostic `IncidentEvent`).
+Ported as `apps/auto-fix-runner` (`@tx-agent-kit/auto-fix-runner`): a Sentry-issue webhook
+(`POST /internal/sentry/new-issue`, HMAC + env-match + dedupe) → a scoped `@temporalio/client`
+trigger (the api's first; ESLint exemption scoped to one file) → a host Temporal worker running a
+pluggable codex|claude agent in a fresh worktree → draft PR. Migration `0053_auto_fix_runs_table`
+(made idempotent for the shared local Postgres). Pragmatic first-port: kept `sentry` naming; only
+de-coupling rename `needsCanaryAccount → needsManualInput` (contracts + JSON-schema mirror + prompt
+in lock-step). Generic operator prompt; `AUTO_FIX_BASE_BRANCH` default `main`; `SENTRY_ORG_SLUG`
+default empty; launchd plist + scripts shipped as generic templates.
+
+Verified green: type-check + lint + unit (incl. 70 runner tests) + stub-mode webhook integration
+(7/7) + full integration (762 passed / 0 failed). The merge also folded in the
+`source_env_if_allowed` e2e CI-skip fix, which greens the pre-existing Web E2E op-env build failure.
+
+Deferred (operator/host): real end-to-end needs a live Temporal cluster, authed codex|claude + gh,
+pre-rendered env, and a real alert rule + `SENTRY_WEBHOOK_SECRET`; launchd install is documented in
+`docs/auto-fix-infra.md`.

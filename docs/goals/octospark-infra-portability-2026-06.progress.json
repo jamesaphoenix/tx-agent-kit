@@ -7,8 +7,8 @@
   "source_branch": "origin/staging",
   "window": "2026-06-07..2026-06-21",
   "created_at": "2026-06-21",
-  "last_updated": "2026-06-21",
-  "status": "implemented_verified_gates_green",
+  "last_updated": "2026-06-22",
+  "status": "pr_a_and_pr_b_merged_to_main",
   "approval_gate": {
     "phase": "implementation_approved",
     "inventory_path": "../octospark/docs/goals/octospark-infra-portability-2026-06.inventory.json",
@@ -414,6 +414,21 @@
       "ci_sdk_openapi_sync_gate: SDK publishing is product-shaped; leave unless the repo publishes a public SDK.",
       "build_guard_prepare_git_hooks_docker: characterized as leave (not applicable)."
     ],
-    "auto_fix_pr_b": "NOT in this branch. The auto-fix subsystem (Sentry issue -> pluggable agent -> draft PR) ships as a separate branch/PR-B. Full file-by-file plan produced (new apps/auto-fix-runner; migration 0053 tx / 0063 trace-learn; Sentry payload generalized to a product-agnostic IncidentEvent)."
+    "auto_fix_pr_b": {
+      "status": "MERGED to main",
+      "main_commit": "e050cbb",
+      "summary": "Sentry-issue -> pluggable agent (codex|claude) -> draft-PR Temporal subsystem ported as apps/auto-fix-runner + api webhook (POST /internal/sentry/new-issue) + first scoped @temporalio/client + migration 0053. Pragmatic first-port: kept sentry naming; only de-coupling rename needsCanaryAccount -> needsManualInput (contracts + JSON-schema mirror + prompt in lock-step). Generic operator prompt, AUTO_FIX_BASE_BRANCH default main, SENTRY_ORG_SLUG default empty, host launchd plist + scripts as generic templates.",
+      "verification": "type-check full + lint full + unit full (incl. 70 auto-fix-runner tests) + stub-mode webhook integration (7/7, AUTO_FIX_TRIGGER_MODE=stub) all green. Migration made idempotent (per-schema guarded enum + IF NOT EXISTS) for the shared local Postgres.",
+      "additional_fixes": "Web E2E op-env fix (source_env_if_allowed CI-skip) folded in.",
+      "deferred": "Real end-to-end (live Temporal + authed codex|claude + gh + pre-rendered env + real Sentry alert rule + SENTRY_WEBHOOK_SECRET) and launchd host install are operator follow-ups; PR-B lands code + stub-tested webhook only."
+    },
+    "ci_main": {
+      "note": "PR-A \"Run All Integration Suites\" verified GREEN in CI on tx-agent-kit. Remaining red CI jobs are pre-existing and not caused by this work.",
+      "preexisting_red": [
+        "Web E2E (browser): op-env e2e:build (fixed by the source_env_if_allowed port in PR-B merge).",
+        "mobile EADDRINUSE:4106 port race (on main before this work).",
+        "Dependabot Updates: pre-existing dependabot job failures."
+      ]
+    }
   }
 }
