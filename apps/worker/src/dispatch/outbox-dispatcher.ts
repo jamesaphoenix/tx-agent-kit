@@ -35,6 +35,12 @@ export interface OutboxDispatcherOptions {
   readonly client: TemporalClient
   /** Task queue used when a dispatch plan does not pin its own. */
   readonly defaultTaskQueue: string
+  /**
+   * Task queue the lifecycle enrollment workflow is routed to. MUST match the
+   * campaign worker's `EMAIL_CAMPAIGNS_TASK_QUEUE`, or lifecycle.* enrollments
+   * enqueue on a queue with no poller and never run.
+   */
+  readonly emailCampaignsTaskQueue: string
   readonly batchSize: number
   readonly backstopIntervalSeconds: number
   /**
@@ -64,7 +70,8 @@ const errorMessage = (error: unknown): string =>
 export const drainOutboxOnce = async (
   client: TemporalClient,
   defaultTaskQueue: string,
-  batchSize: number
+  batchSize: number,
+  emailCampaignsTaskQueue: string
 ): Promise<void> => {
   for (;;) {
     const events = await fetchUnprocessedEvents(batchSize)
@@ -75,7 +82,7 @@ export const drainOutboxOnce = async (
     const dispatched: SerializedDomainEvent[] = []
 
     for (const event of events) {
-      const plan = resolveDispatch(event)
+      const plan = resolveDispatch(event, { emailCampaignsTaskQueue })
 
       if (plan.kind === 'invalid') {
         await markEventFailed(event.id, plan.reason)
@@ -167,11 +174,11 @@ const createSingleFlight = (run: () => Promise<void>): (() => Promise<void>) => 
 export function startOutboxDispatcher(
   options: OutboxDispatcherOptions
 ): OutboxDispatcherHandle {
-  const { client, defaultTaskQueue, batchSize, backstopIntervalSeconds, listenerDatabaseUrl } = options
+  const { client, defaultTaskQueue, emailCampaignsTaskQueue, batchSize, backstopIntervalSeconds, listenerDatabaseUrl } = options
 
   const trigger = createSingleFlight(async () => {
     try {
-      await drainOutboxOnce(client, defaultTaskQueue, batchSize)
+      await drainOutboxOnce(client, defaultTaskQueue, batchSize, emailCampaignsTaskQueue)
     } catch (error: unknown) {
       logger.error('Outbox drain pass failed.', { error: errorMessage(error) })
     }

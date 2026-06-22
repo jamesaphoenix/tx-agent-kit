@@ -1,11 +1,12 @@
-import { eq, sql } from 'drizzle-orm'
-import { Effect } from 'effect'
+import { eq, inArray, sql } from 'drizzle-orm'
+import { Effect, Schema } from 'effect'
 import { userRowSchema } from '../effect-schemas/users.js'
 import { users } from '../schema.js'
 import { withDb, decodeFirst } from './repo-helpers.js'
 import { createOptionalDecoder } from './sql-helpers.js'
 
 const decode = createOptionalDecoder(userRowSchema, 'users row')
+const decodeMany = Schema.decodeUnknown(Schema.Array(userRowSchema))
 
 export const usersRepository = {
   create: (input: { email: string; passwordHash: string; name: string }) =>
@@ -39,6 +40,26 @@ export const usersRepository = {
           .limit(1)
           .execute()
         return yield* decodeFirst(rows, decode)
+      })
+    ),
+
+  /**
+   * Batch-read users by id. Used by the lifecycle drip sweep to resolve every
+   * claimed enrollment's recipient (email + name) in one query instead of one
+   * round-trip per row. Missing ids are simply absent from the result.
+   */
+  findByIds: (ids: ReadonlyArray<string>) =>
+    withDb('Failed to find users by ids', (db) =>
+      Effect.gen(function* () {
+        if (ids.length === 0) {
+          return []
+        }
+        const rows = yield* db
+          .select()
+          .from(users)
+          .where(inArray(users.id, [...ids]))
+          .execute()
+        return yield* decodeMany(rows)
       })
     ),
 

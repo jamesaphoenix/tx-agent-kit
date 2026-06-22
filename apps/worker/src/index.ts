@@ -29,7 +29,12 @@ import {
   startOutboxDispatcher,
   type OutboxDispatcherHandle
 } from './dispatch/outbox-dispatcher.js'
-import { ensureEmailSendsPruneSchedule } from './campaign-schedules.js'
+import {
+  ensureEmailSendsPruneSchedule,
+  ensureDripSweepSchedule,
+  ensureLifecycleScanSchedule
+} from './schedules/index.js'
+import { syncCampaignDefinitions } from './campaign-definition-sync.js'
 import {
   captureWorkerException,
   flushWorkerSentry,
@@ -238,6 +243,7 @@ async function run(env: WorkerEnv): Promise<void> {
         outboxDispatcher = startOutboxDispatcher({
           client: temporalClient,
           defaultTaskQueue: env.TEMPORAL_TASK_QUEUE,
+          emailCampaignsTaskQueue: env.EMAIL_CAMPAIGNS_TASK_QUEUE,
           batchSize: env.OUTBOX_POLL_BATCH_SIZE,
           backstopIntervalSeconds: env.OUTBOX_BACKSTOP_INTERVAL_SECONDS,
           listenerDatabaseUrl: env.OUTBOX_LISTENER_DATABASE_URL
@@ -298,6 +304,29 @@ async function run(env: WorkerEnv): Promise<void> {
           env.EMAIL_CAMPAIGNS_TASK_QUEUE,
           24,
           30
+        )
+
+        // Converge the email_campaigns tables to config-as-code campaign
+        // definitions (slug-keyed upsert) before the sweep schedule starts
+        // claiming due enrollments, so a fresh DB has its lifecycle campaigns.
+        await syncCampaignDefinitions()
+
+        // The drip SWEEP: drains the due-enrollment queue every interval on the
+        // email-campaigns queue (where campaignActivities + dripSweepWorkflow run).
+        await ensureDripSweepSchedule(
+          temporalClient,
+          env.EMAIL_CAMPAIGNS_TASK_QUEUE,
+          env.DRIP_SWEEP_INTERVAL_MINUTES,
+          env.DRIP_SWEEP_BATCH_SIZE,
+          env.DRIP_SWEEP_MAX_BATCHES
+        )
+
+        // The daily per-team activity scan runs on the DEFAULT queue (where
+        // scanTeamActivity + lifecycleScanWorkflow are registered).
+        await ensureLifecycleScanSchedule(
+          temporalClient,
+          env.TEMPORAL_TASK_QUEUE,
+          env.LIFECYCLE_SCAN_INTERVAL_HOURS
         )
       } else {
         logger.info('Temporal schedule reconciliation skipped.', {

@@ -893,7 +893,39 @@ export const emailSendRepository = {
 
         return rows.length
       })
-    ).pipe(Effect.mapError((error) => toDbError('Failed to delete email sends for enrollment', error)))
+    ).pipe(Effect.mapError((error) => toDbError('Failed to delete email sends for enrollment', error))),
+
+  /**
+   * True when the user has clicked the CTA of any prior feedback-ask email
+   * (a send whose step's templateId is one of `feedbackTemplateIds` and whose
+   * row has a non-null `clicked_at`). Backs the `has_not_left_feedback` audience
+   * predicate: "left feedback" = clicked a feedback email's CTA, so the engine
+   * suppresses re-asking. Joins email_sends -> email_campaign_steps by step id.
+   */
+  hasClickedFeedbackEmail: (userId: string, feedbackTemplateIds: ReadonlyArray<string>) =>
+    provideDB(
+      Effect.gen(function* () {
+        const db = yield* DB
+        if (feedbackTemplateIds.length === 0) {
+          return false
+        }
+        const rows = yield* db
+          .select({ id: emailSends.id })
+          .from(emailSends)
+          .innerJoin(emailCampaignSteps, eq(emailCampaignSteps.id, emailSends.stepId))
+          .where(
+            and(
+              eq(emailSends.userId, userId),
+              sql`${emailSends.clickedAt} IS NOT NULL`,
+              inArray(emailCampaignSteps.templateId, [...feedbackTemplateIds])
+            )
+          )
+          .limit(1)
+          .execute()
+
+        return rows.length > 0
+      })
+    ).pipe(Effect.mapError((error) => toDbError('Failed to check feedback-email click', error)))
 }
 
 // ---------------------------------------------------------------------------

@@ -37,6 +37,9 @@ const ensureReleaseStaleReservationsScheduleMock = vi.fn(() => Promise.resolve(u
 const ensureAutoRechargeRetryScheduleMock = vi.fn(() => Promise.resolve(undefined))
 const ensureStorageReconcileScheduleMock = vi.fn(() => Promise.resolve(undefined))
 const ensureEmailSendsPruneScheduleMock = vi.fn(() => Promise.resolve(undefined))
+const ensureDripSweepScheduleMock = vi.fn(() => Promise.resolve(undefined))
+const ensureLifecycleScanScheduleMock = vi.fn(() => Promise.resolve(undefined))
+const syncCampaignDefinitionsMock = vi.fn(() => Promise.resolve(undefined))
 const defaultWorkerEnv = {
   NODE_ENV: 'test',
   DATABASE_URL: 'postgresql://localhost:5432/test',
@@ -63,6 +66,10 @@ const defaultWorkerEnv = {
   RESEND_FROM_EMAIL: undefined,
   WEB_BASE_URL: undefined,
   EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+  DRIP_SWEEP_INTERVAL_MINUTES: 5,
+  DRIP_SWEEP_BATCH_SIZE: 100,
+  DRIP_SWEEP_MAX_BATCHES: 50,
+  LIFECYCLE_SCAN_INTERVAL_HOURS: 24,
   STRIPE_SECRET_KEY: undefined
 }
 const getWorkerEnvMock = vi.fn(() => ({ ...defaultWorkerEnv }))
@@ -117,8 +124,14 @@ vi.mock('./schedules.js', () => ({
   ensureStorageReconcileSchedule: ensureStorageReconcileScheduleMock
 }))
 
-vi.mock('./campaign-schedules.js', () => ({
-  ensureEmailSendsPruneSchedule: ensureEmailSendsPruneScheduleMock
+vi.mock('./schedules/index.js', () => ({
+  ensureEmailSendsPruneSchedule: ensureEmailSendsPruneScheduleMock,
+  ensureDripSweepSchedule: ensureDripSweepScheduleMock,
+  ensureLifecycleScanSchedule: ensureLifecycleScanScheduleMock
+}))
+
+vi.mock('./campaign-definition-sync.js', () => ({
+  syncCampaignDefinitions: syncCampaignDefinitionsMock
 }))
 
 vi.mock('./dispatch/outbox-dispatcher.js', () => ({
