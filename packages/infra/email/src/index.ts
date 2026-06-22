@@ -106,3 +106,26 @@ export {
   renderUsageCapWarningEmail,
   renderWelcomeCreditGrantedEmail
 } from './templates/billing/render.js'
+
+// ---- Lifecycle email templates (lifecycle email engine) ----
+export type { LifecycleEmailProps } from './templates/lifecycle/props.js'
+export {
+  renderEmailTemplate,
+  templateRenderers
+} from './templates/registry.js'
+export { LifecycleWelcomeEmail } from './templates/lifecycle/welcome.js'
+export { LifecycleCompleteOnboardingEmail } from './templates/lifecycle/complete-onboarding.js'
+export { LifecycleCreateWorkspaceEmail } from './templates/lifecycle/create-workspace.js'
+export { LifecycleInviteTeammateEmail } from './templates/lifecycle/invite-teammate.js'
+export { LifecycleUploadFirstAssetEmail } from './templates/lifecycle/upload-first-asset.js'
+export { LifecycleActivationTipsEmail } from './templates/lifecycle/activation-tips.js'
+export { LifecycleTrialGettingStartedEmail } from './templates/lifecycle/trial-getting-started.js'
+export { LifecycleTrialEndingSoonEmail } from './templates/lifecycle/trial-ending-soon.js'
+export { LifecycleFeatureSpotlightCreditsEmail } from './templates/lifecycle/feature-spotlight-credits.js'
+export { LifecycleInactiveNudgeEmail } from './templates/lifecycle/inactive-nudge.js'
+export { LifecycleInactiveFinalEmail } from './templates/lifecycle/inactive-final.js'
+export { LifecycleWeMissYouEmail } from './templates/lifecycle/we-miss-you.js'
+export { LifecycleChurnedWinbackEmail } from './templates/lifecycle/churned-winback.js'
+export { LifecycleChurnedFeedbackEmail } from './templates/lifecycle/churned-feedback.js'
+export { LifecycleUsageMilestoneEmail } from './templates/lifecycle/usage-milestone.js'
+export { LifecycleFeedbackRequestEmail } from './templates/lifecycle/feedback-request.js'
