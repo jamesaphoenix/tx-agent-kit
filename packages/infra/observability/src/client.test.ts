@@ -86,6 +86,9 @@ describe('client telemetry lifecycle', () => {
     delete process.env.NEXT_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT
     delete process.env.EXPO_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT
     delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+    delete process.env.NEXT_PUBLIC_OTEL_METRIC_EXPORT_INTERVAL_MS
+    delete process.env.EXPO_PUBLIC_OTEL_METRIC_EXPORT_INTERVAL_MS
+    delete process.env.OTEL_METRIC_EXPORT_INTERVAL_MS
   })
 
   it('configures client telemetry with explicit OTLP endpoint and records request metrics', async () => {
@@ -114,6 +117,13 @@ describe('client telemetry lifecycle', () => {
     expect(metricExporterConstructorMock).toHaveBeenCalledWith({
       url: 'https://otel.example/v1/metrics'
     })
+
+    expect(metricReaderConstructorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exportIntervalMillis: 30_000,
+        exportTimeoutMillis: 10_000
+      })
+    )
 
     expect(counterAddMock).toHaveBeenCalledWith(
       1,

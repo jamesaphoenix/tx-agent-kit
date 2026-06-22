@@ -96,6 +96,8 @@ const createClientTelemetryState = (
   trace.setGlobalTracerProvider(tracerProvider)
   const tracer = trace.getTracer(config.serviceName)
 
+  const metricExportIntervalMs =
+    getClientObservabilityEnv().OTEL_METRIC_EXPORT_INTERVAL_MS
   const meterProvider = new MeterProvider({
     resource,
     readers: otlpConfigured
@@ -104,7 +106,9 @@ const createClientTelemetryState = (
             exporter: new OTLPMetricExporter({
               url: `${otlpEndpoint}/v1/metrics`
             }),
-            exportIntervalMillis: 5000
+            exportIntervalMillis: metricExportIntervalMs,
+            // SDK requires exportTimeoutMillis <= exportIntervalMillis; clamp.
+            exportTimeoutMillis: Math.min(metricExportIntervalMs, 10_000)
           })
         ]
       : []
