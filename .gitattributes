@@ -1,0 +1,14 @@
+# GitHub Linguist: report the real (TypeScript) language mix.
+# Generated and vendored files are excluded from the language breakdown
+# (and collapsed in diffs) so the repo reads as the TS project it is.
+
+# Test fixtures (generated, never hand-edited)
+packages/testkit/fixtures/** linguist-generated=true
+
+# Generated API clients / SDK / OpenAPI output
+apps/*/lib/api/generated/** linguist-generated=true
+**/*.gen.ts linguist-generated=true
+**/openapi.json linguist-generated=true
+
+# Lockfile
+pnpm-lock.yaml linguist-generated=true
