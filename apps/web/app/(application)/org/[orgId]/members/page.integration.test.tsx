@@ -192,7 +192,7 @@ describe('OrgMembersPage integration', () => {
       ?? screen.getByRole('button', { name: /enable/i })
     expect(enableButton).not.toBeNull()
 
-    await user.click(enableButton as HTMLElement)
+    await user.click(enableButton)
 
     // Verify the member is active again
     await waitFor(() => {

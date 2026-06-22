@@ -43,8 +43,8 @@ export class ActivityErrorBoundaryInterceptor implements ActivityInboundCallsInt
   ): Promise<unknown> {
     const { info } = Context.current()
     const ctx = {
-      workflowId: info.workflowExecution.workflowId,
-      runId: info.workflowExecution.runId,
+      workflowId: info.workflowExecution?.workflowId,
+      runId: info.workflowExecution?.runId,
       activityId: info.activityId,
       activityType: info.activityType,
       attempt: info.attempt

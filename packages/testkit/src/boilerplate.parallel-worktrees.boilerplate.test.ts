@@ -272,7 +272,7 @@ afterAll(() => {
   }
 })
 
-describe.sequential('boilerplate parallel-worktree meta tests', () => {
+describe('boilerplate parallel-worktree meta tests', { concurrent: false }, () => {
   it(
     'creates isolated worktree schemas and runs migrations independently',
     async () => {

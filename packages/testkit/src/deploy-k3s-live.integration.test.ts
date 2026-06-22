@@ -4,7 +4,7 @@ import {
   shouldRunLiveK3sStagingIntegration
 } from './deploy-k3s-live.js'
 
-describe.sequential('live k3s staging deploy integration', () => {
+describe('live k3s staging deploy integration', { concurrent: false }, () => {
   it.skipIf(!shouldRunLiveK3sStagingIntegration)(
     'deploys and verifies mac k3s staging using the real deployment command',
     () => {

@@ -104,7 +104,11 @@ const resolveOffsetWithActiveWorktrees = (
   return Number.parseInt(value, 10)
 }
 
-describe('worktree port derivation', () => {
+// Each assertion shells out to `bash -lc` to source scripts/worktree/lib/ports.sh,
+// and a login shell sources the full profile per call. Under full-suite parallel
+// load those spawns can exceed the 5s default, so give the subprocess-bound suite
+// a wider timeout (the logic itself is synchronous and fast).
+describe('worktree port derivation', { timeout: 30_000 }, () => {
   it('returns deterministic values for the same worktree', () => {
     const first = derivePorts('wt_ports_alpha')
     const second = derivePorts('wt_ports_alpha')

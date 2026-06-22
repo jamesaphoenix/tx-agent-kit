@@ -49,7 +49,7 @@ const tlsFailurePattern = /certificate|tls|x509|handshake|pem|hostname/i
 const namespaceFailurePattern = /not found|permission|denied|unauthorized|unauthenticated/i
 const authFailurePattern = /permission|denied|unauthorized|unauthenticated|forbidden|api key/i
 
-describe.sequential('worker temporal cloud mTLS integration', () => {
+describe('worker temporal cloud mTLS integration', { concurrent: false }, () => {
   it.skipIf(!shouldRunCloudMtlsIntegration)(
     'connects with namespace-specific mTLS material',
     async () => {

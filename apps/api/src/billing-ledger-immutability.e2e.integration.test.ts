@@ -94,7 +94,7 @@ describe('credit_ledger immutability (INV-BILLING-001)', () => {
 
     // Every attempt must have thrown a message mentioning immutability.
     for (const entry of caught) {
-      const row = entry as { label: string; result: string }
+      const row = entry
       expect(row.result).toContain('credit_ledger rows are immutable')
     }
   })

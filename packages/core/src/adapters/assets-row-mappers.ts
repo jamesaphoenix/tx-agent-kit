@@ -24,7 +24,7 @@ export const toPendingUploadRecord = (row: PendingUploadRowShape): PendingUpload
   row
 
 export const toStorageMeteringRecord = (row: StorageMeteringRowShape): StorageMeteringRecord =>
-  row as StorageMeteringRecord
+  row
 
 export const toCollectionRecord = (row: MediaCollectionRowShape): CollectionRecord =>
   row

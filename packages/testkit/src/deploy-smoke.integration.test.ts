@@ -30,7 +30,7 @@ afterAll(async () => {
   await dbAuthContext.teardown()
 })
 
-describe.sequential('deploy smoke integration', () => {
+describe('deploy smoke integration', { concurrent: false }, () => {
   it(
     'executes deploy smoke CLI against live API critical flows',
     () => {

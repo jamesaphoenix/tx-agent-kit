@@ -50,7 +50,7 @@ afterAll(() => {
   }
 })
 
-describe.sequential('CLI workflows integration', () => {
+describe('CLI workflows integration', { concurrent: false }, () => {
   it('scaffolds db trigger migration + pgTAP files and rejects duplicate reruns', () => {
     const fixtureRoot = createDbTriggerFixture()
 

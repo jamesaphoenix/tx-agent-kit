@@ -11,6 +11,12 @@ import { createLogger } from '@tx-agent-kit/logging'
 const GRPC_NOT_FOUND = 5
 const GRPC_ALREADY_EXISTS = 6
 
+// Read the gRPC status as a plain number. `@grpc/grpc-js` now types `code` as a
+// `Status` enum, so comparing it directly to our numeric constants trips
+// no-unsafe-enum-comparison; widening through a number-typed parameter keeps the
+// comparison number-to-number without an inline cast.
+const grpcStatusCode = (error: { readonly code: number }): number => error.code
+
 const logger = createLogger('tx-agent-kit-worker-schedules')
 const OUTBOX_POLLER_SCHEDULE_ID = 'outbox-poller-schedule'
 const STUCK_EVENTS_RESET_SCHEDULE_ID = 'stuck-events-reset-schedule'
@@ -34,11 +40,11 @@ const STORAGE_RECONCILE_CRON = '0 3 * * *'
 
 const isScheduleNotFound = (error: unknown): boolean =>
   error instanceof ScheduleNotFoundError
-  || (isGrpcServiceError(error) && (error.code as number) === GRPC_NOT_FOUND)
+  || (isGrpcServiceError(error) && grpcStatusCode(error) === GRPC_NOT_FOUND)
 
 const isScheduleAlreadyExists = (error: unknown): boolean =>
   error instanceof ScheduleAlreadyRunning
-  || (isGrpcServiceError(error) && (error.code as number) === GRPC_ALREADY_EXISTS)
+  || (isGrpcServiceError(error) && grpcStatusCode(error) === GRPC_ALREADY_EXISTS)
 
 /**
  * Remove the legacy 5s outbox-poller schedule.

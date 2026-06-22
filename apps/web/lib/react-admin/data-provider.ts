@@ -159,7 +159,7 @@ const getOne = async <RecordType extends RaRecord = RaRecord>(
   resource: string,
   params: GetOneParams<RecordType>
 ): Promise<GetOneResult<RecordType>> => {
-  const id = toIdentifier(params.id as unknown, 'getOne.id')
+  const id = toIdentifier(params.id, 'getOne.id')
   const data = await getOneRecord(resource, id)
 
   return { data: data as RecordType }
@@ -169,7 +169,7 @@ const getMany = async <RecordType extends RaRecord = RaRecord>(
   resource: string,
   params: GetManyParams<RecordType>
 ): Promise<GetManyResult<RecordType>> => {
-  const ids = toIdentifierArray(params.ids as unknown, 'getMany.ids')
+  const ids = toIdentifierArray(params.ids, 'getMany.ids')
   const resourceName = toResourceName(resource)
   const config = ADMIN_RESOURCES[resourceName]
   const response = await api.post<{ data: RecordType[] }>(`${config.endpoint}/batch/get-many`, { ids })
@@ -213,7 +213,7 @@ const update = async <RecordType extends RaRecord = RaRecord>(
   resource: string,
   params: UpdateParams<RecordType>
 ): Promise<UpdateResult<RecordType>> => {
-  const id = toIdentifier(params.id as unknown, 'update.id')
+  const id = toIdentifier(params.id, 'update.id')
   const data = await updateRecord(resource, id, params.data)
   cursorCache.clearAll()
 
@@ -224,7 +224,7 @@ const updateMany = async <RecordType extends RaRecord = RaRecord>(
   resource: string,
   params: UpdateManyParams<RecordType>
 ): Promise<UpdateManyResult<RecordType>> => {
-  const ids = toIdentifierArray(params.ids as unknown, 'updateMany.ids')
+  const ids = toIdentifierArray(params.ids, 'updateMany.ids')
   const updatedRows = await Promise.all(ids.map((id) => updateRecord(resource, id, params.data)))
   const updatedIds = updatedRows.map((row) =>
     toIdentifier(row.id, 'updateMany.result.id') as RecordType['id']
@@ -238,7 +238,7 @@ const remove = async <RecordType extends RaRecord = RaRecord>(
   resource: string,
   params: DeleteParams<RecordType>
 ): Promise<DeleteResult<RecordType>> => {
-  const id = toIdentifier(params.id as unknown, 'delete.id')
+  const id = toIdentifier(params.id, 'delete.id')
   const data = await deleteRecord(resource, id)
   cursorCache.clearAll()
 
@@ -249,7 +249,7 @@ const removeMany = async <RecordType extends RaRecord = RaRecord>(
   resource: string,
   params: DeleteManyParams<RecordType>
 ): Promise<DeleteManyResult<RecordType>> => {
-  const ids = toIdentifierArray(params.ids as unknown, 'deleteMany.ids')
+  const ids = toIdentifierArray(params.ids, 'deleteMany.ids')
   const deletedRows = await Promise.all(ids.map((id) => deleteRecord(resource, id)))
   const deletedIds = deletedRows.map((row) =>
     toIdentifier(row.id, 'deleteMany.result.id') as RecordType['id']

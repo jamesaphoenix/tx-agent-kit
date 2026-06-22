@@ -75,7 +75,7 @@ export const verifySessionToken = (token: string): Effect.Effect<SessionTokenPay
         email,
         pwd,
         sid
-      } as SessionTokenPayload
+      }
     },
     catch: (cause) => new AuthError({ message: 'Invalid session token', cause })
   })

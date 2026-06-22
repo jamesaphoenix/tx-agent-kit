@@ -11,16 +11,22 @@ import { createLogger } from '@tx-agent-kit/logging'
 const GRPC_NOT_FOUND = 5
 const GRPC_ALREADY_EXISTS = 6
 
+// Read the gRPC status as a plain number. `@grpc/grpc-js` now types `code` as a
+// `Status` enum, so comparing it directly to our numeric constants trips
+// no-unsafe-enum-comparison; widening through a number-typed parameter keeps the
+// comparison number-to-number without an inline cast.
+const grpcStatusCode = (error: { readonly code: number }): number => error.code
+
 const logger = createLogger('tx-agent-kit-worker-campaign-schedules')
 const EMAIL_SENDS_PRUNE_SCHEDULE_ID = 'email-sends-prune-schedule'
 
 const isScheduleNotFound = (error: unknown): boolean =>
   error instanceof ScheduleNotFoundError
-  || (isGrpcServiceError(error) && (error.code as number) === GRPC_NOT_FOUND)
+  || (isGrpcServiceError(error) && grpcStatusCode(error) === GRPC_NOT_FOUND)
 
 const isScheduleAlreadyExists = (error: unknown): boolean =>
   error instanceof ScheduleAlreadyRunning
-  || (isGrpcServiceError(error) && (error.code as number) === GRPC_ALREADY_EXISTS)
+  || (isGrpcServiceError(error) && grpcStatusCode(error) === GRPC_ALREADY_EXISTS)
 
 export async function ensureEmailSendsPruneSchedule(
   client: Client,

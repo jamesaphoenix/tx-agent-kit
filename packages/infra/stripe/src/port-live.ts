@@ -302,7 +302,7 @@ export const makeStripePortLive = (
         return yield* Effect.try({
           try: () => {
             const event = stripeClient.webhooks.constructEvent(rawBody, signature, webhookSecret)
-            const payload = toJsonObject(event as unknown)
+            const payload = toJsonObject(event)
             const eventData = (event.data as { object: unknown; previous_attributes?: unknown }).object
             const rawPrevious = (event.data as { previous_attributes?: unknown }).previous_attributes
             const previousAttributes = rawPrevious !== undefined && rawPrevious !== null

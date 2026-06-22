@@ -18,7 +18,7 @@ export const toTeamMemberRecordPage = (page: PaginatedResult<TeamMemberRowShape>
   mapPaginatedResult(page, toTeamMemberRecord)
 
 export const toContentReviewTokenRecord = (row: ContentReviewTokenRowShape): ContentReviewTokenRecord =>
-  row as ContentReviewTokenRecord
+  row
 
 export const toContentReviewTokenRecordPage = (
   page: PaginatedResult<ContentReviewTokenRowShape>

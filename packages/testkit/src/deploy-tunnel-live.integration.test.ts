@@ -8,7 +8,7 @@ import { getTestkitEnv } from './env.js'
 const shouldRunLiveTunnelNegativeIntegration =
   getTestkitEnv().RUN_LIVE_TUNNEL_NEGATIVE_INTEGRATION === '1'
 
-describe.sequential('live cloudflare tunnel integration', () => {
+describe('live cloudflare tunnel integration', { concurrent: false }, () => {
   it.skipIf(!shouldRunLiveTunnelIntegration)(
     'reconciles and checks real tunnel routing for requested mode',
     () => {

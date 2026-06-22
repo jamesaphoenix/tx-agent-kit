@@ -1,4 +1,4 @@
-import { useStore } from '@tanstack/react-store'
+import { useSelector } from '@tanstack/react-store'
 import {
   sessionStore,
   sessionStoreSelectors,
@@ -6,11 +6,11 @@ import {
 } from '../stores/session-store'
 
 export const useSessionStore = (): SessionStoreState => {
-  return useStore(sessionStore, (state) => state)
+  return useSelector(sessionStore, (state) => state)
 }
 
 export const useSessionStoreSelector = <T,>(selector: (state: SessionStoreState) => T): T => {
-  return useStore(sessionStore, selector)
+  return useSelector(sessionStore, selector)
 }
 
 export const useCurrentPrincipal = () => {

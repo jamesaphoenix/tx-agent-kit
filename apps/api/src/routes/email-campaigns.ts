@@ -210,13 +210,13 @@ export const EmailCampaignsLive = HttpApiBuilder.group(TxAgentApi, 'emailCampaig
             service.enrollUser(path.campaignId, userId).pipe(
               Effect.map((enrollment) => ({
                 userId,
-                enrolled: true as boolean,
+                enrolled: true,
                 enrollmentId: enrollment.id
               })),
               Effect.catchAll((error) =>
                 Effect.succeed({
                   userId,
-                  enrolled: false as boolean,
+                  enrolled: false,
                   error: error.message
                 })
               )

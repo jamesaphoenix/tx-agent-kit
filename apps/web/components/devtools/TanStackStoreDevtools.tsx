@@ -1,7 +1,7 @@
 'use client'
 
 import type { Store } from '@tanstack/react-store'
-import { useStore } from '@tanstack/react-store'
+import { useSelector } from '@tanstack/react-store'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 
 interface StoreHistoryEntry<TState> {
@@ -146,7 +146,7 @@ export function TanStackStoreDevtools<TState>({
   initiallyOpen = false
 }: TanStackStoreDevtoolsProps<TState>) {
   const historySize = resolveHistorySize(maxHistory)
-  const currentState = useStore(store, (snapshot) => snapshot)
+  const currentState = useSelector(store, (snapshot) => snapshot)
   const [isOpen, setIsOpen] = useState(initiallyOpen)
   const nextHistoryIdRef = useRef(1)
   const wasOpenRef = useRef(initiallyOpen)
