@@ -92,18 +92,24 @@ This work fixed three layers of the E2E pipeline (all clean upstream ports):
    `pnpm --filter @tx-agent-kit/api dev` with stdout/stderr to a log file + `dump_service_logs` on
    readiness timeout.
 
-**Remaining (deeper, pre-existing, NOT this work):** with the above fixed, the api now logs
-`Starting API server (host 127.0.0.1 port 4100)` but never binds :4100 in the E2E `tsx watch`
-start path -> it hangs during server-runtime launch and the readiness wait times out at 120s.
-Confirmed NOT the auto-fix subsystem: `AutoFixTriggerLive` is `Layer.succeed` (lazy; connects
-per-webhook), and the E2E job sets `AUTO_FIX_TRIGGER_MODE=stub`. The integration-test startup path
-(testkit api-server-harness) does NOT hit this hang, which is why the core suite is green.
+**Root cause (FOUND + FIXED 2026-06-22, commit `fix(observability): disable client OTLP export
+when endpoint is empty`):** the earlier "api never binds / silent hang" reading was WRONG. The
+captured E2E readiness log proves the api is healthy: `api ready after 8s (http://localhost:4100/health)`
+returns 200. The failure is entirely web-side: the prod Next.js server (`next start`, `NODE_ENV
+=production`, no OTLP collector in CI) 500'd EVERY request with
+`Error: Configuration: Could not parse user-provided export URL: '/v1/traces'`, so `poll web`
+never saw `/` become ready and timed out at 120s.
 
-**Follow-up (out of scope for this infra port):** investigate the api `tsx watch` startup hang
-under the E2E env. RULED OUT so far: the auto-fix trigger (`AutoFixTriggerLive` is `Layer.succeed`,
-lazy + stub-gated) and eager OIDC discovery (`getGoogleOidcRuntime` is lazy/cached, byte-identical to
-upstream whose E2E is green). The hang is SILENT (no error logged after "Starting API server"),
-pointing at telemetry/OTEL init or server-runtime layer construction that the testkit api-server-harness
-startup path does not exercise. Next step: add startup tracing or reproduce with the exact E2E env
-(closed-port `GOOGLE_OIDC_ISSUER_URL`, full deploy-style env). The job is strictly closer to green than
-before this work, with service logs now captured on failure.
+Why: `apps/web|mobile/lib/env.ts` (`resolveDefault`) deliberately yields `''` for
+`OTEL_EXPORTER_OTLP_ENDPOINT` in a production-like runtime when no `NEXT_PUBLIC_`/`EXPO_PUBLIC_`
+collector is set. `packages/infra/observability/src/client.ts` then built an `OTLPTraceExporter`
+with `url: \`\${''}/v1/traces\`` = `/v1/traces`, which the exporter rejects on every span flush.
+The fix: treat an empty/whitespace endpoint as telemetry-disabled (no exporter, no metric reader;
+keep working no-op tracer/meter providers). Covers both client consumers (web + mobile axios).
+Server-side telemetry is unaffected (`getObservabilityEnv` always defaults to
+`http://localhost:4320`), which is why "Run All Integration Suites" was always green.
+
+Verified locally by building + serving the prod web bundle in the exact CI env (`CI=true`,
+`NODE_ENV=production`, no OTLP endpoint): `/` and `/sign-in` now return 200 with zero `/v1/traces`
+errors in the serve log (was a 500 flood). The api was independently confirmed healthy in the same
+CI env on both macOS and a Linux/Node-22 container (`/health` -> 200 in ~1-8s).
