@@ -678,6 +678,8 @@ export const emailCampaigns = pgTable('email_campaigns', {
   audienceFilter: jsonb('audience_filter').$type<JsonObject>(),
   fromName: text('from_name'),
   replyTo: text('reply_to'),
+  // Stable natural key for config-as-code sync; NULL = hand-created/unmanaged.
+  slug: text('slug'),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
@@ -686,7 +688,8 @@ export const emailCampaigns = pgTable('email_campaigns', {
   index('idx_email_campaigns_type').on(table.campaignType),
   index('idx_email_campaigns_trigger')
     .using('gin', table.triggerConfig)
-    .where(sql`${table.status} = 'active'`)
+    .where(sql`${table.status} = 'active'`),
+  uniqueIndex('email_campaigns_slug_unique').on(table.slug).where(sql`slug IS NOT NULL`)
 ])
 
 export const emailCampaignSteps = pgTable('email_campaign_steps', {
@@ -710,7 +713,18 @@ export const emailCampaignEnrollments = pgTable('email_campaign_enrollments', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   status: emailEnrollmentStatusEnum('status').notNull().default('active'),
   currentStepOrder: integer('current_step_order'),
+  // Due-queue state: when the next step is due (NULL when paused/completed/cancelled).
+  nextStepAt: timestamp('next_step_at', { withTimezone: true }),
+  // Remaining delay captured at pause so resume recomputes next_step_at.
+  pausedRemainingSecs: integer('paused_remaining_secs'),
+  // Optional lease so an overrunning/parallel sweep cannot re-grab an in-flight row.
+  sweepLeasedUntil: timestamp('sweep_leased_until', { withTimezone: true }),
+  // Deprecated: drips no longer use a per-enrollment workflow. Kept nullable.
   temporalWorkflowId: text('temporal_workflow_id'),
+  // Provenance: the source domain event that created/re-enrolled this row
+  // (REQ-LIFECYCLE-051). Null for the manual enroll path. See migration 0056.
+  triggerEventType: text('trigger_event_type'),
+  triggerEventId: uuid('trigger_event_id'),
   enrolledAt: timestamp('enrolled_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
@@ -721,7 +735,26 @@ export const emailCampaignEnrollments = pgTable('email_campaign_enrollments', {
   uniqueIndex('email_campaign_enrollments_campaign_user_unique').on(table.campaignId, table.userId),
   index('idx_email_campaign_enrollments_campaign').on(table.campaignId, table.status),
   index('idx_email_campaign_enrollments_user').on(table.userId, table.status),
-  index('idx_email_campaign_enrollments_status').on(table.status, table.enrolledAt)
+  index('idx_email_campaign_enrollments_status').on(table.status, table.enrolledAt),
+  // THE DUE QUEUE: only active + scheduled rows; paused/terminal rows are excluded
+  // (status != active OR next_step_at IS NULL) so they impose zero per-tick cost.
+  index('idx_email_campaign_enrollments_due')
+    .on(table.nextStepAt)
+    .where(sql`status = 'active' AND next_step_at IS NOT NULL`)
+])
+
+// Markers that make "first time" / "once per team" lifecycle events fire exactly
+// once. feature_used inserts (user_id, milestone); the activity scan inserts
+// (team_id, milestone). Permanent (no retention).
+export const lifecycleMilestones = pgTable('lifecycle_milestones', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  teamId: uuid('team_id').references(() => teams.id, { onDelete: 'cascade' }),
+  milestone: text('milestone').notNull(),
+  reachedAt: timestamp('reached_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  uniqueIndex('lifecycle_milestones_user_unique').on(table.userId, table.milestone).where(sql`user_id IS NOT NULL`),
+  uniqueIndex('lifecycle_milestones_team_unique').on(table.teamId, table.milestone).where(sql`team_id IS NOT NULL`)
 ])
 
 export const emailSends = pgTable('email_sends', {
@@ -748,7 +781,12 @@ export const emailSends = pgTable('email_sends', {
     .where(sql`${table.resendMessageId} IS NOT NULL`),
   index('idx_email_sends_campaign_step').on(table.campaignId, table.stepId, table.status),
   index('idx_email_sends_user').on(table.userId, table.createdAt.desc()),
-  index('idx_email_sends_enrollment_step').on(table.enrollmentId, table.stepId),
+  // Drip-send idempotency key. Partial UNIQUE (enrollment_id IS NOT NULL) so the
+  // (enrollment, step) row is created at most once and the send can upsert; a
+  // null enrollment_id (broadcast send) is exempt. See migration 0055.
+  uniqueIndex('idx_email_sends_enrollment_step_unique')
+    .on(table.enrollmentId, table.stepId)
+    .where(sql`${table.enrollmentId} IS NOT NULL`),
   index('idx_email_sends_prune')
     .on(table.createdAt)
     .where(sql`${table.status} IN ('delivered', 'opened', 'clicked')`)
@@ -852,6 +890,7 @@ export type EmailCampaignEnrollmentRow = typeof emailCampaignEnrollments.$inferS
 export type EmailSendRow = typeof emailSends.$inferSelect
 export type EmailSuppressionListRow = typeof emailSuppressionList.$inferSelect
 export type EmailUnsubscribeRow = typeof emailUnsubscribes.$inferSelect
+export type LifecycleMilestoneRow = typeof lifecycleMilestones.$inferSelect
 
 // ── Auto-fix runs (operational infra, NOT a domain event) ────────────
 //

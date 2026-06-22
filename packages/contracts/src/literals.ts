@@ -124,12 +124,80 @@ export const domainEventTypes = [
   'billing.recharge_requires_action',
   'billing.welcome_credit_granted',
   'assets.thumbnail_requested',
-  'email_campaigns.enrollment_triggered'
+  'lifecycle.signed_up',
+  'lifecycle.trial_started',
+  'lifecycle.onboarding_completed',
+  'lifecycle.workspace_activated',
+  'lifecycle.feature_used',
+  'lifecycle.inactive',
+  'lifecycle.churned'
 ] as const
 export type DomainEventType = (typeof domainEventTypes)[number]
 
-export const domainEventAggregateTypes = ['organization', 'team', 'billing', 'assets', 'email_campaigns'] as const
+export const domainEventAggregateTypes = ['organization', 'team', 'billing', 'assets', 'email_campaigns', 'lifecycle'] as const
 export type DomainEventAggregateType = (typeof domainEventAggregateTypes)[number]
+
+/**
+ * The lifecycle event types that drive the lifecycle email engine. This is the
+ * SINGLE SOURCE OF TRUTH used to build exhaustive `Record<LifecycleEventType, ...>`
+ * maps (payload-extractor, payload-schema, event-test registry) so adding a new
+ * lifecycle event without its extractor/schema/test is a compile error.
+ */
+export const lifecycleEventTypes = [
+  'lifecycle.signed_up',
+  'lifecycle.trial_started',
+  'lifecycle.onboarding_completed',
+  'lifecycle.workspace_activated',
+  'lifecycle.feature_used',
+  'lifecycle.inactive',
+  'lifecycle.churned'
+] as const satisfies ReadonlyArray<DomainEventType>
+export type LifecycleEventType = (typeof lifecycleEventTypes)[number]
+
+/** Reasons carried by `lifecycle.churned` (one normalized churn event). */
+export const lifecycleChurnReasons = ['subscription_cancelled', 'unsubscribed'] as const
+export type LifecycleChurnReason = (typeof lifecycleChurnReasons)[number]
+
+/** Template ids for the lifecycle email template registry (single source of truth). */
+export const lifecycleTemplateIds = [
+  'lifecycle/welcome',
+  'lifecycle/complete-onboarding',
+  'lifecycle/create-workspace',
+  'lifecycle/invite-teammate',
+  'lifecycle/upload-first-asset',
+  'lifecycle/activation-tips',
+  'lifecycle/trial-getting-started',
+  'lifecycle/trial-ending-soon',
+  'lifecycle/feature-spotlight-credits',
+  'lifecycle/inactive-nudge',
+  'lifecycle/inactive-final',
+  'lifecycle/we-miss-you',
+  'lifecycle/churned-winback',
+  'lifecycle/churned-feedback',
+  'lifecycle/usage-milestone',
+  'lifecycle/feedback-request'
+] as const
+export type LifecycleTemplateId = (typeof lifecycleTemplateIds)[number]
+
+/** Audience predicates that gate event-driven enrollment. */
+export const audiencePredicates = ['has_not_left_feedback'] as const
+export type AudiencePredicate = (typeof audiencePredicates)[number]
+export const isAudiencePredicate = (value: unknown): value is AudiencePredicate =>
+  typeof value === 'string' && (audiencePredicates as readonly string[]).includes(value)
+
+/** Predicates the per-team activity scan evaluates. */
+export const activityPredicates = [
+  'has_not_completed_onboarding',
+  'has_no_real_workspace',
+  'has_recorded_usage',
+  'no_activity_since',
+  'subscription_cancelled'
+] as const
+export type ActivityPredicate = (typeof activityPredicates)[number]
+
+/** Statuses a config-as-code campaign definition may declare. */
+export const campaignDefinitionStatuses = ['active', 'draft'] as const
+export type CampaignDefinitionStatus = (typeof campaignDefinitionStatuses)[number]
 
 export const domainEventStatuses = ['pending', 'processing', 'published', 'failed'] as const
 export type DomainEventStatus = (typeof domainEventStatuses)[number]

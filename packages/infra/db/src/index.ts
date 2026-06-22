@@ -35,6 +35,11 @@ export {
   suppressionRepository,
   audienceRepository
 } from './repositories/email-campaigns.js'
+export {
+  lifecycleScanRepository,
+  lifecycleMilestoneRepository,
+  type TeamActivityFacts
+} from './repositories/lifecycle.js'
 export { domainEventsRepository, insertDomainEventInTransaction, type DomainEventInput, type InsertDomainEventInput } from './repositories/domain-events.js'
 export { teamMediaAssetsRepository } from './repositories/team-media-assets.js'
 export { pendingUploadsRepository } from './repositories/pending-uploads.js'
