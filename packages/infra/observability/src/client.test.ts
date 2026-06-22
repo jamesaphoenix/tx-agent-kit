@@ -168,6 +168,35 @@ describe('client telemetry lifecycle', () => {
     await module.stopClientTelemetry()
   })
 
+  it('skips OTLP exporters when the resolved endpoint is empty (prod with no collector)', async () => {
+    // apps/web|mobile/lib/env.ts resolve OTEL_EXPORTER_OTLP_ENDPOINT to '' in a
+    // production-like runtime when no NEXT_PUBLIC_/EXPO_PUBLIC_ endpoint is set.
+    // Building an OTLP exporter with `${''}/v1/traces` previously threw
+    // "Could not parse user-provided export URL: '/v1/traces'" on every span
+    // flush, 500-ing every server-rendered request. An empty endpoint must
+    // instead disable export, keeping a working no-op tracer/meter.
+    const module = await import('./client.js')
+
+    const telemetry = module.getClientHttpTelemetry({
+      serviceName: 'tx-agent-kit-web',
+      otlpEndpoint: ''
+    })
+
+    expect(traceExporterConstructorMock).not.toHaveBeenCalled()
+    expect(metricExporterConstructorMock).not.toHaveBeenCalled()
+    expect(metricReaderConstructorMock).not.toHaveBeenCalled()
+    expect(batchSpanProcessorConstructorMock).not.toHaveBeenCalled()
+
+    // The tracer + request recorder still work (no-op export).
+    expect(() => {
+      const span = telemetry.tracer.startSpan('noop')
+      span.end()
+      telemetry.recordRequest(10, { 'http.request.method': 'GET' })
+    }).not.toThrow()
+
+    await module.stopClientTelemetry()
+  })
+
   it('emits smoke client telemetry span and request metric', async () => {
     const module = await import('./client.js')
 

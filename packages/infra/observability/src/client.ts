@@ -53,6 +53,17 @@ const resolveClientOtelEndpoint = (
 ): string =>
   config.otlpEndpoint ?? getClientObservabilityEnv().OTEL_EXPORTER_OTLP_ENDPOINT
 
+// An empty/whitespace endpoint means "no OTLP collector configured" - the
+// production web/mobile env resolver deliberately yields '' when no
+// NEXT_PUBLIC_/EXPO_PUBLIC_ endpoint is provided (see apps/web/lib/env.ts
+// resolveDefault). Building an OTLPTraceExporter with `${''}/v1/traces` then
+// throws "Could not parse user-provided export URL: '/v1/traces'" on every
+// span flush, which previously 500'd every server-rendered request. Treat an
+// empty endpoint as telemetry-disabled: keep working no-op tracer/meter
+// providers but attach no exporter.
+const hasOtlpEndpoint = (otlpEndpoint: string): boolean =>
+  otlpEndpoint.trim().length > 0
+
 const resolveDeploymentEnvironment = (config: ClientTelemetryConfig): string =>
   config.deploymentEnvironment ?? getClientObservabilityEnv().NODE_ENV
 
@@ -67,30 +78,36 @@ const createClientTelemetryState = (
     [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: deploymentEnvironment
   })
 
+  const otlpConfigured = hasOtlpEndpoint(otlpEndpoint)
+
   const tracerProvider = new BasicTracerProvider({
     resource,
-    spanProcessors: [
-      new BatchSpanProcessor(
-        new OTLPTraceExporter({
-          url: `${otlpEndpoint}/v1/traces`
-        })
-      )
-    ]
+    spanProcessors: otlpConfigured
+      ? [
+          new BatchSpanProcessor(
+            new OTLPTraceExporter({
+              url: `${otlpEndpoint}/v1/traces`
+            })
+          )
+        ]
+      : []
   })
 
   trace.setGlobalTracerProvider(tracerProvider)
   const tracer = trace.getTracer(config.serviceName)
 
-  const metricReader = new PeriodicExportingMetricReader({
-    exporter: new OTLPMetricExporter({
-      url: `${otlpEndpoint}/v1/metrics`
-    }),
-    exportIntervalMillis: 5000
-  })
-
   const meterProvider = new MeterProvider({
     resource,
-    readers: [metricReader]
+    readers: otlpConfigured
+      ? [
+          new PeriodicExportingMetricReader({
+            exporter: new OTLPMetricExporter({
+              url: `${otlpEndpoint}/v1/metrics`
+            }),
+            exportIntervalMillis: 5000
+          })
+        ]
+      : []
   })
 
   metrics.setGlobalMeterProvider(meterProvider)
