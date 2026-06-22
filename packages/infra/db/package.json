@@ -23,7 +23,7 @@
     "@effect/sql-pg": "^0.52.1",
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
-    "drizzle-orm": "1.0.0-beta.17-160831b",
+    "drizzle-orm": "1.0.0-beta.22",
     "effect": "^3.21.4",
     "pg": "^8.22.0"
   },

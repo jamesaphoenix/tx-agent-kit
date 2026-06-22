@@ -607,8 +607,8 @@ importers:
         specifier: workspace:*
         version: link:../logging
       drizzle-orm:
-        specifier: 1.0.0-beta.17-160831b
-        version: 1.0.0-beta.17-160831b(@effect/sql-pg@0.52.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@opentelemetry/api@1.9.1)(@types/mssql@9.1.9)(@types/pg@8.20.0)(mssql@11.0.1)(pg@8.22.0)(postgres@3.4.8)(zod@4.4.3)
+        specifier: 1.0.0-beta.22
+        version: 1.0.0-beta.22(@effect/sql-pg@0.52.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@opentelemetry/api@1.9.1)(@types/mssql@9.1.9)(@types/pg@8.20.0)(mssql@11.0.1)(pg@8.22.0)(postgres@3.4.8)(zod@4.4.3)
       effect:
         specifier: ^3.21.4
         version: 3.21.4
@@ -5951,8 +5951,8 @@ packages:
     resolution: {integrity: sha512-oVaJ9jaC9SWb5OknLAy/eiVTVzDostTrYG3fJivzUYOnRrsgQtywqkfsCkYT9Qh2fb2EqIusDmZ7o5DpG/W/GQ==}
     hasBin: true
 
-  drizzle-orm@1.0.0-beta.17-160831b:
-    resolution: {integrity: sha512-caceqrsmhEr3RsYODqHvGrcSKRRBCojLVsX8sML/Xj7n3PePJPZIHCmoOmyHZegEkbtb6ijJojHz4siFxVl6OA==}
+  drizzle-orm@1.0.0-beta.22:
+    resolution: {integrity: sha512-F+DZyVIvH0oVKa/w08Cle1xfoH+pc+htIXHG/frnMLG72aby9NYYr9oc+9XvghnoO4umxFItduz0OMmQJMnenw==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@cloudflare/workers-types': '>=4'
@@ -6029,6 +6029,8 @@ packages:
         optional: true
       '@types/better-sqlite3':
         optional: true
+      '@types/mssql':
+        optional: true
       '@types/pg':
         optional: true
       '@types/sql.js':
@@ -6048,6 +6050,8 @@ packages:
       expo-sqlite:
         optional: true
       gel:
+        optional: true
+      mssql:
         optional: true
       mysql2:
         optional: true
@@ -10732,10 +10736,12 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/abort-controller@2.1.2':
     dependencies:
       tslib: 2.8.1
+    optional: true
 
   '@azure/core-auth@1.10.1':
     dependencies:
@@ -10744,6 +10750,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/core-client@1.10.2':
     dependencies:
@@ -10756,6 +10763,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/core-lro@2.7.2':
     dependencies:
@@ -10765,10 +10773,12 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/core-paging@1.6.2':
     dependencies:
       tslib: 2.8.1
+    optional: true
 
   '@azure/core-rest-pipeline@1.24.0':
     dependencies:
@@ -10781,10 +10791,12 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/core-tracing@1.3.1':
     dependencies:
       tslib: 2.8.1
+    optional: true
 
   '@azure/core-util@1.13.1':
     dependencies:
@@ -10793,6 +10805,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/identity@4.13.1':
     dependencies:
@@ -10809,6 +10822,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/keyvault-common@2.1.0':
     dependencies:
@@ -10822,6 +10836,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/keyvault-keys@4.10.2':
     dependencies:
@@ -10838,6 +10853,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/logger@1.3.0':
     dependencies:
@@ -10845,17 +10861,21 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/msal-browser@5.14.0':
     dependencies:
       '@azure/msal-common': 16.9.0
+    optional: true
 
-  '@azure/msal-common@16.9.0': {}
+  '@azure/msal-common@16.9.0':
+    optional: true
 
   '@azure/msal-node@5.2.5':
     dependencies:
       '@azure/msal-common': 16.9.0
       jsonwebtoken: 9.0.3
+    optional: true
 
   '@babel/code-frame@7.10.4':
     dependencies:
@@ -12505,7 +12525,8 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@js-joda/core@5.7.0': {}
+  '@js-joda/core@5.7.0':
+    optional: true
 
   '@js-sdsl/ordered-map@4.4.2': {}
 
@@ -14841,7 +14862,8 @@ snapshots:
 
   '@tanstack/store@0.11.0': {}
 
-  '@tediousjs/connection-string@0.5.0': {}
+  '@tediousjs/connection-string@0.5.0':
+    optional: true
 
   '@temporalio/activity@1.18.1':
     dependencies:
@@ -15049,6 +15071,7 @@ snapshots:
       tedious: 19.2.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@types/node@25.9.4':
     dependencies:
@@ -15083,6 +15106,7 @@ snapshots:
   '@types/readable-stream@4.0.23':
     dependencies:
       '@types/node': 25.9.4
+    optional: true
 
   '@types/sarif@2.1.7': {}
 
@@ -15202,6 +15226,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@ungap/structured-clone@1.3.1': {}
 
@@ -15607,6 +15632,7 @@ snapshots:
       buffer: 6.0.3
       inherits: 2.0.4
       readable-stream: 4.7.0
+    optional: true
 
   blamer@1.0.7:
     dependencies:
@@ -15670,7 +15696,8 @@ snapshots:
     dependencies:
       node-int64: 0.4.0
 
-  buffer-equal-constant-time@1.0.1: {}
+  buffer-equal-constant-time@1.0.1:
+    optional: true
 
   buffer-from@1.1.2: {}
 
@@ -15683,6 +15710,7 @@ snapshots:
     dependencies:
       base64-js: 1.5.1
       ieee754: 1.2.1
+    optional: true
 
   builtin-modules@5.2.0: {}
 
@@ -16152,15 +16180,14 @@ snapshots:
       get-tsconfig: 4.14.0
       jiti: 2.7.0
 
-  drizzle-orm@1.0.0-beta.17-160831b(@effect/sql-pg@0.52.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@opentelemetry/api@1.9.1)(@types/mssql@9.1.9)(@types/pg@8.20.0)(mssql@11.0.1)(pg@8.22.0)(postgres@3.4.8)(zod@4.4.3):
-    dependencies:
-      '@types/mssql': 9.1.9
-      mssql: 11.0.1
+  drizzle-orm@1.0.0-beta.22(@effect/sql-pg@0.52.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@opentelemetry/api@1.9.1)(@types/mssql@9.1.9)(@types/pg@8.20.0)(mssql@11.0.1)(pg@8.22.0)(postgres@3.4.8)(zod@4.4.3):
     optionalDependencies:
       '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)
       '@effect/sql-pg': 0.52.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4)(ioredis@5.11.1))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4)
       '@opentelemetry/api': 1.9.1
+      '@types/mssql': 9.1.9
       '@types/pg': 8.20.0
+      mssql: 11.0.1
       pg: 8.22.0
       postgres: 3.4.8
       zod: 4.4.3
@@ -16176,6 +16203,7 @@ snapshots:
   ecdsa-sig-formatter@1.0.11:
     dependencies:
       safe-buffer: 5.2.1
+    optional: true
 
   ee-first@1.1.1: {}
 
@@ -17341,6 +17369,7 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   https-proxy-agent@5.0.1:
     dependencies:
@@ -17582,7 +17611,8 @@ snapshots:
 
   jose@6.2.3: {}
 
-  js-md4@0.3.2: {}
+  js-md4@0.3.2:
+    optional: true
 
   js-stringify@1.0.2: {}
 
@@ -17680,6 +17710,7 @@ snapshots:
       lodash.once: 4.1.1
       ms: 2.1.3
       semver: 7.8.5
+    optional: true
 
   jstransformer@1.0.0:
     dependencies:
@@ -17691,11 +17722,13 @@ snapshots:
       buffer-equal-constant-time: 1.0.1
       ecdsa-sig-formatter: 1.0.11
       safe-buffer: 5.2.1
+    optional: true
 
   jws@4.0.1:
     dependencies:
       jwa: 2.0.1
       safe-buffer: 5.2.1
+    optional: true
 
   keyv@4.5.4:
     dependencies:
@@ -17864,19 +17897,26 @@ snapshots:
 
   lodash.debounce@4.0.8: {}
 
-  lodash.includes@4.3.0: {}
+  lodash.includes@4.3.0:
+    optional: true
 
-  lodash.isboolean@3.0.3: {}
+  lodash.isboolean@3.0.3:
+    optional: true
 
-  lodash.isinteger@4.0.4: {}
+  lodash.isinteger@4.0.4:
+    optional: true
 
-  lodash.isnumber@3.0.3: {}
+  lodash.isnumber@3.0.3:
+    optional: true
 
-  lodash.isplainobject@4.0.6: {}
+  lodash.isplainobject@4.0.6:
+    optional: true
 
-  lodash.isstring@4.0.1: {}
+  lodash.isstring@4.0.1:
+    optional: true
 
-  lodash.once@4.1.1: {}
+  lodash.once@4.1.1:
+    optional: true
 
   lodash.throttle@4.1.1: {}
 
@@ -18695,6 +18735,7 @@ snapshots:
       tedious: 18.6.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   msw@2.13.3(@types/node@25.9.4)(typescript@5.9.3):
     dependencies:
@@ -18735,7 +18776,8 @@ snapshots:
 
   nanoid@3.3.15: {}
 
-  native-duplexpair@1.0.0: {}
+  native-duplexpair@1.0.0:
+    optional: true
 
   natural-compare@1.4.0: {}
 
@@ -18910,6 +18952,7 @@ snapshots:
       define-lazy-prop: 3.0.0
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
+    optional: true
 
   open@11.0.0:
     dependencies:
@@ -19333,7 +19376,8 @@ snapshots:
 
   proc-log@4.2.0: {}
 
-  process@0.11.10: {}
+  process@0.11.10:
+    optional: true
 
   progress@2.0.3: {}
 
@@ -19858,6 +19902,7 @@ snapshots:
       events: 3.3.0
       process: 0.11.10
       string_decoder: 1.3.0
+    optional: true
 
   readdirp@5.0.0: {}
 
@@ -20078,7 +20123,8 @@ snapshots:
 
   reusify@1.1.0: {}
 
-  rfdc@1.4.1: {}
+  rfdc@1.4.1:
+    optional: true
 
   rimraf@3.0.2:
     dependencies:
@@ -20453,7 +20499,8 @@ snapshots:
 
   split2@4.2.0: {}
 
-  sprintf-js@1.1.3: {}
+  sprintf-js@1.1.3:
+    optional: true
 
   stackback@0.0.2: {}
 
@@ -20505,6 +20552,7 @@ snapshots:
   string_decoder@1.3.0:
     dependencies:
       safe-buffer: 5.2.1
+    optional: true
 
   stringify-entities@4.0.4:
     dependencies:
@@ -20631,7 +20679,8 @@ snapshots:
       minizlib: 3.1.0
       yallist: 5.0.0
 
-  tarn@3.0.2: {}
+  tarn@3.0.2:
+    optional: true
 
   tedious@18.6.2:
     dependencies:
@@ -20647,6 +20696,7 @@ snapshots:
       sprintf-js: 1.1.3
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   tedious@19.2.1:
     dependencies:
@@ -20662,6 +20712,7 @@ snapshots:
       sprintf-js: 1.1.3
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   temp-dir@2.0.0: {}
 
@@ -21212,6 +21263,7 @@ snapshots:
   wsl-utils@0.1.0:
     dependencies:
       is-wsl: 3.1.1
+    optional: true
 
   wsl-utils@0.3.1:
     dependencies:
