@@ -148,29 +148,44 @@ describe('email send status rank progression [INV-EMAIL-CAMP-014]', () => {
       expect(canAdvanceEmailSendStatus('clicked', 'opened')).toBe(false)
     })
 
-    it('rejects same-status transitions', () => {
-      const allStatuses: EmailSendStatus[] = [
-        'pending', 'sent', 'delivered', 'opened', 'clicked',
-        'bounced', 'complained', 'failed'
+    it('rejects same-status transitions (except a failed re-stamp)', () => {
+      // failed -> failed is a legitimate re-stamp of the failure reason on a
+      // repeat retry, so it is excluded here and covered by the recovery test.
+      const selfRejecting: EmailSendStatus[] = [
+        'pending', 'sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained'
       ]
 
-      for (const status of allStatuses) {
+      for (const status of selfRejecting) {
         expect(canAdvanceEmailSendStatus(status, status)).toBe(false)
       }
     })
 
-    it('rejects transitions from terminal states', () => {
-      const terminal: EmailSendStatus[] = ['bounced', 'complained', 'failed']
+    it('rejects transitions out of a locked terminal state (bounced, complained)', () => {
+      const locked: EmailSendStatus[] = ['bounced', 'complained']
       const allStatuses: EmailSendStatus[] = [
         'pending', 'sent', 'delivered', 'opened', 'clicked',
         'bounced', 'complained', 'failed'
       ]
 
-      for (const from of terminal) {
+      for (const from of locked) {
         for (const to of allStatuses) {
           expect(canAdvanceEmailSendStatus(from, to)).toBe(false)
         }
       }
+    })
+
+    it('treats failed as recoverable so a successful retry heals the row', () => {
+      // failed is set by our own send activity on a transient error (not a
+      // webhook), so a later successful retry must be able to advance it forward.
+      expect(canAdvanceEmailSendStatus('failed', 'sent')).toBe(true)
+      expect(canAdvanceEmailSendStatus('failed', 'delivered')).toBe(true)
+      expect(canAdvanceEmailSendStatus('failed', 'opened')).toBe(true)
+      expect(canAdvanceEmailSendStatus('failed', 'clicked')).toBe(true)
+      // A repeat failure re-stamps; a later bounce/complaint may still terminate it.
+      expect(canAdvanceEmailSendStatus('failed', 'failed')).toBe(true)
+      expect(canAdvanceEmailSendStatus('failed', 'bounced')).toBe(true)
+      // But it never regresses to pending.
+      expect(canAdvanceEmailSendStatus('failed', 'pending')).toBe(false)
     })
   })
 })
