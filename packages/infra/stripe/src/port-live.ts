@@ -12,7 +12,7 @@ import { readFailedPaymentIntentDetails } from './payment-intent-error.js'
  * Shared Stripe SDK API version pin used by both the API and worker
  * adapters. Kept here so upgrades happen in exactly one place.
  */
-export const STRIPE_API_VERSION = '2025-10-29.clover' as const
+export const STRIPE_API_VERSION = '2026-05-27.dahlia' as const
 
 const stripeLogger = createLogger('tx-agent-kit-stripe')
 
@@ -302,7 +302,7 @@ export const makeStripePortLive = (
         return yield* Effect.try({
           try: () => {
             const event = stripeClient.webhooks.constructEvent(rawBody, signature, webhookSecret)
-            const payload = toJsonObject(event as unknown)
+            const payload = toJsonObject(event)
             const eventData = (event.data as { object: unknown; previous_attributes?: unknown }).object
             const rawPrevious = (event.data as { previous_attributes?: unknown }).previous_attributes
             const previousAttributes = rawPrevious !== undefined && rawPrevious !== null

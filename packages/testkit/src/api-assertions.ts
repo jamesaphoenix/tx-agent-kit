@@ -56,7 +56,7 @@ export const expectApiSuccessWithSchema = <A, I>(
   try {
     return Schema.decodeUnknownSync(schema)(result.body)
   } catch (error) {
-    throw new Error(`Response body did not match schema: ${String(error)}`)
+    throw new Error(`Response body did not match schema: ${String(error)}`, { cause: error })
   }
 }
 

@@ -49,7 +49,7 @@ const callTool = (
   if (name === `${metaToolNames.list}_ping`) {
     return pingResult
   }
-  return callMcpTool(name, input) as CallToolResult
+  return callMcpTool(name, input)
 }
 
 export const createAgentMcpServer = (): ProtocolServerLike => {

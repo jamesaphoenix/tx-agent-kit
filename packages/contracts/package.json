@@ -43,10 +43,10 @@
     "test": "vitest run -c vitest.config.ts"
   },
   "dependencies": {
-    "effect": "^3.21.2"
+    "effect": "^3.21.4"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*",
-    "fast-check": "^4.6.0"
+    "fast-check": "^4.8.0"
   }
 }

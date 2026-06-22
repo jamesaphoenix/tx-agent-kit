@@ -152,6 +152,29 @@ describe('client telemetry lifecycle', () => {
     await module.stopClientTelemetry()
   })
 
+  it('skips OTLP exporters when the endpoint is empty (telemetry export disabled)', async () => {
+    // Production-like web builds resolve OTEL_EXPORTER_OTLP_ENDPOINT to '' to mean
+    // "no collector". Feeding that to the exporters builds a relative '/v1/traces'
+    // URL, which @opentelemetry 0.219+ rejects at construction. The empty endpoint
+    // must yield a working no-op tracer rather than a thrown configuration error.
+    const module = await import('./client.js')
+
+    const telemetry = module.getClientHttpTelemetry({
+      serviceName: 'tx-agent-kit-web',
+      otlpEndpoint: ''
+    })
+
+    expect(traceExporterConstructorMock).not.toHaveBeenCalled()
+    expect(metricExporterConstructorMock).not.toHaveBeenCalled()
+
+    // Recording still works against the no-op providers.
+    expect(() =>
+      telemetry.recordRequest(5, { 'http.request.method': 'GET', 'url.path': '/v1/me' })
+    ).not.toThrow()
+
+    await module.stopClientTelemetry()
+  })
+
   it('reinitializes telemetry when service configuration changes', async () => {
     process.env.NEXT_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT = 'http://collector.local:4320'
 

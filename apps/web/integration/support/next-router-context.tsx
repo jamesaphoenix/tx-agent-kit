@@ -1,6 +1,5 @@
 'use client'
 
-import type { Params } from 'next/dist/server/request/params'
 import {
   AppRouterContext,
   type AppRouterInstance
@@ -80,7 +79,7 @@ export const IntegrationRouterProvider = ({
     <AppRouterContext.Provider value={router}>
       <PathnameContext.Provider value={pathname}>
         <SearchParamsContext.Provider value={searchParams}>
-          <PathParamsContext.Provider value={{} as Params}>
+          <PathParamsContext.Provider value={{}}>
             {children}
           </PathParamsContext.Provider>
         </SearchParamsContext.Provider>

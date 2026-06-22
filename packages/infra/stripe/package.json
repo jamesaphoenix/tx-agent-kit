@@ -14,8 +14,8 @@
   "dependencies": {
     "@tx-agent-kit/core": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
-    "effect": "^3.21.2",
-    "stripe": "^19.2.0"
+    "effect": "^3.21.4",
+    "stripe": "^22.0.0"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*"

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
-import { useStore } from '@tanstack/react-store'
+import { useSelector } from '@tanstack/react-store'
 import {
   useSessionStore,
   useSessionStoreSelector,
@@ -14,7 +14,7 @@ import {
 } from '../stores/session-store'
 
 vi.mock('@tanstack/react-store', () => ({
-  useStore: vi.fn()
+  useSelector: vi.fn()
 }))
 
 vi.mock('../stores/session-store', () => ({
@@ -31,30 +31,30 @@ beforeEach(() => {
 })
 
 describe('useSessionStore', () => {
-  it('passes sessionStore and identity selector to useStore', () => {
+  it('passes sessionStore and identity selector to useSelector', () => {
     const fakeState: SessionStoreState = { principal: null, isReady: false }
-    ;(useStore as Mock).mockReturnValue(fakeState)
+    ;(useSelector as Mock).mockReturnValue(fakeState)
 
     const result = useSessionStore()
 
-    expect(useStore).toHaveBeenCalledWith(sessionStore, expect.any(Function))
+    expect(useSelector).toHaveBeenCalledWith(sessionStore, expect.any(Function))
     expect(result).toBe(fakeState)
 
     // Verify the identity selector returns the full state object
-    const calledSelector = (useStore as Mock).mock.calls[0][1] as (s: SessionStoreState) => SessionStoreState
+    const calledSelector = (useSelector as Mock).mock.calls[0][1] as (s: SessionStoreState) => SessionStoreState
     const testState: SessionStoreState = { principal: { userId: 'u-1', email: 'a@b.com', roles: ['member'], permissions: [] }, isReady: true }
     expect(calledSelector(testState)).toBe(testState)
   })
 })
 
 describe('useSessionStoreSelector', () => {
-  it('passes custom selector to useStore', () => {
+  it('passes custom selector to useSelector', () => {
     const selector = (s: SessionStoreState) => s.isReady
-    ;(useStore as Mock).mockReturnValue(true)
+    ;(useSelector as Mock).mockReturnValue(true)
 
     const result = useSessionStoreSelector(selector)
 
-    expect(useStore).toHaveBeenCalledWith(sessionStore, selector)
+    expect(useSelector).toHaveBeenCalledWith(sessionStore, selector)
     expect(result).toBe(true)
   })
 })
@@ -62,16 +62,16 @@ describe('useSessionStoreSelector', () => {
 describe('useCurrentPrincipal', () => {
   it('uses getPrincipal selector', () => {
     const principal = { userId: 'u-1', email: 'a@b.com', roles: ['member'] as readonly string[], permissions: [] as readonly string[] }
-    ;(useStore as Mock).mockReturnValue(principal)
+    ;(useSelector as Mock).mockReturnValue(principal)
 
     const result = useCurrentPrincipal()
 
-    expect(useStore).toHaveBeenCalledWith(sessionStore, sessionStoreSelectors.getPrincipal)
+    expect(useSelector).toHaveBeenCalledWith(sessionStore, sessionStoreSelectors.getPrincipal)
     expect(result).toBe(principal)
   })
 
   it('returns null when no principal', () => {
-    ;(useStore as Mock).mockReturnValue(null)
+    ;(useSelector as Mock).mockReturnValue(null)
 
     const result = useCurrentPrincipal()
 
@@ -81,22 +81,22 @@ describe('useCurrentPrincipal', () => {
 
 describe('useIsSessionReady', () => {
   it('uses getIsReady selector', () => {
-    ;(useStore as Mock).mockReturnValue(true)
+    ;(useSelector as Mock).mockReturnValue(true)
 
     const result = useIsSessionReady()
 
-    expect(useStore).toHaveBeenCalledWith(sessionStore, sessionStoreSelectors.getIsReady)
+    expect(useSelector).toHaveBeenCalledWith(sessionStore, sessionStoreSelectors.getIsReady)
     expect(result).toBe(true)
   })
 })
 
 describe('useIsAuthenticated', () => {
   it('uses getIsAuthenticated selector', () => {
-    ;(useStore as Mock).mockReturnValue(true)
+    ;(useSelector as Mock).mockReturnValue(true)
 
     const result = useIsAuthenticated()
 
-    expect(useStore).toHaveBeenCalledWith(sessionStore, sessionStoreSelectors.getIsAuthenticated)
+    expect(useSelector).toHaveBeenCalledWith(sessionStore, sessionStoreSelectors.getIsAuthenticated)
     expect(result).toBe(true)
   })
 })

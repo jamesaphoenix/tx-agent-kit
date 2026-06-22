@@ -53,6 +53,17 @@ const resolveClientOtelEndpoint = (
 ): string =>
   config.otlpEndpoint ?? getClientObservabilityEnv().OTEL_EXPORTER_OTLP_ENDPOINT
 
+// An empty OTLP endpoint means "no collector configured" (telemetry export is
+// off, e.g. in the E2E web build). Older @opentelemetry exporters silently
+// tolerated the resulting relative `/v1/traces` URL; 0.219+ rejects it at
+// construction with "Could not parse user-provided export URL". Build the
+// signal URL only for a non-empty endpoint so callers can skip the exporter.
+const buildOtlpSignalUrl = (
+  endpoint: string,
+  signal: 'traces' | 'metrics'
+): string | undefined =>
+  endpoint.trim().length === 0 ? undefined : `${endpoint}/v1/${signal}`
+
 const resolveDeploymentEnvironment = (config: ClientTelemetryConfig): string =>
   config.deploymentEnvironment ?? getClientObservabilityEnv().NODE_ENV
 
@@ -67,30 +78,28 @@ const createClientTelemetryState = (
     [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: deploymentEnvironment
   })
 
+  const traceUrl = buildOtlpSignalUrl(otlpEndpoint, 'traces')
   const tracerProvider = new BasicTracerProvider({
     resource,
-    spanProcessors: [
-      new BatchSpanProcessor(
-        new OTLPTraceExporter({
-          url: `${otlpEndpoint}/v1/traces`
-        })
-      )
-    ]
+    spanProcessors: traceUrl
+      ? [new BatchSpanProcessor(new OTLPTraceExporter({ url: traceUrl }))]
+      : []
   })
 
   trace.setGlobalTracerProvider(tracerProvider)
   const tracer = trace.getTracer(config.serviceName)
 
-  const metricReader = new PeriodicExportingMetricReader({
-    exporter: new OTLPMetricExporter({
-      url: `${otlpEndpoint}/v1/metrics`
-    }),
-    exportIntervalMillis: 5000
-  })
-
+  const metricUrl = buildOtlpSignalUrl(otlpEndpoint, 'metrics')
   const meterProvider = new MeterProvider({
     resource,
-    readers: [metricReader]
+    readers: metricUrl
+      ? [
+          new PeriodicExportingMetricReader({
+            exporter: new OTLPMetricExporter({ url: metricUrl }),
+            exportIntervalMillis: 5000
+          })
+        ]
+      : []
   })
 
   metrics.setGlobalMeterProvider(meterProvider)

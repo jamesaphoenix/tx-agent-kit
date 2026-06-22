@@ -15,7 +15,7 @@ import type { PaginatedResult } from '../pagination.js'
 import { mapPaginatedResult } from './row-mapper-utils.js'
 
 export const toOrganizationRecord = (row: OrganizationRowShape): OrganizationRecord =>
-  row as OrganizationRecord
+  row
 
 export const toOrganizationRecordPage = (
   page: PaginatedResult<OrganizationRowShape>
@@ -34,7 +34,7 @@ export const toOrgMemberRecordPage = (
 ): PaginatedResult<OrgMemberRecord> => mapPaginatedResult(page, toOrgMemberRecord)
 
 export const toOrgMemberWithUserRecord = (row: OrgMemberWithUserRowShape): OrgMemberRecord =>
-  row as OrgMemberRecord
+  row
 
 export const toOrgMemberWithUserRecordPage = (
   page: PaginatedResult<OrgMemberWithUserRowShape>

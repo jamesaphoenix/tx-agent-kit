@@ -4,7 +4,6 @@ import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { useBillingCreatePortalSession } from '@/lib/api/generated/billing/billing'
 import { notify } from '@/lib/notify'
 import { readBrowserLocationState } from '@/lib/url-state'
 import { ManagePaymentMethodButton } from './ManagePaymentMethodButton'
@@ -30,7 +29,7 @@ const setPortalMutation = (mutateAsync = vi.fn()) => {
   mocks.useBillingCreatePortalSession.mockReturnValue({
     mutateAsync,
     isPending: false
-  } as unknown as ReturnType<typeof useBillingCreatePortalSession>)
+  })
   return mutateAsync
 }
 

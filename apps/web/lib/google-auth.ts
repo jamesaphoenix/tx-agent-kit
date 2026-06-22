@@ -47,7 +47,7 @@ export const consumeGoogleAuthNextPath = (fallback: string): string => {
     return sanitizeInternalPath(null, fallback)
   }
 
-  let stored: string | null = null
+  let stored: string | null
   try {
     stored = storage.getItem(googleAuthNextPathStorageKey)
     storage.removeItem(googleAuthNextPathStorageKey)

@@ -104,7 +104,7 @@ afterAll(() => {
   }
 })
 
-describe.sequential('root command entrypoints integration', () => {
+describe('root command entrypoints integration', { concurrent: false }, () => {
   it(
     'starts root dev command without immediate boot failures',
     async () => {

@@ -27,7 +27,7 @@ export const getMobileEnv = (): MobileEnv => {
     return cachedEnv
   }
 
-  const extra = Constants.expoConfig?.extra as Record<string, unknown> | undefined
+  const extra = Constants.expoConfig?.extra
 
   cachedEnv = {
     API_BASE_URL:

@@ -102,7 +102,7 @@ export const systemSettingsRepository = {
           .execute()
 
         if (!rows[0]?.value) {
-          return {} as RetentionSettings
+          return {}
         }
 
         const jsonValue = rows[0].value
@@ -112,7 +112,7 @@ export const systemSettingsRepository = {
           )
         }
 
-        return jsonValue as RetentionSettings
+        return jsonValue
       })
     )
 }
