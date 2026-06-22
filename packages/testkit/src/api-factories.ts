@@ -101,7 +101,7 @@ const decodeWithSchema = <A, I>(schema: Schema.Schema<A, I>, value: unknown, con
   try {
     return Schema.decodeUnknownSync(schema)(value)
   } catch (error) {
-    throw new Error(`${context} response shape mismatch: ${String(error)}`)
+    throw new Error(`${context} response shape mismatch: ${String(error)}`, { cause: error })
   }
 }
 

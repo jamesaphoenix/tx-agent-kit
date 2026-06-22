@@ -128,7 +128,7 @@ describe('worker temporal cloud mTLS integration', { concurrent: false }, () => 
         TEMPORAL_API_KEY: 'invalid-temporal-api-key'
       }
 
-      let connection: NativeConnection | null = null
+      let connection: NativeConnection
       try {
         connection = await NativeConnection.connect(
           resolveWorkerTemporalConnectionOptions(invalidApiKeyEnv)

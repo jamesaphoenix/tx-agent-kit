@@ -127,7 +127,6 @@ export const RetentionCleanerServiceLive = Layer.effect(
           )
 
           if (batch.data.length === 0) {
-            hasMore = false
             break
           }
 
@@ -175,7 +174,6 @@ export const RetentionCleanerServiceLive = Layer.effect(
           )
 
           if (batch.data.length === 0) {
-            hasMore = false
             break
           }
 
