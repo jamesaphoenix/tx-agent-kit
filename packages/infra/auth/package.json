@@ -14,8 +14,8 @@
   "dependencies": {
     "@tx-agent-kit/contracts": "workspace:*",
     "bcryptjs": "^3.0.2",
-    "effect": "^3.21.2",
-    "jose": "^6.2.2"
+    "effect": "^3.21.4",
+    "jose": "^6.2.3"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*"
