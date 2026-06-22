@@ -26,6 +26,6 @@
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*",
     "@types/pg": "^8.20.0",
-    "orval": "^8.8.0"
+    "orval": "^8.18.0"
   }
 }
