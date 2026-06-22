@@ -75,7 +75,7 @@ describe('drainOutboxOnce', () => {
     fetchUnprocessedEventsMock.mockResolvedValueOnce([orgCreated()]).mockResolvedValueOnce([])
     const start = vi.fn(() => Promise.resolve(undefined))
 
-    await drainOutboxOnce(makeClient(start), 'default-queue', 50)
+    await drainOutboxOnce(makeClient(start), 'default-queue', 50, 'email-campaigns')
 
     expect(start).toHaveBeenCalledTimes(1)
     expect(start).toHaveBeenCalledWith('organizationCreatedWorkflow', expect.objectContaining({
@@ -89,16 +89,14 @@ describe('drainOutboxOnce', () => {
     expect(markEventFailedMock).not.toHaveBeenCalled()
   })
 
-  it('uses the plan task queue when one is pinned (email campaigns)', async () => {
-    const event = makeEvent('email_campaigns.enrollment_triggered', {
-      campaignId: 'c1', userId: 'u1', userEmail: 'a@b.co', userName: 'A', enrollmentId: 'en1'
-    })
+  it('uses the configured email-campaigns queue for a lifecycle enrollment event', async () => {
+    const event = makeEvent('lifecycle.signed_up', { userId: 'u1' })
     fetchUnprocessedEventsMock.mockResolvedValueOnce([event]).mockResolvedValueOnce([])
     const start = vi.fn(() => Promise.resolve(undefined))
 
-    await drainOutboxOnce(makeClient(start), 'default-queue', 50)
+    await drainOutboxOnce(makeClient(start), 'default-queue', 50, 'email-campaigns')
 
-    expect(start).toHaveBeenCalledWith('dripSequenceWorkflow', expect.objectContaining({
+    expect(start).toHaveBeenCalledWith('lifecycleEnrollmentWorkflow', expect.objectContaining({
       taskQueue: 'email-campaigns'
     }))
   })
@@ -109,7 +107,7 @@ describe('drainOutboxOnce', () => {
       .mockResolvedValueOnce([])
     const start = vi.fn(() => Promise.resolve(undefined))
 
-    await drainOutboxOnce(makeClient(start), 'default-queue', 50)
+    await drainOutboxOnce(makeClient(start), 'default-queue', 50, 'email-campaigns')
 
     expect(start).not.toHaveBeenCalled()
     expect(markEventFailedMock).toHaveBeenCalledTimes(1)
@@ -122,7 +120,7 @@ describe('drainOutboxOnce', () => {
       Promise.reject(new WorkflowExecutionAlreadyStartedError('dup', 'wf', 'organizationCreatedWorkflow'))
     )
 
-    await drainOutboxOnce(makeClient(start), 'default-queue', 50)
+    await drainOutboxOnce(makeClient(start), 'default-queue', 50, 'email-campaigns')
 
     expect(markEventsPublishedMock).toHaveBeenCalledTimes(1)
     expect(markEventsPublishedMock.mock.calls[0]?.[0]).toEqual(['evt-1'])
@@ -133,7 +131,7 @@ describe('drainOutboxOnce', () => {
     fetchUnprocessedEventsMock.mockResolvedValueOnce([orgCreated()]).mockResolvedValueOnce([])
     const start = vi.fn(() => Promise.reject(new Error('temporal unreachable')))
 
-    await drainOutboxOnce(makeClient(start), 'default-queue', 50)
+    await drainOutboxOnce(makeClient(start), 'default-queue', 50, 'email-campaigns')
 
     // The row is left in 'processing' for stuck-events-reset to recover — NOT failed.
     expect(markEventFailedMock).not.toHaveBeenCalled()
@@ -147,7 +145,7 @@ describe('drainOutboxOnce', () => {
       .mockResolvedValueOnce([orgCreated('c')])                  // partial → stop after this
     const start = vi.fn(() => Promise.resolve(undefined))
 
-    await drainOutboxOnce(makeClient(start), 'default-queue', 2)
+    await drainOutboxOnce(makeClient(start), 'default-queue', 2, 'email-campaigns')
 
     expect(fetchUnprocessedEventsMock).toHaveBeenCalledTimes(2)
     expect(start).toHaveBeenCalledTimes(3)
@@ -157,7 +155,7 @@ describe('drainOutboxOnce', () => {
     fetchUnprocessedEventsMock.mockResolvedValueOnce([])
     const start = vi.fn(() => Promise.resolve(undefined))
 
-    await drainOutboxOnce(makeClient(start), 'default-queue', 50)
+    await drainOutboxOnce(makeClient(start), 'default-queue', 50, 'email-campaigns')
 
     expect(start).not.toHaveBeenCalled()
     expect(markEventsPublishedMock).not.toHaveBeenCalled()

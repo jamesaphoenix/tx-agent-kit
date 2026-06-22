@@ -28,6 +28,7 @@ export const emailCampaignRowSchema = Schema.Struct({
   audienceFilter: Schema.NullOr(jsonObjectSchema),
   fromName: Schema.NullOr(Schema.String),
   replyTo: Schema.NullOr(Schema.String),
+  slug: Schema.NullOr(Schema.String),
   createdBy: Schema.NullOr(Schema.UUID),
   createdAt: Schema.DateFromSelf,
   updatedAt: Schema.DateFromSelf

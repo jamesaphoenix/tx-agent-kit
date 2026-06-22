@@ -1411,6 +1411,44 @@
       "requiresConfirmation": true
     },
     {
+      "key": "email_unsubscribe.post_unsubscribe_one_click",
+      "apiOperationId": "emailUnsubscribe.postUnsubscribeOneClick",
+      "apiMethod": "POST",
+      "apiPath": "/v1/email/unsubscribe/one-click",
+      "schema": {
+        "parameters": {
+          "path": [],
+          "query": [
+            {
+              "name": "token",
+              "in": "query",
+              "required": false
+            }
+          ],
+          "header": [],
+          "cookie": []
+        },
+        "requestBody": null,
+        "responseStatuses": [
+          "200",
+          "400",
+          "401",
+          "402",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "apiStatus": "implemented",
+      "admin": false,
+      "cliCommand": "email-unsubscribe post-unsubscribe-one-click",
+      "mcpTool": "tx_agent_kit_email_unsubscribe_post_unsubscribe_one_click",
+      "mutating": true,
+      "requiresConfirmation": true
+    },
+    {
       "key": "organizations.accept_invitation",
       "apiOperationId": "organizations.acceptInvitation",
       "apiMethod": "POST",

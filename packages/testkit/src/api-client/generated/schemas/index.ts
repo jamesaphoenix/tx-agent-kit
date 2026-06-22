@@ -194,6 +194,8 @@ export * from './emailUnsubscribeGetUnsubscribe200.js';
 export * from './emailUnsubscribeGetUnsubscribeParams.js';
 export * from './emailUnsubscribePostUnsubscribe200.js';
 export * from './emailUnsubscribePostUnsubscribeBody.js';
+export * from './emailUnsubscribePostUnsubscribeOneClick200.js';
+export * from './emailUnsubscribePostUnsubscribeOneClickParams.js';
 export * from './emailWebhooksResendWebhook200.js';
 export * from './forbidden.js';
 export * from './healthHealth200.js';

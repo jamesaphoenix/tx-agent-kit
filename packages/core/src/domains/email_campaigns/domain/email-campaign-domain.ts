@@ -75,11 +75,15 @@ export interface CreateEnrollmentInput {
   campaignId: string
   userId: string
   temporalWorkflowId?: string | null
+  nextStepAt?: Date | null
 }
 
 export interface UpdateEnrollmentInput {
   status?: EmailEnrollmentStatus
   currentStepOrder?: number | null
+  nextStepAt?: Date | null
+  pausedRemainingSecs?: number | null
+  sweepLeasedUntil?: Date | null
   cancelReason?: EmailCancelReason | null
   temporalWorkflowId?: string | null
   enrolledAt?: Date | null

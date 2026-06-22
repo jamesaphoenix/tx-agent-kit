@@ -16,6 +16,7 @@ import { Effect, Layer } from 'effect'
 import { SharpThumbnailGeneratorPortLive } from './asset-thumbnail-generator.js'
 import { getWorkerEnv } from './config/env.js'
 import { billingActivities } from './billing-activities.js'
+import { lifecycleActivities } from './activities/lifecycle.js'
 
 export { billingActivities } from './billing-activities.js'
 
@@ -385,7 +386,12 @@ const runStorageEffect = <A, E>(effect: Effect.Effect<A, E, Storage>): Promise<A
 
 export const combinedActivities = {
   ...activities,
-  ...billingActivities
+  ...billingActivities,
+  // Lifecycle emit + per-team activity scan run on the DEFAULT queue: they are
+  // invoked by the domain-event workflows (organizations/billing) and the daily
+  // lifecycleScanWorkflow. The drip sweep + render/send activities live on the
+  // EMAIL_CAMPAIGNS queue (campaignActivities) and are registered separately.
+  ...lifecycleActivities
 }
 
 export const storageActivities = {

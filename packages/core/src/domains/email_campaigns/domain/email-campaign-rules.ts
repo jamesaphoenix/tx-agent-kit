@@ -36,8 +36,16 @@ export const canModifySteps = (campaignStatus: EmailCampaignStatus): boolean =>
 // ---------------------------------------------------------------------------
 // Email send status monotonic rank progression [INV-EMAIL-CAMP-014]
 // Status updates only advance rank. Out-of-order webhooks cannot regress status.
-// Bounced, complained, and failed are terminal states.
+//
+// `bounced` and `complained` are the only LOCKED terminal states: they are set
+// exclusively by Resend webhooks (a real bounce / spam complaint) and must never
+// be moved. `failed` shares their terminal rank as an OUTCOME, but it is set by
+// our own send activity on a transient error - so unlike a bounce it must remain
+// RECOVERABLE: a later retry that succeeds has to move the row failed -> sent.
+// (The invariant guards against out-of-order webhooks, not against our own retry.)
 // ---------------------------------------------------------------------------
+
+const TERMINAL_RANK = 99
 
 const statusRanks: Record<EmailSendStatus, number> = {
   pending: 0,
@@ -45,10 +53,14 @@ const statusRanks: Record<EmailSendStatus, number> = {
   delivered: 2,
   opened: 3,
   clicked: 4,
-  bounced: 99,
-  complained: 99,
-  failed: 99
+  bounced: TERMINAL_RANK,
+  complained: TERMINAL_RANK,
+  failed: TERMINAL_RANK
 }
+
+// Truly-terminal, webhook-set statuses that can never transition out. `failed` is
+// deliberately excluded so a retry can recover it (see the block comment above).
+const lockedStatuses: ReadonlySet<EmailSendStatus> = new Set<EmailSendStatus>(['bounced', 'complained'])
 
 export const getEmailSendStatusRank = (status: EmailSendStatus): number => statusRanks[status]
 
@@ -56,19 +68,19 @@ export const canAdvanceEmailSendStatus = (
   current: EmailSendStatus,
   next: EmailSendStatus
 ): boolean => {
-  const currentRank = getEmailSendStatusRank(current)
-  const nextRank = getEmailSendStatusRank(next)
-
-  // Cannot move away from a terminal state (bounced, complained, failed)
-  if (currentRank === 99) {
+  // A locked terminal (real bounce / complaint) can never be moved.
+  if (lockedStatuses.has(current)) {
     return false
   }
 
-  // Any non-terminal status can advance to a terminal status
-  if (nextRank === 99) {
+  // Any non-locked status - including `failed` - can advance to a terminal status.
+  if (getEmailSendStatusRank(next) === TERMINAL_RANK) {
     return true
   }
 
-  // For non-terminal transitions, must strictly advance
-  return nextRank > currentRank
+  // For forward progress, `failed` is treated as pending-equivalent (rank 0) so a
+  // successful retry recovers it (failed -> sent); every other status uses its
+  // natural rank. Must strictly advance.
+  const currentRank = current === 'failed' ? 0 : getEmailSendStatusRank(current)
+  return getEmailSendStatusRank(next) > currentRank
 }

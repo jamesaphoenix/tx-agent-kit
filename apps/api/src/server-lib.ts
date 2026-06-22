@@ -40,6 +40,7 @@ import {
   EnrollmentStorePortLive,
   EmailSendStorePortLive,
   UnsubscribeStorePortLive,
+  SuppressionStorePortLive,
   UploadServiceLive,
   MediaAssetServiceLive,
   CollectionServiceLive,
@@ -194,7 +195,8 @@ const PortDependenciesLive = Layer.mergeAll(
   CampaignStepStorePortLive,
   EnrollmentStorePortLive,
   EmailSendStorePortLive,
-  UnsubscribeStorePortLive
+  UnsubscribeStorePortLive,
+  SuppressionStorePortLive
 )
 
 const CreditServicePortLive = Layer.effect(CreditServicePort, makeCreditService)

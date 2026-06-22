@@ -3,9 +3,12 @@ import {
   campaignStepRepository,
   enrollmentRepository,
   emailSendRepository,
-  unsubscribeRepository
+  unsubscribeRepository,
+  suppressionRepository,
+  usersRepository,
+  domainEventsRepository
 } from '@tx-agent-kit/db'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Option } from 'effect'
 import { mapNullable } from '../../../adapters/db-row-mappers.js'
 import { badRequest } from '../../../errors.js'
 import {
@@ -13,7 +16,10 @@ import {
   CampaignStepStorePort,
   EmailSendStorePort,
   EnrollmentStorePort,
-  UnsubscribeStorePort
+  UnsubscribeStorePort,
+  SuppressionStorePort,
+  UserInfoLookupPort,
+  EmailCampaignDomainEventOutboxPort
 } from '../ports/email-campaign-ports.js'
 
 // ---------------------------------------------------------------------------
@@ -69,7 +75,9 @@ export const EnrollmentStorePortLive = Layer.succeed(EnrollmentStorePort, {
     enrollmentRepository.findManyByCampaign(campaignId, filter),
   updateById: (id, input) => enrollmentRepository.updateById(id, input),
   cancelAllForCampaign: (campaignId, reason) =>
-    enrollmentRepository.cancelAllForCampaign(campaignId, reason)
+    enrollmentRepository.cancelAllForCampaign(campaignId, reason),
+  cancelAllActiveForUser: (userId, reason) =>
+    enrollmentRepository.cancelAllForUser(userId, reason)
 })
 
 export const EmailSendStorePortLive = Layer.succeed(EmailSendStorePort, {
@@ -94,3 +102,33 @@ export const UnsubscribeStorePortLive = Layer.succeed(UnsubscribeStorePort, {
     unsubscribeRepository.isUnsubscribed(userId, campaignId),
   unsubscribe: (input) => unsubscribeRepository.unsubscribe(input)
 })
+
+export const SuppressionStorePortLive = Layer.succeed(SuppressionStorePort, {
+  suppress: (input) => suppressionRepository.suppress(input)
+})
+
+export const UserInfoLookupPortLive = Layer.succeed(UserInfoLookupPort, {
+  getUserInfo: (userId) =>
+    usersRepository.findById(userId).pipe(
+      Effect.map((row) =>
+        Option.match(row, {
+          onNone: () => null,
+          onSome: (user) => ({ email: user.email, name: user.name })
+        })
+      )
+    )
+})
+
+export const EmailCampaignDomainEventOutboxDbLive = Layer.succeed(
+  EmailCampaignDomainEventOutboxPort,
+  {
+    emit: (input) =>
+      domainEventsRepository.create({
+        eventType: input.eventType,
+        aggregateType: input.aggregateType,
+        aggregateId: input.aggregateId,
+        payload: input.payload,
+        correlationId: input.correlationId ?? null
+      }).pipe(Effect.asVoid)
+  }
+)

@@ -52,6 +52,23 @@ export interface WorkerEnv {
   WEB_BASE_URL: string | undefined
   EMAIL_CAMPAIGNS_TASK_QUEUE: string
   /**
+   * Drip SWEEP cadence (minutes). Every interval, dripSweepWorkflow drains the
+   * due-enrollment queue in `DRIP_SWEEP_BATCH_SIZE` batches (up to
+   * `DRIP_SWEEP_MAX_BATCHES`), applying the pure reducer. Lower = snappier sends,
+   * more Temporal actions. Default 5.
+   */
+  DRIP_SWEEP_INTERVAL_MINUTES: number
+  /** Enrollments claimed per sweep batch (FOR UPDATE SKIP LOCKED). Default 100. */
+  DRIP_SWEEP_BATCH_SIZE: number
+  /** Max batches a single sweep run drains before yielding to the next run. Default 50. */
+  DRIP_SWEEP_MAX_BATCHES: number
+  /**
+   * Per-team activity scan cadence (hours). The inactivity window in the scan
+   * rules assumes a daily cadence, so keep this at 24 unless that window is
+   * widened too. Default 24.
+   */
+  LIFECYCLE_SCAN_INTERVAL_HOURS: number
+  /**
    * Stripe API key used for off-session auto-recharge PaymentIntents
    * fired by the billing worker. Leave undefined in dev/test — the
    * worker's StripePortLive will fall back to a `pi_local_*` stub so
@@ -269,6 +286,28 @@ export const getWorkerEnv = (): WorkerEnv => {
     7200
   )
 
+  // Lifecycle drip sweep + per-team activity scan cadence/sizing.
+  const resolvedDripSweepIntervalMinutes = parsePositiveIntegerEnv(
+    'DRIP_SWEEP_INTERVAL_MINUTES',
+    process.env.DRIP_SWEEP_INTERVAL_MINUTES,
+    5
+  )
+  const resolvedDripSweepBatchSize = parsePositiveIntegerEnv(
+    'DRIP_SWEEP_BATCH_SIZE',
+    process.env.DRIP_SWEEP_BATCH_SIZE,
+    100
+  )
+  const resolvedDripSweepMaxBatches = parsePositiveIntegerEnv(
+    'DRIP_SWEEP_MAX_BATCHES',
+    process.env.DRIP_SWEEP_MAX_BATCHES,
+    50
+  )
+  const resolvedLifecycleScanIntervalHours = parsePositiveIntegerEnv(
+    'LIFECYCLE_SCAN_INTERVAL_HOURS',
+    process.env.LIFECYCLE_SCAN_INTERVAL_HOURS,
+    24
+  )
+
   const env: WorkerEnv = {
     NODE_ENV: nodeEnv,
     DATABASE_URL: databaseUrl,
@@ -307,6 +346,10 @@ export const getWorkerEnv = (): WorkerEnv => {
     RESEND_FROM_EMAIL: parseOptionalStringEnv(process.env.RESEND_FROM_EMAIL),
     WEB_BASE_URL: parseOptionalStringEnv(process.env.WEB_BASE_URL),
     EMAIL_CAMPAIGNS_TASK_QUEUE: process.env.EMAIL_CAMPAIGNS_TASK_QUEUE ?? defaultEmailCampaignsTaskQueue,
+    DRIP_SWEEP_INTERVAL_MINUTES: resolvedDripSweepIntervalMinutes,
+    DRIP_SWEEP_BATCH_SIZE: resolvedDripSweepBatchSize,
+    DRIP_SWEEP_MAX_BATCHES: resolvedDripSweepMaxBatches,
+    LIFECYCLE_SCAN_INTERVAL_HOURS: resolvedLifecycleScanIntervalHours,
     STRIPE_SECRET_KEY: parseOptionalStringEnv(process.env.STRIPE_SECRET_KEY)
   }
 

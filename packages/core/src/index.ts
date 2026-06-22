@@ -24,6 +24,18 @@ export type {
   NotificationRecord
 } from './domains/notifications/domain/notification-domain.js'
 export { organizationEvents, organizationEventVersions } from './domains/organization/events.js'
+export { emitLifecycleEvent } from './domains/lifecycle/application/emit-lifecycle-event.js'
+export { LifecycleEventOutboxPort } from './domains/lifecycle/ports/lifecycle-ports.js'
+export { LifecycleEventOutboxDbLive } from './domains/lifecycle/adapters/lifecycle-adapters.js'
+export type {
+  LifecycleSignedUpEventPayload,
+  LifecycleTrialStartedEventPayload,
+  LifecycleOnboardingCompletedEventPayload,
+  LifecycleWorkspaceActivatedEventPayload,
+  LifecycleFeatureUsedEventPayload,
+  LifecycleInactiveEventPayload,
+  LifecycleChurnedEventPayload
+} from './domains/lifecycle/events.js'
 export type { OrganizationCreatedEventPayload, OrganizationDeletedEventPayload } from './domains/organization/events.js'
 export { teamEvents, teamEventVersions } from './domains/team/events.js'
 export type { TeamDeletedEventPayload } from './domains/team/events.js'
@@ -216,14 +228,20 @@ export {
   CampaignStepStorePort,
   EnrollmentStorePort,
   EmailSendStorePort,
-  UnsubscribeStorePort
+  UnsubscribeStorePort,
+  SuppressionStorePort,
+  UserInfoLookupPort,
+  EmailCampaignDomainEventOutboxPort
 } from './domains/email_campaigns/ports/email-campaign-ports.js'
 export {
   CampaignStorePortLive,
   CampaignStepStorePortLive,
   EnrollmentStorePortLive,
   EmailSendStorePortLive,
-  UnsubscribeStorePortLive
+  UnsubscribeStorePortLive,
+  SuppressionStorePortLive,
+  UserInfoLookupPortLive,
+  EmailCampaignDomainEventOutboxDbLive
 } from './domains/email_campaigns/adapters/email-campaign-adapters.js'
 export type {
   CampaignRecord,
@@ -237,6 +255,14 @@ export type {
   CampaignFilter,
   EmailSendTimestamps
 } from './domains/email_campaigns/domain/email-campaign-domain.js'
+export { reduceEnrollment } from './domains/email_campaigns/domain/enrollment-reducer.js'
+export type {
+  DripStep,
+  EnrollmentAction,
+  EnrollmentProgressState,
+  EnrollmentStopReason,
+  ReducerGuardsInput
+} from './domains/email_campaigns/domain/enrollment-reducer.js'
 export * from './pagination.js'
 
 // ── Auto-fix (operational infra; neutral cross-cutting ports) ────────

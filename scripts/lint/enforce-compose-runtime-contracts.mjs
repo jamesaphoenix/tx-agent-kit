@@ -67,6 +67,12 @@ const deployRuntimeEnvExemptions = new Set([
   'OUTBOX_PRUNE_RETENTION_DAYS',
   'OUTBOX_STUCK_THRESHOLD_MINUTES',
   'RESERVATION_RECLAIM_MAX_AGE_SECONDS',
+  // Lifecycle drip-sweep + activity-scan cadence/sizing tuning knobs (code
+  // defaults apply when unset: 5m sweep, 100/batch, 50 batches/run, 24h scan).
+  'DRIP_SWEEP_INTERVAL_MINUTES',
+  'DRIP_SWEEP_BATCH_SIZE',
+  'DRIP_SWEEP_MAX_BATCHES',
+  'LIFECYCLE_SCAN_INTERVAL_HOURS',
   // AI routing has built-in OpenRouter defaults; only the API key is required.
   'OPENROUTER_BASE_URL',
   'OPENROUTER_EMBEDDING_MODEL',

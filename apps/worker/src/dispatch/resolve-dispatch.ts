@@ -33,7 +33,31 @@ const isPositiveSafeInteger = (value: number): boolean =>
   && Number.isSafeInteger(value)
   && value > 0
 
-export function resolveDispatch(event: SerializedDomainEvent): DispatchPlan {
+/**
+ * Per-environment task-queue names the dispatcher must agree with the workers on.
+ *
+ * `resolveDispatch` stays pure, so the queue names are injected rather than read
+ * from env here. The worker that polls drip workflows is created with
+ * `env.EMAIL_CAMPAIGNS_TASK_QUEUE` (apps/worker/src/index.ts); the dispatcher MUST
+ * route `lifecycleEnrollmentWorkflow` to that same configured queue, not a
+ * hardcoded literal, or any deployment that overrides the env var (e.g. each
+ * worktree, per scripts/worktree/setup.sh) enqueues enrollments on a queue with
+ * no poller and they never run.
+ */
+export interface DispatchConfig {
+  readonly emailCampaignsTaskQueue: string
+}
+
+// Matches `defaultEmailCampaignsTaskQueue` in apps/worker/src/config/env.ts. Kept
+// as a fallback only so existing single-arg callers/tests keep working; live
+// callers MUST pass the resolved `env.EMAIL_CAMPAIGNS_TASK_QUEUE` so an override
+// is honored.
+const DEFAULT_EMAIL_CAMPAIGNS_TASK_QUEUE = 'email-campaigns'
+
+export function resolveDispatch(
+  event: SerializedDomainEvent,
+  config: DispatchConfig = { emailCampaignsTaskQueue: DEFAULT_EMAIL_CAMPAIGNS_TASK_QUEUE }
+): DispatchPlan {
   const payload = event.payload
 
   switch (event.eventType) {
@@ -303,31 +327,25 @@ export function resolveDispatch(event: SerializedDomainEvent): DispatchPlan {
         workflowRunTimeout: '5 minutes'
       }
     }
-    case 'email_campaigns.enrollment_triggered': {
-      const hasValidPayload =
-        typeof payload.campaignId === 'string'
-        && typeof payload.userId === 'string'
-        && typeof payload.userEmail === 'string'
-        && typeof payload.userName === 'string'
-        && typeof payload.enrollmentId === 'string'
-
-      if (!hasValidPayload) {
-        return { kind: 'invalid', reason: `Invalid email_campaigns.enrollment_triggered payload for event ${event.id}: missing campaignId, userId, userEmail, userName, or enrollmentId` }
-      }
-
+    // Lifecycle events all route to one bounded enrollment workflow (one short
+    // run per event, NOT per enrollment and NOT sleeping). It looks up campaigns
+    // whose domain_event trigger matches and writes enrollment rows stamped with
+    // next_step_at; the drip sweep + reducer then drive progression. Routed to the
+    // EMAIL_CAMPAIGNS queue (the injected config) where the campaign worker polls.
+    case 'lifecycle.signed_up':
+    case 'lifecycle.trial_started':
+    case 'lifecycle.onboarding_completed':
+    case 'lifecycle.workspace_activated':
+    case 'lifecycle.feature_used':
+    case 'lifecycle.inactive':
+    case 'lifecycle.churned': {
       return {
         kind: 'start',
-        workflowType: 'dripSequenceWorkflow',
-        workflowId: `email-campaigns-enrollment-${event.id}`,
-        taskQueue: 'email-campaigns',
-        args: [{
-          enrollmentId: payload.enrollmentId as string,
-          campaignId: payload.campaignId as string,
-          userId: payload.userId as string,
-          userEmail: payload.userEmail as string,
-          userName: payload.userName as string
-        }],
-        workflowRunTimeout: '30 days'
+        workflowType: 'lifecycleEnrollmentWorkflow',
+        workflowId: `lifecycle-enroll-${event.id}`,
+        taskQueue: config.emailCampaignsTaskQueue,
+        args: [event],
+        workflowRunTimeout: '5 minutes'
       }
     }
     default:

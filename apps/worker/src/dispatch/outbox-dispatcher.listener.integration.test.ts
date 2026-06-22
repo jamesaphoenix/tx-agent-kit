@@ -52,6 +52,7 @@ const startDispatcher = (): ReturnType<typeof startOutboxDispatcher> =>
   startOutboxDispatcher({
     client: fakeClient,
     defaultTaskQueue: 'test-queue',
+    emailCampaignsTaskQueue: 'email-campaigns',
     batchSize: 50,
     // Long backstop so any observed drain is attributable to the LISTEN path /
     // reconnect drain-on-connect, never the periodic sweep.

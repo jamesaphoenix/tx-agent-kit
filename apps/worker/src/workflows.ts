@@ -4,6 +4,7 @@ import {
 import { PAYMENT_GRACE_PERIOD_DAYS } from '@tx-agent-kit/contracts/constants'
 import type { activities, SerializedDomainEvent } from './activities.js'
 import type { billingActivities } from './billing-activities.js'
+import type { lifecycleActivities } from './activities/lifecycle.js'
 
 const {
   ping,
@@ -19,6 +20,31 @@ const {
   retry: {
     maximumAttempts: 3,
     initialInterval: '1 second'
+  }
+})
+
+// Lifecycle emit activities run on the DEFAULT queue (registered via
+// combinedActivities). Proxied against lifecycleActivities since they are merged
+// in, not part of the base `activities` object.
+const {
+  emitLifecycleSignedUp,
+  emitLifecycleTrialStarted,
+  emitLifecycleChurned
+} = proxyActivities<typeof lifecycleActivities>({
+  startToCloseTimeout: '30 seconds',
+  retry: {
+    maximumAttempts: 3,
+    initialInterval: '1 second'
+  }
+})
+
+// The per-team activity scan reads + emits across the whole install base in one
+// run, so it gets a longer start-to-close than the per-event activities above.
+const { scanTeamActivity } = proxyActivities<typeof lifecycleActivities>({
+  startToCloseTimeout: '120 seconds',
+  retry: {
+    maximumAttempts: 3,
+    initialInterval: '2 seconds'
   }
 })
 
@@ -128,6 +154,12 @@ export async function organizationCreatedWorkflow(
   }
 
   await sendOrganizationWelcomeEmail({ organizationName, ownerUserId, ownerEmail })
+
+  // The owner just signed up: kick off the lifecycle onboarding drip. Emitting a
+  // generic lifecycle.signed_up (rather than enrolling here) keeps the engine
+  // config-driven and reusable - any campaign whose domain_event trigger matches
+  // enrolls the owner with zero code change.
+  await emitLifecycleSignedUp(ownerUserId)
 }
 
 export async function organizationDeletedWorkflow(
@@ -380,6 +412,11 @@ export async function subscriptionCancelledWorkflow(
 
   await scheduleOrgMediaPurge(organizationId)
   await notifyBillingEvent(event)
+
+  // The subscription was cancelled / lapsed: emit lifecycle.churned for the org
+  // owner to start the win-back drip (mirrors the welcome-credit -> trial_started
+  // bridge). enrollMatchingCampaigns still honors suppression/unsubscribe.
+  await emitLifecycleChurned(organizationId, 'subscription_cancelled')
 }
 
 /**
@@ -472,5 +509,29 @@ export async function welcomeCreditGrantedWorkflow(
   event: SerializedDomainEvent
 ): Promise<{ acknowledged: true }> {
   await notifyBillingEvent(event)
+
+  // A welcome credit means trial credits just went live: emit
+  // lifecycle.trial_started for the org owner to start the trial-nurture drip
+  // (mirroring the churn bridge: subscriptionCancelledWorkflow -> emitLifecycleChurned).
+  // enrollMatchingCampaigns honors suppression/unsubscribe at enroll time.
+  const organizationId = typeof event.payload.organizationId === 'string'
+    ? event.payload.organizationId
+    : undefined
+  if (organizationId) {
+    await emitLifecycleTrialStarted(organizationId)
+  }
+
   return { acknowledged: true }
+}
+
+/**
+ * The one daily per-team activity scan: evaluates every configured activity
+ * check (missed onboarding/workspace activation, first recorded usage,
+ * inactivity, churn) per team and emits the matching lifecycle.* event. Runs on
+ * the default queue alongside the other domain-event workflows; the emitted
+ * events flow back through the dispatcher into their drip campaigns. Delegates
+ * to the activity, which owns all wall-clock + DB access (deterministic here).
+ */
+export async function lifecycleScanWorkflow(): Promise<void> {
+  await scanTeamActivity()
 }

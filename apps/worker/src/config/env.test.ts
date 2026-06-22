@@ -61,6 +61,10 @@ describe('getWorkerEnv', () => {
       RESEND_FROM_EMAIL: undefined,
       WEB_BASE_URL: undefined,
       EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+      DRIP_SWEEP_INTERVAL_MINUTES: 5,
+      DRIP_SWEEP_BATCH_SIZE: 100,
+      DRIP_SWEEP_MAX_BATCHES: 50,
+      LIFECYCLE_SCAN_INTERVAL_HOURS: 24,
       STRIPE_SECRET_KEY: undefined
     })
   })
@@ -113,6 +117,10 @@ describe('getWorkerEnv', () => {
       RESEND_FROM_EMAIL: undefined,
       WEB_BASE_URL: undefined,
       EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+      DRIP_SWEEP_INTERVAL_MINUTES: 5,
+      DRIP_SWEEP_BATCH_SIZE: 100,
+      DRIP_SWEEP_MAX_BATCHES: 50,
+      LIFECYCLE_SCAN_INTERVAL_HOURS: 24,
       STRIPE_SECRET_KEY: undefined
     })
   })
@@ -280,6 +288,10 @@ describe('resolveWorkerTemporalConnectionOptions', () => {
       RESEND_FROM_EMAIL: undefined,
       WEB_BASE_URL: undefined,
       EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+      DRIP_SWEEP_INTERVAL_MINUTES: 5,
+      DRIP_SWEEP_BATCH_SIZE: 100,
+      DRIP_SWEEP_MAX_BATCHES: 50,
+      LIFECYCLE_SCAN_INTERVAL_HOURS: 24,
       STRIPE_SECRET_KEY: undefined
     }
 
@@ -315,6 +327,10 @@ describe('resolveWorkerTemporalConnectionOptions', () => {
       RESEND_FROM_EMAIL: undefined,
       WEB_BASE_URL: undefined,
       EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+      DRIP_SWEEP_INTERVAL_MINUTES: 5,
+      DRIP_SWEEP_BATCH_SIZE: 100,
+      DRIP_SWEEP_MAX_BATCHES: 50,
+      LIFECYCLE_SCAN_INTERVAL_HOURS: 24,
       STRIPE_SECRET_KEY: undefined
     }
 
@@ -354,6 +370,10 @@ describe('resolveWorkerTemporalConnectionOptions', () => {
       RESEND_FROM_EMAIL: undefined,
       WEB_BASE_URL: undefined,
       EMAIL_CAMPAIGNS_TASK_QUEUE: 'email-campaigns',
+      DRIP_SWEEP_INTERVAL_MINUTES: 5,
+      DRIP_SWEEP_BATCH_SIZE: 100,
+      DRIP_SWEEP_MAX_BATCHES: 50,
+      LIFECYCLE_SCAN_INTERVAL_HOURS: 24,
       STRIPE_SECRET_KEY: undefined
     }
 

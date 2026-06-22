@@ -168,3 +168,62 @@ export const EmailCampaignsEnrollmentTriggeredEventPayloadSchema = Schema.Struct
 })
 
 export type EmailCampaignsEnrollmentTriggeredEventPayload = Schema.Schema.Type<typeof EmailCampaignsEnrollmentTriggeredEventPayloadSchema>
+
+// --- Lifecycle domain event payload schemas ---
+// Shapes mirror the authoritative cross-domain event contract at
+// `packages/core/src/domains/lifecycle/domain/lifecycle-events.ts`. Field-name
+// parity is enforced by the domain-event-contracts structural lint. Every event
+// carries only userId (+ a few domain-meaningful fields); the sweep looks up
+// the user's email + name fresh from the DB at send time.
+
+export const LifecycleSignedUpEventPayloadSchema = Schema.Struct({
+  userId: Schema.String
+})
+
+export type LifecycleSignedUpEventPayload = Schema.Schema.Type<typeof LifecycleSignedUpEventPayloadSchema>
+
+export const LifecycleTrialStartedEventPayloadSchema = Schema.Struct({
+  userId: Schema.String
+})
+
+export type LifecycleTrialStartedEventPayload = Schema.Schema.Type<typeof LifecycleTrialStartedEventPayloadSchema>
+
+export const LifecycleOnboardingCompletedEventPayloadSchema = Schema.Struct({
+  userId: Schema.String,
+  teamId: Schema.String,
+  sinceDays: Schema.Number
+})
+
+export type LifecycleOnboardingCompletedEventPayload = Schema.Schema.Type<typeof LifecycleOnboardingCompletedEventPayloadSchema>
+
+export const LifecycleWorkspaceActivatedEventPayloadSchema = Schema.Struct({
+  userId: Schema.String,
+  teamId: Schema.String,
+  sinceDays: Schema.Number
+})
+
+export type LifecycleWorkspaceActivatedEventPayload = Schema.Schema.Type<typeof LifecycleWorkspaceActivatedEventPayloadSchema>
+
+export const LifecycleFeatureUsedEventPayloadSchema = Schema.Struct({
+  userId: Schema.String,
+  teamId: Schema.String,
+  feature: Schema.String
+})
+
+export type LifecycleFeatureUsedEventPayload = Schema.Schema.Type<typeof LifecycleFeatureUsedEventPayloadSchema>
+
+export const LifecycleInactiveEventPayloadSchema = Schema.Struct({
+  userId: Schema.String,
+  teamId: Schema.String,
+  inactiveDays: Schema.Number,
+  lastActiveAt: Schema.String
+})
+
+export type LifecycleInactiveEventPayload = Schema.Schema.Type<typeof LifecycleInactiveEventPayloadSchema>
+
+export const LifecycleChurnedEventPayloadSchema = Schema.Struct({
+  userId: Schema.String,
+  reason: Schema.Literal('subscription_cancelled', 'unsubscribed')
+})
+
+export type LifecycleChurnedEventPayload = Schema.Schema.Type<typeof LifecycleChurnedEventPayloadSchema>

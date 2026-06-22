@@ -1,6 +1,6 @@
 import { HttpApiBuilder, HttpServerRequest } from '@effect/platform'
-import type { EmailSendStatus } from '@tx-agent-kit/contracts'
-import { EmailCampaignService } from '@tx-agent-kit/core'
+import type { EmailSendStatus, EmailSuppressionReason } from '@tx-agent-kit/contracts'
+import { EmailCampaignService, SuppressionStorePort } from '@tx-agent-kit/core'
 import {
   verifyResendWebhook,
   parseResendWebhookEvent
@@ -20,7 +20,8 @@ const RESEND_EVENT_TO_STATUS: Record<string, string> = {
   'email.opened': 'opened',
   'email.clicked': 'clicked',
   'email.bounced': 'bounced',
-  'email.complained': 'complained'
+  'email.complained': 'complained',
+  'email.failed': 'failed'
 }
 
 export const EmailWebhooksLive = HttpApiBuilder.group(TxAgentApi, 'emailWebhooks', (handlers) =>
@@ -70,8 +71,24 @@ export const EmailWebhooksLive = HttpApiBuilder.group(TxAgentApi, 'emailWebhooks
         )
       }
 
-      const parsed = JSON.parse(rawBody) as unknown
-      const event = parseResendWebhookEvent(parsed)
+      // Parse + validate inside Effect.try so a malformed (but signature-valid)
+      // body becomes a typed BadRequest (400), not an Effect defect (500). A
+      // synchronous throw in this generator would die and surface as a 500,
+      // which Resend retries forever and can use to auto-disable the endpoint.
+      const event = yield* Effect.try({
+        try: () => parseResendWebhookEvent(JSON.parse(rawBody) as unknown),
+        catch: (cause) =>
+          new BadRequest({
+            message: `Invalid Resend webhook payload: ${cause instanceof Error ? cause.message : String(cause)}`
+          })
+      })
+
+      // Well-formed but unhandled event type (e.g. email.delivery_delayed,
+      // email.scheduled): acknowledge with 2xx so Resend stops retrying.
+      if (!event) {
+        logger.warn('Skipping unhandled Resend webhook event type')
+        return { processed: false }
+      }
 
       const emailId = event.data.email_id
       const statusKey = RESEND_EVENT_TO_STATUS[event.type]
@@ -112,13 +129,36 @@ export const EmailWebhooksLive = HttpApiBuilder.group(TxAgentApi, 'emailWebhooks
         )
         .pipe(Effect.mapError(mapCoreError))
 
-      // For hard bounces and complaints, log for suppression handling.
-      // Full suppression list integration is handled by the campaign worker.
+      // Hard bounces + spam complaints suppress the address so the drip sweep and
+      // enroll stop emailing it (the send was looked up by resend message id, so
+      // this is a campaigns-system suppression). Idempotent at the repo level.
       if (event.type === 'email.bounced' || event.type === 'email.complained') {
-        logger.info('Email suppression event received', {
+        const suppression = yield* SuppressionStorePort
+        const reason: EmailSuppressionReason = event.type === 'email.bounced' ? 'hard_bounce' : 'complaint'
+        const recipients = event.data.to
+        yield* Effect.forEach(
+          recipients,
+          (address) =>
+            suppression
+              .suppress({ email: address, reason, sourceSystem: 'campaigns', sourceId: emailId })
+              .pipe(Effect.mapError(mapCoreError)),
+          { discard: true }
+        )
+        logger.info('Suppressed email address after bounce/complaint', {
           type: event.type,
           emailId,
-          to: event.data.to
+          count: recipients.length
+        })
+      }
+
+      // Post-acceptance provider failure: the send is now terminally 'failed'.
+      // Log it so delivery problems surface to operators instead of staying
+      // silently stuck at 'sent'.
+      if (event.type === 'email.failed') {
+        logger.warn('Email failed at provider after acceptance', {
+          emailId,
+          to: event.data.to,
+          reason: event.data.failed?.reason
         })
       }
 

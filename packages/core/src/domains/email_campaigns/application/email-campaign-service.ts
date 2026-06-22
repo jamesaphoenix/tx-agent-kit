@@ -90,7 +90,11 @@ export class EmailCampaignService extends Context.Tag('EmailCampaignService')<
     ) => Effect.Effect<
       EnrollmentRecord,
       CoreError,
-      CampaignStorePort | EnrollmentStorePort | UnsubscribeStorePort | ClockPort
+      | CampaignStorePort
+      | EnrollmentStorePort
+      | UnsubscribeStorePort
+      | CampaignStepStorePort
+      | ClockPort
     >
 
     cancelEnrollment: (
@@ -405,6 +409,8 @@ export const EmailCampaignServiceLive = Layer.effect(
         const campaignStore = yield* CampaignStorePort
         const enrollmentStore = yield* EnrollmentStorePort
         const unsubscribeStore = yield* UnsubscribeStorePort
+        const stepStore = yield* CampaignStepStorePort
+        const clock = yield* ClockPort
 
         const campaign = yield* campaignStore.findById(campaignId).pipe(
           Effect.mapError(toCoreInternal('Failed to fetch campaign'))
@@ -430,6 +436,21 @@ export const EmailCampaignServiceLive = Layer.effect(
           )
         }
 
+        // Also honor a global unsubscribe (campaignId IS NULL). The repository's
+        // isUnsubscribed only matches the exact campaign when campaignId is
+        // non-null, so a globally-unsubscribed user would otherwise be enrolled
+        // here and only cancelled later by the drip workflow. Mirror the worker's
+        // dual check (campaign-specific then global) and reject up front.
+        const isGloballyUnsubscribed = yield* unsubscribeStore.isUnsubscribed(userId, null).pipe(
+          Effect.mapError(toCoreInternal('Failed to check unsubscribe status'))
+        )
+
+        if (isGloballyUnsubscribed) {
+          return yield* Effect.fail(
+            conflict('User has unsubscribed from all campaigns')
+          )
+        }
+
         const existingEnrollment = yield* enrollmentStore
           .findByCampaignAndUser(campaignId, userId)
           .pipe(Effect.mapError(toCoreInternal('Failed to check existing enrollment')))
@@ -440,18 +461,31 @@ export const EmailCampaignServiceLive = Layer.effect(
           )
         }
 
-        // Re-enroll: if enrollment exists with terminal status, UPDATE instead of INSERT
-        // to avoid unique constraint violation on (campaignId, userId)
-        if (existingEnrollment && (existingEnrollment.status === 'cancelled' || existingEnrollment.status === 'completed' || existingEnrollment.status === 'failed')) {
-          const clock = yield* ClockPort
-          const now = yield* clock.now()
+        // Stamp next_step_at = now + first-step delay so the drip SWEEP (not a
+        // per-enrollment workflow) picks it up. The sweep + reducer drive sends.
+        const now = yield* clock.now()
+        const steps = yield* stepStore.findByCampaign(campaignId).pipe(
+          Effect.mapError(toCoreInternal('Failed to load campaign steps'))
+        )
+        const firstDelaySeconds = steps[0]?.delaySeconds ?? 0
+        const nextStepAt = new Date(now.getTime() + firstDelaySeconds * 1000)
 
+        // Re-enroll a terminal enrollment in place (unique campaignId+userId), else insert.
+        if (
+          existingEnrollment &&
+          (existingEnrollment.status === 'cancelled' ||
+            existingEnrollment.status === 'completed' ||
+            existingEnrollment.status === 'failed')
+        ) {
           const reactivated = yield* enrollmentStore.updateById(existingEnrollment.id, {
             status: 'active',
             cancelReason: null,
             cancelledAt: null,
             completedAt: null,
             currentStepOrder: null,
+            nextStepAt,
+            pausedRemainingSecs: null,
+            sweepLeasedUntil: null,
             temporalWorkflowId: null,
             enrolledAt: now
           }).pipe(
@@ -467,7 +501,8 @@ export const EmailCampaignServiceLive = Layer.effect(
 
         const enrollment = yield* enrollmentStore.create({
           campaignId,
-          userId
+          userId,
+          nextStepAt
         }).pipe(
           Effect.mapError(toCoreInternal('Failed to enroll user'))
         )

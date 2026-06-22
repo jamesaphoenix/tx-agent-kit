@@ -1022,6 +1022,14 @@ export const EmailUnsubscribeGroup = HttpApiGroup.make('emailUnsubscribe')
       .setPayload(UnsubscribeBody)
       .addSuccess(UnsubscribeResponseSchema)
   )
+  // RFC 8058 one-click: the List-Unsubscribe header points here and mail clients
+  // POST with the token in the query string (no JSON body). Reuses the verify
+  // params (token) + the standard unsubscribe response.
+  .add(
+    HttpApiEndpoint.post('postUnsubscribeOneClick', '/v1/email/unsubscribe/one-click')
+      .setUrlParams(UnsubscribeTokenParams)
+      .addSuccess(UnsubscribeResponseSchema)
+  )
 
 export class TxAgentApi extends HttpApi.make('tx-agent-kit')
   .addError(BadRequest, { status: 400 })

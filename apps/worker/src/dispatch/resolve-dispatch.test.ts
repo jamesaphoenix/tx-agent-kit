@@ -46,9 +46,22 @@ const validCases: ReadonlyArray<{
   { eventType: 'billing.subscription_cancelled', payload: { organizationId: 'o1' }, workflowType: 'subscriptionCancelledWorkflow', workflowId: 'billing-subscription-cancelled-evt-1', workflowRunTimeout: '10 minutes' },
   { eventType: 'billing.credits_refunded', payload: { organizationId: 'o1' }, workflowType: 'creditsRefundedWorkflow', workflowId: 'billing-credits-refunded-evt-1', workflowRunTimeout: '5 minutes' },
   { eventType: 'billing.welcome_credit_granted', payload: { organizationId: 'o1', amountDecimillicents: 100, plan: 'plan-under-test' }, workflowType: 'welcomeCreditGrantedWorkflow', workflowId: 'billing-welcome-credit-granted-evt-1', workflowRunTimeout: '5 minutes' },
-  { eventType: 'billing.recharge_requires_action', payload: { organizationId: 'o1', attemptId: 'at1', amountDecimillicents: 100, stripePaymentIntentId: 'pi1', clientSecret: 'cs1' }, workflowType: 'rechargeRequiresActionWorkflow', workflowId: 'billing-recharge-requires-action-evt-1', workflowRunTimeout: '5 minutes' },
-  { eventType: 'email_campaigns.enrollment_triggered', payload: { campaignId: 'c1', userId: 'u1', userEmail: 'a@b.co', userName: 'A', enrollmentId: 'en1' }, workflowType: 'dripSequenceWorkflow', workflowId: 'email-campaigns-enrollment-evt-1', workflowRunTimeout: '30 days', taskQueue: 'email-campaigns' }
+  { eventType: 'billing.recharge_requires_action', payload: { organizationId: 'o1', attemptId: 'at1', amountDecimillicents: 100, stripePaymentIntentId: 'pi1', clientSecret: 'cs1' }, workflowType: 'rechargeRequiresActionWorkflow', workflowId: 'billing-recharge-requires-action-evt-1', workflowRunTimeout: '5 minutes' }
 ]
+
+// Every lifecycle.* event routes to one bounded enrollment workflow on the
+// email-campaigns queue. Unlike the cases above, lifecycle events carry no
+// dispatcher-validated required fields (the raw event is forwarded), so they do
+// NOT belong in the "rejects empty payload" table.
+const lifecycleEventTypes = [
+  'lifecycle.signed_up',
+  'lifecycle.trial_started',
+  'lifecycle.onboarding_completed',
+  'lifecycle.workspace_activated',
+  'lifecycle.feature_used',
+  'lifecycle.inactive',
+  'lifecycle.churned'
+] as const
 
 describe('resolveDispatch', () => {
   for (const c of validCases) {
@@ -72,15 +85,28 @@ describe('resolveDispatch', () => {
     })
   }
 
-  it('passes the structured drip payload (not the raw event) for email enrollment', () => {
-    const plan = resolveDispatch(makeEvent('email_campaigns.enrollment_triggered', {
-      campaignId: 'c1', userId: 'u1', userEmail: 'a@b.co', userName: 'A', enrollmentId: 'en1'
-    }))
+  for (const eventType of lifecycleEventTypes) {
+    it(`routes ${eventType} to lifecycleEnrollmentWorkflow on the configured email queue`, () => {
+      const plan = resolveDispatch(
+        makeEvent(eventType, { userId: 'u1' }),
+        { emailCampaignsTaskQueue: 'custom-email-queue' }
+      )
+      expect(plan.kind).toBe('start')
+      if (plan.kind !== 'start') { return }
+      expect(plan.workflowType).toBe('lifecycleEnrollmentWorkflow')
+      expect(plan.workflowId).toBe('lifecycle-enroll-evt-1')
+      expect(plan.taskQueue).toBe('custom-email-queue')
+      expect(plan.workflowRunTimeout).toBe('5 minutes')
+      // The RAW event is forwarded (the sweep looks up the user later).
+      expect(plan.args[0]).toMatchObject({ eventType, payload: { userId: 'u1' } })
+    })
+  }
+
+  it('falls back to the default email-campaigns queue when no config is passed', () => {
+    const plan = resolveDispatch(makeEvent('lifecycle.signed_up', { userId: 'u1' }))
     expect(plan.kind).toBe('start')
     if (plan.kind !== 'start') { return }
-    expect(plan.args[0]).toEqual({
-      enrollmentId: 'en1', campaignId: 'c1', userId: 'u1', userEmail: 'a@b.co', userName: 'A'
-    })
+    expect(plan.taskQueue).toBe('email-campaigns')
   })
 
   it('rejects dispute_resolved with a negative charge amount when lost', () => {
