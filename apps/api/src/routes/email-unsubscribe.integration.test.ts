@@ -8,7 +8,7 @@ import {
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { createUnsubscribeToken } from '../utils/unsubscribe-token.js'
+import { createUnsubscribeToken } from '@tx-agent-kit/email'
 
 const apiPort = Number.parseInt(process.env.API_INTEGRATION_TEST_PORT_EMAIL_UNSUB ?? '4112', 10)
 const integrationAuthSecret = 'integration-auth-secret-minimum-32-chars'
@@ -170,11 +170,13 @@ describe('email unsubscribe API integration', () => {
   // POST /v1/email/unsubscribe — process unsubscribe
   // ---------------------------------------------------------------------------
   describe('POST /v1/email/unsubscribe', () => {
-    it('processes unsubscribe and cancels active enrollments [INV-EMAIL-CAMP-016]', async () => {
+    it('processes a GLOBAL unsubscribe and cancels all active enrollments [INV-EMAIL-CAMP-016]', async () => {
       // Create a real user so we have a valid user ID in the system
       const user = await dbAuthContext.createUser()
       const { campaignId, enrollmentId } = await seedCampaignWithEnrollment(user.user.id)
 
+      // The token may carry the campaign the user clicked from, but the action is
+      // intentionally global: one click stops ALL future lifecycle emails.
       const token = createUnsubscribeToken(
         { userId: user.user.id, campaignId },
         integrationAuthSecret
@@ -193,7 +195,9 @@ describe('email unsubscribe API integration', () => {
       const body = await response.json() as { unsubscribed: boolean; userId: string; campaignId: string | null }
       expect(body.unsubscribed).toBe(true)
       expect(body.userId).toBe(user.user.id)
-      expect(body.campaignId).toBe(campaignId)
+      // Global suppression: the response campaignId is null even when the token
+      // carried a campaign id.
+      expect(body.campaignId).toBeNull()
 
       // Verify enrollment was cancelled
       const dbResult = await dbAuthContext.testContext.withSchemaClient(async (client) => {
@@ -207,7 +211,7 @@ describe('email unsubscribe API integration', () => {
       expect(dbResult?.status).toBe('cancelled')
       expect(dbResult?.cancel_reason).toBe('user_unsubscribed')
 
-      // Verify unsubscribe record was created
+      // Verify a GLOBAL unsubscribe record was created (campaign_id null).
       const unsubRecord = await dbAuthContext.testContext.withSchemaClient(async (client) => {
         const result = await client.query<{ user_id: string; campaign_id: string | null }>(
           'SELECT user_id, campaign_id FROM email_unsubscribes WHERE user_id = $1',
@@ -217,7 +221,7 @@ describe('email unsubscribe API integration', () => {
       })
 
       expect(unsubRecord?.user_id).toBe(user.user.id)
-      expect(unsubRecord?.campaign_id).toBe(campaignId)
+      expect(unsubRecord?.campaign_id).toBeNull()
     })
 
     it('rejects unsubscribe with invalid token', async () => {
@@ -254,6 +258,67 @@ describe('email unsubscribe API integration', () => {
       const body = await response.json() as { unsubscribed: boolean; userId: string; campaignId: string | null }
       expect(body.unsubscribed).toBe(true)
       expect(body.campaignId).toBeNull()
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // POST /v1/email/unsubscribe/one-click - RFC 8058 one-click target
+  // ---------------------------------------------------------------------------
+  describe('POST /v1/email/unsubscribe/one-click', () => {
+    it('unsubscribes globally with the token in the query string', async () => {
+      const user = await dbAuthContext.createUser()
+      const { enrollmentId } = await seedCampaignWithEnrollment(user.user.id)
+
+      const token = createUnsubscribeToken(
+        { userId: user.user.id },
+        integrationAuthSecret
+      )
+
+      const response = await fetch(
+        `${dbAuthContext.baseUrl}/v1/email/unsubscribe/one-click?token=${encodeURIComponent(token)}`,
+        {
+          method: 'POST',
+          headers: dbAuthContext.testContext.headersForCase('one-click-unsubscribe')
+        }
+      )
+
+      expect(response.status).toBe(200)
+      const body = await response.json() as { unsubscribed: boolean; userId: string; campaignId: string | null }
+      expect(body.unsubscribed).toBe(true)
+      expect(body.userId).toBe(user.user.id)
+      expect(body.campaignId).toBeNull()
+
+      // Global suppression row created.
+      const unsubRecord = await dbAuthContext.testContext.withSchemaClient(async (client) => {
+        const result = await client.query<{ campaign_id: string | null }>(
+          'SELECT campaign_id FROM email_unsubscribes WHERE user_id = $1',
+          [user.user.id]
+        )
+        return result.rows[0]
+      })
+      expect(unsubRecord?.campaign_id).toBeNull()
+
+      // Active enrollment eagerly cancelled.
+      const dbResult = await dbAuthContext.testContext.withSchemaClient(async (client) => {
+        const result = await client.query<{ status: string }>(
+          'SELECT status FROM email_campaign_enrollments WHERE id = $1',
+          [enrollmentId]
+        )
+        return result.rows[0]
+      })
+      expect(dbResult?.status).toBe('cancelled')
+    })
+
+    it('rejects a missing/invalid token', async () => {
+      const response = await fetch(
+        `${dbAuthContext.baseUrl}/v1/email/unsubscribe/one-click?token=not.a.valid.token`,
+        {
+          method: 'POST',
+          headers: dbAuthContext.testContext.headersForCase('one-click-invalid')
+        }
+      )
+
+      expect(response.status).toBe(400)
     })
   })
 })

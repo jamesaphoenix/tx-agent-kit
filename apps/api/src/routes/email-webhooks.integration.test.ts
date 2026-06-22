@@ -336,15 +336,34 @@ describe('email webhooks API integration', () => {
 
       expect(dbResult?.status).toBe('bounced')
       expect(dbResult?.bounced_at).not.toBeNull()
+
+      // A hard bounce suppresses the recipient address so the drip sweep stops
+      // emailing it (campaigns-system suppression keyed on the resend message id).
+      const suppression = await dbAuthContext.testContext.withSchemaClient(async (client) => {
+        const result = await client.query<{ reason: string; source_system: string }>(
+          'SELECT reason, source_system FROM email_suppression_list WHERE email = $1',
+          ['bounced@example.com']
+        )
+        return result.rows[0]
+      })
+      expect(suppression?.reason).toBe('hard_bounce')
+      expect(suppression?.source_system).toBe('campaigns')
     })
 
-    it('returns processed: false for unknown event types', async () => {
+    it('processes complaint events and suppresses the address', async () => {
+      const { resendMessageId } = await seedEmailSend()
+
       const payload = JSON.stringify({
-        type: 'email.unknown_event',
+        type: 'email.complained',
         created_at: new Date().toISOString(),
-        data: { email_id: 'test-123' }
+        data: {
+          email_id: resendMessageId,
+          from: 'test@example.com',
+          to: ['complained@example.com'],
+          subject: 'Complained Email'
+        }
       })
-      const svixId = `msg_unknown_${generateId()}`
+      const svixId = `msg_complaint_${generateId()}`
       const svixTimestamp = String(Math.floor(Date.now() / 1000))
       const svixSignature = signWebhookPayload(payload, svixId, svixTimestamp)
 
@@ -355,14 +374,120 @@ describe('email webhooks API integration', () => {
           'svix-id': svixId,
           'svix-timestamp': svixTimestamp,
           'svix-signature': svixSignature,
-          ...dbAuthContext.testContext.headersForCase('unknown-event')
+          ...dbAuthContext.testContext.headersForCase('complaint-webhook')
         },
         body: payload
       })
 
-      // parseResendWebhookEvent throws for unknown event types
-      // This should result in a 500 or 400
-      expect([400, 500]).toContain(response.status)
+      expect(response.status).toBe(200)
+      const body = await response.json() as { processed: boolean }
+      expect(body.processed).toBe(true)
+
+      const suppression = await dbAuthContext.testContext.withSchemaClient(async (client) => {
+        const result = await client.query<{ reason: string }>(
+          'SELECT reason FROM email_suppression_list WHERE email = $1',
+          ['complained@example.com']
+        )
+        return result.rows[0]
+      })
+      expect(suppression?.reason).toBe('complaint')
+    })
+
+    it('processes email.failed events as a terminal failure', async () => {
+      const { resendMessageId } = await seedEmailSend()
+
+      const payload = JSON.stringify({
+        type: 'email.failed',
+        created_at: new Date().toISOString(),
+        data: {
+          email_id: resendMessageId,
+          from: 'test@example.com',
+          to: ['failed@example.com'],
+          subject: 'Failed Email',
+          failed: { reason: 'Provider rejected the message' }
+        }
+      })
+      const svixId = `msg_failed_${generateId()}`
+      const svixTimestamp = String(Math.floor(Date.now() / 1000))
+      const svixSignature = signWebhookPayload(payload, svixId, svixTimestamp)
+
+      const response = await fetch(`${dbAuthContext.baseUrl}/v1/webhooks/resend`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'svix-id': svixId,
+          'svix-timestamp': svixTimestamp,
+          'svix-signature': svixSignature,
+          ...dbAuthContext.testContext.headersForCase('failed-webhook')
+        },
+        body: payload
+      })
+
+      expect(response.status).toBe(200)
+      const body = await response.json() as { processed: boolean }
+      expect(body.processed).toBe(true)
+
+      const dbResult = await dbAuthContext.testContext.withSchemaClient(async (client) => {
+        const result = await client.query<{ status: string }>(
+          'SELECT status FROM email_sends WHERE resend_message_id = $1',
+          [resendMessageId]
+        )
+        return result.rows[0]
+      })
+      expect(dbResult?.status).toBe('failed')
+    })
+
+    it('acknowledges well-formed but unhandled event types with processed: false', async () => {
+      // email.delivery_delayed is a legitimate, well-formed Resend event we do not
+      // map to a status transition. The parser returns null and the route 2xx-acks
+      // so Resend stops retrying (a throw would be a 500 and retry forever).
+      const payload = JSON.stringify({
+        type: 'email.delivery_delayed',
+        created_at: new Date().toISOString(),
+        data: { email_id: 'test-123' }
+      })
+      const svixId = `msg_unhandled_${generateId()}`
+      const svixTimestamp = String(Math.floor(Date.now() / 1000))
+      const svixSignature = signWebhookPayload(payload, svixId, svixTimestamp)
+
+      const response = await fetch(`${dbAuthContext.baseUrl}/v1/webhooks/resend`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'svix-id': svixId,
+          'svix-timestamp': svixTimestamp,
+          'svix-signature': svixSignature,
+          ...dbAuthContext.testContext.headersForCase('unhandled-event')
+        },
+        body: payload
+      })
+
+      expect(response.status).toBe(200)
+      const body = await response.json() as { processed: boolean }
+      expect(body.processed).toBe(false)
+    })
+
+    it('rejects a structurally malformed payload with 400', async () => {
+      // Missing the structural created_at/data fields: the parser throws, the
+      // route maps it to a typed BadRequest (400), not a 500 defect.
+      const payload = JSON.stringify({ type: 'email.bounced' })
+      const svixId = `msg_malformed_${generateId()}`
+      const svixTimestamp = String(Math.floor(Date.now() / 1000))
+      const svixSignature = signWebhookPayload(payload, svixId, svixTimestamp)
+
+      const response = await fetch(`${dbAuthContext.baseUrl}/v1/webhooks/resend`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'svix-id': svixId,
+          'svix-timestamp': svixTimestamp,
+          'svix-signature': svixSignature,
+          ...dbAuthContext.testContext.headersForCase('malformed-event')
+        },
+        body: payload
+      })
+
+      expect(response.status).toBe(400)
     })
   })
 })

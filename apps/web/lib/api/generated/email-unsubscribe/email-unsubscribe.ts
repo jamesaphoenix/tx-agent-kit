@@ -31,6 +31,8 @@ import type {
   EmailUnsubscribeGetUnsubscribeParams,
   EmailUnsubscribePostUnsubscribe200,
   EmailUnsubscribePostUnsubscribeBody,
+  EmailUnsubscribePostUnsubscribeOneClick200,
+  EmailUnsubscribePostUnsubscribeOneClickParams,
   Forbidden,
   HttpApiDecodeError,
   InternalError,
@@ -195,4 +197,60 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getEmailUnsubscribePostUnsubscribeMutationOptions(options), queryClient);
+    }
+    export const emailUnsubscribePostUnsubscribeOneClick = (
+    params?: EmailUnsubscribePostUnsubscribeOneClickParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<EmailUnsubscribePostUnsubscribeOneClick200>(
+      {url: `/v1/email/unsubscribe/one-click`, method: 'POST',
+        params, signal
+    },
+      options);
+    }
+
+
+
+export const getEmailUnsubscribePostUnsubscribeOneClickMutationOptions = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | PaymentRequired | Forbidden | NotFound | Conflict | TooManyRequests | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof emailUnsubscribePostUnsubscribeOneClick>>, TError,{params?: EmailUnsubscribePostUnsubscribeOneClickParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof emailUnsubscribePostUnsubscribeOneClick>>, TError,{params?: EmailUnsubscribePostUnsubscribeOneClickParams}, TContext> => {
+
+const mutationKey = ['emailUnsubscribePostUnsubscribeOneClick'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof emailUnsubscribePostUnsubscribeOneClick>>, {params?: EmailUnsubscribePostUnsubscribeOneClickParams}> = (props) => {
+          const {params} = props ?? {};
+
+          return  emailUnsubscribePostUnsubscribeOneClick(params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EmailUnsubscribePostUnsubscribeOneClickMutationResult = NonNullable<Awaited<ReturnType<typeof emailUnsubscribePostUnsubscribeOneClick>>>
+
+    export type EmailUnsubscribePostUnsubscribeOneClickMutationError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | PaymentRequired | Forbidden | NotFound | Conflict | TooManyRequests | InternalError>
+
+    export const useEmailUnsubscribePostUnsubscribeOneClick = <TError = ErrorType<HttpApiDecodeError | BadRequest | Unauthorized | PaymentRequired | Forbidden | NotFound | Conflict | TooManyRequests | InternalError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof emailUnsubscribePostUnsubscribeOneClick>>, TError,{params?: EmailUnsubscribePostUnsubscribeOneClickParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof emailUnsubscribePostUnsubscribeOneClick>>,
+        TError,
+        {params?: EmailUnsubscribePostUnsubscribeOneClickParams},
+        TContext
+      > => {
+      return useMutation(getEmailUnsubscribePostUnsubscribeOneClickMutationOptions(options), queryClient);
     }

@@ -12,6 +12,8 @@ import type {
   EmailUnsubscribeGetUnsubscribeParams,
   EmailUnsubscribePostUnsubscribe200,
   EmailUnsubscribePostUnsubscribeBody,
+  EmailUnsubscribePostUnsubscribeOneClick200,
+  EmailUnsubscribePostUnsubscribeOneClickParams,
   Forbidden,
   HttpApiDecodeError,
   InternalError,
@@ -175,6 +177,87 @@ export const emailUnsubscribePostUnsubscribe = async (emailUnsubscribePostUnsubs
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       emailUnsubscribePostUnsubscribeBody,)
+  }
+);}
+
+
+export type emailUnsubscribePostUnsubscribeOneClickResponse200 = {
+  data: EmailUnsubscribePostUnsubscribeOneClick200
+  status: 200
+}
+
+export type emailUnsubscribePostUnsubscribeOneClickResponse400 = {
+  data: HttpApiDecodeError | BadRequest
+  status: 400
+}
+
+export type emailUnsubscribePostUnsubscribeOneClickResponse401 = {
+  data: Unauthorized
+  status: 401
+}
+
+export type emailUnsubscribePostUnsubscribeOneClickResponse402 = {
+  data: PaymentRequired
+  status: 402
+}
+
+export type emailUnsubscribePostUnsubscribeOneClickResponse403 = {
+  data: Forbidden
+  status: 403
+}
+
+export type emailUnsubscribePostUnsubscribeOneClickResponse404 = {
+  data: NotFound
+  status: 404
+}
+
+export type emailUnsubscribePostUnsubscribeOneClickResponse409 = {
+  data: Conflict
+  status: 409
+}
+
+export type emailUnsubscribePostUnsubscribeOneClickResponse429 = {
+  data: TooManyRequests
+  status: 429
+}
+
+export type emailUnsubscribePostUnsubscribeOneClickResponse500 = {
+  data: InternalError
+  status: 500
+}
+
+export type emailUnsubscribePostUnsubscribeOneClickResponseSuccess = (emailUnsubscribePostUnsubscribeOneClickResponse200) & {
+  headers: Headers;
+};
+export type emailUnsubscribePostUnsubscribeOneClickResponseError = (emailUnsubscribePostUnsubscribeOneClickResponse400 | emailUnsubscribePostUnsubscribeOneClickResponse401 | emailUnsubscribePostUnsubscribeOneClickResponse402 | emailUnsubscribePostUnsubscribeOneClickResponse403 | emailUnsubscribePostUnsubscribeOneClickResponse404 | emailUnsubscribePostUnsubscribeOneClickResponse409 | emailUnsubscribePostUnsubscribeOneClickResponse429 | emailUnsubscribePostUnsubscribeOneClickResponse500) & {
+  headers: Headers;
+};
+
+export type emailUnsubscribePostUnsubscribeOneClickResponse = (emailUnsubscribePostUnsubscribeOneClickResponseSuccess | emailUnsubscribePostUnsubscribeOneClickResponseError)
+
+export const getEmailUnsubscribePostUnsubscribeOneClickUrl = (params?: EmailUnsubscribePostUnsubscribeOneClickParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/v1/email/unsubscribe/one-click?${stringifiedParams}` : `/v1/email/unsubscribe/one-click`
+}
+
+export const emailUnsubscribePostUnsubscribeOneClick = async (params?: EmailUnsubscribePostUnsubscribeOneClickParams, options?: RequestInit): Promise<emailUnsubscribePostUnsubscribeOneClickResponse> => {
+
+  return testFetchInstance<emailUnsubscribePostUnsubscribeOneClickResponse>(getEmailUnsubscribePostUnsubscribeOneClickUrl(params),
+  {
+    ...options,
+    method: 'POST'
+
+
   }
 );}
 

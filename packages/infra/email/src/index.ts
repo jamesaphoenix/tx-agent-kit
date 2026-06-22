@@ -1,4 +1,9 @@
 export { getEmailEnv, resetEmailEnvCache, type EmailEnv } from './env.js'
+export {
+  createUnsubscribeToken,
+  verifyUnsubscribeToken,
+  type UnsubscribeTokenPayload
+} from './unsubscribe-token.js'
 export { getResendClient, resetResendClientCache } from './client.js'
 export {
   EmailDeliveryError,

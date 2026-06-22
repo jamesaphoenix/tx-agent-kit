@@ -79,6 +79,20 @@ export interface ResendEmailClickedEvent {
   }
 }
 
+export interface ResendEmailFailedEvent {
+  readonly type: 'email.failed'
+  readonly created_at: string
+  readonly data: {
+    readonly email_id: string
+    readonly from: string
+    readonly to: ReadonlyArray<string>
+    readonly subject: string
+    readonly failed?: {
+      readonly reason: string
+    }
+  }
+}
+
 export type ResendWebhookEvent =
   | ResendEmailSentEvent
   | ResendEmailDeliveredEvent
@@ -86,14 +100,21 @@ export type ResendWebhookEvent =
   | ResendEmailComplainedEvent
   | ResendEmailOpenedEvent
   | ResendEmailClickedEvent
+  | ResendEmailFailedEvent
 
-const VALID_EVENT_TYPES = new Set([
+// Event types this system maps to an email_sends status transition. Resend
+// emits other legitimate types too (email.delivery_delayed, email.scheduled,
+// contact.*, domain.*); those are well-formed but unhandled - the parser
+// returns null for them so the route can acknowledge-and-skip with 2xx rather
+// than throwing (which would surface as a 500 and make Resend retry forever).
+const HANDLED_EVENT_TYPES = new Set([
   'email.sent',
   'email.delivered',
   'email.bounced',
   'email.complained',
   'email.opened',
-  'email.clicked'
+  'email.clicked',
+  'email.failed'
 ])
 
 /**
@@ -155,8 +176,18 @@ export const verifyResendWebhook = (input: {
 
 /**
  * Parse and validate a raw Resend webhook event body.
+ *
+ * Throws WebhookVerificationError only for genuinely malformed payloads (not an
+ * object, or missing the structural `type` / `created_at` / `data` fields).
+ *
+ * Returns `null` for a well-formed event whose `type` is not one this system
+ * maps to a status transition (e.g. email.delivery_delayed, email.scheduled,
+ * contact.*, domain.*). The caller should treat null as an acknowledge-and-skip
+ * so Resend receives a 2xx and stops retrying, rather than throwing - a throw
+ * inside Effect.gen becomes a defect (500) and Resend would retry indefinitely
+ * and can auto-disable the endpoint.
  */
-export const parseResendWebhookEvent = (body: unknown): ResendWebhookEvent => {
+export const parseResendWebhookEvent = (body: unknown): ResendWebhookEvent | null => {
   if (typeof body !== 'object' || body === null) {
     throw new WebhookVerificationError({ reason: 'Webhook body must be a non-null object' })
   }
@@ -167,18 +198,17 @@ export const parseResendWebhookEvent = (body: unknown): ResendWebhookEvent => {
     throw new WebhookVerificationError({ reason: 'Webhook body missing "type" field' })
   }
 
-  if (!VALID_EVENT_TYPES.has(record['type'])) {
-    throw new WebhookVerificationError({
-      reason: `Unknown webhook event type: ${record['type']}`
-    })
-  }
-
   if (typeof record['created_at'] !== 'string') {
     throw new WebhookVerificationError({ reason: 'Webhook body missing "created_at" field' })
   }
 
   if (typeof record['data'] !== 'object' || record['data'] === null) {
     throw new WebhookVerificationError({ reason: 'Webhook body missing "data" field' })
+  }
+
+  // Well-formed but unhandled event type: skip gracefully, do not throw.
+  if (!HANDLED_EVENT_TYPES.has(record['type'])) {
+    return null
   }
 
   return body as ResendWebhookEvent
