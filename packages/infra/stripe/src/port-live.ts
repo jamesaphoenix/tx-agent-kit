@@ -12,7 +12,7 @@ import { readFailedPaymentIntentDetails } from './payment-intent-error.js'
  * Shared Stripe SDK API version pin used by both the API and worker
  * adapters. Kept here so upgrades happen in exactly one place.
  */
-export const STRIPE_API_VERSION = '2025-10-29.clover' as const
+export const STRIPE_API_VERSION = '2026-05-27.dahlia' as const
 
 const stripeLogger = createLogger('tx-agent-kit-stripe')
 
