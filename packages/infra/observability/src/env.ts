@@ -3,6 +3,11 @@ const defaultClientOtelEndpoint = 'http://localhost:4320'
 const defaultLangfuseBaseUrl = 'http://localhost:3003'
 const defaultNodeEnv = 'development'
 const defaultLangfuseSampleRate = 1
+// Metric export cadence shared by the server SDK + client metric readers. 30s
+// keeps Google Managed Prometheus ingestion (and its cost) low while staying
+// well inside every alert window; local dev can override to 5000 for snappier
+// dashboards via OTEL_METRIC_EXPORT_INTERVAL_MS.
+const defaultMetricExportIntervalMs = 30_000
 
 const allowedLangfuseLogLevels = new Set(['DEBUG', 'INFO', 'WARN', 'ERROR'])
 
@@ -23,12 +28,14 @@ export interface ObservabilityEnv {
   OTEL_EXPORTER_OTLP_HEADERS: Readonly<Record<string, string>>
   OTEL_LOGS_EXPORTER: 'otlp' | 'none'
   OTEL_RESOURCE_ATTRIBUTES: Readonly<Record<string, string>>
+  OTEL_METRIC_EXPORT_INTERVAL_MS: number
   NODE_ENV: string
   LANGFUSE: LangfuseEnv
 }
 
 export interface ClientObservabilityEnv {
   OTEL_EXPORTER_OTLP_ENDPOINT: string
+  OTEL_METRIC_EXPORT_INTERVAL_MS: number
   NODE_ENV: string
 }
 
@@ -73,6 +80,21 @@ const parseLangfuseSampleRate = (): number => {
   const parsed = Number(raw)
   if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
     throw new Error('LANGFUSE_SAMPLE_RATE must be a number between 0 and 1')
+  }
+
+  return parsed
+}
+
+const parseMetricExportIntervalMs = (raw: string | undefined): number => {
+  if (raw === undefined || raw.trim().length === 0) {
+    return defaultMetricExportIntervalMs
+  }
+
+  const parsed = Number(raw)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(
+      'OTEL_METRIC_EXPORT_INTERVAL_MS must be a positive integer (milliseconds)'
+    )
   }
 
   return parsed
@@ -143,6 +165,9 @@ export const getObservabilityEnv = (): ObservabilityEnv => {
       'OTEL_RESOURCE_ATTRIBUTES',
       process.env.OTEL_RESOURCE_ATTRIBUTES
     ),
+    OTEL_METRIC_EXPORT_INTERVAL_MS: parseMetricExportIntervalMs(
+      process.env.OTEL_METRIC_EXPORT_INTERVAL_MS
+    ),
     NODE_ENV: nodeEnv,
     LANGFUSE: getLangfuseEnv(nodeEnv)
   }
@@ -155,6 +180,11 @@ export const getClientObservabilityEnv = (): ClientObservabilityEnv => {
       process.env.EXPO_PUBLIC_OTEL_EXPORTER_OTLP_ENDPOINT ??
       process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
       defaultClientOtelEndpoint,
+    OTEL_METRIC_EXPORT_INTERVAL_MS: parseMetricExportIntervalMs(
+      process.env.NEXT_PUBLIC_OTEL_METRIC_EXPORT_INTERVAL_MS ??
+        process.env.EXPO_PUBLIC_OTEL_METRIC_EXPORT_INTERVAL_MS ??
+        process.env.OTEL_METRIC_EXPORT_INTERVAL_MS
+    ),
     NODE_ENV:
       process.env.NEXT_PUBLIC_NODE_ENV ??
       process.env.EXPO_PUBLIC_NODE_ENV ??

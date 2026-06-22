@@ -65,6 +65,7 @@ const getObservabilityEnvMock = vi.fn<() => ObservabilityEnv>(() => ({
     'service.name': 'should-be-overridden',
     'deployment.environment.name': 'should-also-be-overridden'
   },
+  OTEL_METRIC_EXPORT_INTERVAL_MS: 30_000,
   NODE_ENV: 'staging',
   LANGFUSE: {
     enabled: false,
@@ -215,7 +216,9 @@ describe('telemetry lifecycle', () => {
 
     expect(metricReaderConstructorMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        exportIntervalMillis: 5000
+        exportIntervalMillis: 30_000,
+        // exportTimeoutMillis is clamped to min(interval, 10000).
+        exportTimeoutMillis: 10_000
       })
     )
 
@@ -263,6 +266,7 @@ describe('telemetry lifecycle', () => {
       OTEL_EXPORTER_OTLP_HEADERS: {},
       OTEL_LOGS_EXPORTER: 'none',
       OTEL_RESOURCE_ATTRIBUTES: {},
+      OTEL_METRIC_EXPORT_INTERVAL_MS: 30_000,
       NODE_ENV: 'staging',
       LANGFUSE: {
         enabled: false,
@@ -293,6 +297,7 @@ describe('telemetry lifecycle', () => {
       OTEL_EXPORTER_OTLP_HEADERS: {},
       OTEL_LOGS_EXPORTER: 'none',
       OTEL_RESOURCE_ATTRIBUTES: {},
+      OTEL_METRIC_EXPORT_INTERVAL_MS: 30_000,
       NODE_ENV: 'staging',
       LANGFUSE: {
         enabled: true,

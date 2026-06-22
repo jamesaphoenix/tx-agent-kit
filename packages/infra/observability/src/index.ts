@@ -286,7 +286,11 @@ export const startTelemetry = (serviceName: string): void => {
           env.OTEL_EXPORTER_OTLP_HEADERS
         )
       ),
-      exportIntervalMillis: 5000
+      exportIntervalMillis: env.OTEL_METRIC_EXPORT_INTERVAL_MS,
+      // The SDK requires exportTimeoutMillis <= exportIntervalMillis; clamp so a
+      // small override (e.g. in tests) cannot violate it, while capping the
+      // timeout at 10s for the normal 30s+ cadence.
+      exportTimeoutMillis: Math.min(env.OTEL_METRIC_EXPORT_INTERVAL_MS, 10_000)
     })
   })
 

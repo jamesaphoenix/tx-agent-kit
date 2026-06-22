@@ -13,6 +13,9 @@ const resetObservedEnvKeys = () => {
   delete process.env.OTEL_LOG_LEVEL
   delete process.env.OTEL_LOGS_EXPORTER
   delete process.env.OTEL_RESOURCE_ATTRIBUTES
+  delete process.env.OTEL_METRIC_EXPORT_INTERVAL_MS
+  delete process.env.NEXT_PUBLIC_OTEL_METRIC_EXPORT_INTERVAL_MS
+  delete process.env.EXPO_PUBLIC_OTEL_METRIC_EXPORT_INTERVAL_MS
   delete process.env.LANGFUSE_ENABLED
   delete process.env.LANGFUSE_BASE_URL
   delete process.env.LANGFUSE_HOST
@@ -42,6 +45,7 @@ describe('getObservabilityEnv', () => {
       OTEL_EXPORTER_OTLP_HEADERS: {},
       OTEL_LOGS_EXPORTER: 'otlp',
       OTEL_RESOURCE_ATTRIBUTES: {},
+      OTEL_METRIC_EXPORT_INTERVAL_MS: 30_000,
       NODE_ENV: 'development',
       LANGFUSE: {
         enabled: false,
@@ -64,6 +68,7 @@ describe('getObservabilityEnv', () => {
     process.env.OTEL_LOGS_EXPORTER = 'none'
     process.env.OTEL_RESOURCE_ATTRIBUTES =
       'service.namespace=tx-agent-kit,cloud.region=europe-west3'
+    process.env.OTEL_METRIC_EXPORT_INTERVAL_MS = '60000'
     process.env.LANGFUSE_ENABLED = 'true'
     process.env.LANGFUSE_BASE_URL = 'https://us.cloud.langfuse.com'
     process.env.LANGFUSE_PUBLIC_KEY = 'pk-lf-test'
@@ -85,6 +90,7 @@ describe('getObservabilityEnv', () => {
         'service.namespace': 'tx-agent-kit',
         'cloud.region': 'europe-west3'
       },
+      OTEL_METRIC_EXPORT_INTERVAL_MS: 60_000,
       NODE_ENV: 'production',
       LANGFUSE: {
         enabled: true,
@@ -143,6 +149,30 @@ describe('getObservabilityEnv', () => {
       'OTEL_RESOURCE_ATTRIBUTES must be comma-separated key=value pairs'
     )
   })
+
+  it('defaults the metric export interval to 30000ms', () => {
+    resetObservedEnvKeys()
+
+    expect(getObservabilityEnv().OTEL_METRIC_EXPORT_INTERVAL_MS).toBe(30_000)
+  })
+
+  it('parses an OTEL_METRIC_EXPORT_INTERVAL_MS override', () => {
+    resetObservedEnvKeys()
+    process.env.OTEL_METRIC_EXPORT_INTERVAL_MS = '5000'
+
+    expect(getObservabilityEnv().OTEL_METRIC_EXPORT_INTERVAL_MS).toBe(5000)
+  })
+
+  it('rejects a non-positive or non-integer metric export interval', () => {
+    for (const invalid of ['0', '-1', 'abc', '1.5']) {
+      resetObservedEnvKeys()
+      process.env.OTEL_METRIC_EXPORT_INTERVAL_MS = invalid
+
+      expect(() => getObservabilityEnv()).toThrow(
+        'OTEL_METRIC_EXPORT_INTERVAL_MS must be a positive integer (milliseconds)'
+      )
+    }
+  })
 })
 
 describe('getClientObservabilityEnv', () => {
@@ -151,6 +181,7 @@ describe('getClientObservabilityEnv', () => {
 
     expect(getClientObservabilityEnv()).toEqual({
       OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4320',
+      OTEL_METRIC_EXPORT_INTERVAL_MS: 30_000,
       NODE_ENV: 'development'
     })
   })
@@ -162,6 +193,7 @@ describe('getClientObservabilityEnv', () => {
 
     expect(getClientObservabilityEnv()).toEqual({
       OTEL_EXPORTER_OTLP_ENDPOINT: 'https://next-public-otel.example',
+      OTEL_METRIC_EXPORT_INTERVAL_MS: 30_000,
       NODE_ENV: 'staging'
     })
   })
@@ -173,6 +205,7 @@ describe('getClientObservabilityEnv', () => {
 
     expect(getClientObservabilityEnv()).toEqual({
       OTEL_EXPORTER_OTLP_ENDPOINT: 'https://expo-public-otel.example',
+      OTEL_METRIC_EXPORT_INTERVAL_MS: 30_000,
       NODE_ENV: 'preview'
     })
 
@@ -182,7 +215,17 @@ describe('getClientObservabilityEnv', () => {
 
     expect(getClientObservabilityEnv()).toEqual({
       OTEL_EXPORTER_OTLP_ENDPOINT: 'https://shared-otel.example',
+      OTEL_METRIC_EXPORT_INTERVAL_MS: 30_000,
       NODE_ENV: 'test'
     })
+  })
+
+  it('parses a NEXT_PUBLIC metric export interval override', () => {
+    resetObservedEnvKeys()
+    process.env.NEXT_PUBLIC_OTEL_METRIC_EXPORT_INTERVAL_MS = '5000'
+
+    expect(
+      getClientObservabilityEnv().OTEL_METRIC_EXPORT_INTERVAL_MS
+    ).toBe(5000)
   })
 })
