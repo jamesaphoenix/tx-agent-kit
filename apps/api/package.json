@@ -15,9 +15,9 @@
     "test:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
-    "@effect/platform": "^0.96.0",
-    "@effect/platform-node": "^0.106.0",
-    "@temporalio/client": "^1.16.0",
+    "@effect/platform": "^0.96.2",
+    "@effect/platform-node": "^0.107.0",
+    "@temporalio/client": "^1.19.0",
     "@tx-agent-kit/auth": "workspace:*",
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/core": "workspace:*",
@@ -28,14 +28,14 @@
     "@tx-agent-kit/redis": "workspace:*",
     "@tx-agent-kit/storage": "workspace:*",
     "@tx-agent-kit/stripe": "workspace:*",
-    "effect": "^3.21.2",
-    "openid-client": "^6.8.3",
+    "effect": "^3.21.4",
+    "openid-client": "^6.8.4",
     "@opentelemetry/api": "^1.9.1"
   },
   "devDependencies": {
-    "@opentelemetry/sdk-metrics": "^2.6.1",
+    "@opentelemetry/sdk-metrics": "^2.9.0",
     "@tx-agent-kit/testkit": "workspace:*",
     "@tx-agent-kit/vitest-config": "workspace:*",
-    "jose": "^6.2.2"
+    "jose": "^6.2.3"
   }
 }
