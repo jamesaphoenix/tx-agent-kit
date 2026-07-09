@@ -16,19 +16,31 @@ concurrency:
   group: integration-tests-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: true
 
-# Slot-scoped values (API_PORT, DATABASE_URL, DATABASE_SCHEMA,
-# WORKTREE_PORT_OFFSET, API_CORS_ORIGIN, WEB_BASE_URL, GOOGLE_OIDC_CALLBACK_URL,
-# TEMPORAL_TASK_QUEUE, and the e2e WEB_PORT) are deliberately NOT declared here.
-# They depend on which of the four Mac Studio runners picked up the job, so the
-# "Resolve runner slot" step emits them via $GITHUB_ENV
-# (scripts/deploy/ci/resolve-runner-slot.sh). Re-declaring any of them in YAML
-# would shadow the slot values and collide concurrent runners (this repo AND
-# its sibling repos share the same four runners + Docker infra).
+# These jobs run on GitHub-hosted ubuntu-latest, so each run gets its own
+# ephemeral VM + fresh Docker infra and needs no cross-run isolation - the
+# port-bearing / schema-bound keys below are static and self-contained.
+#
+# DORMANT runner-slot scaffolding: scripts/deploy/ci/{runner-slot-lib,
+# resolve-runner-slot,cleanup-runner-slot}.sh + setup-mac-docker-config.sh, the
+# env-first PGTAP_SCHEMA/PGTAP_REBUILD_SCHEMA path in run-pgtap.sh, the
+# DATABASE_SCHEMA baseline in reset-test-db.sh, and the startup locks exist so
+# this repo stays consistent with its sibling repos, but they are NOT wired
+# into this workflow. This repo is PUBLIC and has no self-hosted runners; a
+# Studio runner here would expose the production host to fork-PR code, so CI
+# stays on ubuntu-latest. To ACTIVATE slots (only on trusted, slotted
+# self-hosted runners): point runs-on at [self-hosted, mac-studio], add a
+# "Resolve runner slot" step (scripts/deploy/ci/resolve-runner-slot.sh) to each
+# job, and DELETE the port-bearing / schema-bound static keys below so the
+# GITHUB_ENV slot values are not shadowed. validate-ci-env.mjs already accepts
+# either source.
 env:
   NODE_ENV: test
+  API_PORT: '4100'
   API_HOST: '127.0.0.1'
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/tx_agent_kit
   REDIS_URL: redis://localhost:6379
   AUTH_SECRET: ci-integration-auth-secret-${{ github.run_id }}-${{ github.run_attempt }}
+  API_CORS_ORIGIN: http://localhost:3000
   AUTH_RATE_LIMIT_WINDOW_MS: '60000'
   AUTH_RATE_LIMIT_MAX_REQUESTS: '100'
   AUTH_RATE_LIMIT_IDENTIFIER_MAX_REQUESTS: '100'
@@ -58,9 +70,11 @@ env:
   TEMPORAL_TLS_CA_CERT_PEM: ''
   TEMPORAL_TLS_CLIENT_CERT_PEM: ''
   TEMPORAL_TLS_CLIENT_KEY_PEM: ''
+  WEB_BASE_URL: http://localhost:3000
   GOOGLE_OIDC_ISSUER_URL: http://localhost:65535
   GOOGLE_OIDC_CLIENT_ID: ci-google-client-id
   GOOGLE_OIDC_CLIENT_SECRET: ci-google-client-secret
+  GOOGLE_OIDC_CALLBACK_URL: http://localhost:4100/v1/auth/google/callback
   STRIPE_SECRET_KEY: ''
   STRIPE_WEBHOOK_SECRET: ''
   STRIPE_TRY_ME_PRICE_ID: ''
@@ -82,24 +96,12 @@ env:
 jobs:
   integration:
     name: Run All Integration Suites
-    runs-on: [self-hosted, mac-studio]
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
       WORKTREE_SETUP_BATCH_MAX_LATENCY_MS: '60000'
-      # Cap web-integration parallelism on the shared self-hosted runner: the
-      # full web suite's peak parallel-render load can starve fragile secondary
-      # queries / async component state under contention. CI-only; the robust
-      # assertions are the primary guard, this is belt-and-suspenders.
-      WEB_INTEGRATION_MAX_WORKERS: '2'
-      # Cap api-integration parallelism: with four runner slots this job can run
-      # 4x concurrently on the shared 16-core Studio (which also hosts the
-      # prod/staging stacks). The local default of min(CPU, 6) is tuned for one
-      # job per machine.
-      INTEGRATION_MAX_WORKERS: '3'
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      - name: Resolve runner slot
-        run: ./scripts/deploy/ci/resolve-runner-slot.sh integration
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: 22
@@ -127,26 +129,18 @@ jobs:
         run: |
           curl -sSf https://temporal.download/cli.sh | TEMPORAL_CLI_VERSION=1.1.2 sh
           echo "$HOME/.temporalio/bin" >> "$GITHUB_PATH"
-      - name: Setup Docker config
-        run: ./scripts/deploy/ci/setup-mac-docker-config.sh
       - name: Ensure infrastructure
         run: pnpm infra:ensure
       - name: Run integration suites
         run: pnpm test:integration:quiet
       - name: Run pgTAP tests
-        run: pnpm test:db:pgtap
+        run: pnpm test:db:pgtap --skip-setup
       - name: Run Temporal integration suite
         run: pnpm test:temporal:integration
-      - name: Cleanup runner slot
-        if: always()
-        run: |
-          if [[ -x scripts/deploy/ci/cleanup-runner-slot.sh ]]; then
-            ./scripts/deploy/ci/cleanup-runner-slot.sh
-          fi
 
   e2e:
     name: Web E2E (browser)
-    runs-on: [self-hosted, mac-studio]
+    runs-on: ubuntu-latest
     # The Playwright TEST RUN is hard-capped at 120s by globalTimeout in
     # apps/web/e2e/playwright.config.ts AND by the portable process-kill wrapper
     # in the test:e2e script. The production BUILD is a SEPARATE prerequisite
@@ -157,14 +151,10 @@ jobs:
     # RUN, not this job. The dedicated test step below carries its own
     # `timeout-minutes: 2` so the bounded run cannot drag on.
     timeout-minutes: 15
-    # WEB_PORT / API_PORT and every URL derived from them (e2e bases 3510/4510
-    # plus the slot offset) come from the "Resolve runner slot" step below, NOT
-    # from YAML env - see the note above the workflow env block. The pre-slot
-    # WEB_PORT 3000 base would land slot 1/2 on the Studio's AirPlay ports.
+    env:
+      WEB_PORT: '3000'
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      - name: Resolve runner slot
-        run: ./scripts/deploy/ci/resolve-runner-slot.sh e2e
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: 22
@@ -181,17 +171,8 @@ jobs:
         run: pnpm exec turbo run build --filter='./packages/**'
       - name: Configure local env files
         run: pnpm env:configure
-      - name: Setup Docker config
-        run: ./scripts/deploy/ci/setup-mac-docker-config.sh
       - name: Ensure infrastructure
         run: pnpm infra:ensure
-      # Migrate + reset this slot's schema (DATABASE_SCHEMA/DATABASE_URL from the
-      # slot step) so the api below starts against a current, clean schema.
-      # Unlike the integration job, nothing else in this job runs migrations.
-      # reset-test-db.sh serializes on the shared db-reset lock and creates the
-      # slot schema before migrating.
-      - name: Prepare slot database schema
-        run: TX_AGENT_SKIP_INFRA_ENSURE=1 ./scripts/test/reset-test-db.sh
       # PREREQUISITE (not in the 120s test budget): produce the Next.js prod
       # build the E2E suite serves. Lazy-compiled dev bundles are the typical
       # first-attempt flake; the prod build has no lazy compile.
@@ -249,9 +230,3 @@ jobs:
       - name: Run Web E2E suite
         timeout-minutes: 2
         run: pnpm --filter @tx-agent-kit/web run test:e2e
-      - name: Cleanup runner slot
-        if: always()
-        run: |
-          if [[ -x scripts/deploy/ci/cleanup-runner-slot.sh ]]; then
-            ./scripts/deploy/ci/cleanup-runner-slot.sh
-          fi
