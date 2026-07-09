@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { AppProviders } from './AppProviders'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { IntegrationRouterProvider } from '../../integration/support/next-router-context'
-import { render, screen, userEvent, waitFor } from '../../integration/test-utils'
+import { act, render, screen, userEvent, waitFor } from '../../integration/test-utils'
 import { sessionStoreActions } from '../../stores/session-store'
 
 const mutableProcessEnv = process.env as Record<string, string | undefined>
@@ -101,15 +101,24 @@ describe('AppProviders integration', () => {
       expect(screen.getByTestId('tanstack-store-devtools-panel')).toBeInTheDocument()
     }, { timeout: 5000 })
 
-    for (let index = 0; index < 45; index += 1) {
-      sessionStoreActions.setPrincipal({
-        userId: randomUUID(),
-        email: `history-${index}@example.com`,
-        roles: ['member'],
-        organizationId: undefined,
-        permissions: []
-      })
-    }
+    // Flush the burst of store writes through React inside act() so the
+    // useStore-driven "current snapshot" render commits deterministically.
+    // Firing all 45 synchronously outside act() left React's external-store
+    // subscription stuck at the initial cleared state under CI parallel load
+    // (the imperative history subscription recorded every write - length hits
+    // 30 - but the current-state render never converged, so the assertion
+    // timed out reading `{ principal: null, isReady: true }`).
+    act(() => {
+      for (let index = 0; index < 45; index += 1) {
+        sessionStoreActions.setPrincipal({
+          userId: randomUUID(),
+          email: `history-${index}@example.com`,
+          roles: ['member'],
+          organizationId: undefined,
+          permissions: []
+        })
+      }
+    })
 
     await waitFor(() => {
       expect(screen.getAllByTestId('tanstack-store-devtools-history-entry')).toHaveLength(30)
