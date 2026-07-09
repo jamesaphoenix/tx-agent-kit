@@ -118,8 +118,10 @@ describe('AppProviders integration', () => {
       )
     }, { timeout: 5000 })
 
-    expect(screen.getByTestId('tanstack-store-devtools-current-state')).toHaveTextContent(
-      'history-44@example.com'
-    )
+    await waitFor(() => {
+      expect(screen.getByTestId('tanstack-store-devtools-current-state')).toHaveTextContent(
+        'history-44@example.com'
+      )
+    }, { timeout: 5000 })
   })
 })
