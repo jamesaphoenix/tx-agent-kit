@@ -21,7 +21,7 @@ concurrency:
 # port-bearing / schema-bound keys below are static and self-contained.
 #
 # DORMANT runner-slot scaffolding: scripts/deploy/ci/{runner-slot-lib,
-# resolve-runner-slot,cleanup-runner-slot}.sh + setup-mac-docker-config.sh, the
+# resolve-runner-slot,cleanup-runner-slot}.sh, the
 # env-first PGTAP_SCHEMA/PGTAP_REBUILD_SCHEMA path in run-pgtap.sh, the
 # DATABASE_SCHEMA baseline in reset-test-db.sh, and the startup locks exist so
 # this repo stays consistent with its sibling repos, but they are NOT wired
