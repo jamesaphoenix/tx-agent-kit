@@ -134,6 +134,16 @@ END;
 $fn$ LANGUAGE plpgsql;
 SQL
 
+# Respect DATABASE_SCHEMA as the migration baseline. Worktrees and CI runner
+# slots point DATABASE_URL's search_path at a dedicated schema (wt_<name> /
+# wt_ci_txak_slot<N>); create it before `db:migrate` so the first CREATE TABLE
+# has a target. The primary checkout falls through to `public` (always exists).
+# render-reset-public-sql.ts already scopes its reset to DATABASE_SCHEMA.
+BASELINE_SCHEMA="${DATABASE_SCHEMA:-public}"
+echo "Ensuring baseline schema '$BASELINE_SCHEMA' exists before migrate..."
+docker exec -i "$POSTGRES_CONTAINER_ID" psql -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" \
+  -c "CREATE SCHEMA IF NOT EXISTS \"$BASELINE_SCHEMA\";"
+
 echo "Applying migrations..."
 pnpm db:migrate
 
