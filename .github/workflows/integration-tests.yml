@@ -127,6 +127,8 @@ jobs:
         run: |
           curl -sSf https://temporal.download/cli.sh | TEMPORAL_CLI_VERSION=1.1.2 sh
           echo "$HOME/.temporalio/bin" >> "$GITHUB_PATH"
+      - name: Setup Docker config
+        run: ./scripts/deploy/ci/setup-mac-docker-config.sh
       - name: Ensure infrastructure
         run: pnpm infra:ensure
       - name: Run integration suites
@@ -179,6 +181,8 @@ jobs:
         run: pnpm exec turbo run build --filter='./packages/**'
       - name: Configure local env files
         run: pnpm env:configure
+      - name: Setup Docker config
+        run: ./scripts/deploy/ci/setup-mac-docker-config.sh
       - name: Ensure infrastructure
         run: pnpm infra:ensure
       # Migrate + reset this slot's schema (DATABASE_SCHEMA/DATABASE_URL from the
