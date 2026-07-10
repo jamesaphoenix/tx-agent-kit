@@ -88,8 +88,19 @@ const extractPostgresError = (
   return null
 }
 
-const isPostgresUniqueViolation = (error: unknown): boolean =>
+export const isPostgresUniqueViolation = (error: unknown): boolean =>
   extractPostgresError(error)?.code === '23505'
+
+/**
+ * True when `error` (anywhere in its cause chain) is a Postgres
+ * duplicate-table error (42P07). Raised when a concurrent creator wins a
+ * CREATE TABLE IF NOT EXISTS race: the existence check passes for both
+ * sessions and the loser hits the already-committed relation. Exported for
+ * DDL callers (migration-table bootstrap) that must treat "someone else
+ * created it" as success.
+ */
+export const isPostgresDuplicateTable = (error: unknown): boolean =>
+  extractPostgresError(error)?.code === '42P07'
 
 // Class-40 (Transaction Rollback) errors that Postgres guarantees have rolled
 // back the transaction — so retrying the operation is safe (no partial commit)

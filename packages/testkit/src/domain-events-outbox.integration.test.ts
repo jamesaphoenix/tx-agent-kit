@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { domainEventsRepository } from '@tx-agent-kit/db'
+import { domainEventsRepository, resetPool } from '@tx-agent-kit/db'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { defaultTestBrandSettings } from './api-factories.js'
@@ -40,6 +40,12 @@ const runWithRepositoryDatabaseUrl = async <A>(
 ): Promise<A> => {
   const originalDatabaseUrl = process.env.DATABASE_URL
   process.env.DATABASE_URL = dbAuthContext.testContext.schemaDatabaseUrl
+  // The no-arg repository runtime captures the default URL once; a deliberate
+  // repoint goes through resetPool() (the 3ds-webhook e2e test follows the
+  // same contract). Without this the capture would pin repository access to
+  // the pre-repoint schema and silently miss the rows created on this suite's
+  // schema.
+  await resetPool()
 
   try {
     return await Effect.runPromise(createEffect())
@@ -49,6 +55,7 @@ const runWithRepositoryDatabaseUrl = async <A>(
     } else {
       process.env.DATABASE_URL = originalDatabaseUrl
     }
+    await resetPool()
   }
 }
 

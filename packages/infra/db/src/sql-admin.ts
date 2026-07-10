@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import type { Client } from 'pg'
+import { isPostgresDuplicateTable, isPostgresUniqueViolation } from './errors.js'
 
 export type SqlFile = {
   readonly name: string
@@ -151,13 +152,29 @@ export const getSchemaFiles = (
   return readSqlFilesRecursively(schemaDir)
 }
 
+// CREATE TABLE IF NOT EXISTS checks existence BEFORE inserting the catalog
+// rows, so two concurrent creators in the same schema can both pass the check
+// and the loser fails with a unique violation on pg_type/pg_class, or a
+// duplicate-table error. With multiple repos' CI sharing one Postgres this
+// race is real (hit twice within 12h on the shared runner host). Losing the
+// race MEANS the table exists - retry once and the IF NOT EXISTS no-ops.
 export const ensureMigrationTable = async (client: SqlClient): Promise<void> => {
-  await client.query(`
+  const createMigrationTable = () =>
+    client.query(`
     CREATE TABLE IF NOT EXISTS __tx_agent_migrations (
       name text PRIMARY KEY,
       applied_at timestamptz NOT NULL DEFAULT now()
     )
   `)
+
+  try {
+    await createMigrationTable()
+  } catch (error) {
+    if (!isPostgresUniqueViolation(error) && !isPostgresDuplicateTable(error)) {
+      throw error
+    }
+    await createMigrationTable()
+  }
 }
 
 export const applySqlFiles = async (
