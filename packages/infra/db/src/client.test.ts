@@ -209,3 +209,124 @@ describe('getPool', () => {
     await resetPool()
   })
 })
+
+describe('default DATABASE_URL capture', () => {
+  // The pool singleton froze DATABASE_URL at first getPool() call while
+  // getDBRuntime() re-read env on every call. A mid-process env mutation
+  // (e.g. a test stub leaking under isolate:false) then split the two onto
+  // different URLs/schemas - raw-SQL reads and Effect-repo reads silently
+  // targeting different schemas. Found via trace-learn's billing suite; see
+  // that repo's issue #40. The default URL must be captured ONCE, shared by
+  // both paths, and released only by resetPool().
+  const urlA = 'postgres://test:test@db.example.com:5432/tx_agent_kit?options=-c%20search_path%3Dschema_a,public'
+  const urlB = 'postgres://test:test@db.example.com:5432/tx_agent_kit?options=-c%20search_path%3Dschema_b,public'
+
+  const mockLayers = (): { readonly layerUrls: string[]; readonly poolConfigs: Array<{ readonly connectionString?: string }> } => {
+    const layerUrls: string[] = []
+    const poolConfigs: Array<{ readonly connectionString?: string }> = []
+
+    vi.doMock('@effect/sql-pg/PgClient', async () => {
+      const effect = await import('effect')
+      const PgClient = effect.Context.GenericTag<Readonly<{ connectionId: number }>>(
+        '@effect/sql-pg/PgClient'
+      )
+
+      return {
+        PgClient,
+        layer: (options: { readonly url: unknown }) => {
+          layerUrls.push(effect.Redacted.value(options.url as ReturnType<typeof effect.Redacted.make<string>>))
+          return effect.Layer.scoped(
+            PgClient,
+            effect.Effect.acquireRelease(
+              effect.Effect.succeed({ connectionId: layerUrls.length }),
+              () => effect.Effect.void
+            )
+          )
+        }
+      }
+    })
+
+    vi.doMock('drizzle-orm/effect-postgres', async () => {
+      const effect = await import('effect')
+      return { makeWithDefaults: () => effect.Effect.sync(() => ({ db: true })) }
+    })
+
+    vi.doMock('pg', () => {
+      class FakePool extends EventEmitter {
+        readonly options: { readonly connectionString?: string }
+        constructor(config: { readonly connectionString?: string }) {
+          super()
+          this.options = config
+          poolConfigs.push(config)
+        }
+        end(): Promise<void> {
+          return Promise.resolve()
+        }
+      }
+      return { Pool: FakePool, types: { getTypeParser: () => (value: unknown) => value } }
+    })
+
+    return { layerUrls, poolConfigs }
+  }
+
+  it('pins the Effect runtime to the URL captured by the first getPool(), ignoring later env mutation', async () => {
+    vi.stubEnv('DATABASE_URL', urlA)
+    vi.stubEnv('NODE_ENV', 'staging')
+    const { layerUrls } = mockLayers()
+
+    const { DB, getPool, provideDB } = await import('./client.js')
+
+    getPool()
+    vi.stubEnv('DATABASE_URL', urlB)
+
+    await Effect.runPromise(provideDB(Effect.gen(function* () {
+      yield* DB
+      return true
+    })))
+
+    expect(layerUrls).toHaveLength(1)
+    expect(layerUrls[0]).toContain('schema_a')
+    expect(layerUrls[0]).not.toContain('schema_b')
+  })
+
+  it('pins getPool() to the URL captured by the first Effect runtime, ignoring later env mutation', async () => {
+    vi.stubEnv('DATABASE_URL', urlA)
+    vi.stubEnv('NODE_ENV', 'staging')
+    const { poolConfigs } = mockLayers()
+
+    const { DB, getPool, provideDB } = await import('./client.js')
+
+    await Effect.runPromise(provideDB(Effect.gen(function* () {
+      yield* DB
+      return true
+    })))
+    vi.stubEnv('DATABASE_URL', urlB)
+
+    getPool()
+
+    expect(poolConfigs).toHaveLength(1)
+    expect(poolConfigs[0]?.connectionString).toContain('schema_a')
+    expect(poolConfigs[0]?.connectionString).not.toContain('schema_b')
+  })
+
+  it('resetPool() releases the captured URL so a deliberate repoint takes effect', async () => {
+    vi.stubEnv('DATABASE_URL', urlA)
+    vi.stubEnv('NODE_ENV', 'staging')
+    const { layerUrls, poolConfigs } = mockLayers()
+
+    const { DB, getPool, provideDB, resetPool } = await import('./client.js')
+
+    getPool()
+    await resetPool()
+    vi.stubEnv('DATABASE_URL', urlB)
+
+    getPool()
+    await Effect.runPromise(provideDB(Effect.gen(function* () {
+      yield* DB
+      return true
+    })))
+
+    expect(poolConfigs[1]?.connectionString).toContain('schema_b')
+    expect(layerUrls[0]).toContain('schema_b')
+  })
+})

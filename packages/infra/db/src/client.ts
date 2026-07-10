@@ -29,9 +29,18 @@ export const setPoolErrorReporter = (reporter: PoolErrorReporter): void => {
   poolErrorReporter = reporter
 }
 
+// The default URL is captured ONCE (first resolution by either getPool or a
+// no-arg getDBRuntime) and shared by both paths. Without this, the pool
+// singleton froze the URL at first call while getDBRuntime re-read env on
+// every call, so a mid-process env mutation (a test stub leaking under
+// isolate:false) silently split raw-SQL and Effect-repo access onto different
+// schemas. A deliberate repoint goes through resetPool(), which releases the
+// capture along with the singletons. Explicit-URL callers are unaffected.
+let capturedDefaultDatabaseUrl: string | undefined
+
 const getDatabaseUrl = (): string => {
-  const env = getDbEnv()
-  return env.DATABASE_URL
+  capturedDefaultDatabaseUrl ??= getDbEnv().DATABASE_URL
+  return capturedDefaultDatabaseUrl
 }
 
 export const getPgSslConfigForDatabaseUrl = (
@@ -89,6 +98,7 @@ export const getPool = (): Pool => {
 
 export const resetPool = async (): Promise<void> => {
   await disposeDBRuntimes()
+  capturedDefaultDatabaseUrl = undefined
 
   if (!poolSingleton) {
     return
