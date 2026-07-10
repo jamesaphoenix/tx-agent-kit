@@ -9,6 +9,12 @@ const root = path.resolve(__dirname, '..')
 
 const apiEnvPath = path.join(root, 'apps/api/src/config/env.ts')
 const ciWorkflowPath = path.join(root, '.github/workflows/integration-tests.yml')
+// Slot-scoped keys (ports, schema-bound DATABASE_URL, port-bearing URLs) are
+// deliberately absent from the workflow YAML: they depend on which Mac Studio
+// runner picked up the job, so the "Resolve runner slot" step emits them via
+// $GITHUB_ENV. Keys emitted there count as provided - deleting an emit line
+// without re-adding the key to the workflow YAML still fails this gate.
+const slotScriptPath = path.join(root, 'scripts/deploy/ci/resolve-runner-slot.sh')
 
 const extractRequiredApiEnv = (source) => {
   const shapeMatch = source.match(/const requiredApiEnvShape = \{([\s\S]*?)\} as const/)
@@ -64,6 +70,16 @@ const extractWorkflowEnv = (source) => {
   return keys
 }
 
+const extractSlotScriptEnv = (source) => {
+  const keys = new Set()
+  for (const match of source.matchAll(/^\s*emit ([A-Z][A-Z0-9_]*) /gm)) {
+    if (match[1]) {
+      keys.add(match[1])
+    }
+  }
+  return keys
+}
+
 const main = () => {
   if (!fs.existsSync(apiEnvPath)) {
     throw new Error(`Missing API env schema file: ${apiEnvPath}`)
@@ -73,23 +89,29 @@ const main = () => {
     throw new Error(`Missing CI workflow file: ${ciWorkflowPath}`)
   }
 
+  if (!fs.existsSync(slotScriptPath)) {
+    throw new Error(`Missing runner slot script: ${slotScriptPath}`)
+  }
+
   const apiEnvSource = fs.readFileSync(apiEnvPath, 'utf8')
   const workflowSource = fs.readFileSync(ciWorkflowPath, 'utf8')
+  const slotScriptSource = fs.readFileSync(slotScriptPath, 'utf8')
 
   const requiredApiKeys = extractRequiredApiEnv(apiEnvSource)
   const ciKeys = extractWorkflowEnv(workflowSource)
+  const slotKeys = extractSlotScriptEnv(slotScriptSource)
 
-  const missing = requiredApiKeys.filter((key) => !ciKeys.has(key))
+  const missing = requiredApiKeys.filter((key) => !ciKeys.has(key) && !slotKeys.has(key))
 
   if (missing.length > 0) {
-    console.error('CI env validation failed. Missing API env keys in .github/workflows/integration-tests.yml:')
+    console.error('CI env validation failed. Missing API env keys (checked .github/workflows/integration-tests.yml env blocks and scripts/deploy/ci/resolve-runner-slot.sh emit lines):')
     for (const key of missing) {
       console.error(`- ${key}`)
     }
     process.exit(1)
   }
 
-  console.log(`CI env validation passed (${requiredApiKeys.length} required API env keys mapped).`)
+  console.log(`CI env validation passed (${requiredApiKeys.length} required API env keys mapped, ${slotKeys.size} slot-scoped).`)
 }
 
 main()

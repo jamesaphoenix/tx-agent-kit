@@ -569,6 +569,28 @@ if ! docker_daemon_ready; then
   exit 1
 fi
 
+# Serialize the mutating startup path across concurrent checkouts (worktrees,
+# CI runner slots) and sibling repos sharing this compose project. The healthy
+# fast path above stays lock-free; whoever loses the race re-checks health
+# after acquiring so the winner's work is not repeated or raced (concurrent
+# `docker compose up` on one project can trip over network/volume creation).
+# The lock dir is host-global and keyed by compose project, so all checkouts
+# and repos on this host serialize against each other by design.
+source "$PROJECT_ROOT/scripts/lib/lock.sh"
+INFRA_START_LOCK_DIR="/tmp/${COMPOSE_PROJECT_NAME}-infra-start.lock"
+lock_acquire \
+  "$INFRA_START_LOCK_DIR" \
+  "${INFRA_START_LOCK_TIMEOUT_SECONDS:-600}" \
+  "${INFRA_START_LOCK_MISSING_PID_GRACE_SECONDS:-15}"
+trap 'lock_release "$INFRA_START_LOCK_DIR"' EXIT
+
+if all_healthy; then
+  ensure_langfuse_bootstrap
+  write_local_infra_env
+  echo "Infrastructure already healthy (started by a concurrent run)."
+  exit 0
+fi
+
 maybe_fallback_plain_host_port "LANGFUSE_CLICKHOUSE_HTTP_PORT" "Langfuse ClickHouse HTTP" "langfuse-clickhouse" "8123"
 maybe_fallback_plain_host_port "LANGFUSE_CLICKHOUSE_TCP_PORT" "Langfuse ClickHouse TCP" "langfuse-clickhouse" "9000"
 maybe_fallback_plain_host_port "LANGFUSE_MINIO_PORT" "Langfuse MinIO API" "langfuse-minio" "9000"

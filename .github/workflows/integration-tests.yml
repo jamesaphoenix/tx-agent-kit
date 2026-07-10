@@ -16,6 +16,23 @@ concurrency:
   group: integration-tests-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: true
 
+# These jobs run on GitHub-hosted ubuntu-latest, so each run gets its own
+# ephemeral VM + fresh Docker infra and needs no cross-run isolation - the
+# port-bearing / schema-bound keys below are static and self-contained.
+#
+# DORMANT runner-slot scaffolding: scripts/deploy/ci/{runner-slot-lib,
+# resolve-runner-slot,cleanup-runner-slot}.sh, the
+# env-first PGTAP_SCHEMA/PGTAP_REBUILD_SCHEMA path in run-pgtap.sh, the
+# DATABASE_SCHEMA baseline in reset-test-db.sh, and the startup locks exist so
+# this repo stays consistent with its sibling repos, but they are NOT wired
+# into this workflow. This repo is PUBLIC and has no self-hosted runners; a
+# Studio runner here would expose the production host to fork-PR code, so CI
+# stays on ubuntu-latest. To ACTIVATE slots (only on trusted, slotted
+# self-hosted runners): point runs-on at [self-hosted, mac-studio], add a
+# "Resolve runner slot" step (scripts/deploy/ci/resolve-runner-slot.sh) to each
+# job, and DELETE the port-bearing / schema-bound static keys below so the
+# GITHUB_ENV slot values are not shadowed. validate-ci-env.mjs already accepts
+# either source.
 env:
   NODE_ENV: test
   API_PORT: '4100'

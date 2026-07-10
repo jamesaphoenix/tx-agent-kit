@@ -42,6 +42,25 @@ if is_temporal_cli_healthy; then
   exit 0
 fi
 
+# Serialize the start/restart path across concurrent checkouts (worktrees, CI
+# runner slots) and sibling repos sharing this one Temporal dev server - two
+# cold starters would otherwise race to bind the port and the loser would
+# hard-fail on "port in use". The healthy fast path above stays lock-free; the
+# lock loser re-checks health after acquiring. The lock dir is host-global and
+# keyed by the Temporal port, so all repos on this host serialize by design.
+source "$SCRIPT_DIR/../lib/lock.sh"
+TEMPORAL_START_LOCK_DIR="/tmp/temporal-cli-dev-${TEMPORAL_CLI_PORT}-start.lock"
+lock_acquire \
+  "$TEMPORAL_START_LOCK_DIR" \
+  "${TEMPORAL_START_LOCK_TIMEOUT_SECONDS:-300}" \
+  "${TEMPORAL_START_LOCK_MISSING_PID_GRACE_SECONDS:-15}"
+trap 'lock_release "$TEMPORAL_START_LOCK_DIR"' EXIT
+
+if is_temporal_cli_healthy; then
+  echo "Temporal CLI server is already healthy at $(temporal_cli_address) (started by a concurrent run)."
+  exit 0
+fi
+
 existing_pid=""
 if existing_pid="$(read_temporal_pid)" && is_pid_alive "$existing_pid"; then
   echo "Temporal CLI process is running (pid=${existing_pid}) but not healthy yet. Waiting up to ${TEMPORAL_CLI_EXISTING_PROCESS_GRACE_SECONDS}s before restart..."

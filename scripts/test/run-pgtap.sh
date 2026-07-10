@@ -32,6 +32,26 @@ PGTAP_DIR="$PROJECT_ROOT/packages/infra/db/pgtap"
 LOCK_DIR="/tmp/${COMPOSE_PROJECT_NAME}-db-reset.lock"
 SKIP_SETUP="false"
 
+# Env-first target schema + rebuild toggle. Defaults preserve the pre-slot
+# behaviour: primary checkout runs against `public`, worktrees against their
+# DATABASE_SCHEMA, and neither rebuilds. CI runner slots override both
+# (PGTAP_SCHEMA=pgtap_txak_slot<N>, PGTAP_REBUILD_SCHEMA=true) so pgTAP gets a
+# DEDICATED schema rebuilt from scratch, isolated from the slot's app schema
+# and from sibling repos sharing this Postgres.
+PGTAP_SCHEMA="${PGTAP_SCHEMA:-${DATABASE_SCHEMA:-public}}"
+PGTAP_REBUILD_SCHEMA="${PGTAP_REBUILD_SCHEMA:-false}"
+
+# Never rebuild `public` destructively: DROP SCHEMA public CASCADE would take
+# out the shared extensions every other schema depends on.
+if [[ "$PGTAP_SCHEMA" == "public" && "$PGTAP_REBUILD_SCHEMA" == "true" ]]; then
+  PGTAP_REBUILD_SCHEMA="false"
+fi
+
+if [[ ! "$PGTAP_SCHEMA" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+  echo "Refusing to run pgTAP against invalid schema name '$PGTAP_SCHEMA'."
+  exit 1
+fi
+
 if [[ "${1:-}" == "--skip-setup" ]]; then
   SKIP_SETUP="true"
   shift
@@ -53,14 +73,82 @@ trap 'lock_release "$LOCK_DIR"' EXIT
 
 if [[ "$SKIP_SETUP" != "true" ]]; then
   "$PROJECT_ROOT/scripts/start-dev-services.sh"
-  pnpm db:migrate >/dev/null
-  pnpm db:schemas:apply >/dev/null
 fi
 
 POSTGRES_CONTAINER_ID="$(docker compose -p "$COMPOSE_PROJECT_NAME" ps -q postgres)"
 if [[ -z "$POSTGRES_CONTAINER_ID" ]]; then
   echo "Postgres container is not running for compose project '$COMPOSE_PROJECT_NAME'."
   exit 1
+fi
+
+run_schema_scoped_sql_file() {
+  local sql_file="$1"
+  {
+    printf 'SET search_path TO "%s", public;\n' "$PGTAP_SCHEMA"
+    cat "$sql_file"
+  } |
+    docker exec -i "$POSTGRES_CONTAINER_ID" \
+      psql -X -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" -f - >/dev/null
+}
+
+apply_pgtap_schema_sql() {
+  local sql_file
+
+  echo "Applying pgTAP migration SQL files..."
+  while IFS= read -r sql_file; do
+    run_schema_scoped_sql_file "$sql_file"
+  done < <(find "$PROJECT_ROOT/packages/infra/db/drizzle/migrations" -maxdepth 1 -type f -name '*.sql' | sort)
+
+  echo "Applying pgTAP desired-state SQL files..."
+  while IFS= read -r sql_file; do
+    run_schema_scoped_sql_file "$sql_file"
+  done < <(find "$PROJECT_ROOT/packages/infra/db/schemas" -type f -name '*.sql' | sort)
+}
+
+rebuild_target_schema() {
+  echo "Rebuilding pgTAP target schema '$PGTAP_SCHEMA'..."
+  docker exec -i "$POSTGRES_CONTAINER_ID" \
+    psql -X -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" \
+      -c "DROP SCHEMA IF EXISTS \"$PGTAP_SCHEMA\" CASCADE; CREATE SCHEMA \"$PGTAP_SCHEMA\";"
+}
+
+schema_has_core_tables() {
+  local result
+  result="$(
+    docker exec -i "$POSTGRES_CONTAINER_ID" \
+      psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" \
+        -c "SELECT to_regclass(format('%I.%I', '$PGTAP_SCHEMA', 'users')) IS NOT NULL;"
+  )"
+
+  [[ "$result" == "t" ]]
+}
+
+if [[ "$SKIP_SETUP" != "true" ]]; then
+  if [[ "$PGTAP_REBUILD_SCHEMA" == "true" ]]; then
+    # Dedicated pgTAP schema (CI runner slots): build it from scratch by
+    # replaying the raw migration + desired-state SQL with a search_path
+    # prefix. Replaying over an already-drizzle-migrated schema is not
+    # idempotent (early migrations reference columns later ones renamed), so
+    # the DROP+CREATE gives a clean target every run.
+    rebuild_target_schema
+    apply_pgtap_schema_sql
+
+    if ! schema_has_core_tables; then
+      echo "pgTAP target schema '$PGTAP_SCHEMA' is missing core tables after rebuild; retrying once..."
+      rebuild_target_schema
+      apply_pgtap_schema_sql
+    fi
+
+    if ! schema_has_core_tables; then
+      echo "pgTAP target schema '$PGTAP_SCHEMA' is still missing core tables after rebuild."
+      exit 1
+    fi
+  else
+    # App schema path (primary checkout / worktree): pgTAP reads the schema the
+    # normal migrate + reconcile just built.
+    pnpm db:migrate >/dev/null
+    pnpm db:schemas:apply >/dev/null
+  fi
 fi
 
 if ! docker exec -i "$POSTGRES_CONTAINER_ID" psql -v ON_ERROR_STOP=1 -U postgres -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS pgtap;" >/dev/null; then
@@ -85,14 +173,10 @@ if [[ "${#PGTAP_FILES[@]}" -eq 0 ]]; then
   exit 0
 fi
 
-# Resolve target schema for the pgTAP session. The primary checkout uses
-# `public`; worktrees set DATABASE_SCHEMA=wt_<name> via setup.sh, and the
-# reconcile-schemas step only installs triggers into that schema, so running
-# pgTAP against the default `public` search_path would see stale/missing
-# triggers. Prefix each script with a `SET search_path` statement to match
+# PGTAP_SCHEMA was resolved above (env-first, then DATABASE_SCHEMA, then
+# `public`). The reconcile-schemas step only installs triggers into that
+# schema, so prefix each script with a `SET search_path` statement to match
 # the schema where migrations and reconciled triggers actually live.
-PGTAP_SCHEMA="${DATABASE_SCHEMA:-public}"
-
 echo "Running pgTAP suites (${#PGTAP_FILES[@]} files) against schema '$PGTAP_SCHEMA'..."
 for sql_file in "${PGTAP_FILES[@]}"; do
   relative_sql_file="${sql_file#$PROJECT_ROOT/}"
