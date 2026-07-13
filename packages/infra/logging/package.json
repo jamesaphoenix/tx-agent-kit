@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/api-logs": "^0.214.0",
-    "effect": "^3.21.2"
+    "@opentelemetry/api-logs": "^0.220.0",
+    "effect": "^3.22.0"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*"

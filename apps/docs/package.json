@@ -11,19 +11,19 @@
     "postinstall": "fumadocs-mdx"
   },
   "dependencies": {
-    "fumadocs-core": "^16.7.16",
+    "fumadocs-core": "^16.11.4",
     "fumadocs-mdx": "^14.2.14",
-    "fumadocs-ui": "^16.7.16",
-    "next": "16.2.3",
-    "react": "19.2.5",
-    "react-dom": "19.2.5"
+    "fumadocs-ui": "^16.11.4",
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.20.1",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/mdx": "^2.0.13",
     "@types/node": "^25.6.0",
-    "@types/react": "^19.1.6",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.1.6",
     "postcss": "8.5.10",
     "postcss-load-config": "6.0.1",

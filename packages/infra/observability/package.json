@@ -31,21 +31,21 @@
     "test:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
-    "@effect/opentelemetry": "^0.63.0",
-    "@langfuse/otel": "5.1.0",
+    "@effect/opentelemetry": "^0.64.0",
+    "@langfuse/otel": "5.9.1",
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/exporter-logs-otlp-http": "^0.214.0",
-    "@opentelemetry/exporter-metrics-otlp-http": "^0.214.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.214.0",
-    "@opentelemetry/resources": "^2.6.1",
-    "@opentelemetry/sdk-logs": "^0.214.0",
-    "@opentelemetry/sdk-metrics": "^2.6.1",
-    "@opentelemetry/sdk-node": "^0.214.0",
-    "@opentelemetry/sdk-trace-base": "^2.6.1",
-    "@opentelemetry/semantic-conventions": "^1.40.0",
-    "@sentry/node": "^10.48.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.220.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.220.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.220.0",
+    "@opentelemetry/resources": "^2.9.0",
+    "@opentelemetry/sdk-logs": "^0.220.0",
+    "@opentelemetry/sdk-metrics": "^2.9.0",
+    "@opentelemetry/sdk-node": "^0.220.0",
+    "@opentelemetry/sdk-trace-base": "^2.9.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
+    "@sentry/node": "^10.65.0",
     "@tx-agent-kit/logging": "workspace:*",
-    "effect": "^3.21.2"
+    "effect": "^3.22.0"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*"

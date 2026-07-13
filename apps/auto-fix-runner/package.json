@@ -12,14 +12,14 @@
     "test": "vitest run -c vitest.config.ts"
   },
   "dependencies": {
-    "@temporalio/activity": "^1.16.0",
-    "@temporalio/worker": "^1.16.0",
-    "@temporalio/workflow": "^1.16.0",
+    "@temporalio/activity": "^1.20.2",
+    "@temporalio/worker": "^1.20.2",
+    "@temporalio/workflow": "^1.20.2",
     "@tx-agent-kit/contracts": "workspace:*",
     "@tx-agent-kit/db": "workspace:*",
     "@tx-agent-kit/logging": "workspace:*",
     "@tx-agent-kit/redis": "workspace:*",
-    "effect": "^3.21.2"
+    "effect": "^3.22.0"
   },
   "devDependencies": {
     "@tx-agent-kit/vitest-config": "workspace:*"
