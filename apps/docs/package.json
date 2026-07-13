@@ -20,16 +20,16 @@
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.20.1",
-    "@tailwindcss/postcss": "^4.2.2",
-    "@types/mdx": "^2.0.13",
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/mdx": "^2.0.14",
     "@types/node": "^25.6.0",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
-    "postcss": "8.5.10",
+    "postcss": "8.5.19",
     "postcss-load-config": "6.0.1",
-    "tailwindcss": "^4.2.2",
+    "tailwindcss": "^4.3.2",
     "typescript": "^5.9.3",
     "wrangler": "^4.110.0",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   }
 }
