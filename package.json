@@ -127,7 +127,7 @@
     "@types/node": "^25.6.0",
     "dotenv": "^17.4.2",
     "eslint": "^9.39.2",
-    "eslint-plugin-boundaries": "^6.0.2",
+    "eslint-plugin-boundaries": "^7.0.2",
     "eslint-plugin-no-only-tests": "^3.3.0",
     "eslint-plugin-promise": "^7.2.1",
     "eslint-plugin-testing-library": "^7.16.2",
