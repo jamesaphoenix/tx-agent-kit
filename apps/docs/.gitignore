@@ -2,3 +2,5 @@
 .next/
 node_modules/
 .vercel
+.open-next/
+.wrangler/
