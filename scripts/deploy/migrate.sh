@@ -3,6 +3,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Bounded, HOME-isolated `op` (see scripts/lib/op-cli.sh for the traced root cause).
+# shellcheck source=scripts/lib/op-cli.sh
+source "$SCRIPT_DIR/../lib/op-cli.sh"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$PROJECT_ROOT"
@@ -33,7 +37,7 @@ RENDERED_ENV_FILE="$(mktemp -t tx-agent-kit-${TARGET_ENV}-migrate-env.XXXXXX)"
 chmod 600 "$RENDERED_ENV_FILE"
 trap 'rm -f "$RENDERED_ENV_FILE"' EXIT
 
-op inject -f -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
+run_op inject -f -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
 
 # Export env vars in a subshell-safe way to avoid leaking set -a into the outer shell.
 (

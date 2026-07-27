@@ -3,6 +3,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Bounded, HOME-isolated `op` (see scripts/lib/op-cli.sh for the traced root cause).
+# shellcheck source=scripts/lib/op-cli.sh
+source "$SCRIPT_DIR/../lib/op-cli.sh"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$PROJECT_ROOT"
@@ -35,7 +39,7 @@ preflight_missing_op_fields() {
   [[ -z "$expected_fields" ]] && return 0
 
   local item_json
-  if ! item_json="$(op item get "$op_env" --vault "$op_vault" --format json 2>/dev/null)"; then
+  if ! item_json="$(run_op item get "$op_env" --vault "$op_vault" --format json 2>/dev/null)"; then
     echo "Pre-flight: could not read op://$op_vault/$op_env; deferring field validation to op inject."
     return 0
   fi
@@ -168,7 +172,7 @@ cleanup_rendered_env() { rm -f "$RENDERED_ENV_FILE"; }
 trap cleanup_rendered_env EXIT
 
 preflight_missing_op_fields "$TEMPLATE_FILE"
-op inject -f -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
+run_op inject -f -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
 
 {
   printf '\nAPI_IMAGE=%s\n' "$API_IMAGE"

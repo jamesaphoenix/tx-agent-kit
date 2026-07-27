@@ -3,6 +3,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Bounded, HOME-isolated `op` (see scripts/lib/op-cli.sh for the traced root cause).
+# shellcheck source=scripts/lib/op-cli.sh
+source "$SCRIPT_DIR/../lib/op-cli.sh"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=../lib/lock.sh
 source "$SCRIPT_DIR/../lib/lock.sh"
@@ -270,7 +274,7 @@ rendered_env_base_dir="${DEPLOY_RENDERED_ENV_DIR:-${RUNNER_TEMP:-/tmp}}"
 mkdir -p "$rendered_env_base_dir"
 RENDERED_ENV_FILE="$(mktemp "$rendered_env_base_dir/tx-agent-kit-k8s-${TARGET}-${DEPLOY_ENV}.env.XXXXXX")"
 chmod 600 "$RENDERED_ENV_FILE"
-op inject -f -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
+run_op inject -f -i "$TEMPLATE_FILE" -o "$RENDERED_ENV_FILE" >/dev/null
 if [[ -n "${RUNTIME_ENV_OVERRIDES_FILE:-}" ]]; then
   if [[ ! -f "$RUNTIME_ENV_OVERRIDES_FILE" ]]; then
     echo "Runtime overrides file not found: $RUNTIME_ENV_OVERRIDES_FILE"

@@ -3,6 +3,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Bounded, HOME-isolated `op` (see scripts/lib/op-cli.sh for the traced root cause).
+# shellcheck source=scripts/lib/op-cli.sh
+source "$SCRIPT_DIR/../../lib/op-cli.sh"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 # shellcheck source=../../lib/lock.sh
 source "$SCRIPT_DIR/../../lib/lock.sh"
@@ -231,7 +235,7 @@ if [[ ! -f "$TEMPLATE_FILE" ]]; then
   exit 1
 fi
 
-op inject -f -i "$TEMPLATE_FILE" -o "$expected_env_file" >/dev/null
+run_op inject -f -i "$TEMPLATE_FILE" -o "$expected_env_file" >/dev/null
 
 expected_temporal_namespace="$(extract_env_value "$expected_env_file" "TEMPORAL_NAMESPACE")"
 expected_temporal_address="$(extract_env_value "$expected_env_file" "TEMPORAL_ADDRESS")"
