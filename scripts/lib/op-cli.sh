@@ -2,8 +2,12 @@
 #
 # Safe wrappers for the 1Password CLI. Source this, then call `run_op` instead of `op`.
 #
-# Deliberately does NOT set -euo pipefail: this is sourced into callers that already set
-# their own shell options, and changing them from a library surprises the caller.
+# `set -euo pipefail` is present because scripts/check-shell-invariants.sh requires it of
+# every shell file, with no exemption for sourced libraries. That is safe here rather than
+# merely tolerated: every caller (deploy-compose.sh, deploy-k8s.sh, migrate.sh,
+# ci/verify-k3s-staging.sh, and the sibling repos' callers) already sets exactly these
+# options at the top of the file, so sourcing this cannot change the shell they run under.
+set -euo pipefail
 #
 # ── Why this file exists ────────────────────────────────────────────────────────────────
 #
