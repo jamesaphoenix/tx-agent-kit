@@ -49,6 +49,22 @@ services:
 
   jaeger:
     image: jaegertracing/jaeger:2.15.1
+    command:
+      # Jaeger v2 embeds its default config in the binary (there is no config
+      # file in the image), so `--set` overrides a single value rather than
+      # replacing the whole thing. The backend key `some_storage` is the name
+      # used by that embedded default - it was read out of the binary, not
+      # guessed, and the near-miss `some_store` from Jaeger's example configs
+      # silently creates a second unused backend instead of erroring.
+      #
+      # The default is max_traces: 100000, which is not a real bound here: on
+      # the Mac Studio this container reached 3.2GB RSS after 4 weeks of
+      # uptime with no memory limit set. 20000 caps it near 600MB.
+      #
+      # NB: max_traces also bounds query depth - the UI cannot request a limit
+      # >= this value ("search depth must be greater than 0 and less than max
+      # traces"), so do not lower it towards the UI's page size.
+      - '--set=extensions.jaeger_storage.backends.some_storage.memory.max_traces=20000'
     ports:
       - '${JAEGER_UI_PORT:-16686}:16686'
       - '${JAEGER_OTLP_GRPC_PORT:-4317}:4317'
