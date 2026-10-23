@@ -5,4 +5,5 @@ import staticAssetsIncrementalCache from "@opennextjs/cloudflare/overrides/incre
 // read-only static assets cache instead of rendering on demand in the Worker.
 export default defineCloudflareConfig({
   incrementalCache: staticAssetsIncrementalCache,
+  enableCacheInterception: true,
 });
