@@ -4,6 +4,16 @@ set -euo pipefail
 # Source a .env file into the current shell with set -a semantics, resolving
 # 1Password op:// references on the fly when the op CLI is available.
 
+# 1Password read budget: every `op://` reference costs one read against the
+# service account's shared limit (1000 per rolling 24h across every agent and
+# job). This helper runs on every dev/test entrypoint, so resolving fresh each
+# time exhausted the limit on 18 Oct 2026. The resolved file is cached outside
+# the repo, keyed by a hash of the .env content, so editing .env re-resolves:
+#   TX_SOURCE_ENV_CACHE_DIR          default ${XDG_CACHE_HOME:-$HOME/.cache}/txak-source-env
+#   TX_SOURCE_ENV_CACHE_TTL_SECONDS  default 28800 (8h); 0 disables the cache
+#   TX_SOURCE_ENV_NO_CACHE=1         resolve fresh (e.g. after rotating a secret)
+# The directory is mode 700 and each file mode 600.
+
 # Tunnel-mode support: every source_env call re-applies the overlay env file
 # AFTER the requested file. Without this, per-app dev scripts that re-source
 # .env (apps/api, apps/web, ...) would clobber the overlay values - turbo's
@@ -68,6 +78,16 @@ __source_env_one() {
     return 1
   fi
 
+  local cache_file=""
+  cache_file="$(__source_env_cache_file "$env_file")"
+  if [[ -n "$cache_file" && -f "$cache_file" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$cache_file"
+    set +a
+    return 0
+  fi
+
   local resolved
   resolved="$(mktemp -t txak-env.XXXXXX)" || {
     echo "source-env: failed to create tempfile for op injection." >&2
@@ -91,7 +111,49 @@ __source_env_one() {
   source "$resolved"
   set +a
 
+  # Only a successful inject is cached. mv within the cache dir is atomic, so
+  # a concurrent reader never sees a half-written file.
+  if [[ -n "$cache_file" ]]; then
+    local staged
+    staged="$(mktemp "$(dirname "$cache_file")/.staging.XXXXXX" 2>/dev/null)" &&
+      chmod 600 "$staged" &&
+      cat "$resolved" >"$staged" &&
+      mv -f "$staged" "$cache_file" || rm -f "${staged:-}" >/dev/null 2>&1 || true
+  fi
+
   rm -f "$resolved" >/dev/null 2>&1 || true
+}
+
+# Prints the cache path for an env file, or nothing when caching is disabled
+# or unavailable. Expired entries are removed here, so a hit is always fresh.
+__source_env_cache_file() {
+  local env_file="$1"
+  local ttl="${TX_SOURCE_ENV_CACHE_TTL_SECONDS:-28800}"
+
+  if [[ "${TX_SOURCE_ENV_NO_CACHE:-0}" == "1" || ! "$ttl" =~ ^[0-9]+$ || "$ttl" -eq 0 ]]; then
+    return 0
+  fi
+
+  local dir="${TX_SOURCE_ENV_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/txak-source-env}"
+  (umask 077 && mkdir -p "$dir") >/dev/null 2>&1 || return 0
+  chmod 700 "$dir" >/dev/null 2>&1 || return 0
+
+  # `|| true`: callers source this file under `set -euo pipefail`.
+  local digest
+  digest="$( (shasum -a 256 "$env_file" 2>/dev/null || sha256sum "$env_file" 2>/dev/null) | cut -c1-64)" || true
+  [[ -n "$digest" ]] || return 0
+
+  local file="$dir/$digest.env"
+  if [[ -f "$file" ]]; then
+    local mtime now
+    mtime="$(stat -f %m "$file" 2>/dev/null || stat -c %Y "$file" 2>/dev/null || echo 0)"
+    now="$(date +%s)"
+    if (( now - mtime >= ttl )); then
+      rm -f "$file" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  printf '%s\n' "$file"
 }
 
 # Decide whether a local .env should be sourced. In CI the environment is
