@@ -1,4 +1,4 @@
-import { HttpApiBuilder, HttpApiSwagger } from '@effect/platform'
+import { HttpApiBuilder, HttpApiSwagger, HttpMiddleware } from '@effect/platform'
 import { NodeHttpServer, NodeRuntime } from '@effect/platform-node'
 import {
   AuthServiceLive,
@@ -69,6 +69,7 @@ import { createLogger } from '@tx-agent-kit/logging'
 import { startTelemetry, stopTelemetry } from '@tx-agent-kit/observability'
 import { closeRedisClients } from '@tx-agent-kit/redis'
 import { flushApiSentry, initializeApiSentry } from './observability/sentry.js'
+import { isUntracedRequest } from './observability/untraced-requests.js'
 import { Effect, Layer } from 'effect'
 import { createServer } from 'node:http'
 import { TxAgentApi } from './api.js'
@@ -254,7 +255,9 @@ export const makeServerLive = (options?: { port?: number; host?: string }) => {
   return HttpApiBuilder.serve().pipe(
     Layer.provide(MiddlewareLive),
     Layer.provide(ApiWithDependenciesLive),
-    Layer.provide(NodeHttpServer.layer(() => createServer(), { port, host }))
+    Layer.provide(NodeHttpServer.layer(() => createServer(), { port, host })),
+    // Health probes get no Effect server span (see untraced-requests.ts).
+    HttpMiddleware.withTracerDisabledWhen(isUntracedRequest)
   )
 }
 

@@ -727,6 +727,9 @@ importers:
         specifier: ^3.21.2
         version: 3.21.2
     devDependencies:
+      '@opentelemetry/context-async-hooks':
+        specifier: ^2.6.1
+        version: 2.6.1(@opentelemetry/api@1.9.1)
       '@tx-agent-kit/vitest-config':
         specifier: workspace:*
         version: link:../../tooling/vitest-config
