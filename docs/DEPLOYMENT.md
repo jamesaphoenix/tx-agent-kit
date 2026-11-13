@@ -251,6 +251,11 @@ origin, update `origins_for()` in the script and re-run.
   - `gcp`: Cloud Trace + Cloud Monitoring + Cloud Logging.
   - `oss`: Jaeger + Prometheus OTLP receiver + Loki OTLP endpoint.
 
+### Health probe volume
+`GET /health` is excluded from Effect server spans (`apps/api/src/observability/untraced-requests.ts`), so a probe runs the handler and nothing else. Keep it that way: a traced probe re-enters the OpenTelemetry context on every fiber operation.
+
+A load balancer or uptime monitor that probes from many regions multiplies health traffic by the number of regions (a pool with no region restriction can poll from every data centre). Restrict probe regions to the few you need and use a sensible probe interval. If CPU is high with little real traffic, check the request rate on `/health` first.
+
 ## Smoke Checks
 Manual smoke run:
 

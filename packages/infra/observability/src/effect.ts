@@ -3,6 +3,7 @@ import * as EffectOtelResource from '@effect/opentelemetry/Resource'
 import * as EffectOtelTracer from '@effect/opentelemetry/Tracer'
 import { makeEffectLoggerLayer } from '@tx-agent-kit/logging'
 import { Layer } from 'effect'
+import { cachedContextTracerLayerGlobal } from './effect-tracer.js'
 
 export interface EffectOtelLayerConfig {
   serviceName: string
@@ -35,7 +36,8 @@ export const makeEffectOtelLayer = (config: EffectOtelLayerConfig) =>
   // additive and leaves the tracer behavior untouched.
   Layer.merge(
     Layer.provide(
-      EffectOtelTracer.layerGlobal,
+      // layerGlobal, minus a context manager `with` per fiber operation.
+      cachedContextTracerLayerGlobal,
       EffectOtelResource.layer(makeEffectOtelResourceConfig(config))
     ),
     makeEffectLoggerLayer(config.serviceName)

@@ -31,6 +31,14 @@ export {
   type EffectOtelResourceConfig
 } from './effect.js'
 
+export {
+  cachedContextTracerLayerGlobal,
+  setBuiltContextEntry,
+  withCachedSpanContext,
+  type EnterBuiltContext
+} from './effect-tracer.js'
+export { isHealthCheckRequestUrl } from './health.js'
+
 export { METRICS_INSTRUMENTATION_SCOPE, getMetricsMeter } from './metrics-meter.js'
 export {
   authRateLimitRejectedMetricName,
