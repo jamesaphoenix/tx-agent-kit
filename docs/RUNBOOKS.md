@@ -249,3 +249,26 @@ psql "$DATABASE_URL" -c "SELECT count(*) FILTER (WHERE status='pending') AS pend
 psql "$DATABASE_URL" -c "SELECT id, event_type, processing_at FROM domain_events
   WHERE status='processing' ORDER BY processing_at LIMIT 20;"
 ```
+
+## Worker during a Temporal outage
+
+The worker (`apps/worker`) rides out a Temporal outage (server down, or its database down or
+slow) without a manual restart. Timings live in `apps/worker/src/worker-resilience-policy.ts`.
+
+| Phase | Behaviour | Logs |
+|-------|-----------|------|
+| Boot | Connect and `DescribeNamespace` retry with backoff (1s to 30s, jittered). Workers are created only once the namespace answers. `Worker.create` is retried only for transient Temporal errors. | warn `Temporal startup (connect and describe namespace) failed; retrying with backoff.` for 5 minutes, then error. After 30 minutes: error `... giving up.`, exit 1, container restarts. |
+| Running | Both task-queue workers (`TEMPORAL_TASK_QUEUE`, `EMAIL_CAMPAIGNS_TASK_QUEUE`) are supervised together. If either stops (error or otherwise) without SIGTERM/SIGINT, the other is shut down and the process exits 1. Cleanup is capped at 60s by a forced exit. | warn `A Temporal worker stopped without a shutdown request; ...`, then error `Temporal worker stopped due to an unhandled error.` |
+| Background | Schedule client connection, outbox dispatcher start, every schedule reconcile step and the campaign definition sync run after polling starts. Each pass runs every pending step; only failed steps are retried (5s to 5m backoff). They never stop the workers. | warn `Temporal schedule reconciliation failed; retrying with backoff.` with `failedSteps`; error and one Sentry event after 30 minutes. `Temporal schedule reconciliation complete.` once done. |
+| Shutdown | SIGTERM/SIGINT drains both workers, aborts background reconciliation and exits 0. | info `Temporal workers stopped.` |
+
+Checking a worker after an outage:
+
+- Container uptime alone proves nothing: check for fresh pollers on both task queues
+  (`temporal task-queue describe --task-queue <queue>`) and for
+  `Temporal schedule reconciliation complete.` in the logs.
+- The outbox dispatcher only starts once the schedule client connects, so `outbox-dispatcher-stale`
+  can fire while Temporal is unreachable; it clears on its own once the client connects.
+- A container that restarts roughly every 30 minutes means Temporal is still unreachable from that host.
+- Repeated `failedSteps` naming one step while the others succeed points at that step, not at Temporal.
+- Behaviour is covered by `apps/worker/src/index.test.ts` ("worker survives a Temporal outage").
