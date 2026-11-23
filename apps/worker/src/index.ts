@@ -1,5 +1,5 @@
 import { Client, Connection } from '@temporalio/client'
-import { NativeConnection, Worker } from '@temporalio/worker'
+import { NativeConnection, Worker, type WorkerOptions } from '@temporalio/worker'
 import { ActivityErrorBoundaryInterceptor } from './activity-error-boundary.js'
 import { setPoolErrorReporter } from '@tx-agent-kit/db'
 import { createLogger } from '@tx-agent-kit/logging'
@@ -35,6 +35,25 @@ import {
   ensureLifecycleScanSchedule
 } from './schedules/index.js'
 import { syncCampaignDefinitions } from './campaign-definition-sync.js'
+import {
+  reconcileUntilComplete,
+  retryWithBackoff,
+  RetryAbortedError,
+  type ReconcileStep
+} from './retry-backoff.js'
+import {
+  BACKGROUND_RECONCILE_RETRY,
+  isTransientTemporalError,
+  TEMPORAL_STARTUP_RETRY,
+  WORKER_EXIT_BACKSTOP_MS
+} from './worker-resilience-policy.js'
+import {
+  firstWorkerToStop,
+  resolveWorkerExitCode,
+  settleWorkerRuns,
+  type SupervisedWorkerRun,
+  type WorkerRunOutcome
+} from './worker-supervisor.js'
 import {
   captureWorkerException,
   flushWorkerSentry,
@@ -95,6 +114,219 @@ const removeWorkerPidfile = (file: string): void => {
   }
 }
 
+const scheduleStep = (name: string, run: () => Promise<unknown>): ReconcileStep => ({
+  name,
+  run: async () => {
+    await run()
+  }
+})
+
+/**
+ * Every schedule this worker owns (plus the campaign definition sync), as
+ * idempotent reconciliation steps. They run in the background after the
+ * workers are polling (see startBackgroundReconciliation), so a slow or
+ * unreachable Temporal can delay them but can never stop the workers.
+ */
+const buildScheduleReconcileSteps = (
+  temporalClient: Client,
+  env: WorkerEnv
+): ReadonlyArray<ReconcileStep> => [
+  // The outbox is drained by the event-driven dispatcher (Postgres NOTIFY +
+  // backstop sweep), not a 5s poller schedule. Reap the legacy schedule if a
+  // prior deploy left it behind.
+  scheduleStep('legacy-outbox-poller-schedule-delete', () => deleteOutboxPollerScheduleIfExists(temporalClient)),
+
+  scheduleStep('stuck-events-reset-schedule', () => ensureStuckEventsResetSchedule(
+    temporalClient,
+    env.TEMPORAL_TASK_QUEUE,
+    120,
+    env.OUTBOX_STUCK_THRESHOLD_MINUTES
+  )),
+
+  scheduleStep('prune-published-schedule', () => ensurePrunePublishedSchedule(
+    temporalClient,
+    env.TEMPORAL_TASK_QUEUE,
+    24,
+    env.OUTBOX_PRUNE_RETENTION_DAYS
+  )),
+
+  scheduleStep('retention-cleaner-schedule', () => ensureRetentionCleanerSchedule(
+    temporalClient,
+    env.TEMPORAL_TASK_QUEUE,
+    6,
+    72
+  )),
+
+  // @spec INV-BILLING-003 — reclaim orphaned credit reservations every
+  // 10 minutes. Default max age is 7200s (2 hours), overridable via
+  // `RESERVATION_RECLAIM_MAX_AGE_SECONDS`.
+  scheduleStep('release-stale-reservations-schedule', () => ensureReleaseStaleReservationsSchedule(
+    temporalClient,
+    env.TEMPORAL_TASK_QUEUE,
+    10,
+    env.RESERVATION_RECLAIM_MAX_AGE_SECONDS
+  )),
+
+  // @spec billing-and-pricing-design §"Auto-recharge retry policy" —
+  // every hour, scan for failed auto-recharge attempts whose
+  // `next_retry_at` has elapsed and re-fire the trigger.
+  scheduleStep('auto-recharge-retry-schedule', () => ensureAutoRechargeRetrySchedule(
+    temporalClient,
+    env.TEMPORAL_TASK_QUEUE,
+    60
+  )),
+
+  // @spec billing-and-pricing-design §"Monthly Storage Reconciliation" —
+  // nightly at 03:00 UTC, walk every org whose storage_usage rollup
+  // has rolled over and charge ongoing overage via
+  // `StorageBillingService.reconcileMonthlyOverage`. Idempotent via the
+  // `reconcile:<orgId>:<monthTag>` ledger reference.
+  scheduleStep('storage-reconcile-schedule', () => ensureStorageReconcileSchedule(
+    temporalClient,
+    env.TEMPORAL_TASK_QUEUE
+  )),
+
+  scheduleStep('email-sends-prune-schedule', () => ensureEmailSendsPruneSchedule(
+    temporalClient,
+    env.EMAIL_CAMPAIGNS_TASK_QUEUE,
+    24,
+    30
+  )),
+
+  // Converge the email_campaigns tables to config-as-code campaign
+  // definitions (slug-keyed upsert) before the sweep schedule starts
+  // claiming due enrollments, so a fresh DB has its lifecycle campaigns.
+  // On a pass where the sync fails the sweep step still runs; the sweep only
+  // claims enrollments that exist, and the sync is retried on the next pass.
+  scheduleStep('campaign-definitions-sync', () => syncCampaignDefinitions()),
+
+  // The drip SWEEP: drains the due-enrollment queue every interval on the
+  // email-campaigns queue (where campaignActivities + dripSweepWorkflow run).
+  scheduleStep('drip-sweep-schedule', () => ensureDripSweepSchedule(
+    temporalClient,
+    env.EMAIL_CAMPAIGNS_TASK_QUEUE,
+    env.DRIP_SWEEP_INTERVAL_MINUTES,
+    env.DRIP_SWEEP_BATCH_SIZE,
+    env.DRIP_SWEEP_MAX_BATCHES
+  )),
+
+  // The daily per-team activity scan runs on the DEFAULT queue (where
+  // scanTeamActivity + lifecycleScanWorkflow are registered).
+  scheduleStep('lifecycle-scan-schedule', () => ensureLifecycleScanSchedule(
+    temporalClient,
+    env.TEMPORAL_TASK_QUEUE,
+    env.LIFECYCLE_SCAN_INTERVAL_HOURS
+  ))
+]
+
+interface BackgroundReconciliation {
+  /** Abort retries, stop the outbox dispatcher, close the schedule client and wait for the task. */
+  readonly stop: () => Promise<void>
+}
+
+/**
+ * Work that needs Temporal (or the database) but must never block or stop the
+ * workers: the schedule client connection, the outbox dispatcher (which needs
+ * that client), schedule reconciliation and the campaign definition sync.
+ * Everything retries with backoff until it succeeds or the worker shuts down.
+ *
+ * Without this, a schedule describe that timed out with DEADLINE_EXCEEDED
+ * while Temporal was overloaded crashed the boot, so the container
+ * restart-looped (and raised a Sentry issue each time) instead of polling.
+ */
+const startBackgroundReconciliation = (input: {
+  readonly env: WorkerEnv
+  readonly connectScheduleClient: () => Promise<Connection>
+}): BackgroundReconciliation => {
+  const { env } = input
+  const controller = new AbortController()
+  const { signal } = controller
+  let clientConnection: Connection | undefined
+  let outboxDispatcher: OutboxDispatcherHandle | null = null
+
+  const retryOptions = {
+    policy: BACKGROUND_RECONCILE_RETRY.policy,
+    escalateAfterMs: BACKGROUND_RECONCILE_RETRY.escalateAfterMs,
+    // One Sentry event when a failure has lasted long enough to need a human,
+    // not one per retry.
+    onEscalate: captureWorkerException,
+    signal,
+    logger
+  }
+
+  const runInBackground = async (label: string, task: () => Promise<void>): Promise<void> => {
+    try {
+      await task()
+    } catch (error: unknown) {
+      if (error instanceof RetryAbortedError) {
+        logger.info(`${label} stopped because the worker is shutting down.`)
+        return
+      }
+      // Retries here have no time limit, so this is a programming error, not an outage.
+      captureWorkerException(error)
+      logger.error(`${label} stopped unexpectedly.`, { error: toErrorLogContext(error) })
+    }
+  }
+
+  const scheduleReconciliation = env.WORKER_ENABLE_SCHEDULES
+    ? runInBackground('Temporal schedule reconciliation', async () => {
+        const connection = await retryWithBackoff(
+          () => input.connectScheduleClient(),
+          { ...retryOptions, label: 'Temporal schedule client connection' }
+        )
+        if (signal.aborted) {
+          await connection.close()
+          throw new RetryAbortedError('Temporal schedule client connection')
+        }
+        clientConnection = connection
+
+        const temporalClient = new Client({
+          connection,
+          namespace: env.TEMPORAL_NAMESPACE
+        })
+
+        // The outbox dispatcher is the live data path, so it starts as soon as
+        // a client exists rather than waiting for every schedule to reconcile.
+        outboxDispatcher = startOutboxDispatcher({
+          client: temporalClient,
+          defaultTaskQueue: env.TEMPORAL_TASK_QUEUE,
+          emailCampaignsTaskQueue: env.EMAIL_CAMPAIGNS_TASK_QUEUE,
+          batchSize: env.OUTBOX_POLL_BATCH_SIZE,
+          backstopIntervalSeconds: env.OUTBOX_BACKSTOP_INTERVAL_SECONDS,
+          listenerDatabaseUrl: env.OUTBOX_LISTENER_DATABASE_URL
+        })
+
+        const steps = buildScheduleReconcileSteps(temporalClient, env)
+        await reconcileUntilComplete(steps, { ...retryOptions, label: 'Temporal schedule reconciliation' })
+        logger.info('Temporal schedule reconciliation complete.', { steps: steps.length })
+      })
+    : (() => {
+        logger.info('Temporal schedule reconciliation skipped.', {
+          nodeEnv: env.NODE_ENV
+        })
+        return Promise.resolve()
+      })()
+
+  return {
+    stop: async () => {
+      controller.abort()
+      try {
+        await outboxDispatcher?.stop()
+      } finally {
+        // Closing the client also fails any schedule call still in flight, so
+        // the background task settles promptly.
+        await clientConnection?.close()
+        await scheduleReconciliation
+      }
+    }
+  }
+}
+
+const describeWorkerStop = (outcome: WorkerRunOutcome): Record<string, unknown> =>
+  outcome.kind === 'failed'
+    ? { taskQueue: outcome.taskQueue, outcome: 'failed', error: toErrorLogContext(outcome.error) }
+    : { taskQueue: outcome.taskQueue, outcome: 'stopped' }
+
 async function run(env: WorkerEnv): Promise<void> {
   const sourceDir = path.dirname(fileURLToPath(import.meta.url))
   const workflowJsPath = path.join(sourceDir, 'workflows.js')
@@ -124,8 +356,6 @@ async function run(env: WorkerEnv): Promise<void> {
   ]
 
   const connOpts = resolveWorkerTemporalConnectionOptions(env)
-
-  const connection = await NativeConnection.connect(connOpts)
   const testPollerOptions = env.NODE_ENV === 'test'
     ? {
         maxConcurrentWorkflowTaskPolls: 1,
@@ -133,9 +363,54 @@ async function run(env: WorkerEnv): Promise<void> {
       }
     : {}
 
+  let tlsConfig: Record<string, unknown> = {}
+  if (typeof connOpts.tls === 'object') {
+    tlsConfig = {
+      tls: {
+        serverNameOverride: connOpts.tls.serverNameOverride,
+        serverRootCACertificate: connOpts.tls.serverRootCACertificate,
+        clientCertPair: connOpts.tls.clientCertPair
+      }
+    }
+  } else if (connOpts.tls === true) {
+    tlsConfig = { tls: true }
+  }
+
+  // One budget for the whole boot: connect, describe the namespace, create
+  // both workers. A Temporal outage is waited out here (see
+  // TEMPORAL_STARTUP_RETRY) instead of crash-looping the container.
+  const startupRetry = {
+    policy: TEMPORAL_STARTUP_RETRY.policy,
+    escalateAfterMs: TEMPORAL_STARTUP_RETRY.escalateAfterMs,
+    maxElapsedMs: TEMPORAL_STARTUP_RETRY.maxElapsedMs,
+    startedAtMs: Date.now(),
+    logger
+  }
+
+  let connection: NativeConnection | undefined
   try {
-    const worker = await Worker.create({
-      connection,
+    // The namespace probe is cheap; Worker.create re-bundles the workflow code
+    // on every attempt, so it only runs once the namespace answers.
+    const nativeConnection = await retryWithBackoff(async () => {
+      connection ??= await NativeConnection.connect(connOpts)
+      await connection.workflowService.describeNamespace({ namespace: env.TEMPORAL_NAMESPACE })
+      return connection
+    }, { ...startupRetry, label: 'Temporal startup (connect and describe namespace)' })
+
+    // A bundle or configuration error fails the same way every time, so only
+    // Temporal-side failures are retried here.
+    const createWorker = (options: WorkerOptions): Promise<Worker> =>
+      retryWithBackoff(
+        () => Worker.create(options),
+        {
+          ...startupRetry,
+          label: `Temporal worker creation (${options.taskQueue})`,
+          isRetryable: isTransientTemporalError
+        }
+      )
+
+    const worker = await createWorker({
+      connection: nativeConnection,
       namespace: env.TEMPORAL_NAMESPACE,
       taskQueue: env.TEMPORAL_TASK_QUEUE,
       workflowsPath: workflowSourcePath,
@@ -145,8 +420,8 @@ async function run(env: WorkerEnv): Promise<void> {
       ...testPollerOptions
     })
 
-    const emailCampaignWorker = await Worker.create({
-      connection,
+    const emailCampaignWorker = await createWorker({
+      connection: nativeConnection,
       namespace: env.TEMPORAL_NAMESPACE,
       taskQueue: env.EMAIL_CAMPAIGNS_TASK_QUEUE,
       workflowsPath: campaignWorkflowSourcePath,
@@ -156,47 +431,27 @@ async function run(env: WorkerEnv): Promise<void> {
       ...testPollerOptions
     })
 
-    let clientConnection: Connection | undefined
-    let outboxDispatcher: OutboxDispatcherHandle | null = null
-    let tlsConfig: Record<string, unknown> = {}
-    if (typeof connOpts.tls === 'object') {
-      tlsConfig = {
-        tls: {
-          serverNameOverride: connOpts.tls.serverNameOverride,
-          serverRootCACertificate: connOpts.tls.serverRootCACertificate,
-          clientCertPair: connOpts.tls.clientCertPair
-        }
-      }
-    } else if (connOpts.tls === true) {
-      tlsConfig = { tls: true }
+    const workerRuns: ReadonlyArray<SupervisedWorkerRun> = [
+      { taskQueue: env.TEMPORAL_TASK_QUEUE, run: worker.run() },
+      { taskQueue: env.EMAIL_CAMPAIGNS_TASK_QUEUE, run: emailCampaignWorker.run() }
+    ]
+    const shutdownAllWorkers = () => {
+      shutdownWorkerIfRunning(worker, env.TEMPORAL_TASK_QUEUE)
+      shutdownWorkerIfRunning(emailCampaignWorker, env.EMAIL_CAMPAIGNS_TASK_QUEUE)
     }
-    const workerRun = worker.run()
-    const emailCampaignWorkerRun = emailCampaignWorker.run()
-    const workerRuns = Promise.all([
-      workerRun,
-      emailCampaignWorkerRun
-    ])
-    void (async () => {
-      try {
-        await workerRuns
-      } catch {
-        // The rejection is awaited below; attach a handler now to avoid a
-        // transient unhandled-rejection while schedule reconciliation runs.
-      }
-    })()
 
-    let shuttingDown = false
-    let shutdownSignal = 'worker.run completed'
+    let shutdownSignal: string | null = null
+    // Read through a function: the signal handlers set `shutdownSignal` during
+    // the awaits below, which control-flow narrowing cannot see.
+    const requestedShutdownSignal = (): string | null => shutdownSignal
     const requestShutdown = (signal: string) => {
-      if (shuttingDown) {
+      if (shutdownSignal !== null) {
         return
       }
 
-      shuttingDown = true
       shutdownSignal = signal
       logger.info('Stopping Temporal workers.', { signal })
-      shutdownWorkerIfRunning(worker, env.TEMPORAL_TASK_QUEUE)
-      shutdownWorkerIfRunning(emailCampaignWorker, env.EMAIL_CAMPAIGNS_TASK_QUEUE)
+      shutdownAllWorkers()
     }
 
     const onSigint = () => {
@@ -217,8 +472,9 @@ async function run(env: WorkerEnv): Promise<void> {
       emailCampaignsTaskQueue: env.EMAIL_CAMPAIGNS_TASK_QUEUE
     })
 
-    try {
-      clientConnection = await Connection.connect({
+    const background = startBackgroundReconciliation({
+      env,
+      connectScheduleClient: () => Connection.connect({
         address: connOpts.address,
         ...tlsConfig,
         ...(connOpts.apiKey
@@ -228,129 +484,47 @@ async function run(env: WorkerEnv): Promise<void> {
             }
           : {})
       })
+    })
 
-      const temporalClient = new Client({
-        connection: clientConnection,
-        namespace: env.TEMPORAL_NAMESPACE
+    try {
+      // The process is healthy only while BOTH workers poll. The first one to
+      // stop, for whatever reason, ends the run loop.
+      const firstStop = await firstWorkerToStop(workerRuns)
+      armExitBackstop()
+      if (requestedShutdownSignal() === null) {
+        logger.warn('A Temporal worker stopped without a shutdown request; stopping the other worker so the process can be restarted.', describeWorkerStop(firstStop))
+      }
+      shutdownAllWorkers()
+
+      const outcomes = await settleWorkerRuns(workerRuns)
+      logger.info('Temporal workers stopped.', {
+        signal: requestedShutdownSignal() ?? 'none',
+        workers: outcomes.map(describeWorkerStop)
       })
 
-      if (env.WORKER_ENABLE_SCHEDULES) {
-        // The outbox is drained by the event-driven dispatcher (Postgres NOTIFY
-        // + backstop sweep), not a 5s poller schedule. Reap the legacy schedule
-        // if a prior deploy left it behind, then start the listener loop.
-        await deleteOutboxPollerScheduleIfExists(temporalClient)
-
-        outboxDispatcher = startOutboxDispatcher({
-          client: temporalClient,
-          defaultTaskQueue: env.TEMPORAL_TASK_QUEUE,
-          emailCampaignsTaskQueue: env.EMAIL_CAMPAIGNS_TASK_QUEUE,
-          batchSize: env.OUTBOX_POLL_BATCH_SIZE,
-          backstopIntervalSeconds: env.OUTBOX_BACKSTOP_INTERVAL_SECONDS,
-          listenerDatabaseUrl: env.OUTBOX_LISTENER_DATABASE_URL
-        })
-
-        await ensureStuckEventsResetSchedule(
-          temporalClient,
-          env.TEMPORAL_TASK_QUEUE,
-          120,
-          env.OUTBOX_STUCK_THRESHOLD_MINUTES
-        )
-
-        await ensurePrunePublishedSchedule(
-          temporalClient,
-          env.TEMPORAL_TASK_QUEUE,
-          24,
-          env.OUTBOX_PRUNE_RETENTION_DAYS
-        )
-
-        await ensureRetentionCleanerSchedule(
-          temporalClient,
-          env.TEMPORAL_TASK_QUEUE,
-          6,
-          72
-        )
-
-        // @spec INV-BILLING-003 — reclaim orphaned credit reservations every
-        // 10 minutes. Default max age is 7200s (2 hours), overridable via
-        // `RESERVATION_RECLAIM_MAX_AGE_SECONDS`.
-        await ensureReleaseStaleReservationsSchedule(
-          temporalClient,
-          env.TEMPORAL_TASK_QUEUE,
-          10,
-          env.RESERVATION_RECLAIM_MAX_AGE_SECONDS
-        )
-
-        // @spec billing-and-pricing-design §"Auto-recharge retry policy" —
-        // every hour, scan for failed auto-recharge attempts whose
-        // `next_retry_at` has elapsed and re-fire the trigger.
-        await ensureAutoRechargeRetrySchedule(
-          temporalClient,
-          env.TEMPORAL_TASK_QUEUE,
-          60
-        )
-
-        // @spec billing-and-pricing-design §"Monthly Storage Reconciliation" —
-        // nightly at 03:00 UTC, walk every org whose storage_usage rollup
-        // has rolled over and charge ongoing overage via
-        // `StorageBillingService.reconcileMonthlyOverage`. Idempotent via the
-        // `reconcile:<orgId>:<monthTag>` ledger reference.
-        await ensureStorageReconcileSchedule(
-          temporalClient,
-          env.TEMPORAL_TASK_QUEUE
-        )
-
-        await ensureEmailSendsPruneSchedule(
-          temporalClient,
-          env.EMAIL_CAMPAIGNS_TASK_QUEUE,
-          24,
-          30
-        )
-
-        // Converge the email_campaigns tables to config-as-code campaign
-        // definitions (slug-keyed upsert) before the sweep schedule starts
-        // claiming due enrollments, so a fresh DB has its lifecycle campaigns.
-        await syncCampaignDefinitions()
-
-        // The drip SWEEP: drains the due-enrollment queue every interval on the
-        // email-campaigns queue (where campaignActivities + dripSweepWorkflow run).
-        await ensureDripSweepSchedule(
-          temporalClient,
-          env.EMAIL_CAMPAIGNS_TASK_QUEUE,
-          env.DRIP_SWEEP_INTERVAL_MINUTES,
-          env.DRIP_SWEEP_BATCH_SIZE,
-          env.DRIP_SWEEP_MAX_BATCHES
-        )
-
-        // The daily per-team activity scan runs on the DEFAULT queue (where
-        // scanTeamActivity + lifecycleScanWorkflow are registered).
-        await ensureLifecycleScanSchedule(
-          temporalClient,
-          env.TEMPORAL_TASK_QUEUE,
-          env.LIFECYCLE_SCAN_INTERVAL_HOURS
-        )
-      } else {
-        logger.info('Temporal schedule reconciliation skipped.', {
-          nodeEnv: env.NODE_ENV
-        })
+      if (resolveWorkerExitCode(outcomes, requestedShutdownSignal() !== null) !== 0) {
+        const failure = firstStop.kind === 'failed'
+          ? firstStop
+          : outcomes.find((outcome) => outcome.kind === 'failed')
+        if (failure?.kind === 'failed') {
+          throw failure.error
+        }
+        throw new Error(`Temporal worker for task queue ${firstStop.taskQueue} stopped without a shutdown request.`)
       }
-
-      await workerRuns
-      logger.info('Temporal workers stopped.', { signal: shutdownSignal })
     } finally {
       process.off('SIGINT', onSigint)
       process.off('SIGTERM', onSigterm)
-      await outboxDispatcher?.stop()
-      shutdownWorkerIfRunning(worker, env.TEMPORAL_TASK_QUEUE)
-      shutdownWorkerIfRunning(emailCampaignWorker, env.EMAIL_CAMPAIGNS_TASK_QUEUE)
-      await Promise.allSettled([
-        workerRun,
-        emailCampaignWorkerRun
-      ])
-      await clientConnection?.close()
+      await background.stop()
+      shutdownAllWorkers()
+      await Promise.allSettled(workerRuns.map(({ run: workerRun }) => workerRun))
     }
   } finally {
+    // From here the process is on its way out: make sure cleanup that hangs
+    // (for example closing a connection to an unreachable server) cannot keep
+    // it alive.
+    armExitBackstop()
     try {
-      await connection.close()
+      await connection?.close()
     } finally {
       await Promise.all([
         stopTelemetry(),
@@ -358,6 +532,34 @@ async function run(env: WorkerEnv): Promise<void> {
       ])
     }
   }
+}
+
+/**
+ * Once the run loop has ended the process must actually exit, even if cleanup
+ * hangs (a worker that logged it had stopped but stayed alive with nothing
+ * polling would never be restarted by Docker).
+ */
+let exitBackstop: ReturnType<typeof setTimeout> | undefined
+
+const armExitBackstop = (): void => {
+  if (exitBackstop !== undefined) {
+    return
+  }
+  exitBackstop = setTimeout(() => {
+    logger.error('Temporal worker shutdown did not finish in time; forcing exit.', {
+      timeoutMs: WORKER_EXIT_BACKSTOP_MS
+    })
+    process.exit(1)
+  }, WORKER_EXIT_BACKSTOP_MS)
+  exitBackstop.unref()
+}
+
+const exitWorkerProcess = (code: number): void => {
+  if (exitBackstop !== undefined) {
+    clearTimeout(exitBackstop)
+    exitBackstop = undefined
+  }
+  process.exit(code)
 }
 
 // Last-resort handler for genuinely unexpected process-level faults. We do NOT
@@ -420,9 +622,11 @@ const runWorker = async (): Promise<void> => {
     handleFatalError(error, 'Uncaught exception in worker')
   })
 
+  let exitCode = 0
   try {
     await run(env)
   } catch (error) {
+    armExitBackstop()
     captureWorkerException(error)
     logger.error('Temporal worker stopped due to an unhandled error.', {
       error:
@@ -436,9 +640,18 @@ const runWorker = async (): Promise<void> => {
               message: String(error)
             }
     })
+    exitCode = 1
     process.exitCode = 1
   } finally {
-    await flushWorkerSentry()
+    armExitBackstop()
+    try {
+      await flushWorkerSentry()
+    } finally {
+      // Exit explicitly: native Temporal handles or telemetry exporters can
+      // keep the event loop alive after every worker has stopped, which leaves
+      // a process that looks "Up" to Docker but polls nothing.
+      exitWorkerProcess(exitCode)
+    }
   }
 }
 
