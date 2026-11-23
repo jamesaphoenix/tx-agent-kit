@@ -140,7 +140,11 @@ jobs:
 
   e2e:
     name: Web E2E (browser)
-    runs-on: ubuntu-latest
+    # Pinned: `ubuntu-latest` moved to Ubuntu 26.04, which Playwright 1.60 does not
+    # support for Chromium ("Playwright does not support chromium on ubuntu26.04-x64"),
+    # so `playwright install --with-deps chromium` fails before any test runs.
+    # Bump this label only after confirming the Playwright release supports it.
+    runs-on: ubuntu-24.04
     # The Playwright TEST RUN is hard-capped at 120s by globalTimeout in
     # apps/web/e2e/playwright.config.ts AND by the portable process-kill wrapper
     # in the test:e2e script. The production BUILD is a SEPARATE prerequisite
