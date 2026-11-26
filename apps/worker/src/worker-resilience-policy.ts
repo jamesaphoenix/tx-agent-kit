@@ -46,6 +46,13 @@ export const BACKGROUND_RECONCILE_RETRY: {
  */
 export const WORKER_EXIT_BACKSTOP_MS = 60 * SECOND_MS
 
+/**
+ * Upper bound on the Sentry flush before the process exits. A flush to an
+ * unreachable endpoint must not keep a failed worker alive (on 22 Nov 2026 a
+ * product worker stayed up for three days after its run loop failed).
+ */
+export const WORKER_EXIT_FLUSH_TIMEOUT_MS = 5 * SECOND_MS
+
 /** gRPC DEADLINE_EXCEEDED, RESOURCE_EXHAUSTED and UNAVAILABLE. */
 const TRANSIENT_GRPC_CODES = new Set([4, 8, 14])
 const TRANSIENT_MESSAGE =

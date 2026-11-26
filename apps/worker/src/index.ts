@@ -45,7 +45,8 @@ import {
   BACKGROUND_RECONCILE_RETRY,
   isTransientTemporalError,
   TEMPORAL_STARTUP_RETRY,
-  WORKER_EXIT_BACKSTOP_MS
+  WORKER_EXIT_BACKSTOP_MS,
+  WORKER_EXIT_FLUSH_TIMEOUT_MS
 } from './worker-resilience-policy.js'
 import {
   firstWorkerToStop,
@@ -644,14 +645,40 @@ const runWorker = async (): Promise<void> => {
     process.exitCode = 1
   } finally {
     armExitBackstop()
+    await flushBeforeExit(WORKER_EXIT_FLUSH_TIMEOUT_MS)
+    // Exit explicitly: native Temporal handles or telemetry exporters can
+    // keep the event loop alive after every worker has stopped, which leaves
+    // a process that looks "Up" to Docker but polls nothing. Setting
+    // process.exitCode alone is not enough.
+    exitWorkerProcess(exitCode)
+  }
+}
+
+/**
+ * Flush Sentry before exiting, bounded by `timeoutMs`. A flush that rejects or
+ * never settles (an unreachable endpoint) is logged and abandoned rather than
+ * allowed to hold the exit.
+ */
+const flushBeforeExit = async (timeoutMs: number): Promise<void> => {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const flushed = (async (): Promise<true> => {
     try {
       await flushWorkerSentry()
-    } finally {
-      // Exit explicitly: native Temporal handles or telemetry exporters can
-      // keep the event loop alive after every worker has stopped, which leaves
-      // a process that looks "Up" to Docker but polls nothing.
-      exitWorkerProcess(exitCode)
+    } catch {
+      // A failed flush must not stop the exit; Sentry already lost the event.
     }
+    return true
+  })()
+  const timedOut = new Promise<false>((resolve) => {
+    timer = setTimeout(() => { resolve(false) }, timeoutMs)
+    timer.unref()
+  })
+  try {
+    if (!(await Promise.race([flushed, timedOut]))) {
+      logger.warn('Worker exit flush did not finish in time; exiting without waiting for it.', { timeoutMs })
+    }
+  } finally {
+    clearTimeout(timer)
   }
 }
 

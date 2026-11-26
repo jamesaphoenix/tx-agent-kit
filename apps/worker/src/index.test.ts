@@ -193,7 +193,8 @@ vi.mock('./worker-resilience-policy.js', async (importOriginal) => ({
     policy: { initialDelayMs: 1, maxDelayMs: 4, multiplier: 2, jitterRatio: 0 },
     escalateAfterMs: 10_000
   },
-  WORKER_EXIT_BACKSTOP_MS: 10_000
+  WORKER_EXIT_BACKSTOP_MS: 10_000,
+  WORKER_EXIT_FLUSH_TIMEOUT_MS: 50
 }))
 
 vi.mock('./config/env.js', () => ({
@@ -380,6 +381,46 @@ describe('worker survives a Temporal outage', () => {
       { error: objectContaining({ message: stringContaining('could not be described') }) }
     )
     expect(processExitSpy).not.toHaveBeenCalledWith(0)
+  })
+
+  it('exits 1 only after flushing Sentry when a worker run fails with the namespace TransportError', async () => {
+    // The 22 Nov 2026 prod failure: Temporal answered, its database did not.
+    workerRunMock.mockRejectedValueOnce(Object.assign(namespaceUnavailable(), { name: 'TransportError' }))
+
+    await import('./index.js')
+    await waitForExit(1)
+
+    expect(flushWorkerSentryMock).toHaveBeenCalledTimes(1)
+    expect(flushWorkerSentryMock.mock.invocationCallOrder[0]).toBeLessThan(
+      processExitSpy.mock.invocationCallOrder[0] ?? 0
+    )
+    expect(processExitSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('still exits 1 promptly when the Sentry flush never settles', async () => {
+    workerRunMock.mockRejectedValueOnce(namespaceUnavailable())
+    flushWorkerSentryMock.mockImplementationOnce(() => new Promise<undefined>(() => {}))
+
+    await import('./index.js')
+    // The 10s exit backstop is far beyond vi.waitFor's 1s default: exiting
+    // here proves the bounded flush, not the backstop, ended the process.
+    await waitForExit(1)
+
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      'Worker exit flush did not finish in time; exiting without waiting for it.',
+      { timeoutMs: 50 }
+    )
+    expect(processExitSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('still exits 1 when the Sentry flush rejects', async () => {
+    workerRunMock.mockRejectedValueOnce(namespaceUnavailable())
+    flushWorkerSentryMock.mockRejectedValueOnce(new Error('sentry transport closed'))
+
+    await import('./index.js')
+    await waitForExit(1)
+
+    expect(processExitSpy).toHaveBeenCalledTimes(1)
   })
 
   it('exits non-zero when one worker stops on its own while the other is still polling', async () => {
